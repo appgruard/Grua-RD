@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useWebSocket } from '@/lib/websocket';
 import { MapPin, Navigation, DollarSign, Loader2 } from 'lucide-react';
 import type { Servicio, Conductor } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
@@ -29,6 +30,49 @@ export default function DriverDashboard() {
     refetchInterval: 5000,
   });
 
+  const { data: activeService } = useQuery<Servicio | null>({
+    queryKey: ['/api/drivers/active-service'],
+    enabled: !!driverData,
+    refetchInterval: 10000,
+  });
+
+  const { send, connectionId } = useWebSocket(
+    (message) => {
+      if (message.type === 'new_request') {
+        queryClient.invalidateQueries({ queryKey: ['/api/drivers/nearby-requests'] });
+        toast({
+          title: 'Nueva solicitud',
+          description: 'Hay una nueva solicitud de servicio cerca de ti',
+        });
+      }
+    },
+    () => {
+      if (driverData?.disponible && driverData.id) {
+        send({ type: 'register_driver', payload: { driverId: driverData.id } });
+      }
+    }
+  );
+
+  useEffect(() => {
+    if (driverData?.disponible && driverData.id) {
+      send({ type: 'register_driver', payload: { driverId: driverData.id } });
+    }
+  }, [driverData?.disponible, driverData?.id, send, connectionId]);
+
+  useEffect(() => {
+    if (activeService && driverData?.id && currentLocation) {
+      send({
+        type: 'update_location',
+        payload: {
+          servicioId: activeService.id,
+          conductorId: driverData.id,
+          lat: currentLocation.lat,
+          lng: currentLocation.lng,
+        },
+      });
+    }
+  }, [activeService, driverData?.id, currentLocation, send]);
+
   const toggleAvailability = useMutation({
     mutationFn: async (disponible: boolean) => {
       const res = await apiRequest('PUT', '/api/drivers/availability', { disponible });
@@ -40,6 +84,13 @@ export default function DriverDashboard() {
       toast({
         title: driverData?.disponible ? 'Ahora estás inactivo' : 'Ahora estás disponible',
         description: driverData?.disponible ? 'No recibirás nuevas solicitudes' : 'Puedes recibir solicitudes',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo cambiar el estado de disponibilidad',
+        variant: 'destructive',
       });
     },
   });
@@ -55,6 +106,13 @@ export default function DriverDashboard() {
       toast({
         title: 'Servicio aceptado',
         description: 'Dirígete hacia el cliente',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo aceptar el servicio',
+        variant: 'destructive',
       });
     },
   });

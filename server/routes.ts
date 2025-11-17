@@ -334,6 +334,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/drivers/active-service", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const services = await storage.getServiciosByConductorId(req.user!.id);
+      const activeService = services.find(s => s.estado === 'aceptado' || s.estado === 'en_progreso');
+      res.json(activeService || null);
+    } catch (error: any) {
+      console.error('Get active service error:', error);
+      res.status(500).json({ message: "Failed to get active service" });
+    }
+  });
+
   app.post("/api/services/:id/accept", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
       return res.status(401).json({ message: "Not authorized" });
