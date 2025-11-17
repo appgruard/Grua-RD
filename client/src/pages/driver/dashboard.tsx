@@ -6,12 +6,14 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/lib/websocket';
-import { MapPin, Navigation, DollarSign, Loader2 } from 'lucide-react';
-import type { Servicio, Conductor } from '@shared/schema';
+import { ChatBox } from '@/components/chat/ChatBox';
+import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle } from 'lucide-react';
+import type { Servicio, Conductor, ServicioWithDetails } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
 
 export default function DriverDashboard() {
@@ -19,6 +21,7 @@ export default function DriverDashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [currentLocation, setCurrentLocation] = useState<Coordinates>({ lat: 18.4861, lng: -69.9312 });
+  const [chatOpen, setChatOpen] = useState(false);
 
   const { data: driverData } = useQuery<Conductor>({
     queryKey: ['/api/drivers/me'],
@@ -30,7 +33,7 @@ export default function DriverDashboard() {
     refetchInterval: 5000,
   });
 
-  const { data: activeService } = useQuery<Servicio | null>({
+  const { data: activeService } = useQuery<ServicioWithDetails | null>({
     queryKey: ['/api/drivers/active-service'],
     enabled: !!driverData,
     refetchInterval: 10000,
@@ -103,6 +106,7 @@ export default function DriverDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers/nearby-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
       toast({
         title: 'Servicio aceptado',
         description: 'Dirígete hacia el cliente',
@@ -112,6 +116,50 @@ export default function DriverDashboard() {
       toast({
         title: 'Error',
         description: 'No se pudo aceptar el servicio',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const startService = useMutation({
+    mutationFn: async (serviceId: string) => {
+      const res = await apiRequest('POST', `/api/services/${serviceId}/start`, {});
+      if (!res.ok) throw new Error('Failed to start service');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
+      toast({
+        title: 'Servicio iniciado',
+        description: 'El servicio está en progreso',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo iniciar el servicio',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const completeService = useMutation({
+    mutationFn: async (serviceId: string) => {
+      const res = await apiRequest('POST', `/api/services/${serviceId}/complete`, {});
+      if (!res.ok) throw new Error('Failed to complete service');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
+      toast({
+        title: 'Servicio completado',
+        description: 'El servicio ha sido marcado como completado',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo completar el servicio',
         variant: 'destructive',
       });
     },
@@ -174,7 +222,98 @@ export default function DriverDashboard() {
         </Card>
       </div>
 
-      {driverData?.disponible && nearbyRequests && nearbyRequests.length > 0 && (
+      {activeService ? (
+        <div className="absolute bottom-4 left-4 right-4">
+          <Card className="p-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Servicio Activo</h3>
+                <Badge variant="default">{activeService.estado}</Badge>
+              </div>
+
+              {activeService.cliente && (
+                <div className="flex items-center justify-between pb-2 border-b">
+                  <div>
+                    <p className="text-sm font-medium">Cliente</p>
+                    <p className="text-sm text-muted-foreground">
+                      {activeService.cliente.nombre} {activeService.cliente.apellido}
+                    </p>
+                  </div>
+                  <Button 
+                    size="icon" 
+                    variant="outline"
+                    onClick={() => setChatOpen(true)}
+                    data-testid="button-chat-client"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-4 h-4 text-green-600 mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Origen</p>
+                    <p className="text-sm truncate">{activeService.origenDireccion}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Navigation className="w-4 h-4 text-destructive mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Destino</p>
+                    <p className="text-sm truncate">{activeService.destinoDireccion}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-bold">
+                    RD$ {parseFloat(activeService.costoTotal as string).toFixed(2)}
+                  </span>
+                </div>
+                <Badge variant="secondary">
+                  {parseFloat(activeService.distanciaKm as string).toFixed(1)} km
+                </Badge>
+              </div>
+
+              {activeService.estado === 'aceptado' && (
+                <Button 
+                  className="w-full" 
+                  onClick={() => startService.mutate(activeService.id)}
+                  disabled={startService.isPending}
+                  data-testid="button-start-service"
+                >
+                  {startService.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Play className="w-4 h-4 mr-2" />
+                  )}
+                  Iniciar Servicio
+                </Button>
+              )}
+
+              {activeService.estado === 'en_progreso' && (
+                <Button 
+                  className="w-full" 
+                  onClick={() => completeService.mutate(activeService.id)}
+                  disabled={completeService.isPending}
+                  data-testid="button-complete-service"
+                >
+                  {completeService.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                  )}
+                  Completar Servicio
+                </Button>
+              )}
+            </div>
+          </Card>
+        </div>
+      ) : driverData?.disponible && nearbyRequests && nearbyRequests.length > 0 ? (
         <div className="absolute bottom-4 left-4 right-4 max-h-80 overflow-y-auto space-y-3">
           <h3 className="text-sm font-semibold text-white bg-black/50 backdrop-blur-sm p-2 rounded-lg">
             Solicitudes Cercanas ({nearbyRequests.length})
@@ -238,7 +377,26 @@ export default function DriverDashboard() {
             </Card>
           ))}
         </div>
-      )}
+      ) : null}
+
+      <Drawer open={chatOpen} onOpenChange={setChatOpen}>
+        <DrawerContent className="h-[80vh]">
+          <DrawerHeader>
+            <DrawerTitle>Chat con el Cliente</DrawerTitle>
+          </DrawerHeader>
+          <div className="flex-1 overflow-hidden px-4 pb-4">
+            {user && activeService && (
+              <ChatBox
+                servicioId={activeService.id}
+                currentUserId={user.id}
+                currentUserNombre={user.nombre}
+                currentUserApellido={user.apellido}
+                otherUserName={activeService.cliente ? `${activeService.cliente.nombre} ${activeService.cliente.apellido}` : 'Cliente'}
+              />
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

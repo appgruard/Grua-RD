@@ -5,9 +5,12 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Phone, MessageCircle, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/websocket';
+import { useAuth } from '@/lib/auth';
+import { ChatBox } from '@/components/chat/ChatBox';
 import type { ServicioWithDetails } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
 
@@ -15,6 +18,8 @@ export default function ClientTracking() {
   const [, params] = useRoute('/client/tracking/:id');
   const serviceId = params?.id;
   const [driverLocation, setDriverLocation] = useState<Coordinates | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const { user } = useAuth();
 
   const { data: service, isLoading } = useQuery<ServicioWithDetails>({
     queryKey: ['/api/services', serviceId],
@@ -91,7 +96,12 @@ export default function ClientTracking() {
                 <Button size="icon" variant="outline" data-testid="button-call">
                   <Phone className="w-4 h-4" />
                 </Button>
-                <Button size="icon" variant="outline" data-testid="button-message">
+                <Button 
+                  size="icon" 
+                  variant="outline" 
+                  data-testid="button-message"
+                  onClick={() => setChatOpen(true)}
+                >
                   <MessageCircle className="w-4 h-4" />
                 </Button>
               </div>
@@ -129,6 +139,25 @@ export default function ClientTracking() {
           </Card>
         </div>
       )}
+
+      <Drawer open={chatOpen} onOpenChange={setChatOpen}>
+        <DrawerContent className="h-[80vh]">
+          <DrawerHeader>
+            <DrawerTitle>Chat con el Conductor</DrawerTitle>
+          </DrawerHeader>
+          <div className="flex-1 overflow-hidden px-4 pb-4">
+            {user && service && (
+              <ChatBox
+                servicioId={serviceId!}
+                currentUserId={user.id}
+                currentUserNombre={user.nombre}
+                currentUserApellido={user.apellido}
+                otherUserName={service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Conductor'}
+              />
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }
