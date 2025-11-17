@@ -32,11 +32,10 @@ export function ChatBox({
 }: ChatBoxProps) {
   const [mensaje, setMensaje] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { sendMessage } = useWebSocket();
 
   const { data: mensajes = [], isLoading } = useQuery<MensajeChatConRemitente[]>({
     queryKey: ['/api/chat', servicioId],
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
 
   const sendMutation = useMutation({
@@ -81,20 +80,6 @@ export function ChatBox({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!mensaje.trim()) return;
-
-    sendMessage({
-      type: 'send_message',
-      payload: {
-        servicioId,
-        remitenteId: currentUserId,
-        contenido: mensaje.trim(),
-        remitente: {
-          id: currentUserId,
-          nombre: currentUserNombre,
-          apellido: currentUserApellido,
-        },
-      },
-    });
 
     sendMutation.mutate(mensaje.trim());
   };

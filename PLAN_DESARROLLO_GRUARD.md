@@ -28,9 +28,19 @@
 - [ ] Tests WebSocket (requiere backend más robusto)
 - [ ] Validaciones y mejoras de UX
 
+### 🚀 Fase 3 - Integraciones Avanzadas - EN PROGRESO
+- [x] Chat en tiempo real entre Cliente y Conductor
+  - [x] Tabla `mensajes_chat` en base de datos
+  - [x] API endpoints para envío y lectura de mensajes
+  - [x] WebSocket events para mensajes en tiempo real
+  - [x] Componente ChatBox reutilizable
+  - [x] Integración en página de tracking del cliente
+  - [x] Integración en dashboard del conductor
+- [ ] Notificaciones Push (FCM)
+- [ ] Geofencing para zonas de servicio
+
 ### ⏳ Pendiente
 - [ ] Stripe API Keys (STRIPE_SECRET_KEY, VITE_STRIPE_PUBLIC_KEY)
-- [ ] Fase 3 - Integraciones Avanzadas
 - [ ] Fase 4 - Producción
 
 ---
@@ -199,6 +209,18 @@ shared/
 }
 ```
 
+#### 7. **mensajes_chat** (chat en tiempo real)
+```typescript
+{
+  id: uuid (PK)
+  servicio_id: uuid (FK -> servicios)
+  remitente_id: uuid (FK -> users)
+  contenido: text
+  leido: boolean (default: false)
+  created_at: timestamp
+}
+```
+
 ---
 
 ## 🔌 API Endpoints (Backend)
@@ -248,6 +270,11 @@ shared/
 - `POST /api/maps/calculate-route` - Calcular distancia/duración
 - `POST /api/maps/geocode` - Convertir dirección a coordenadas
 
+### Chat
+- `GET /api/chat/:servicioId` - Obtener mensajes de un servicio
+- `POST /api/chat/send` - Enviar mensaje
+- `POST /api/chat/:servicioId/mark-read` - Marcar mensajes como leídos
+
 ---
 
 ## 🔄 WebSocket Events (Tracking en Tiempo Real)
@@ -272,6 +299,11 @@ shared/
 ### Servidor → Admin
 - `all_active_drivers` - Ubicaciones de todos los conductores activos
 - `driver_status_change` - Cambio de disponibilidad de conductor
+
+### Chat (Cliente ↔ Conductor)
+- `send_message` - Enviar mensaje de chat
+- `new_message` - Notificación de nuevo mensaje
+- `message_read` - Mensaje marcado como leído
 
 ---
 

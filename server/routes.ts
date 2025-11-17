@@ -124,31 +124,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const { driverId } = message.payload;
             driverSessions.set(driverId, ws);
             break;
-
-          case 'send_message':
-            const { servicioId: chatServiceId, remitenteId, contenido, remitente } = message.payload;
-            
-            const nuevoMensaje = await storage.createMensajeChat({
-              servicioId: chatServiceId,
-              remitenteId,
-              contenido,
-            });
-
-            if (serviceSessions.has(chatServiceId)) {
-              const broadcast = JSON.stringify({
-                type: 'new_message',
-                payload: {
-                  ...nuevoMensaje,
-                  remitente,
-                },
-              });
-              serviceSessions.get(chatServiceId)!.forEach((client) => {
-                if (client.readyState === WebSocket.OPEN) {
-                  client.send(broadcast);
-                }
-              });
-            }
-            break;
         }
       } catch (error) {
         console.error('WebSocket message error:', error);
@@ -441,6 +416,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      const servicioId = req.body.servicioId;
+      
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (servicio.clienteId !== req.user!.id && servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to send messages in this service" });
+      }
+
       const validatedData = insertMensajeChatSchema.parse({
         servicioId: req.body.servicioId,
         remitenteId: req.user!.id,
@@ -448,26 +434,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const mensaje = await storage.createMensajeChat(validatedData);
-      
-      if (serviceSessions.has(validatedData.servicioId)) {
-        const broadcast = JSON.stringify({
-          type: 'new_message',
-          payload: {
-            ...mensaje,
-            remitente: {
-              id: req.user!.id,
-              nombre: req.user!.nombre,
-              apellido: req.user!.apellido,
-            },
-          },
-        });
-        serviceSessions.get(validatedData.servicioId)!.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(broadcast);
-          }
-        });
-      }
-
       res.json(mensaje);
     } catch (error: any) {
       console.error('Send message error:', error);
@@ -481,6 +447,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      const servicio = await storage.getServicioById(req.params.servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (servicio.clienteId !== req.user!.id && servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to view messages in this service" });
+      }
+
       const mensajes = await storage.getMensajesByServicioId(req.params.servicioId);
       res.json(mensajes);
     } catch (error: any) {
@@ -495,6 +470,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      const servicio = await storage.getServicioById(req.params.servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (servicio.clienteId !== req.user!.id && servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to mark messages as read in this service" });
+      }
+
       await storage.marcarMensajesComoLeidos(req.params.servicioId, req.user!.id);
       res.json({ success: true });
     } catch (error: any) {

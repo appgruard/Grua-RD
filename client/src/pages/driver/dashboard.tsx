@@ -62,6 +62,7 @@ export default function DriverDashboard() {
     }
   }, [driverData?.disponible, driverData?.id, send, connectionId]);
 
+
   useEffect(() => {
     if (activeService && driverData?.id && currentLocation) {
       send({
