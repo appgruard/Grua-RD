@@ -6,7 +6,7 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema } from "@shared/schema";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -123,6 +123,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           case 'register_driver':
             const { driverId } = message.payload;
             driverSessions.set(driverId, ws);
+            break;
+
+          case 'send_message':
+            const { servicioId: chatServiceId, remitenteId, contenido, remitente } = message.payload;
+            
+            const nuevoMensaje = await storage.createMensajeChat({
+              servicioId: chatServiceId,
+              remitenteId,
+              contenido,
+            });
+
+            if (serviceSessions.has(chatServiceId)) {
+              const broadcast = JSON.stringify({
+                type: 'new_message',
+                payload: {
+                  ...nuevoMensaje,
+                  remitente,
+                },
+              });
+              serviceSessions.get(chatServiceId)!.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN) {
+                  client.send(broadcast);
+                }
+              });
+            }
             break;
         }
       } catch (error) {
@@ -407,6 +432,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Complete service error:', error);
       res.status(500).json({ message: "Failed to complete service" });
+    }
+  });
+
+  app.post("/api/chat/send", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const validatedData = insertMensajeChatSchema.parse({
+        servicioId: req.body.servicioId,
+        remitenteId: req.user!.id,
+        contenido: req.body.contenido,
+      });
+
+      const mensaje = await storage.createMensajeChat(validatedData);
+      
+      if (serviceSessions.has(validatedData.servicioId)) {
+        const broadcast = JSON.stringify({
+          type: 'new_message',
+          payload: {
+            ...mensaje,
+            remitente: {
+              id: req.user!.id,
+              nombre: req.user!.nombre,
+              apellido: req.user!.apellido,
+            },
+          },
+        });
+        serviceSessions.get(validatedData.servicioId)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
+
+      res.json(mensaje);
+    } catch (error: any) {
+      console.error('Send message error:', error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/chat/:servicioId", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const mensajes = await storage.getMensajesByServicioId(req.params.servicioId);
+      res.json(mensajes);
+    } catch (error: any) {
+      console.error('Get messages error:', error);
+      res.status(500).json({ message: "Failed to get messages" });
+    }
+  });
+
+  app.post("/api/chat/:servicioId/mark-read", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      await storage.marcarMensajesComoLeidos(req.params.servicioId, req.user!.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Mark messages read error:', error);
+      res.status(500).json({ message: "Failed to mark messages as read" });
     }
   });
 
