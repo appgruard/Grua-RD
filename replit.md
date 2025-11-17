@@ -245,12 +245,17 @@ GruaRD es una Progressive Web App (PWA) tipo Uber para servicios de grúa en Rep
 - [x] Google Maps integration
 - [x] PWA configuration
 
-### Fase 2: Testing & Refinamiento
-- [ ] End-to-end testing con Playwright
-- [ ] Validar flujos completos (solicitud → tracking → completado)
-- [ ] Probar WebSocket en diferentes escenarios
-- [ ] Mejorar manejo de errores y loading states
-- [ ] Agregar toasts informativos
+### Fase 2: Testing & Refinamiento 🔄 EN PROGRESO
+- [x] Playwright instalado y configurado (playwright.config.ts)
+- [x] Tests E2E para Cliente - 7 tests (registro, login, solicitud, historial, perfil, validaciones)
+- [x] Tests E2E para Conductor - 7 tests (registro con grúa, disponibilidad, solicitudes, perfil)
+- [x] Tests E2E para Admin - 9 tests (dashboard, usuarios, conductores, servicios, tarifas, monitoreo)
+- [x] Tests de integración completos - 4 tests (flujo E2E, monitoreo admin, cancelaciones)
+- [x] Helpers con generación de IDs únicos (compatible con cualquier versión de Node)
+- [x] Documentación completa (e2e/README.md con guía de uso, comandos, debugging)
+- [ ] Tests WebSocket en tiempo real (requiere backend más robusto para testing determinístico)
+- [ ] Validaciones adicionales de UX
+- [x] Sistema de toasts ya implementado en toda la aplicación
 
 ### Fase 3: Integraciones Avanzadas
 - [ ] Configurar Stripe para pagos reales
