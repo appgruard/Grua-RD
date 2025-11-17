@@ -108,6 +108,16 @@ export const ubicacionesTracking = pgTable("ubicaciones_tracking", {
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
 
+// Mensajes Chat Table (for real-time chat between client and driver)
+export const mensajesChat = pgTable("mensajes_chat", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  servicioId: varchar("servicio_id").notNull().references(() => servicios.id, { onDelete: "cascade" }),
+  remitenteId: varchar("remitente_id").notNull().references(() => users.id),
+  contenido: text("contenido").notNull(),
+  leido: boolean("leido").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   conductor: one(conductores, {
@@ -140,6 +150,7 @@ export const serviciosRelations = relations(servicios, ({ one, many }) => ({
   }),
   calificacion: one(calificaciones),
   ubicacionesTracking: many(ubicacionesTracking),
+  mensajesChat: many(mensajesChat),
 }));
 
 export const calificacionesRelations = relations(calificaciones, ({ one }) => ({
@@ -157,6 +168,17 @@ export const ubicacionesTrackingRelations = relations(ubicacionesTracking, ({ on
   conductor: one(conductores, {
     fields: [ubicacionesTracking.conductorId],
     references: [conductores.id],
+  }),
+}));
+
+export const mensajesChatRelations = relations(mensajesChat, ({ one }) => ({
+  servicio: one(servicios, {
+    fields: [mensajesChat.servicioId],
+    references: [servicios.id],
+  }),
+  remitente: one(users, {
+    fields: [mensajesChat.remitenteId],
+    references: [users.id],
   }),
 }));
 
@@ -216,6 +238,14 @@ export const insertUbicacionTrackingSchema = createInsertSchema(ubicacionesTrack
   timestamp: true,
 });
 
+export const insertMensajeChatSchema = createInsertSchema(mensajesChat, {
+  contenido: z.string().min(1).max(1000),
+}).omit({
+  id: true,
+  createdAt: true,
+  leido: true,
+});
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -223,6 +253,7 @@ export const selectServicioSchema = createSelectSchema(servicios);
 export const selectTarifaSchema = createSelectSchema(tarifas);
 export const selectCalificacionSchema = createSelectSchema(calificaciones);
 export const selectUbicacionTrackingSchema = createSelectSchema(ubicacionesTracking);
+export const selectMensajeChatSchema = createSelectSchema(mensajesChat);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -243,6 +274,9 @@ export type Calificacion = typeof calificaciones.$inferSelect;
 export type InsertUbicacionTracking = z.infer<typeof insertUbicacionTrackingSchema>;
 export type UbicacionTracking = typeof ubicacionesTracking.$inferSelect;
 
+export type InsertMensajeChat = z.infer<typeof insertMensajeChatSchema>;
+export type MensajeChat = typeof mensajesChat.$inferSelect;
+
 // Helper types for API responses
 export type UserWithConductor = User & {
   conductor?: Conductor;
@@ -252,4 +286,8 @@ export type ServicioWithDetails = Servicio & {
   cliente?: User;
   conductor?: User;
   calificacion?: Calificacion;
+};
+
+export type MensajeChatWithRemitente = MensajeChat & {
+  remitente?: User;
 };

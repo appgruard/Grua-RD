@@ -7,6 +7,7 @@ import {
   tarifas,
   calificaciones,
   ubicacionesTracking,
+  mensajesChat,
   type User,
   type InsertUser,
   type Conductor,
@@ -18,8 +19,11 @@ import {
   type Calificacion,
   type InsertCalificacion,
   type InsertUbicacionTracking,
+  type InsertMensajeChat,
+  type MensajeChat,
   type UserWithConductor,
   type ServicioWithDetails,
+  type MensajeChatWithRemitente,
 } from '@shared/schema';
 
 export interface IStorage {
@@ -62,6 +66,11 @@ export interface IStorage {
   // Ubicaciones Tracking
   createUbicacionTracking(ubicacion: InsertUbicacionTracking): Promise<void>;
   getUbicacionesByServicioId(servicioId: string): Promise<any[]>;
+
+  // Mensajes Chat
+  createMensajeChat(mensaje: InsertMensajeChat): Promise<MensajeChat>;
+  getMensajesByServicioId(servicioId: string): Promise<MensajeChatWithRemitente[]>;
+  marcarMensajesComoLeidos(servicioId: string, userId: string): Promise<void>;
 
   // Dashboard Stats
   getDashboardStats(): Promise<{
@@ -313,6 +322,35 @@ export class DatabaseStorage implements IStorage {
       .from(ubicacionesTracking)
       .where(eq(ubicacionesTracking.servicioId, servicioId))
       .orderBy(desc(ubicacionesTracking.timestamp));
+  }
+
+  // Mensajes Chat
+  async createMensajeChat(insertMensaje: InsertMensajeChat): Promise<MensajeChat> {
+    const [mensaje] = await db.insert(mensajesChat).values(insertMensaje).returning();
+    return mensaje;
+  }
+
+  async getMensajesByServicioId(servicioId: string): Promise<MensajeChatWithRemitente[]> {
+    const results = await db.query.mensajesChat.findMany({
+      where: eq(mensajesChat.servicioId, servicioId),
+      with: {
+        remitente: true,
+      },
+      orderBy: (mensajesChat, { asc }) => [asc(mensajesChat.createdAt)],
+    });
+    return results as any;
+  }
+
+  async marcarMensajesComoLeidos(servicioId: string, userId: string): Promise<void> {
+    await db
+      .update(mensajesChat)
+      .set({ leido: true })
+      .where(
+        and(
+          eq(mensajesChat.servicioId, servicioId),
+          sql`${mensajesChat.remitenteId} != ${userId}`
+        )
+      );
   }
 
   // Dashboard Stats
