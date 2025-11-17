@@ -118,6 +118,17 @@ export const mensajesChat = pgTable("mensajes_chat", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Push Subscriptions Table (for web push notifications)
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dhKey: text("p256dh_key").notNull(),
+  authKey: text("auth_key").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   conductor: one(conductores, {
@@ -178,6 +189,13 @@ export const mensajesChatRelations = relations(mensajesChat, ({ one }) => ({
   }),
   remitente: one(users, {
     fields: [mensajesChat.remitenteId],
+    references: [users.id],
+  }),
+}));
+
+export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [pushSubscriptions.userId],
     references: [users.id],
   }),
 }));
@@ -246,6 +264,15 @@ export const insertMensajeChatSchema = createInsertSchema(mensajesChat, {
   leido: true,
 });
 
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions, {
+  endpoint: z.string().url(),
+  p256dhKey: z.string().min(1),
+  authKey: z.string().min(1),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -254,6 +281,7 @@ export const selectTarifaSchema = createSelectSchema(tarifas);
 export const selectCalificacionSchema = createSelectSchema(calificaciones);
 export const selectUbicacionTrackingSchema = createSelectSchema(ubicacionesTracking);
 export const selectMensajeChatSchema = createSelectSchema(mensajesChat);
+export const selectPushSubscriptionSchema = createSelectSchema(pushSubscriptions);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -276,6 +304,9 @@ export type UbicacionTracking = typeof ubicacionesTracking.$inferSelect;
 
 export type InsertMensajeChat = z.infer<typeof insertMensajeChatSchema>;
 export type MensajeChat = typeof mensajesChat.$inferSelect;
+
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 
 // Helper types for API responses
 export type UserWithConductor = User & {
