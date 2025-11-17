@@ -8,6 +8,7 @@ import {
   calificaciones,
   ubicacionesTracking,
   mensajesChat,
+  pushSubscriptions,
   type User,
   type InsertUser,
   type Conductor,
@@ -21,6 +22,8 @@ import {
   type InsertUbicacionTracking,
   type InsertMensajeChat,
   type MensajeChat,
+  type InsertPushSubscription,
+  type PushSubscription,
   type UserWithConductor,
   type ServicioWithDetails,
   type MensajeChatWithRemitente,
@@ -71,6 +74,12 @@ export interface IStorage {
   createMensajeChat(mensaje: InsertMensajeChat): Promise<MensajeChat>;
   getMensajesByServicioId(servicioId: string): Promise<MensajeChatWithRemitente[]>;
   marcarMensajesComoLeidos(servicioId: string, userId: string): Promise<void>;
+
+  // Push Subscriptions
+  createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
+  getPushSubscriptionsByUserId(userId: string): Promise<PushSubscription[]>;
+  deletePushSubscription(endpoint: string): Promise<void>;
+  deleteUserPushSubscriptions(userId: string): Promise<void>;
 
   // Dashboard Stats
   getDashboardStats(): Promise<{
@@ -351,6 +360,39 @@ export class DatabaseStorage implements IStorage {
           sql`${mensajesChat.remitenteId} != ${userId}`
         )
       );
+  }
+
+  // Push Subscriptions
+  async createPushSubscription(insertSubscription: InsertPushSubscription): Promise<PushSubscription> {
+    const existing = await db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, insertSubscription.endpoint))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(pushSubscriptions)
+        .set(insertSubscription)
+        .where(eq(pushSubscriptions.endpoint, insertSubscription.endpoint))
+        .returning();
+      return updated;
+    }
+
+    const [subscription] = await db.insert(pushSubscriptions).values(insertSubscription).returning();
+    return subscription;
+  }
+
+  async getPushSubscriptionsByUserId(userId: string): Promise<PushSubscription[]> {
+    return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+  }
+
+  async deletePushSubscription(endpoint: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  }
+
+  async deleteUserPushSubscriptions(userId: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
   }
 
   // Dashboard Stats

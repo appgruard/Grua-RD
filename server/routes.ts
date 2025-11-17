@@ -6,7 +6,7 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema } from "@shared/schema";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -484,6 +484,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Mark messages read error:', error);
       res.status(500).json({ message: "Failed to mark messages as read" });
+    }
+  });
+
+  app.post("/api/push/subscribe", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const validatedData = insertPushSubscriptionSchema.parse({
+        userId: req.user!.id,
+        endpoint: req.body.endpoint,
+        p256dhKey: req.body.keys.p256dh,
+        authKey: req.body.keys.auth,
+        userAgent: req.get('User-Agent'),
+      });
+
+      const subscription = await storage.createPushSubscription(validatedData);
+      res.json({ success: true, subscription });
+    } catch (error: any) {
+      console.error('Subscribe to push error:', error);
+      res.status(500).json({ message: "Failed to subscribe to push notifications" });
+    }
+  });
+
+  app.post("/api/push/unsubscribe", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      await storage.deletePushSubscription(req.body.endpoint);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Unsubscribe from push error:', error);
+      res.status(500).json({ message: "Failed to unsubscribe from push notifications" });
+    }
+  });
+
+  app.get("/api/push/subscriptions", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const subscriptions = await storage.getPushSubscriptionsByUserId(req.user!.id);
+      res.json(subscriptions);
+    } catch (error: any) {
+      console.error('Get push subscriptions error:', error);
+      res.status(500).json({ message: "Failed to get push subscriptions" });
     }
   });
 
