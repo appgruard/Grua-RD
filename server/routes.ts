@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { pushService } from "./push-service";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -218,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const availableDrivers = await storage.getAvailableDrivers();
-      availableDrivers.forEach((driver) => {
+      availableDrivers.forEach(async (driver) => {
         const ws = driverSessions.get(driver.userId);
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({
@@ -226,6 +227,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             payload: servicio,
           }));
         }
+        
+        await pushService.notifyNewServiceRequest(driver.userId, servicio.origenDireccion);
       });
 
       res.json(servicio);
@@ -369,6 +372,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const conductorName = `${req.user!.nombre} ${req.user!.apellido}`;
+      await pushService.notifyServiceAccepted(servicio.id, servicio.clienteId, conductorName);
+
       res.json(servicio);
     } catch (error: any) {
       console.error('Accept service error:', error);
@@ -386,6 +392,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: 'en_progreso',
         iniciadoAt: new Date(),
       });
+
+      await pushService.notifyServiceStarted(servicio.id, servicio.clienteId);
+
       res.json(servicio);
     } catch (error: any) {
       console.error('Start service error:', error);
@@ -403,6 +412,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: 'completado',
         completadoAt: new Date(),
       });
+
+      await pushService.notifyServiceCompleted(servicio.id, servicio.clienteId);
+
       res.json(servicio);
     } catch (error: any) {
       console.error('Complete service error:', error);
@@ -434,6 +446,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const mensaje = await storage.createMensajeChat(validatedData);
+
+      const recipientId = servicio.clienteId === req.user!.id ? servicio.conductorId! : servicio.clienteId;
+      const senderName = `${req.user!.nombre} ${req.user!.apellido}`;
+      await pushService.notifyNewMessage(recipientId, senderName, mensaje.contenido);
+
       res.json(mensaje);
     } catch (error: any) {
       console.error('Send message error:', error);
