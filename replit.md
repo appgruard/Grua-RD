@@ -208,6 +208,8 @@ GruaRD es una Progressive Web App (PWA) tipo Uber para servicios de grúa en Rep
 ### Opcionales (para funcionalidad completa)
 - `STRIPE_SECRET_KEY` - Stripe backend key
 - `VITE_STRIPE_PUBLIC_KEY` - Stripe frontend key
+- `VAPID_PRIVATE_KEY` - Web Push private key (generar con: npx web-push generate-vapid-keys)
+- `VITE_VAPID_PUBLIC_KEY` - Web Push public key (generar con: npx web-push generate-vapid-keys)
 
 ## Configuración PWA
 
@@ -257,10 +259,21 @@ GruaRD es una Progressive Web App (PWA) tipo Uber para servicios de grúa en Rep
 - [ ] Validaciones adicionales de UX
 - [x] Sistema de toasts ya implementado en toda la aplicación
 
-### Fase 3: Integraciones Avanzadas
-- [ ] Configurar Stripe para pagos reales
-- [ ] Push notifications (Web Push API)
-- [ ] Chat en tiempo real (cliente ↔ conductor)
+### Fase 3: Integraciones Avanzadas 🔄 EN PROGRESO
+- [x] Chat en tiempo real (cliente ↔ conductor)
+  - [x] Tabla `mensajes_chat` en base de datos
+  - [x] API endpoints para envío y lectura de mensajes
+  - [x] WebSocket events para mensajes en tiempo real
+  - [x] Componente ChatBox reutilizable
+  - [x] Integración en tracking y dashboard
+- [x] Push Notifications (Web Push API)
+  - [x] Tabla `push_subscriptions` en base de datos
+  - [x] API endpoints para gestión de suscripciones
+  - [x] Servicio de notificaciones push (web-push)
+  - [x] Service Worker actualizado con listeners push
+  - [x] Hook `usePushNotifications` para frontend
+  - [x] Integración en eventos clave (servicio aceptado, iniciado, completado, nuevos mensajes)
+- [ ] Configurar Stripe para pagos reales (requiere API keys)
 - [ ] Geofencing para zonas de servicio
 
 ### Fase 4: Producción

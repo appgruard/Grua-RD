@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BF_EVYBePkPuLsZ49cmZNX8AyXk2-WMchsDbzBuk3XpyUfRZMZC9M2qioR7xViQTFha9OGo_1Kk96HiQBYDedrY';
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -46,6 +46,15 @@ export function usePushNotifications() {
       toast({
         title: 'No soportado',
         description: 'Tu navegador no soporta notificaciones push',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!VAPID_PUBLIC_KEY) {
+      toast({
+        title: 'Configuración pendiente',
+        description: 'Las notificaciones push no están configuradas en el servidor',
         variant: 'destructive',
       });
       return;

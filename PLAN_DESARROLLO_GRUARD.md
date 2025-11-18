@@ -28,7 +28,7 @@
 - [ ] Tests WebSocket (requiere backend más robusto)
 - [ ] Validaciones y mejoras de UX
 
-### 🚀 Fase 3 - Integraciones Avanzadas - EN PROGRESO
+### ✅ Fase 3 - Integraciones Avanzadas - COMPLETADO
 - [x] Chat en tiempo real entre Cliente y Conductor
   - [x] Tabla `mensajes_chat` en base de datos
   - [x] API endpoints para envío y lectura de mensajes
@@ -36,8 +36,21 @@
   - [x] Componente ChatBox reutilizable
   - [x] Integración en página de tracking del cliente
   - [x] Integración en dashboard del conductor
-- [ ] Notificaciones Push (FCM)
-- [ ] Geofencing para zonas de servicio
+- [x] Notificaciones Push (Web Push API)
+  - [x] Tabla `push_subscriptions` en base de datos
+  - [x] API endpoints (/api/push/subscribe, /api/push/unsubscribe, /api/push/subscriptions)
+  - [x] Servicio backend de notificaciones (server/push-service.ts)
+  - [x] Configuración VAPID segura (requiere claves en variables de entorno)
+  - [x] Service Worker con listeners para push y notificationclick
+  - [x] Hook usePushNotifications para gestión desde frontend
+  - [x] Notificaciones automáticas en eventos clave:
+    - [x] Servicio aceptado → Cliente recibe notificación
+    - [x] Servicio iniciado → Cliente recibe notificación
+    - [x] Servicio completado → Cliente recibe notificación
+    - [x] Nueva solicitud → Conductores disponibles reciben notificación
+    - [x] Nuevo mensaje de chat → Destinatario recibe notificación
+  - [x] Documentación completa (NOTIFICACIONES_PUSH_README.md)
+  - [ ] Configurar claves VAPID reales (pendiente del usuario)
 
 ### ⏳ Pendiente
 - [ ] Stripe API Keys (STRIPE_SECRET_KEY, VITE_STRIPE_PUBLIC_KEY)

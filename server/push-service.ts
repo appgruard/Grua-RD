@@ -1,14 +1,20 @@
 import webpush from 'web-push';
 import { storage } from './storage';
 
-const VAPID_PUBLIC_KEY = process.env.VITE_VAPID_PUBLIC_KEY || 'BF_EVYBePkPuLsZ49cmZNX8AyXk2-WMchsDbzBuk3XpyUfRZMZC9M2qioR7xViQTFha9OGo_1Kk96HiQBYDedrY';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'mXZjummRZOBCZOc0Ms9xijWx5GKtvpJQ6bAZWh3nN0U';
+const VAPID_PUBLIC_KEY = process.env.VITE_VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 
-webpush.setVapidDetails(
-  'mailto:admin@gruard.com',
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY
-);
+if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  console.warn('⚠️  VAPID keys not configured. Push notifications will not work.');
+  console.warn('   Generate keys with: npx web-push generate-vapid-keys');
+  console.warn('   Then set VAPID_PRIVATE_KEY and VITE_VAPID_PUBLIC_KEY in environment variables');
+} else {
+  webpush.setVapidDetails(
+    'mailto:admin@gruard.com',
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+}
 
 interface PushNotificationPayload {
   title: string;
@@ -21,6 +27,11 @@ interface PushNotificationPayload {
 
 export class PushNotificationService {
   async sendToUser(userId: string, payload: PushNotificationPayload): Promise<void> {
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+      console.log('Push notifications not configured, skipping notification');
+      return;
+    }
+
     try {
       const subscriptions = await storage.getPushSubscriptionsByUserId(userId);
       
