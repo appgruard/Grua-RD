@@ -696,6 +696,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/analytics/revenue", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { startDate, endDate, period } = req.query;
+      
+      if (!startDate || !endDate || !period) {
+        return res.status(400).json({ message: "startDate, endDate, and period are required" });
+      }
+
+      if (period !== 'day' && period !== 'week' && period !== 'month') {
+        return res.status(400).json({ message: "period must be 'day', 'week', or 'month'" });
+      }
+
+      const data = await storage.getRevenueByPeriod(
+        startDate as string,
+        endDate as string,
+        period as 'day' | 'week' | 'month'
+      );
+      res.json(data);
+    } catch (error: any) {
+      console.error('Get revenue by period error:', error);
+      res.status(500).json({ message: "Failed to get revenue data" });
+    }
+  });
+
+  app.get("/api/admin/analytics/services", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { startDate, endDate, period } = req.query;
+      
+      if (!startDate || !endDate || !period) {
+        return res.status(400).json({ message: "startDate, endDate, and period are required" });
+      }
+
+      if (period !== 'day' && period !== 'week' && period !== 'month') {
+        return res.status(400).json({ message: "period must be 'day', 'week', or 'month'" });
+      }
+
+      const data = await storage.getServicesByPeriod(
+        startDate as string,
+        endDate as string,
+        period as 'day' | 'week' | 'month'
+      );
+      res.json(data);
+    } catch (error: any) {
+      console.error('Get services by period error:', error);
+      res.status(500).json({ message: "Failed to get services data" });
+    }
+  });
+
+  app.get("/api/admin/analytics/drivers", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const data = await storage.getDriverRankings();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Get driver rankings error:', error);
+      res.status(500).json({ message: "Failed to get driver rankings" });
+    }
+  });
+
+  app.get("/api/admin/analytics/peak-hours", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const data = await storage.getServicesByHour();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Get services by hour error:', error);
+      res.status(500).json({ message: "Failed to get peak hours data" });
+    }
+  });
+
+  app.get("/api/admin/analytics/status-breakdown", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { startDate, endDate } = req.query;
+      const data = await storage.getServiceStatusBreakdown(
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      res.json(data);
+    } catch (error: any) {
+      console.error('Get service status breakdown error:', error);
+      res.status(500).json({ message: "Failed to get status breakdown" });
+    }
+  });
+
   app.post("/api/maps/calculate-route", async (req: Request, res: Response) => {
     try {
       const { origin, destination } = req.body;

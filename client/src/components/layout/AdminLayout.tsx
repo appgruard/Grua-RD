@@ -8,6 +8,7 @@ import {
   DollarSign,
   FileText,
   LogOut,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ interface AdminLayoutProps {
 
 const menuItems = [
   { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' },
+  { path: '/admin/analytics', icon: BarChart3, label: 'Analytics', testId: 'nav-analytics' },
   { path: '/admin/users', icon: Users, label: 'Usuarios', testId: 'nav-users' },
   { path: '/admin/drivers', icon: Truck, label: 'Conductores', testId: 'nav-drivers' },
   { path: '/admin/services', icon: FileText, label: 'Servicios', testId: 'nav-services' },

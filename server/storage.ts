@@ -90,6 +90,13 @@ export interface IStorage {
     activeDrivers: number;
     pendingServices: number;
   }>;
+
+  // Analytics
+  getRevenueByPeriod(startDate: string, endDate: string, period: 'day' | 'week' | 'month'): Promise<Array<{ period: string; revenue: number }>>;
+  getServicesByPeriod(startDate: string, endDate: string, period: 'day' | 'week' | 'month'): Promise<Array<{ period: string; count: number }>>;
+  getDriverRankings(): Promise<Array<{ driverId: string; driverName: string; completedServices: number; averageRating: number }>>;
+  getServicesByHour(): Promise<Array<{ hour: number; count: number }>>;
+  getServiceStatusBreakdown(startDate?: string, endDate?: string): Promise<Array<{ status: string; count: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -433,6 +440,127 @@ export class DatabaseStorage implements IStorage {
       activeDrivers: activeDriversCount.count,
       pendingServices: pendingServicesCount.count,
     };
+  }
+
+  // Analytics
+  async getRevenueByPeriod(startDate: string, endDate: string, period: 'day' | 'week' | 'month'): Promise<Array<{ period: string; revenue: number }>> {
+    const formatMap = {
+      day: 'YYYY-MM-DD',
+      week: 'IYYY-IW',
+      month: 'YYYY-MM',
+    };
+    
+    const format = formatMap[period];
+    const periodExpression = sql.raw(`to_char(${servicios.createdAt.name}, '${format}')`);
+    
+    const results = await db
+      .select({
+        period: sql<string>`${periodExpression}`.as('period'),
+        revenue: sql<number>`COALESCE(SUM(CAST(${servicios.costoTotal} AS NUMERIC)), 0)`.as('revenue'),
+      })
+      .from(servicios)
+      .where(
+        and(
+          eq(servicios.estado, 'completado'),
+          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
+          sql`${servicios.createdAt} <= ${endDate}::timestamp`
+        )
+      )
+      .groupBy(sql`${periodExpression}`)
+      .orderBy(sql`${periodExpression}`);
+
+    return results.map(r => ({ period: r.period, revenue: Number(r.revenue) }));
+  }
+
+  async getServicesByPeriod(startDate: string, endDate: string, period: 'day' | 'week' | 'month'): Promise<Array<{ period: string; count: number }>> {
+    const formatMap = {
+      day: 'YYYY-MM-DD',
+      week: 'IYYY-IW',
+      month: 'YYYY-MM',
+    };
+    
+    const format = formatMap[period];
+    const periodExpression = sql.raw(`to_char(${servicios.createdAt.name}, '${format}')`);
+    
+    const results = await db
+      .select({
+        period: sql<string>`${periodExpression}`.as('period'),
+        count: sql<number>`COUNT(*)::int`.as('count'),
+      })
+      .from(servicios)
+      .where(
+        and(
+          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
+          sql`${servicios.createdAt} <= ${endDate}::timestamp`
+        )
+      )
+      .groupBy(sql`${periodExpression}`)
+      .orderBy(sql`${periodExpression}`);
+
+    return results;
+  }
+
+  async getDriverRankings(): Promise<Array<{ driverId: string; driverName: string; completedServices: number; averageRating: number }>> {
+    const results = await db
+      .select({
+        driverId: users.id,
+        driverName: sql<string>`${users.nombre} || ' ' || ${users.apellido}`,
+        completedServices: sql<number>`COUNT(DISTINCT ${servicios.id})::int`,
+        averageRating: sql<number>`COALESCE(AVG(${calificaciones.puntuacion}), 0)`,
+      })
+      .from(users)
+      .innerJoin(conductores, eq(conductores.userId, users.id))
+      .leftJoin(servicios, and(
+        eq(servicios.conductorId, users.id),
+        eq(servicios.estado, 'completado')
+      ))
+      .leftJoin(calificaciones, eq(calificaciones.servicioId, servicios.id))
+      .groupBy(users.id, users.nombre, users.apellido)
+      .orderBy(desc(sql`COUNT(DISTINCT ${servicios.id})`));
+
+    return results.map(r => ({
+      driverId: r.driverId,
+      driverName: r.driverName,
+      completedServices: r.completedServices,
+      averageRating: Number(r.averageRating),
+    }));
+  }
+
+  async getServicesByHour(): Promise<Array<{ hour: number; count: number }>> {
+    const results = await db
+      .select({
+        hour: sql<number>`EXTRACT(HOUR FROM ${servicios.createdAt})::int`.as('hour'),
+        count: sql<number>`COUNT(*)::int`.as('count'),
+      })
+      .from(servicios)
+      .groupBy(sql`EXTRACT(HOUR FROM ${servicios.createdAt})`)
+      .orderBy(sql`EXTRACT(HOUR FROM ${servicios.createdAt})`);
+
+    return results;
+  }
+
+  async getServiceStatusBreakdown(startDate?: string, endDate?: string): Promise<Array<{ status: string; count: number }>> {
+    let query = db
+      .select({
+        status: servicios.estado,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(servicios);
+
+    if (startDate && endDate) {
+      query = query.where(
+        and(
+          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
+          sql`${servicios.createdAt} <= ${endDate}::timestamp`
+        )
+      ) as any;
+    }
+
+    const results = await query
+      .groupBy(servicios.estado)
+      .orderBy(desc(sql`COUNT(*)`));
+
+    return results.map(r => ({ status: r.status as string, count: r.count }));
   }
 }
 

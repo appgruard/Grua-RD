@@ -20,6 +20,7 @@ import DriverHistory from '@/pages/driver/history';
 import DriverProfile from '@/pages/driver/profile';
 
 import AdminDashboard from '@/pages/admin/dashboard';
+import AdminAnalytics from '@/pages/admin/analytics';
 import AdminUsers from '@/pages/admin/users';
 import AdminDrivers from '@/pages/admin/drivers';
 import AdminServices from '@/pages/admin/services';
@@ -99,6 +100,7 @@ function AdminRoutes() {
       <AdminLayout>
         <Switch>
           <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin/analytics" component={AdminAnalytics} />
           <Route path="/admin/users" component={AdminUsers} />
           <Route path="/admin/drivers" component={AdminDrivers} />
           <Route path="/admin/services" component={AdminServices} />
