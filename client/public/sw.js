@@ -79,3 +79,53 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+self.addEventListener('push', (event) => {
+  if (!event.data) {
+    return;
+  }
+
+  const data = event.data.json();
+  const options = {
+    body: data.body,
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/icon-192.png',
+    data: data.data || {},
+    tag: data.tag || 'default',
+    vibrate: [200, 100, 200],
+    requireInteraction: false,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      const data = event.notification.data || {};
+      
+      let urlToOpen = '/';
+      if (data.type === 'service_accepted' || data.type === 'service_started' || data.type === 'service_completed') {
+        urlToOpen = `/client/tracking/${data.servicioId}`;
+      } else if (data.type === 'new_request') {
+        urlToOpen = '/driver/dashboard';
+      } else if (data.type === 'new_message') {
+        urlToOpen = '/';
+      }
+
+      for (const client of clientList) {
+        if (client.url.includes(urlToOpen) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});
