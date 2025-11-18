@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'gruard-static-v2';
-const DYNAMIC_CACHE = 'gruard-dynamic-v2';
+const STATIC_CACHE = 'gruard-static-v3';
+const DYNAMIC_CACHE = 'gruard-dynamic-v3';
 
 const urlsToCache = [
   '/',

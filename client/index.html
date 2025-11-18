@@ -27,6 +27,11 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then(registration => console.log('SW registered:', registration))
