@@ -65,14 +65,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       
-      {/* Client Routes */}
-      <Route path="/client">
-        <ProtectedRoute allowedTypes={['cliente']}>
-          <MobileLayout userType="cliente">
-            <ClientHome />
-          </MobileLayout>
-        </ProtectedRoute>
-      </Route>
+      {/* Client Routes - Most specific first */}
       <Route path="/client/tracking/:id">
         <ProtectedRoute allowedTypes={['cliente']}>
           <MobileLayout userType="cliente">
@@ -106,15 +99,15 @@ function Router() {
           </MobileLayout>
         </ProtectedRoute>
       </Route>
-
-      {/* Driver Routes */}
-      <Route path="/driver">
-        <ProtectedRoute allowedTypes={['conductor']}>
-          <MobileLayout userType="conductor">
-            <DriverDashboard />
+      <Route path="/client">
+        <ProtectedRoute allowedTypes={['cliente']}>
+          <MobileLayout userType="cliente">
+            <ClientHome />
           </MobileLayout>
         </ProtectedRoute>
       </Route>
+
+      {/* Driver Routes - Most specific first */}
       <Route path="/driver/history">
         <ProtectedRoute allowedTypes={['conductor']}>
           <MobileLayout userType="conductor">
@@ -129,15 +122,15 @@ function Router() {
           </MobileLayout>
         </ProtectedRoute>
       </Route>
-
-      {/* Admin Routes */}
-      <Route path="/admin">
-        <ProtectedRoute allowedTypes={['admin']}>
-          <AdminLayout>
-            <AdminDashboard />
-          </AdminLayout>
+      <Route path="/driver">
+        <ProtectedRoute allowedTypes={['conductor']}>
+          <MobileLayout userType="conductor">
+            <DriverDashboard />
+          </MobileLayout>
         </ProtectedRoute>
       </Route>
+
+      {/* Admin Routes - Most specific first */}
       <Route path="/admin/analytics">
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
@@ -177,6 +170,13 @@ function Router() {
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
             <AdminMonitoring />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminDashboard />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
