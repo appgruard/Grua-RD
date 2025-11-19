@@ -57,61 +57,6 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
-function ClientRoutes() {
-  return (
-    <ProtectedRoute allowedTypes={['cliente']}>
-      <MobileLayout userType="cliente">
-        <Switch>
-          <Route path="/client" component={ClientHome} />
-          <Route path="/client/tracking/:id" component={ClientTracking} />
-          <Route path="/client/history" component={ClientHistory} />
-          <Route path="/client/profile" component={ClientProfile} />
-          <Route path="/client/support">
-            <div className="p-4">
-              <h1 className="text-2xl font-bold mb-4">Soporte</h1>
-              <p className="text-muted-foreground">
-                Para asistencia, contacta al +1 (809) 555-0100
-              </p>
-            </div>
-          </Route>
-        </Switch>
-      </MobileLayout>
-    </ProtectedRoute>
-  );
-}
-
-function DriverRoutes() {
-  return (
-    <ProtectedRoute allowedTypes={['conductor']}>
-      <MobileLayout userType="conductor">
-        <Switch>
-          <Route path="/driver" component={DriverDashboard} />
-          <Route path="/driver/history" component={DriverHistory} />
-          <Route path="/driver/profile" component={DriverProfile} />
-        </Switch>
-      </MobileLayout>
-    </ProtectedRoute>
-  );
-}
-
-function AdminRoutes() {
-  return (
-    <ProtectedRoute allowedTypes={['admin']}>
-      <AdminLayout>
-        <Switch>
-          <Route path="/admin" component={AdminDashboard} />
-          <Route path="/admin/analytics" component={AdminAnalytics} />
-          <Route path="/admin/users" component={AdminUsers} />
-          <Route path="/admin/drivers" component={AdminDrivers} />
-          <Route path="/admin/services" component={AdminServices} />
-          <Route path="/admin/pricing" component={AdminPricing} />
-          <Route path="/admin/monitoring" component={AdminMonitoring} />
-        </Switch>
-      </AdminLayout>
-    </ProtectedRoute>
-  );
-}
-
 function Router() {
   const { user } = useAuth();
 
@@ -120,14 +65,121 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       
-      <Route path="/client/:rest*" component={ClientRoutes} />
-      <Route path="/client" component={ClientRoutes} />
-      
-      <Route path="/driver/:rest*" component={DriverRoutes} />
-      <Route path="/driver" component={DriverRoutes} />
-      
-      <Route path="/admin/:rest*" component={AdminRoutes} />
-      <Route path="/admin" component={AdminRoutes} />
+      {/* Client Routes */}
+      <Route path="/client">
+        <ProtectedRoute allowedTypes={['cliente']}>
+          <MobileLayout userType="cliente">
+            <ClientHome />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client/tracking/:id">
+        <ProtectedRoute allowedTypes={['cliente']}>
+          <MobileLayout userType="cliente">
+            <ClientTracking />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client/history">
+        <ProtectedRoute allowedTypes={['cliente']}>
+          <MobileLayout userType="cliente">
+            <ClientHistory />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client/profile">
+        <ProtectedRoute allowedTypes={['cliente']}>
+          <MobileLayout userType="cliente">
+            <ClientProfile />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/client/support">
+        <ProtectedRoute allowedTypes={['cliente']}>
+          <MobileLayout userType="cliente">
+            <div className="p-4">
+              <h1 className="text-2xl font-bold mb-4">Soporte</h1>
+              <p className="text-muted-foreground">
+                Para asistencia, contacta al +1 (809) 555-0100
+              </p>
+            </div>
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Driver Routes */}
+      <Route path="/driver">
+        <ProtectedRoute allowedTypes={['conductor']}>
+          <MobileLayout userType="conductor">
+            <DriverDashboard />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/history">
+        <ProtectedRoute allowedTypes={['conductor']}>
+          <MobileLayout userType="conductor">
+            <DriverHistory />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/profile">
+        <ProtectedRoute allowedTypes={['conductor']}>
+          <MobileLayout userType="conductor">
+            <DriverProfile />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Admin Routes */}
+      <Route path="/admin">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminDashboard />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/analytics">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminAnalytics />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/users">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminUsers />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/drivers">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminDrivers />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/services">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminServices />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/pricing">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminPricing />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/monitoring">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminMonitoring />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
 
       <Route path="/">
         {user ? (
