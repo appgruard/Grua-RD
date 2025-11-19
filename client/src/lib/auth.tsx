@@ -6,7 +6,7 @@ import type { User, UserWithConductor } from '@shared/schema';
 interface AuthContextType {
   user: UserWithConductor | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<UserWithConductor>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -42,8 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error('Login failed');
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+    onSuccess: async (data) => {
+      // Update the cache immediately with the user data
+      queryClient.setQueryData(['/api/auth/me'], data.user);
+      // Also invalidate to ensure fresh data
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
     },
   });
 
@@ -69,7 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const login = async (email: string, password: string) => {
-    await loginMutation.mutateAsync({ email, password });
+    const result = await loginMutation.mutateAsync({ email, password });
+    return result.user;
   };
 
   const register = async (data: RegisterData) => {

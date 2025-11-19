@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation, Redirect } from 'wouter';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,16 +17,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
-
-  if (user) {
-    if (user.userType === 'admin') {
-      return <Redirect to="/admin" />;
-    } else if (user.userType === 'conductor') {
-      return <Redirect to="/driver" />;
-    } else {
-      return <Redirect to="/client" />;
-    }
-  }
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -58,11 +48,21 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      const loggedInUser = await login(email, password);
+      
       toast({
         title: '¡Bienvenido!',
         description: 'Has iniciado sesión exitosamente',
       });
+      
+      // Redirect based on user type
+      if (loggedInUser.userType === 'admin') {
+        setLocation('/admin');
+      } else if (loggedInUser.userType === 'conductor') {
+        setLocation('/driver');
+      } else {
+        setLocation('/client');
+      }
     } catch (error: any) {
       const errorMessage = error?.message || 'Credenciales inválidas';
       setErrors({ general: errorMessage });
