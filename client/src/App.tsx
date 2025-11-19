@@ -120,17 +120,14 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       
-      <Route path="/client/:rest*">
-        <ClientRoutes />
-      </Route>
+      <Route path="/client/:rest*" component={ClientRoutes} />
+      <Route path="/client" component={ClientRoutes} />
       
-      <Route path="/driver/:rest*">
-        <DriverRoutes />
-      </Route>
+      <Route path="/driver/:rest*" component={DriverRoutes} />
+      <Route path="/driver" component={DriverRoutes} />
       
-      <Route path="/admin/:rest*">
-        <AdminRoutes />
-      </Route>
+      <Route path="/admin/:rest*" component={AdminRoutes} />
+      <Route path="/admin" component={AdminRoutes} />
 
       <Route path="/">
         {user ? (
