@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -18,11 +18,17 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
-  if (user) {
-    if (user.userType === 'admin') setLocation('/admin');
-    else if (user.userType === 'conductor') setLocation('/driver');
-    else setLocation('/client');
-  }
+  useEffect(() => {
+    if (user) {
+      if (user.userType === 'admin') {
+        setLocation('/admin');
+      } else if (user.userType === 'conductor') {
+        setLocation('/driver');
+      } else {
+        setLocation('/client');
+      }
+    }
+  }, [user, setLocation]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
