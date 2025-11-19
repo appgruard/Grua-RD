@@ -1,398 +1,49 @@
 # GruaRD - Plataforma de Servicios de Grúa
 
-## Descripción General
-GruaRD es una Progressive Web App (PWA) tipo Uber para servicios de grúa en República Dominicana. La plataforma conecta clientes que necesitan servicios de grúa con conductores disponibles en tiempo real, con tres interfaces distintas: Cliente, Conductor y Admin.
+## Overview
+GruaRD is a Progressive Web App (PWA) designed to connect users needing tow truck services with available drivers in real-time within the Dominican Republic, similar to Uber. The platform features three distinct interfaces: Client, Driver, and Admin. Its primary purpose is to streamline tow truck requests, real-time tracking, and service management.
 
-## Arquitectura
+## User Preferences
+I prefer detailed explanations.
+I want iterative development.
+Ask before making major changes.
+Do not make changes to the folder `shared/`.
+Do not make changes to the file `client/src/App.tsx`.
+I like functional programming.
+I prefer simple language.
+I want to be kept informed about the progress regularly.
+I expect the agent to write clear and concise code with comments where necessary.
+Ensure all new features have corresponding tests.
+Prioritize performance and scalability in new implementations.
 
-### Stack Tecnológico
-- **Frontend**: React 18 + TypeScript + Vite
-- **Backend**: Express.js + Node.js
-- **Base de Datos**: PostgreSQL (Neon) con Drizzle ORM
-- **Autenticación**: Passport.js con estrategia local + bcrypt
-- **Real-time**: WebSocket (ws library) para tracking GPS
-- **Mapas**: Google Maps JavaScript API
-- **Pagos**: Stripe (configuración preparada)
-- **Estilos**: Tailwind CSS + shadcn/ui components
-- **Estado**: TanStack Query (React Query v5)
+## System Architecture
 
-### Estructura del Proyecto
-```
-├── client/                 # Frontend React
-│   ├── src/
-│   │   ├── pages/         # Páginas por rol (auth, client, driver, admin)
-│   │   ├── components/    # Componentes reutilizables (UI, layouts, maps)
-│   │   ├── lib/           # Utilities (auth, queryClient, websocket, maps)
-│   │   └── App.tsx        # Router principal con rutas protegidas
-│   └── public/            # Assets estáticos + manifest.json + sw.js
-├── server/                # Backend Express
-│   ├── db.ts             # Conexión PostgreSQL + Drizzle
-│   ├── storage.ts        # DatabaseStorage con todos los métodos CRUD
-│   ├── routes.ts         # API REST + WebSocket server
-│   └── index.ts          # Entry point
-└── shared/
-    └── schema.ts         # Modelos Drizzle compartidos + tipos TypeScript
-```
+### UI/UX Decisions
+The design system is based on Inter font, with a primary blue color (`#2563eb`). It utilizes `shadcn/ui` components with Tailwind CSS for a mobile-first, responsive layout. The application currently supports a light mode, with dark mode preparation in place. Client and Driver interfaces use a `MobileLayout` with bottom navigation, while the Admin interface employs an `AdminLayout` with a sidebar. The PWA is configured for standalone installation with appropriate icons and a theme color.
 
-## Base de Datos
+### Technical Implementations
+GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js) backend. PostgreSQL (Neon) with Drizzle ORM handles database operations. Authentication uses Passport.js with a local strategy and bcrypt for password hashing. Real-time functionalities, including GPS tracking, are managed via WebSockets (ws library). Google Maps JavaScript API is integrated for interactive maps, distance calculations, and geocoding. State management is handled by TanStack Query (React Query v5). The project adheres to a modular structure, separating frontend, backend, and shared schema definitions.
 
-### Tablas Principales
-1. **users** - Usuarios del sistema (clientes, conductores, admins)
-2. **conductores** - Información específica de conductores (licencia, grúa, ubicación)
-3. **servicios** - Solicitudes de servicio (origen, destino, estado, costos)
-4. **tarifas** - Configuración de precios (base, por km, nocturna)
-5. **calificaciones** - Ratings de servicios completados
-6. **ubicaciones_tracking** - Historial GPS para tracking en tiempo real
+### Feature Specifications
+The platform supports comprehensive authentication with role-based access for clients, drivers, and administrators.
+- **Client Features**: Service requests with map-based origin/destination, real-time service tracking, service history, user profiles, and automatic price calculation.
+- **Driver Features**: Dashboard with nearby requests, ability to accept/reject services, real-time GPS tracking, service status updates, service history, availability toggle, and truck information management.
+- **Admin Features**: Dashboard with statistics, user and driver management, real-time service monitoring, and dynamic tariff configuration.
+- **Real-time Communication**: WebSocket protocol facilitates real-time location updates for drivers and instant notifications for new service requests and status changes.
+- **PWA Capabilities**: Configured `manifest.json` for installability and a service worker (`sw.js`) for static asset caching with a cache-first strategy.
+- **Robust Error Handling**: Implemented with toasts for descriptive error messages, visual alerts in forms, and immediate feedback on validations.
+- **UX Enhancements**: Includes complete form validations with specific error messages, reusable Skeleton components for loading states, informative Empty States, and confirmation dialogs for critical actions.
+- **Chat Functionality**: Real-time chat between clients and drivers, supported by a dedicated database table, API endpoints, and WebSocket events.
+- **Push Notifications**: Web Push API integration for critical events like service acceptance, start, completion, and new chat messages.
 
-### Relaciones
-- `users` 1:1 `conductores` (userId)
-- `servicios` N:1 `users` (clienteId, conductorId)
-- `calificaciones` N:1 `servicios` (servicioId)
-- `ubicaciones_tracking` N:1 `servicios` (servicioId)
+### System Design Choices
+The system uses a PostgreSQL database with Drizzle ORM for type-safe data access. WebSocket communication is optimized by using service-specific rooms to efficiently broadcast location updates and service status changes. Security measures include bcrypt for password hashing, HTTP-only session cookies, role-based access control, and Drizzle ORM's protection against SQL injection.
 
-## Funcionalidades Implementadas
-
-### Autenticación
-- ✅ Registro con tipo de usuario (cliente/conductor/admin)
-- ✅ Login con email/password
-- ✅ Sesiones persistentes con express-session
-- ✅ Rutas protegidas por rol
-
-### Cliente
-- ✅ Solicitar servicio con origen/destino en mapa
-- ✅ Ver servicios activos con tracking en tiempo real
-- ✅ Historial de servicios completados
-- ✅ Perfil de usuario con calificación promedio
-- ✅ Cálculo automático de precios por distancia
-
-### Conductor
-- ✅ Dashboard con solicitudes pendientes cercanas
-- ✅ Aceptar/rechazar solicitudes
-- ✅ Tracking GPS en tiempo real durante servicio
-- ✅ Marcar servicio como iniciado/completado
-- ✅ Historial de servicios realizados
-- ✅ Disponibilidad on/off
-- ✅ Perfil con información de grúa
-
-### Admin
-- ✅ Dashboard con estadísticas (usuarios, conductores, servicios, ingresos)
-- ✅ Gestión de usuarios y conductores
-- ✅ Monitoreo de servicios en tiempo real
-- ✅ Configuración de tarifas (crear, editar, activar/desactivar)
-- ✅ Vista de mapa con grúas activas
-
-### Integraciones
-- ✅ Google Maps API para mapas interactivos
-- ✅ Distance Matrix API para cálculo de rutas
-- ✅ Geocoding API para conversión dirección ↔ coordenadas
-- ✅ WebSocket para ubicaciones en tiempo real
-- ⏳ Stripe para pagos (keys pendientes)
-
-## API Endpoints
-
-### Autenticación
-- `POST /api/auth/register` - Registro de usuario
-- `POST /api/auth/login` - Login
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Usuario actual
-
-### Servicios
-- `POST /api/services/request` - Solicitar servicio
-- `GET /api/services/:id` - Detalles de servicio
-- `GET /api/services/my-services` - Mis servicios
-- `POST /api/services/:id/accept` - Aceptar servicio (conductor)
-- `POST /api/services/:id/start` - Iniciar servicio (conductor)
-- `POST /api/services/:id/complete` - Completar servicio (conductor)
-
-### Conductores
-- `GET /api/drivers/me` - Datos de conductor
-- `PUT /api/drivers/availability` - Cambiar disponibilidad
-- `PUT /api/drivers/location` - Actualizar ubicación
-- `GET /api/drivers/nearby-requests` - Solicitudes pendientes
-
-### Admin
-- `GET /api/admin/dashboard` - Estadísticas generales
-- `GET /api/admin/users` - Lista de usuarios
-- `GET /api/admin/drivers` - Lista de conductores
-- `GET /api/admin/services` - Todos los servicios
-- `GET /api/admin/active-drivers` - Conductores activos
-- `GET /api/admin/pricing` - Tarifas configuradas
-- `POST /api/admin/pricing` - Crear tarifa
-- `PUT /api/admin/pricing/:id` - Actualizar tarifa
-
-### Tarifas y Mapas
-- `GET /api/pricing/active` - Tarifa activa actual
-- `POST /api/pricing/calculate` - Calcular costo por distancia
-- `POST /api/maps/calculate-route` - Calcular ruta (Distance Matrix)
-- `POST /api/maps/geocode` - Convertir dirección a coordenadas
-
-## WebSocket Protocol
-
-### Conexión
-- Endpoint: `ws://[host]/ws`
-- Sin autenticación inicial (validar userId en mensajes)
-
-### Mensajes del Cliente
-
-#### Unirse a sesión de servicio
-```json
-{
-  "type": "join_service",
-  "payload": {
-    "serviceId": "uuid",
-    "role": "client|driver"
-  }
-}
-```
-
-#### Actualizar ubicación (conductor)
-```json
-{
-  "type": "update_location",
-  "payload": {
-    "servicioId": "uuid",
-    "conductorId": "uuid",
-    "lat": 18.4861,
-    "lng": -69.9312
-  }
-}
-```
-
-#### Registrar conductor para notificaciones
-```json
-{
-  "type": "register_driver",
-  "payload": {
-    "driverId": "uuid"
-  }
-}
-```
-
-### Mensajes del Servidor
-
-#### Nueva solicitud (broadcast a conductores)
-```json
-{
-  "type": "new_request",
-  "payload": { ...servicio }
-}
-```
-
-#### Actualización de ubicación
-```json
-{
-  "type": "driver_location_update",
-  "payload": {
-    "servicioId": "uuid",
-    "lat": 18.4861,
-    "lng": -69.9312
-  }
-}
-```
-
-#### Cambio de estado de servicio
-```json
-{
-  "type": "service_status_change",
-  "payload": { ...servicio }
-}
-```
-
-## Variables de Entorno
-
-### Requeridas
-- `DATABASE_URL` - PostgreSQL connection string (auto-configurada en Replit)
-- `SESSION_SECRET` - Secret para sessions (auto-generada)
-- `VITE_GOOGLE_MAPS_API_KEY` - Google Maps API key (configurada)
-
-### Opcionales (para funcionalidad completa)
-- `STRIPE_SECRET_KEY` - Stripe backend key
-- `VITE_STRIPE_PUBLIC_KEY` - Stripe frontend key
-- `VAPID_PRIVATE_KEY` - Web Push private key (generar con: npx web-push generate-vapid-keys)
-- `VITE_VAPID_PUBLIC_KEY` - Web Push public key (generar con: npx web-push generate-vapid-keys)
-
-## Configuración PWA
-
-### manifest.json
-- ✅ Configurado para instalación standalone
-- ✅ Iconos 192x192 y 512x512
-- ✅ Theme color: #2563eb (azul)
-- ✅ Shortcuts para acción rápida
-
-### Service Worker (sw.js)
-- ✅ Cache de assets estáticos
-- ✅ Estrategia cache-first
-- ✅ Auto-limpieza de cache antiguo
-
-## Diseño Visual
-
-### Sistema de Diseño
-- **Fuente**: Inter (Google Fonts)
-- **Color primario**: Azul (#2563eb)
-- **Componentes**: shadcn/ui con Tailwind CSS
-- **Layout**: Mobile-first responsive
-- **Tema**: Light mode (dark mode preparado)
-
-### Layouts
-- **Cliente/Conductor**: `MobileLayout` con bottom navigation
-- **Admin**: `AdminLayout` con sidebar lateral
-
-## Próximos Pasos (Roadmap)
-
-### Fase 1: Core MVP ✅ COMPLETADO
-- [x] Schema completo con todas las tablas
-- [x] Frontend para las 3 interfaces
-- [x] Backend con todos los endpoints
-- [x] WebSocket para tracking
-- [x] Google Maps integration
-- [x] PWA configuration
-
-### Fase 2: Testing & Refinamiento ✅ COMPLETADO
-- [x] Playwright instalado y configurado (playwright.config.ts)
-- [x] Tests E2E para Cliente - 7 tests (registro, login, solicitud, historial, perfil, validaciones)
-- [x] Tests E2E para Conductor - 7 tests (registro con grúa, disponibilidad, solicitudes, perfil)
-- [x] Tests E2E para Admin - 9 tests (dashboard, usuarios, conductores, servicios, tarifas, monitoreo)
-- [x] Tests de integración completos - 4 tests (flujo E2E, monitoreo admin, cancelaciones)
-- [x] Helpers con generación de IDs únicos (compatible con cualquier versión de Node)
-- [x] Documentación completa (e2e/README.md con guía de uso, comandos, debugging)
-- [x] Sistema de toasts implementado en toda la aplicación
-- [x] **Mejoras de UX implementadas:**
-  - [x] Validaciones completas en formularios de autenticación (login y registro)
-    - Validación de email con regex
-    - Validación de contraseña (mínimo 6 caracteres)
-    - Validación de campos de conductor (licencia, placa, marca, modelo)
-    - Mensajes de error específicos y visuales con iconos
-    - Estados de error inline con bordes rojos
-    - Iconos contextuales en inputs (Mail, Lock, User, Phone, etc.)
-  - [x] Componentes de Skeleton reutilizables
-    - ServiceCardSkeleton para listas de servicios
-    - DashboardSkeleton para estadísticas
-    - TableSkeleton para tablas de datos
-    - Implementados en páginas de historial (cliente y conductor)
-  - [x] Empty States informativos
-    - Componente EmptyState reutilizable con icono, título, descripción y acción opcional
-    - Implementado en historial de cliente con botón "Solicitar Servicio"
-    - Implementado en historial de conductor
-  - [x] Diálogos de confirmación para acciones críticas
-    - Componente ConfirmDialog reutilizable
-    - Confirmación antes de iniciar servicio (conductor)
-    - Confirmación antes de completar servicio (conductor)
-    - Estados de carga durante confirmación
-  - [x] Manejo robusto de errores
-    - Mensajes de error descriptivos en toasts
-    - Alertas visuales en formularios
-    - Feedback inmediato en validaciones
-- [ ] Tests WebSocket en tiempo real (requiere backend más robusto para testing determinístico)
-
-### Fase 3: Integraciones Avanzadas 🔄 EN PROGRESO
-- [x] Chat en tiempo real (cliente ↔ conductor)
-  - [x] Tabla `mensajes_chat` en base de datos
-  - [x] API endpoints para envío y lectura de mensajes
-  - [x] WebSocket events para mensajes en tiempo real
-  - [x] Componente ChatBox reutilizable
-  - [x] Integración en tracking y dashboard
-- [x] Push Notifications (Web Push API)
-  - [x] Tabla `push_subscriptions` en base de datos
-  - [x] API endpoints para gestión de suscripciones
-  - [x] Servicio de notificaciones push (web-push)
-  - [x] Service Worker actualizado con listeners push
-  - [x] Hook `usePushNotifications` para frontend
-  - [x] Integración en eventos clave (servicio aceptado, iniciado, completado, nuevos mensajes)
-- [ ] Configurar Stripe para pagos reales (requiere API keys)
-- [ ] Geofencing para zonas de servicio
-
-### Fase 4: Producción
-- [ ] Migración a Capacitor para Android APK
-- [ ] Configurar Google Play Store
-- [ ] Añadir pasarelas de pago locales (Azul, BanReservas)
-- [ ] Sistema de verificación de documentos
-- [ ] Analytics y reportes avanzados
-
-## Comandos Útiles
-
-```bash
-# Desarrollo
-npm run dev                 # Iniciar servidor dev (Express + Vite)
-
-# Base de datos
-npm run db:push            # Sincronizar schema con PostgreSQL
-npm run db:studio          # Abrir Drizzle Studio (GUI)
-
-# Producción
-npm run build              # Build frontend para producción
-npm start                  # Iniciar servidor producción
-```
-
-## Notas de Desarrollo
-
-### Google Maps API Key
-- Key actual: `AIzaSyCHae3-wAWIy2xcWcF5YApYSEv2ZYi9N20`
-- Configurada en variable de entorno `VITE_GOOGLE_MAPS_API_KEY`
-- APIs habilitadas: Maps JavaScript API, Distance Matrix API, Geocoding API
-
-### Sesiones y Autenticación
-- Sesiones persistentes con cookies
-- Duración: 30 días
-- Password hashing: bcrypt con salt 10
-
-### WebSocket Implementation
-- Path separado: `/ws` (no interfiere con Vite HMR)
-- Salas por servicio para broadcast eficiente
-- Registro de conductores para notificaciones push
-
-### Stripe Integration
-- Configuración preparada en shared/schema.ts
-- Esperando keys `STRIPE_SECRET_KEY` y `VITE_STRIPE_PUBLIC_KEY`
-- Métodos de pago: `efectivo` y `tarjeta` soportados en schema
-
-## Arquitectura de Datos en Tiempo Real
-
-### Flujo de Solicitud de Servicio
-1. Cliente crea solicitud → guardada en DB
-2. Backend envía notificación WebSocket a conductores disponibles
-3. Conductor acepta → actualiza servicio en DB
-4. Cliente recibe notificación de servicio aceptado
-5. Conductor inicia servicio → tracking GPS comienza
-6. Cada ubicación GPS se broadcast a cliente via WebSocket
-7. Conductor completa servicio → cliente puede calificar
-
-### Optimizaciones
-- Ubicaciones GPS se guardan en `ubicaciones_tracking` cada X segundos
-- WebSocket usa salas por servicio para evitar broadcast innecesario
-- Queries con `with` de Drizzle para reducir roundtrips a DB
-
-## Seguridad
-
-- ✅ Passwords hasheados con bcrypt
-- ✅ Sesiones con cookies HTTP-only
-- ✅ Rutas protegidas por autenticación
-- ✅ Validación de roles (cliente/conductor/admin)
-- ✅ SQL injection protegido (Drizzle ORM)
-- ⏳ HTTPS en producción (configurar en deploy)
-- ⏳ CORS configurado para dominio específico
-
-## Migración a Android (Capacitor)
-
-### Preparación Actual
-- ✅ PWA completamente funcional
-- ✅ manifest.json configurado
-- ✅ Service worker implementado
-- ✅ APIs móviles compatibles (Geolocation, WebSocket)
-
-### Pasos para Conversión (futuro)
-1. Instalar Capacitor: `npm i @capacitor/core @capacitor/cli @capacitor/android`
-2. Inicializar: `npx cap init`
-3. Agregar Android: `npx cap add android`
-4. Build web: `npm run build`
-5. Sincronizar: `npx cap sync`
-6. Abrir Android Studio: `npx cap open android`
-7. Configurar permisos en AndroidManifest.xml (GPS, red)
-8. Build APK para Google Play
-
-## Documentación Técnica Adicional
-
-Ver archivo `PLAN_DESARROLLO_GRUARD.md` para:
-- Plan de desarrollo detallado en español
-- Especificaciones técnicas completas
-- Roadmap de features futuras
-- Guía de migración a Android
+## External Dependencies
+- **PostgreSQL (Neon)**: Main database solution.
+- **Google Maps Platform**:
+    - **Maps JavaScript API**: For interactive map displays.
+    - **Distance Matrix API**: For calculating travel times and distances.
+    - **Geocoding API**: For converting addresses to geographical coordinates and vice-versa.
+- **Stripe**: Payment gateway (configuration prepared, awaiting API keys).
+- **Web Push API**: For sending push notifications (requires VAPID keys).
