@@ -1,27 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Calendar, DollarSign } from 'lucide-react';
+import { MapPin, Navigation, Calendar, DollarSign, ClipboardList } from 'lucide-react';
 import type { ServicioWithDetails } from '@shared/schema';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { ServiceCardSkeletonList } from '@/components/skeletons/ServiceCardSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 
 export default function ClientHistory() {
+  const [, setLocation] = useLocation();
   const { data: services, isLoading } = useQuery<ServicioWithDetails[]>({
     queryKey: ['/api/services/my-services'],
   });
 
   if (isLoading) {
     return (
-      <div className="p-4">
+      <div className="p-4 pb-20">
         <h1 className="text-2xl font-bold mb-6">Historial de Servicios</h1>
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="p-4 animate-pulse">
-              <div className="h-20 bg-muted rounded" />
-            </Card>
-          ))}
-        </div>
+        <ServiceCardSkeletonList count={4} />
       </div>
     );
   }
@@ -47,9 +45,15 @@ export default function ClientHistory() {
       <h1 className="text-2xl font-bold mb-6">Historial de Servicios</h1>
       
       {!services || services.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">No tienes servicios aún</p>
-        </div>
+        <EmptyState
+          icon={ClipboardList}
+          title="No hay servicios"
+          description="Aún no has solicitado ningún servicio de grúa. Solicita tu primer servicio desde la pantalla principal."
+          action={{
+            label: "Solicitar Servicio",
+            onClick: () => setLocation('/client')
+          }}
+        />
       ) : (
         <div className="space-y-3">
           {services.map((service) => (

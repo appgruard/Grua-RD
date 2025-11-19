@@ -12,6 +12,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/lib/websocket';
 import { ChatBox } from '@/components/chat/ChatBox';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle } from 'lucide-react';
 import type { Servicio, Conductor, ServicioWithDetails } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
@@ -22,6 +23,11 @@ export default function DriverDashboard() {
   const { toast } = useToast();
   const [currentLocation, setCurrentLocation] = useState<Coordinates>({ lat: 18.4861, lng: -69.9312 });
   const [chatOpen, setChatOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    action: 'complete' | 'start' | null;
+    serviceId: string | null;
+  }>({ open: false, action: null, serviceId: null });
 
   const { data: driverData } = useQuery<Conductor>({
     queryKey: ['/api/drivers/me'],
@@ -152,6 +158,7 @@ export default function DriverDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
+      setConfirmDialog({ open: false, action: null, serviceId: null });
       toast({
         title: 'Servicio completado',
         description: 'El servicio ha sido marcado como completado',
@@ -165,6 +172,17 @@ export default function DriverDashboard() {
       });
     },
   });
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog.serviceId || !confirmDialog.action) return;
+    
+    if (confirmDialog.action === 'complete') {
+      await completeService.mutateAsync(confirmDialog.serviceId);
+    } else if (confirmDialog.action === 'start') {
+      await startService.mutateAsync(confirmDialog.serviceId);
+      setConfirmDialog({ open: false, action: null, serviceId: null });
+    }
+  };
 
   useEffect(() => {
     if ('geolocation' in navigator && driverData?.disponible) {
@@ -283,15 +301,10 @@ export default function DriverDashboard() {
               {activeService.estado === 'aceptado' && (
                 <Button 
                   className="w-full" 
-                  onClick={() => startService.mutate(activeService.id)}
-                  disabled={startService.isPending}
+                  onClick={() => setConfirmDialog({ open: true, action: 'start', serviceId: activeService.id })}
                   data-testid="button-start-service"
                 >
-                  {startService.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <Play className="w-4 h-4 mr-2" />
-                  )}
+                  <Play className="w-4 h-4 mr-2" />
                   Iniciar Servicio
                 </Button>
               )}
@@ -299,15 +312,10 @@ export default function DriverDashboard() {
               {activeService.estado === 'en_progreso' && (
                 <Button 
                   className="w-full" 
-                  onClick={() => completeService.mutate(activeService.id)}
-                  disabled={completeService.isPending}
+                  onClick={() => setConfirmDialog({ open: true, action: 'complete', serviceId: activeService.id })}
                   data-testid="button-complete-service"
                 >
-                  {completeService.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                  )}
+                  <CheckCircle className="w-4 h-4 mr-2" />
                   Completar Servicio
                 </Button>
               )}
@@ -398,6 +406,20 @@ export default function DriverDashboard() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog({ open, action: null, serviceId: null })}
+        title={confirmDialog.action === 'complete' ? '¿Completar servicio?' : '¿Iniciar servicio?'}
+        description={
+          confirmDialog.action === 'complete'
+            ? 'Confirma que has llegado al destino y completado el servicio. Esta acción no se puede deshacer.'
+            : 'Confirma que estás listo para comenzar el servicio y dirigirte al destino.'
+        }
+        confirmLabel={confirmDialog.action === 'complete' ? 'Completar' : 'Iniciar'}
+        onConfirm={handleConfirmAction}
+        loading={completeService.isPending || startService.isPending}
+      />
     </div>
   );
 }
