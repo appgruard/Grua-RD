@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -10,13 +10,25 @@ import { Truck, Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function Login() {
-  const [, setLocation] = useLocation();
-  const { login, user } = useAuth();
+  const [location, setLocation] = useLocation();
+  const { login, user, isLoading } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+
+  useEffect(() => {
+    if (user && !isLoading) {
+      if (user.userType === 'admin') {
+        setLocation('/admin');
+      } else if (user.userType === 'conductor') {
+        setLocation('/driver');
+      } else {
+        setLocation('/client');
+      }
+    }
+  }, [user, isLoading, setLocation]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -48,21 +60,12 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const loggedInUser = await login(email, password);
+      await login(email, password);
       
       toast({
         title: '¡Bienvenido!',
         description: 'Has iniciado sesión exitosamente',
       });
-      
-      // Redirect based on user type
-      if (loggedInUser.userType === 'admin') {
-        setLocation('/admin');
-      } else if (loggedInUser.userType === 'conductor') {
-        setLocation('/driver');
-      } else {
-        setLocation('/client');
-      }
     } catch (error: any) {
       const errorMessage = error?.message || 'Credenciales inválidas';
       setErrors({ general: errorMessage });
