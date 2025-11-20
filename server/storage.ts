@@ -9,6 +9,7 @@ import {
   ubicacionesTracking,
   mensajesChat,
   pushSubscriptions,
+  verificationCodes,
   type User,
   type InsertUser,
   type Conductor,
@@ -24,6 +25,8 @@ import {
   type MensajeChat,
   type InsertPushSubscription,
   type PushSubscription,
+  type InsertVerificationCode,
+  type VerificationCode,
   type UserWithConductor,
   type ServicioWithDetails,
   type MensajeChatWithRemitente,
@@ -80,6 +83,16 @@ export interface IStorage {
   getPushSubscriptionsByUserId(userId: string): Promise<PushSubscription[]>;
   deletePushSubscription(endpoint: string): Promise<void>;
   deleteUserPushSubscriptions(userId: string): Promise<void>;
+
+  // Verification Codes
+  createVerificationCode(code: InsertVerificationCode): Promise<VerificationCode>;
+  getVerificationCode(telefono: string, codigo: string, tipoOperacion: string): Promise<VerificationCode | undefined>;
+  getActiveVerificationCode(telefono: string, tipoOperacion: string): Promise<VerificationCode | undefined>;
+  incrementVerificationAttempts(id: string): Promise<void>;
+  markVerificationCodeAsUsed(id: string): Promise<void>;
+  deleteExpiredVerificationCodes(): Promise<void>;
+  deletePriorVerificationCodes(telefono: string, tipoOperacion: string): Promise<void>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
 
   // Dashboard Stats
   getDashboardStats(): Promise<{
@@ -561,6 +574,87 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(sql`COUNT(*)`));
 
     return results.map(r => ({ status: r.status as string, count: r.count }));
+  }
+
+  // Verification Codes
+  async createVerificationCode(insertCode: InsertVerificationCode): Promise<VerificationCode> {
+    const [code] = await db.insert(verificationCodes).values(insertCode).returning();
+    return code;
+  }
+
+  async getVerificationCode(telefono: string, codigo: string, tipoOperacion: string): Promise<VerificationCode | undefined> {
+    const [code] = await db
+      .select()
+      .from(verificationCodes)
+      .where(
+        and(
+          eq(verificationCodes.telefono, telefono),
+          eq(verificationCodes.codigo, codigo),
+          eq(verificationCodes.tipoOperacion, tipoOperacion),
+          eq(verificationCodes.verificado, false),
+          sql`${verificationCodes.expiraEn} > NOW()`
+        )
+      )
+      .limit(1);
+    return code;
+  }
+
+  async getActiveVerificationCode(telefono: string, tipoOperacion: string): Promise<VerificationCode | undefined> {
+    const [code] = await db
+      .select()
+      .from(verificationCodes)
+      .where(
+        and(
+          eq(verificationCodes.telefono, telefono),
+          eq(verificationCodes.tipoOperacion, tipoOperacion),
+          eq(verificationCodes.verificado, false),
+          sql`${verificationCodes.expiraEn} > NOW()`
+        )
+      )
+      .orderBy(desc(verificationCodes.createdAt))
+      .limit(1);
+    return code;
+  }
+
+  async incrementVerificationAttempts(id: string): Promise<void> {
+    await db
+      .update(verificationCodes)
+      .set({ intentos: sql`${verificationCodes.intentos} + 1` })
+      .where(eq(verificationCodes.id, id));
+  }
+
+  async markVerificationCodeAsUsed(id: string): Promise<void> {
+    await db
+      .update(verificationCodes)
+      .set({ verificado: true })
+      .where(eq(verificationCodes.id, id));
+  }
+
+  async deleteExpiredVerificationCodes(): Promise<void> {
+    await db
+      .delete(verificationCodes)
+      .where(sql`${verificationCodes.expiraEn} < NOW()`);
+  }
+
+  async deletePriorVerificationCodes(telefono: string, tipoOperacion: string): Promise<void> {
+    await db
+      .delete(verificationCodes)
+      .where(
+        and(
+          eq(verificationCodes.telefono, telefono),
+          eq(verificationCodes.tipoOperacion, tipoOperacion),
+          eq(verificationCodes.verificado, false)
+        )
+      );
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.phone, phone))
+      .limit(1);
+    return user;
   }
 }
 

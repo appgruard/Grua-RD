@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { pushService } from "./push-service";
+import { smsService, generateOTP } from "./sms-service";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -149,22 +150,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
-      const { email, password, nombre, apellido, phone, userType, conductorData } = req.body;
+      const { password, userType, conductorData, ...userData } = req.body;
 
-      const existingUser = await storage.getUserByEmail(email);
+      if (!password || password.length < 6) {
+        return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+      }
+
+      const validationResult = insertUserSchema.safeParse({
+        ...userData,
+        passwordHash: password,
+        userType: userType || 'cliente',
+      });
+
+      if (!validationResult.success) {
+        const firstError = validationResult.error.errors[0];
+        return res.status(400).json({ 
+          message: firstError.message || "Datos de registro inválidos",
+          errors: validationResult.error.errors
+        });
+      }
+
+      const existingUser = await storage.getUserByEmail(userData.email);
       if (existingUser) {
-        return res.status(400).json({ message: "Email already registered" });
+        return res.status(400).json({ message: "Email ya está registrado" });
+      }
+
+      if (userData.phone) {
+        const existingPhone = await storage.getUserByPhone(userData.phone);
+        if (existingPhone) {
+          return res.status(400).json({ message: "Teléfono ya está registrado" });
+        }
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
 
       const user = await storage.createUser({
-        email,
+        ...validationResult.data,
         passwordHash,
-        nombre,
-        apellido,
-        phone: phone || null,
-        userType: userType || 'cliente',
       });
 
       if (userType === 'conductor' && conductorData) {
@@ -185,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error('Registration error:', error);
-      res.status(500).json({ message: "Registration failed" });
+      res.status(500).json({ message: "Error en el registro" });
     }
   });
 
@@ -204,6 +226,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(req.user);
     } else {
       res.status(401).json({ message: "Not authenticated" });
+    }
+  });
+
+  app.post("/api/auth/send-otp", async (req: Request, res: Response) => {
+    try {
+      const { telefono, tipoOperacion } = req.body;
+
+      if (!telefono || !tipoOperacion) {
+        return res.status(400).json({ message: "Teléfono y tipo de operación son requeridos" });
+      }
+
+      if (!['registro', 'recuperacion_password'].includes(tipoOperacion)) {
+        return res.status(400).json({ message: "Tipo de operación inválido" });
+      }
+
+      const codigo = generateOTP();
+      const expiraEn = new Date(Date.now() + 10 * 60 * 1000);
+
+      await storage.deleteExpiredVerificationCodes();
+      await storage.deletePriorVerificationCodes(telefono, tipoOperacion);
+
+      await storage.createVerificationCode({
+        telefono,
+        codigo,
+        expiraEn,
+        tipoOperacion,
+      });
+
+      const mensaje = `Tu código de verificación para GruaRD es: ${codigo}. Válido por 10 minutos.`;
+      await smsService.sendSMS(telefono, mensaje);
+
+      res.json({ 
+        message: "Código enviado exitosamente",
+        expiresIn: 600
+      });
+    } catch (error: any) {
+      console.error('Send OTP error:', error);
+      res.status(500).json({ message: "Error al enviar código de verificación" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req: Request, res: Response) => {
+    try {
+      const { telefono, codigo, tipoOperacion } = req.body;
+
+      if (!telefono || !codigo || !tipoOperacion) {
+        return res.status(400).json({ message: "Datos incompletos" });
+      }
+
+      const verificationCode = await storage.getActiveVerificationCode(telefono, tipoOperacion);
+
+      if (!verificationCode) {
+        return res.status(400).json({ message: "Código inválido o expirado" });
+      }
+
+      if (verificationCode.intentos >= 3) {
+        await storage.markVerificationCodeAsUsed(verificationCode.id);
+        return res.status(400).json({ message: "Demasiados intentos. Solicita un nuevo código" });
+      }
+
+      if (verificationCode.codigo !== codigo) {
+        await storage.incrementVerificationAttempts(verificationCode.id);
+        return res.status(400).json({ message: "Código incorrecto" });
+      }
+
+      await storage.markVerificationCodeAsUsed(verificationCode.id);
+
+      if (tipoOperacion === 'registro') {
+        const user = await storage.getUserByPhone(telefono);
+        if (user) {
+          await storage.updateUser(user.id, { 
+            telefonoVerificado: true,
+            estadoCuenta: 'activo'
+          });
+        }
+      }
+
+      res.json({ 
+        message: "Código verificado exitosamente",
+        verified: true
+      });
+    } catch (error: any) {
+      console.error('Verify OTP error:', error);
+      res.status(500).json({ message: "Error al verificar código" });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const { telefono } = req.body;
+
+      if (!telefono) {
+        return res.status(400).json({ message: "Teléfono es requerido" });
+      }
+
+      const user = await storage.getUserByPhone(telefono);
+      if (!user) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+
+      const codigo = generateOTP();
+      const expiraEn = new Date(Date.now() + 10 * 60 * 1000);
+
+      await storage.deleteExpiredVerificationCodes();
+      await storage.deletePriorVerificationCodes(telefono, 'recuperacion_password');
+
+      await storage.createVerificationCode({
+        telefono,
+        codigo,
+        expiraEn,
+        tipoOperacion: 'recuperacion_password',
+      });
+
+      const mensaje = `Tu código de recuperación de contraseña para GruaRD es: ${codigo}. Válido por 10 minutos.`;
+      await smsService.sendSMS(telefono, mensaje);
+
+      res.json({ 
+        message: "Código de recuperación enviado",
+        expiresIn: 600
+      });
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ message: "Error al enviar código de recuperación" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { telefono, codigo, nuevaPassword } = req.body;
+
+      if (!telefono || !codigo || !nuevaPassword) {
+        return res.status(400).json({ message: "Datos incompletos" });
+      }
+
+      if (nuevaPassword.length < 6) {
+        return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+      }
+
+      const verificationCode = await storage.getActiveVerificationCode(telefono, 'recuperacion_password');
+
+      if (!verificationCode) {
+        return res.status(400).json({ message: "Código inválido o expirado" });
+      }
+
+      if (verificationCode.intentos >= 3) {
+        await storage.markVerificationCodeAsUsed(verificationCode.id);
+        return res.status(400).json({ message: "Demasiados intentos. Solicita un nuevo código" });
+      }
+
+      if (verificationCode.codigo !== codigo) {
+        await storage.incrementVerificationAttempts(verificationCode.id);
+        return res.status(400).json({ message: "Código incorrecto" });
+      }
+
+      const user = await storage.getUserByPhone(telefono);
+      if (!user) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+
+      const passwordHash = await bcrypt.hash(nuevaPassword, 10);
+      await storage.updateUser(user.id, { passwordHash });
+      await storage.markVerificationCodeAsUsed(verificationCode.id);
+
+      res.json({ message: "Contraseña actualizada exitosamente" });
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ message: "Error al resetear contraseña" });
     }
   });
 

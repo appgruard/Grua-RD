@@ -26,6 +26,14 @@ GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (N
 
 ### Feature Specifications
 The platform supports comprehensive authentication with role-based access for clients, drivers, and administrators.
+- **Authentication & Security (FASE 0.1 - Implementado)**:
+  - User registration with Dominican Republic cédula validation (11 digits with verification algorithm)
+  - Phone verification via OTP (One-Time Password) system
+  - Account status management (pendiente_verificacion, activo, suspendido, rechazado)
+  - Password recovery via SMS verification code
+  - Zod schema validation for all registration inputs
+  - Brute-force protection with attempt limits (max 3 attempts per OTP code)
+  - Automatic expiration of verification codes (10 minutes)
 - **Client Features**: Service requests with map-based origin/destination, real-time service tracking, service history, user profiles, and automatic price calculation.
 - **Driver Features**: Dashboard with nearby requests, ability to accept/reject services, real-time GPS tracking, service status updates, service history, availability toggle, and truck information management.
 - **Admin Features**: Dashboard with statistics, user and driver management, real-time service monitoring, and dynamic tariff configuration.
@@ -47,3 +55,25 @@ The system uses a PostgreSQL database with Drizzle ORM for type-safe data access
     - **Geocoding API**: For converting addresses to geographical coordinates and vice-versa.
 - **Stripe**: Payment gateway (configuration prepared, awaiting API keys).
 - **Web Push API**: For sending push notifications (requires VAPID keys).
+- **SMS Service** (Pending): Currently using mock service for OTP delivery. Integration with Twilio/Infobip/MessageBird planned for production.
+
+## Recent Changes (FASE 0.1 - Identidad y Autenticación)
+
+### Database Schema Updates
+- Added `cedula` field to users table with validation for Dominican Republic ID format
+- Added `estadoCuenta` enum field to users table (pendiente_verificacion, activo, suspendido, rechazado)
+- Added `telefonoVerificado` boolean field to users table
+- Created `verification_codes` table for OTP management with fields: telefono, codigo, expiraEn, intentos, verificado, tipoOperacion
+
+### API Endpoints (Backend)
+- `POST /api/auth/send-otp` - Send OTP verification code via SMS
+- `POST /api/auth/verify-otp` - Verify OTP code and activate account
+- `POST /api/auth/forgot-password` - Request password recovery code
+- `POST /api/auth/reset-password` - Reset password with verification code
+- Updated `POST /api/auth/register` - Now includes cédula validation and Zod schema validation
+
+### Security Improvements
+- Implemented brute-force protection on OTP verification (max 3 attempts)
+- Automatic cleanup of expired verification codes
+- Deletion of prior active codes when issuing new ones
+- Full Zod validation on registration endpoint for input sanitization

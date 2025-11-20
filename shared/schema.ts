@@ -15,6 +15,12 @@ import { z } from "zod";
 
 // Enums
 export const userTypeEnum = pgEnum("user_type", ["cliente", "conductor", "admin"]);
+export const estadoCuentaEnum = pgEnum("estado_cuenta", [
+  "pendiente_verificacion",
+  "activo",
+  "suspendido",
+  "rechazado"
+]);
 export const estadoServicioEnum = pgEnum("estado_servicio", [
   "pendiente",
   "aceptado", 
@@ -29,12 +35,15 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   phone: text("phone"),
+  cedula: text("cedula"),
   passwordHash: text("password_hash").notNull(),
   userType: userTypeEnum("user_type").notNull().default("cliente"),
+  estadoCuenta: estadoCuentaEnum("estado_cuenta").notNull().default("pendiente_verificacion"),
   nombre: text("nombre").notNull(),
   apellido: text("apellido").notNull(),
   fotoUrl: text("foto_url"),
   calificacionPromedio: decimal("calificacion_promedio", { precision: 3, scale: 2 }),
+  telefonoVerificado: boolean("telefono_verificado").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -129,6 +138,18 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Verification Codes Table (for OTP verification)
+export const verificationCodes = pgTable("verification_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  telefono: text("telefono").notNull(),
+  codigo: text("codigo").notNull(),
+  expiraEn: timestamp("expira_en").notNull(),
+  intentos: integer("intentos").default(0).notNull(),
+  verificado: boolean("verificado").default(false).notNull(),
+  tipoOperacion: text("tipo_operacion").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   conductor: one(conductores, {
@@ -200,16 +221,42 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
   }),
 }));
 
+// Validation functions
+const validarCedulaRD = (cedula: string): boolean => {
+  if (!/^\d{11}$/.test(cedula)) return false;
+  
+  const digits = cedula.split('').map(Number);
+  const weights = [1, 2, 1, 2, 1, 2, 1, 2, 1, 2];
+  
+  let sum = 0;
+  for (let i = 0; i < 10; i++) {
+    let product = digits[i] * weights[i];
+    if (product >= 10) {
+      product = Math.floor(product / 10) + (product % 10);
+    }
+    sum += product;
+  }
+  
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === digits[10];
+};
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users, {
-  email: z.string().email(),
-  phone: z.string().optional(),
-  nombre: z.string().min(1),
-  apellido: z.string().min(1),
+  email: z.string().email("Email inválido"),
+  phone: z.string().min(10, "Teléfono debe tener al menos 10 dígitos").optional(),
+  cedula: z.string()
+    .regex(/^\d{11}$/, "Cédula debe tener 11 dígitos")
+    .refine(validarCedulaRD, "Cédula inválida")
+    .optional(),
+  nombre: z.string().min(1, "Nombre es requerido"),
+  apellido: z.string().min(1, "Apellido es requerido"),
 }).omit({
   id: true,
   createdAt: true,
   calificacionPromedio: true,
+  telefonoVerificado: true,
+  estadoCuenta: true,
 });
 
 export const insertConductorSchema = createInsertSchema(conductores, {
@@ -273,6 +320,17 @@ export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions
   createdAt: true,
 });
 
+export const insertVerificationCodeSchema = createInsertSchema(verificationCodes, {
+  telefono: z.string().min(10),
+  codigo: z.string().length(6),
+  tipoOperacion: z.enum(["registro", "recuperacion_password"]),
+}).omit({
+  id: true,
+  createdAt: true,
+  intentos: true,
+  verificado: true,
+});
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -282,6 +340,7 @@ export const selectCalificacionSchema = createSelectSchema(calificaciones);
 export const selectUbicacionTrackingSchema = createSelectSchema(ubicacionesTracking);
 export const selectMensajeChatSchema = createSelectSchema(mensajesChat);
 export const selectPushSubscriptionSchema = createSelectSchema(pushSubscriptions);
+export const selectVerificationCodeSchema = createSelectSchema(verificationCodes);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -307,6 +366,9 @@ export type MensajeChat = typeof mensajesChat.$inferSelect;
 
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+
+export type InsertVerificationCode = z.infer<typeof insertVerificationCodeSchema>;
+export type VerificationCode = typeof verificationCodes.$inferSelect;
 
 // Helper types for API responses
 export type UserWithConductor = User & {
