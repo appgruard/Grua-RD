@@ -60,12 +60,20 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      const loggedInUser = await login(email, password);
       
       toast({
         title: '¡Bienvenido!',
         description: 'Has iniciado sesión exitosamente',
       });
+      
+      if (loggedInUser.userType === 'admin') {
+        setLocation('/admin');
+      } else if (loggedInUser.userType === 'conductor') {
+        setLocation('/driver');
+      } else {
+        setLocation('/client');
+      }
     } catch (error: any) {
       const errorMessage = error?.message || 'Credenciales inválidas';
       setErrors({ general: errorMessage });

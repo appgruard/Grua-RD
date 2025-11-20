@@ -7,7 +7,7 @@ interface AuthContextType {
   user: UserWithConductor | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<UserWithConductor>;
-  register: (data: RegisterData) => Promise<void>;
+  register: (data: RegisterData) => Promise<UserWithConductor>;
   logout: () => Promise<void>;
 }
 
@@ -56,8 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error('Registration failed');
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+    onSuccess: async (data) => {
+      queryClient.setQueryData(['/api/auth/me'], data.user);
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
     },
   });
 
@@ -77,7 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (data: RegisterData) => {
-    await registerMutation.mutateAsync(data);
+    const result = await registerMutation.mutateAsync(data);
+    return result.user;
   };
 
   const logout = async () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -24,12 +24,24 @@ type FormErrors = {
 };
 
 export default function Register() {
-  const [, setLocation] = useLocation();
-  const { register } = useAuth();
+  const [location, setLocation] = useLocation();
+  const { register, user, isLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [userType, setUserType] = useState<'cliente' | 'conductor'>('cliente');
   const [errors, setErrors] = useState<FormErrors>({});
+
+  useEffect(() => {
+    if (user && !isLoading) {
+      if (user.userType === 'admin') {
+        setLocation('/admin');
+      } else if (user.userType === 'conductor') {
+        setLocation('/driver');
+      } else {
+        setLocation('/client');
+      }
+    }
+  }, [user, isLoading, setLocation]);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -127,12 +139,20 @@ export default function Register() {
         };
       }
 
-      await register(data);
+      const registeredUser = await register(data);
       
       toast({
         title: '¡Registro exitoso!',
         description: 'Tu cuenta ha sido creada correctamente',
       });
+      
+      if (registeredUser.userType === 'admin') {
+        setLocation('/admin');
+      } else if (registeredUser.userType === 'conductor') {
+        setLocation('/driver');
+      } else {
+        setLocation('/client');
+      }
     } catch (error: any) {
       const errorMessage = error?.message || 'No se pudo crear la cuenta. Intenta nuevamente.';
       setErrors({ general: errorMessage });
