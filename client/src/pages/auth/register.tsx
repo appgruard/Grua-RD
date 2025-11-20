@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car } from 'lucide-react';
+import { Truck, Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type FormErrors = {
@@ -16,6 +16,7 @@ type FormErrors = {
   nombre?: string;
   apellido?: string;
   phone?: string;
+  cedula?: string;
   licencia?: string;
   placaGrua?: string;
   marcaGrua?: string;
@@ -49,6 +50,7 @@ export default function Register() {
     nombre: '',
     apellido: '',
     phone: '',
+    cedula: '',
     licencia: '',
     placaGrua: '',
     marcaGrua: '',
@@ -78,6 +80,10 @@ export default function Register() {
 
     if (formData.phone && !/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
       newErrors.phone = 'Ingresa un número de teléfono válido (10 dígitos)';
+    }
+
+    if (formData.cedula && !/^\d{11}$/.test(formData.cedula.replace(/\D/g, ''))) {
+      newErrors.cedula = 'La cédula debe tener 11 dígitos';
     }
 
     if (!formData.password) {
@@ -127,6 +133,7 @@ export default function Register() {
         nombre: formData.nombre,
         apellido: formData.apellido,
         phone: formData.phone,
+        cedula: formData.cedula || null,
         userType,
       };
 
@@ -139,20 +146,15 @@ export default function Register() {
         };
       }
 
-      const registeredUser = await register(data);
+      await register(data);
       
       toast({
-        title: '¡Registro exitoso!',
-        description: 'Tu cuenta ha sido creada correctamente',
+        title: '¡Cuenta creada!',
+        description: 'Serás redirigido para verificar tu teléfono',
       });
-      
-      if (registeredUser.userType === 'admin') {
-        setLocation('/admin');
-      } else if (registeredUser.userType === 'conductor') {
-        setLocation('/driver');
-      } else {
-        setLocation('/client');
-      }
+
+      sessionStorage.setItem('pendingVerificationPhone', formData.phone);
+      setLocation(`/verify-otp?phone=${encodeURIComponent(formData.phone)}&type=registro`);
     } catch (error: any) {
       const errorMessage = error?.message || 'No se pudo crear la cuenta. Intenta nuevamente.';
       setErrors({ general: errorMessage });
@@ -279,30 +281,56 @@ export default function Register() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono (opcional)</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="809-555-1234"
-                  className={`pl-10 ${errors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                  value={formData.phone}
-                  onChange={(e) => {
-                    setFormData({ ...formData, phone: e.target.value });
-                    setErrors({ ...errors, phone: undefined });
-                  }}
-                  disabled={loading}
-                  data-testid="input-phone"
-                />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Teléfono</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="809-555-1234"
+                    className={`pl-10 ${errors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    value={formData.phone}
+                    onChange={(e) => {
+                      setFormData({ ...formData, phone: e.target.value });
+                      setErrors({ ...errors, phone: undefined });
+                    }}
+                    disabled={loading}
+                    data-testid="input-phone"
+                  />
+                </div>
+                {errors.phone && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {errors.phone}
+                  </p>
+                )}
               </div>
-              {errors.phone && (
-                <p className="text-sm text-destructive flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {errors.phone}
-                </p>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="cedula">Cédula (opcional)</Label>
+                <div className="relative">
+                  <IdCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="cedula"
+                    placeholder="00000000000"
+                    className={`pl-10 ${errors.cedula ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    value={formData.cedula}
+                    onChange={(e) => {
+                      setFormData({ ...formData, cedula: e.target.value });
+                      setErrors({ ...errors, cedula: undefined });
+                    }}
+                    disabled={loading}
+                    data-testid="input-cedula"
+                  />
+                </div>
+                {errors.cedula && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {errors.cedula}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

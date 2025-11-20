@@ -9,6 +9,8 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 
 import Login from '@/pages/auth/login';
 import Register from '@/pages/auth/register';
+import VerifyOTP from '@/pages/auth/verify-otp';
+import ForgotPassword from '@/pages/auth/forgot-password';
 
 import ClientHome from '@/pages/client/home';
 import ClientTracking from '@/pages/client/tracking';
@@ -64,6 +66,8 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/verify-otp" component={VerifyOTP} />
+      <Route path="/forgot-password" component={ForgotPassword} />
       
       {/* Client Routes - Most specific first */}
       <Route path="/client/tracking/:id">

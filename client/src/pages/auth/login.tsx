@@ -179,7 +179,7 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-2">
             <p className="text-sm text-muted-foreground">
               ¿No tienes cuenta?{' '}
               <Button
@@ -189,6 +189,16 @@ export default function Login() {
                 data-testid="link-register"
               >
                 Regístrate aquí
+              </Button>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <Button
+                variant="link"
+                className="p-0 h-auto"
+                onClick={() => setLocation('/forgot-password')}
+                data-testid="link-forgot-password"
+              >
+                ¿Olvidaste tu contraseña?
               </Button>
             </p>
           </div>
