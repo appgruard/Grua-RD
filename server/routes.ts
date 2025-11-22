@@ -61,42 +61,124 @@ passport.deserializeUser(async (id: string, done) => {
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use(express.json());
 
-  app.use(
-    session({
-      secret: process.env.SESSION_SECRET || "gruard-secret-change-in-production",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      },
-    })
-  );
+  const sessionParser = session({
+    secret: process.env.SESSION_SECRET || "gruard-secret-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    },
+  });
+
+  app.use(sessionParser);
 
   app.use(passport.initialize());
   app.use(passport.session());
 
   const httpServer = createServer(app);
 
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ noServer: true });
 
   const serviceSessions = new Map<string, Set<WebSocket>>();
   const driverSessions = new Map<string, WebSocket>();
 
-  wss.on('connection', (ws: WebSocket) => {
-    console.log('WebSocket client connected');
+  interface ExtendedWebSocket extends WebSocket {
+    isAlive: boolean;
+    pingInterval?: NodeJS.Timeout;
+    userId?: string;
+    userType?: string;
+  }
 
-    ws.on('message', async (data: string) => {
-      try {
-        const message = JSON.parse(data.toString());
+  httpServer.on('upgrade', (request: any, socket, head) => {
+    if (request.url !== '/ws') {
+      socket.destroy();
+      return;
+    }
 
-        switch (message.type) {
+    sessionParser(request, {} as any, () => {
+      if (!request.session || !request.session.passport || !request.session.passport.user) {
+        console.log('WebSocket connection rejected: Not authenticated');
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    });
+  });
+
+  setInterval(() => {
+    wss.clients.forEach((ws) => {
+      const extWs = ws as ExtendedWebSocket;
+      
+      if (extWs.isAlive === false) {
+        console.log('WebSocket connection terminated due to no pong response');
+        return extWs.terminate();
+      }
+
+      extWs.isAlive = false;
+      extWs.send(JSON.stringify({ type: 'ping' }));
+    });
+  }, 30000);
+
+  wss.on('connection', async (ws: WebSocket, request: any) => {
+    const userId = request.session.passport.user;
+    
+    try {
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        console.log('WebSocket rejected: User not found');
+        ws.close();
+        return;
+      }
+
+      const extWs = ws as ExtendedWebSocket;
+      extWs.isAlive = true;
+      extWs.userId = user.id;
+      extWs.userType = user.userType;
+
+      console.log(`WebSocket authenticated: user ${user.id} (${user.userType})`);
+
+      if (user.userType === 'conductor') {
+        driverSessions.set(user.id, ws);
+      }
+
+      ws.send(JSON.stringify({
+        type: 'authenticated',
+        payload: { success: true, userId: user.id, userType: user.userType }
+      }));
+
+      ws.on('message', async (data: string) => {
+        try {
+          const message = JSON.parse(data.toString());
+
+          switch (message.type) {
+            case 'pong':
+              extWs.isAlive = true;
+              break;
+
           case 'join_service':
-            const { serviceId, role } = message.payload;
+            const { serviceId } = message.payload;
+            
+            const servicio = await storage.getServicioById(serviceId);
+            if (!servicio) {
+              console.log(`join_service rejected: Service ${serviceId} not found`);
+              break;
+            }
+            
+            if (servicio.clienteId !== extWs.userId && servicio.conductorId !== extWs.userId) {
+              console.log(`join_service rejected: User ${extWs.userId} not authorized for service ${serviceId}`);
+              break;
+            }
+            
             if (!serviceSessions.has(serviceId)) {
               serviceSessions.set(serviceId, new Set());
             }
             serviceSessions.get(serviceId)!.add(ws);
+            console.log(`User ${extWs.userId} joined service ${serviceId}`);
             break;
 
           case 'update_location':
@@ -127,25 +209,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             driverSessions.set(driverId, ws);
             break;
         }
-      } catch (error) {
-        console.error('WebSocket message error:', error);
-      }
-    });
-
-    ws.on('close', () => {
-      serviceSessions.forEach((clients, serviceId) => {
-        clients.delete(ws);
-        if (clients.size === 0) {
-          serviceSessions.delete(serviceId);
+        } catch (error) {
+          console.error('WebSocket message error:', error);
         }
       });
 
-      driverSessions.forEach((client, driverId) => {
-        if (client === ws) {
-          driverSessions.delete(driverId);
+      ws.on('close', () => {
+        console.log(`WebSocket disconnected: user ${extWs.userId}`);
+        
+        serviceSessions.forEach((clients, serviceId) => {
+          clients.delete(ws);
+          if (clients.size === 0) {
+            serviceSessions.delete(serviceId);
+          }
+        });
+
+        if (extWs.userId && extWs.userType === 'conductor') {
+          driverSessions.delete(extWs.userId);
         }
       });
-    });
+    } catch (error) {
+      console.error('WebSocket connection error:', error);
+      ws.close();
+    }
   });
 
   app.post("/api/auth/register", async (req: Request, res: Response) => {
@@ -639,6 +725,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recipientId = servicio.clienteId === req.user!.id ? servicio.conductorId! : servicio.clienteId;
       const senderName = `${req.user!.nombre} ${req.user!.apellido}`;
       await pushService.notifyNewMessage(recipientId, senderName, mensaje.contenido);
+
+      if (serviceSessions.has(servicioId)) {
+        const broadcast = JSON.stringify({
+          type: 'new_chat_message',
+          payload: mensaje,
+        });
+        serviceSessions.get(servicioId)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
 
       res.json(mensaje);
     } catch (error: any) {

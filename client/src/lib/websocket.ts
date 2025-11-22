@@ -47,6 +47,14 @@ export function useWebSocket(
     ws.current.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
+        
+        if (message.type === 'ping') {
+          if (ws.current?.readyState === WebSocket.OPEN) {
+            ws.current.send(JSON.stringify({ type: 'pong' }));
+          }
+          return;
+        }
+        
         onMessageRef.current?.(message);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);

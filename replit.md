@@ -57,23 +57,46 @@ The system uses a PostgreSQL database with Drizzle ORM for type-safe data access
 - **Web Push API**: For sending push notifications (requires VAPID keys).
 - **SMS Service** (Pending): Currently using mock service for OTP delivery. Integration with Twilio/Infobip/MessageBird planned for production.
 
-## Recent Changes (FASE 0.1 - Identidad y Autenticación)
+## Recent Changes
 
-### Database Schema Updates
+### FASE 0.1 - Identidad y Autenticación ✅ COMPLETADA
+
+#### Database Schema Updates
 - Added `cedula` field to users table with validation for Dominican Republic ID format
 - Added `estadoCuenta` enum field to users table (pendiente_verificacion, activo, suspendido, rechazado)
 - Added `telefonoVerificado` boolean field to users table
 - Created `verification_codes` table for OTP management with fields: telefono, codigo, expiraEn, intentos, verificado, tipoOperacion
 
-### API Endpoints (Backend)
+#### API Endpoints (Backend)
 - `POST /api/auth/send-otp` - Send OTP verification code via SMS
 - `POST /api/auth/verify-otp` - Verify OTP code and activate account
 - `POST /api/auth/forgot-password` - Request password recovery code
 - `POST /api/auth/reset-password` - Reset password with verification code
 - Updated `POST /api/auth/register` - Now includes cédula validation and Zod schema validation
 
-### Security Improvements
+#### Security Improvements
 - Implemented brute-force protection on OTP verification (max 3 attempts)
 - Automatic cleanup of expired verification codes
 - Deletion of prior active codes when issuing new ones
 - Full Zod validation on registration endpoint for input sanitization
+
+---
+
+### FASE 0.2 - Comunicaciones en Tiempo Real ✅ COMPLETADA PARCIAL
+
+#### WebSocket Enhancements
+- **Heartbeat/Ping-Pong**: Implemented heartbeat mechanism with ping every 30 seconds to detect disconnected clients
+- **Secure Authentication**: WebSocket connections now validate Express session on upgrade - reject unauthenticated connections
+- **User Identity**: Server derives userId from session (`request.session.passport.user`) instead of trusting client data
+- **Authorization**: `join_service` messages validate that user is either the service's cliente or conductor before allowing subscription
+- **Real-time Chat**: Chat messages broadcast via WebSocket to service participants (reduced polling from 2s to 30s fallback)
+
+#### Frontend Updates
+- Updated `useWebSocket` hook to handle server-driven authentication
+- Added quick message buttons to ChatBox: "¿Cuánto falta?", "Ya llegué", "Gracias", "En camino"
+- ChatBox now sends `join_service` on connection to receive real-time chat updates
+- WebSocket automatically responds to ping with pong to maintain connection health
+
+#### Remaining Items
+- Visual reconnection notifications (in progress)
+- Further optimization of chat real-time updates

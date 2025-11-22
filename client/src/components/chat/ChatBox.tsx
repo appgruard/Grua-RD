@@ -35,8 +35,25 @@ export function ChatBox({
 
   const { data: mensajes = [], isLoading } = useQuery<MensajeChatConRemitente[]>({
     queryKey: ['/api/chat', servicioId],
-    refetchInterval: 2000,
+    refetchInterval: 30000,
   });
+
+  const { send, connectionId } = useWebSocket(
+    (message) => {
+      if (message.type === 'new_chat_message') {
+        queryClient.invalidateQueries({ queryKey: ['/api/chat', servicioId] });
+      }
+    }
+  );
+
+  useEffect(() => {
+    if (connectionId > 0) {
+      send({
+        type: 'join_service',
+        payload: { serviceId: servicioId }
+      });
+    }
+  }, [connectionId]);
 
   const sendMutation = useMutation({
     mutationFn: async (contenido: string) => {
@@ -143,7 +160,21 @@ export function ChatBox({
           )}
         </ScrollArea>
       </CardContent>
-      <CardFooter className="pt-3">
+      <CardFooter className="pt-3 flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2 w-full">
+          {['¿Cuánto falta?', 'Ya llegué', 'Gracias', 'En camino'].map((quickMsg) => (
+            <Button
+              key={quickMsg}
+              variant="outline"
+              size="sm"
+              onClick={() => setMensaje(quickMsg)}
+              disabled={sendMutation.isPending}
+              data-testid={`button-quick-${quickMsg.toLowerCase().replace(/[¿?]/g, '').replace(/\s+/g, '-')}`}
+            >
+              {quickMsg}
+            </Button>
+          ))}
+        </div>
         <form onSubmit={handleSubmit} className="flex w-full gap-2">
           <Input
             value={mensaje}
