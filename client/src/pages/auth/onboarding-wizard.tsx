@@ -291,7 +291,7 @@ export default function OnboardingWizard() {
         return;
       }
 
-      queryClient.invalidateQueries(['/api/auth/me']);
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
 
       sessionStorage.removeItem(WIZARD_STORAGE_KEY);
 

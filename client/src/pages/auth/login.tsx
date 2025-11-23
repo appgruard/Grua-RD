@@ -182,24 +182,24 @@ export default function Login() {
           <div className="mt-6 text-center space-y-2">
             <p className="text-sm text-muted-foreground">
               ¿No tienes cuenta?{' '}
-              <Button
-                variant="link"
-                className="p-0 h-auto"
+              <button
+                type="button"
+                className="text-primary underline-offset-4 hover:underline"
                 onClick={() => setLocation('/onboarding')}
                 data-testid="link-register"
               >
                 Regístrate aquí
-              </Button>
+              </button>
             </p>
             <p className="text-sm text-muted-foreground">
-              <Button
-                variant="link"
-                className="p-0 h-auto"
+              <button
+                type="button"
+                className="text-primary underline-offset-4 hover:underline"
                 onClick={() => setLocation('/forgot-password')}
                 data-testid="link-forgot-password"
               >
                 ¿Olvidaste tu contraseña?
-              </Button>
+              </button>
             </p>
           </div>
         </CardContent>
