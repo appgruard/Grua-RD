@@ -787,6 +787,7 @@ export default function OnboardingWizard() {
             ) : (
               'Reenviar Código'
             )}
+          </Button>
         </>
       )}
     </div>

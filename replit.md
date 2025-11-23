@@ -18,15 +18,16 @@ Prioritize performance and scalability in new implementations.
 
 ## Recent Changes
 
-### Noviembre 23, 2025 - Avance en Fase 4 - Producción (Workstream A)
+### Noviembre 23, 2025 - Workstream A Completado (95%)
 - ✅ **Completadas Fases 1, 2 y 3** del desarrollo completo
 - ✅ **Definida Fase 4 - Producción** con 4 workstreams estructurados:
-  - **Workstream A: Identidad y Cumplimiento** - 75% completado (backend completo)
+  - **Workstream A: Identidad y Cumplimiento** - ✅ 95% completado (backend + frontend completo)
   - Workstream B: Gestión Documental & Seguridad Operativa - Pendiente
   - Workstream C: Pagos y Cumplimiento Financiero (Stripe Connect 70/30) - Pendiente
   - Workstream D: Preparación Producción & Deployabilidad (Capacitor/APK) - Pendiente
 
-### Workstream A - Implementado (Backend):
+### Workstream A - Implementado:
+**Backend:**
 - ✅ **Sistema de Logging:** Winston con logging estructurado (`server/logger.ts`)
 - ✅ **Servicio SMS:** Twilio con fallback a Mock (`server/sms-service.ts`)
 - ✅ **Validación Cédula:** Algoritmo Luhn, format validation (`server/services/identity.ts`)
@@ -37,21 +38,39 @@ Prioritize performance and scalability in new implementations.
   - `/api/identity/send-phone-otp` - Enviar código OTP via SMS
   - `/api/identity/verify-phone-otp` - Verificar código OTP
   - `/api/identity/status` - Estado de verificación del usuario
+  - `/api/admin/verification-status` - Lista de usuarios con estado de verificación (con paginación y filtros)
+  - `/api/admin/users/:id/verification-history` - Historial de intentos de verificación
 - ✅ **Rate Limiting:** Protección contra abuso (3 OTP/hora, 5 cédula/hora)
 - ✅ **Audit Logging:** Registro de todos los intentos de verificación
 
-### Workstream A - Pendiente (Frontend/Testing):
-- ⏳ **UI Wizard Multi-paso:** Onboarding Email → Cédula → Teléfono → Datos
-- ⏳ **Panel Admin:** Vista de estado de verificación de usuarios
-- ⏳ **Tests E2E:** Flujo completo de verificación de identidad
+**Frontend:**
+- ✅ **UI Wizard Multi-paso:** `client/src/pages/auth/onboarding-wizard.tsx` con 4 pasos completos:
+  - Paso 1: Crear cuenta (email, password, nombre, apellido, teléfono, tipo de usuario)
+  - Paso 2: Verificación de cédula dominicana
+  - Paso 3: Verificación de teléfono con OTP (countdown timer, reenvío)
+  - Paso 4: Datos de grúa (conductores) o confirmación (clientes)
+  - Persistencia de estado en sessionStorage
+  - Validaciones completas en cada paso
+- ✅ **Panel Admin de Verificaciones:** `client/src/pages/admin/verifications.tsx` completamente funcional:
+  - Dashboard con estadísticas (total usuarios, verificados, pendientes)
+  - Tabla de usuarios con estado de verificación (cédula y teléfono)
+  - Filtros por estado (todos, verificados, pendiente teléfono, pendiente cédula, sin verificar)
+  - Búsqueda por nombre, email o cédula
+  - Paginación
+  - Vista de historial de verificación por usuario (modal lateral)
+  - Badges visuales para estado de verificación
+- ✅ **Integración con Login:** Botón de registro redirige a `/onboarding`
 
-### Estado Actual (Post-Fase 3 + Avance Fase 4):
+### Workstream A - Pendiente:
+- ⏳ **Tests E2E:** Flujo completo de verificación de identidad con onboarding wizard
+
+### Estado Actual (Post-Fase 3 + Workstream A):
 - **Funcionalidades Core:** ✅ 100% implementadas (autenticación, servicios, tracking, chat, notificaciones)
 - **Testing:** ✅ 27 tests E2E con Playwright (cobertura completa de flujos Fases 1-3)
 - **UI/UX:** ✅ Responsive design, modo oscuro, estados de carga, manejo de errores
 - **Integraciones:** ✅ Google Maps, WebSocket, Web Push API, Stripe (requiere API keys)
-- **Fase 4 - Workstream A:** ✅ 75% (backend completo, pendiente UI wizard y tests)
-- **Pendiente:** Wizard onboarding, panel admin verificación, gestión documentos, Stripe Connect, optimización, APK
+- **Fase 4 - Workstream A:** ✅ 95% (backend + frontend completo, solo pendiente tests E2E)
+- **Pendiente:** Tests E2E wizard, gestión documentos (Workstream B), Stripe Connect (Workstream C), optimización y APK (Workstream D)
 
 ## System Architecture
 
@@ -75,12 +94,12 @@ GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (N
 - **Robust UX**: Skeleton loaders, empty states, confirmation dialogs, toast notifications, form validations, responsive mobile-first design.
 - **Monitoring & Logging**: Structured logging with Winston for all server operations.
 
-**Planificadas (Fase 4 - Producción):**
-- **Identity Verification**: Cédula dominicana validation, OTP phone verification via SMS (Twilio/Infobip).
-- **Document Management**: Secure upload and admin approval of driver documents (license, registration, ID).
-- **Advanced Payments**: Stripe Connect for automatic 70/30 commission split, PDF receipt generation.
-- **Security Hardening**: Helmet.js, CORS configuration, rate limiting, health check endpoint.
-- **Production Ready**: Capacitor configuration for Android APK, Lighthouse optimization, error monitoring (Sentry).
+**Fase 4 - Producción (En progreso):**
+- **Identity Verification** ✅ 95%: Wizard de onboarding con 4 pasos (email→cédula→OTP→datos), validación de cédula dominicana, verificación de teléfono via OTP/SMS, panel admin de verificaciones con historial completo.
+- **Document Management** ⏳: Secure upload and admin approval of driver documents (license, registration, ID).
+- **Advanced Payments** ⏳: Stripe Connect for automatic 70/30 commission split, PDF receipt generation.
+- **Security Hardening** ⏳: Helmet.js, CORS configuration, additional rate limiting, health check endpoint.
+- **Production Ready** ⏳: Capacitor configuration for Android APK, Lighthouse optimization, error monitoring (Sentry).
 
 ### System Design Choices
 The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket communication employs service-specific rooms for efficient updates. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage utilizes Replit Object Storage, with strict authorization for uploads. Stripe integration prioritizes server-side processing and webhook verification for security.

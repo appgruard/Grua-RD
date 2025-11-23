@@ -60,37 +60,49 @@
 ### 🚧 Fase 4 - Producción - EN PROGRESO
 Esta fase prepara la aplicación para lanzamiento en producción, organizando el trabajo en cuatro flujos (workstreams) que se ejecutarán de forma secuencial y parcialmente paralela.
 
-#### **Workstream A: Identidad y Cumplimiento** (Prioridad ALTA) - 75% COMPLETADO
+#### **Workstream A: Identidad y Cumplimiento** (Prioridad ALTA) - ✅ 95% COMPLETADO
 Implementar verificación de identidad robusta para cumplir con regulaciones locales.
 
-- [x] **Validación de Cédula Dominicana** (Backend completo, falta UI wizard)
+- [x] **Validación de Cédula Dominicana** ✅ COMPLETO
   - [x] Servicio de validación de cédula (servidor) - `server/services/identity.ts`
   - [x] Validación local con algoritmo Luhn (checksum)
   - [x] API endpoint: `/api/identity/verify-cedula` con rate limiting
   - [x] Actualizar schema para almacenar cédula y estado de verificación
   - [x] Audit logging de intentos de verificación
-  - [ ] UI dedicada para verificación de cédula en wizard de onboarding
+  - [x] UI dedicada para verificación de cédula en wizard de onboarding
   - [ ] Tests E2E para flujo de verificación
 
-- [x] **Verificación de Teléfono (OTP via SMS)** (Backend completo, falta UI wizard)
+- [x] **Verificación de Teléfono (OTP via SMS)** ✅ COMPLETO
   - [x] Integrar proveedor SMS - Twilio con fallback a Mock (`server/sms-service.ts`)
   - [x] Tabla `otp_tokens` con expiración y rate limiting (`server/schema-extensions.ts`)
   - [x] API endpoints implementados:
     - [x] `/api/auth/send-otp`, `/api/auth/verify-otp` (legacy)
     - [x] `/api/identity/send-phone-otp`, `/api/identity/verify-phone-otp` (nuevo)
     - [x] `/api/identity/status` (verificar estado completo)
-  - [x] UI para ingreso de OTP con countdown timer (`client/src/pages/auth/verify-otp.tsx`)
+  - [x] UI para ingreso de OTP con countdown timer (integrado en wizard)
   - [x] Rate limiting (3 intentos/hora para envío, 10 para verificación)
   - [x] Funciones: `createAndSendOTP`, `verifyOTP` con bcrypt hash
   - [x] Audit logging de intentos OTP
-  - [ ] Integrar UI de OTP en wizard de onboarding
+  - [x] UI de OTP integrada en wizard de onboarding
   - [ ] Tests E2E para flujo OTP completo
 
-- [ ] **Flujo de Onboarding Mejorado** (Pendiente)
-  - [ ] Wizard multi-paso: Email → Cédula → Teléfono → Datos personales
-  - [x] Re-intentos y estados de error (implementado en verify-otp.tsx)
+- [x] **Flujo de Onboarding Mejorado** ✅ COMPLETO
+  - [x] Wizard multi-paso: Email → Cédula → Teléfono → Datos personales (`client/src/pages/auth/onboarding-wizard.tsx`)
+    - [x] Paso 1: Email, Password, Nombre, Apellido, Teléfono, Tipo de usuario
+    - [x] Paso 2: Verificación de Cédula dominicana
+    - [x] Paso 3: Verificación de Teléfono con OTP (countdown timer, reenvío)
+    - [x] Paso 4: Datos de la Grúa (conductores) o Confirmación (clientes)
+    - [x] Persistencia de estado en sessionStorage
+    - [x] Validaciones completas en cada paso
+  - [x] Re-intentos y estados de error
   - [x] Auditoría de verificaciones en tabla `verification_audit` (`server/schema-extensions.ts`)
-  - [ ] Panel admin para ver estado de verificación de usuarios
+  - [x] Panel admin para ver estado de verificación de usuarios (`client/src/pages/admin/verifications.tsx`)
+    - [x] Dashboard con estadísticas (total usuarios, verificados, pendientes)
+    - [x] Tabla de usuarios con estado de verificación
+    - [x] Filtros por estado y búsqueda
+    - [x] Paginación
+    - [x] Historial de verificación por usuario
+  - [x] Endpoints admin: `/api/admin/verification-status`, `/api/admin/users/:id/verification-history`
 
 **Archivos Backend Implementados:**
 - `server/services/identity.ts` - Validación y verificación de cédula
@@ -98,16 +110,28 @@ Implementar verificación de identidad robusta para cumplir con regulaciones loc
 - `server/schema-extensions.ts` - Tablas `otp_tokens` y `verification_audit`
 - `server/logger.ts` - Logging estructurado con Winston
 - `server/routes.ts` - Endpoints de API con rate limiting
+  - `/api/identity/verify-cedula` - Validar cédula dominicana
+  - `/api/identity/send-phone-otp` - Enviar código OTP
+  - `/api/identity/verify-phone-otp` - Verificar código OTP
+  - `/api/identity/status` - Estado de verificación
+  - `/api/admin/verification-status` - Lista de usuarios con verificación
+  - `/api/admin/users/:id/verification-history` - Historial de verificación
 
 **Archivos Frontend Implementados:**
+- `client/src/pages/auth/onboarding-wizard.tsx` - Wizard completo de onboarding (4 pasos)
+- `client/src/pages/admin/verifications.tsx` - Panel admin de verificaciones
 - `client/src/pages/auth/verify-otp.tsx` - UI de verificación OTP standalone
 - `client/src/pages/auth/register.tsx` - Registro con campos cédula y teléfono
 - `client/src/pages/auth/forgot-password.tsx` - Recuperación con OTP
+- `client/src/App.tsx` - Ruta `/onboarding` registrada, ruta `/admin/verifications` registrada
 
 **Acceptance Criteria:**
 - ✅ Usuarios solo pueden completar registro con cédula y teléfono verificados
 - ✅ Admins pueden visualizar estado de verificación en panel de gestión
 - ✅ Sistema previene abuso de OTP con rate limiting
+- ✅ Wizard de onboarding funcional con 4 pasos y persistencia de estado
+- ✅ Panel admin muestra estadísticas, filtros, búsqueda y paginación
+- ⏳ Tests E2E para flujo completo (pendiente)
 
 ---
 
