@@ -16,6 +16,7 @@ import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensa
 import type { User, Servicio } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
+import { uploadDocument, getDocument } from "./services/object-storage";
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -2052,6 +2053,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Generate receipt error', error);
       res.status(500).json({ message: "Failed to generate receipt" });
+    }
+  });
+
+  // ========================================
+  // DOCUMENT MANAGEMENT ENDPOINTS
+  // ========================================
+
+  // Upload document (drivers only) - reuses existing multer config
+  app.post("/api/documents/upload", upload.single('file'), async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can upload documents" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file provided" });
+    }
+
+    try {
+      const { tipo } = req.body;
+      
+      if (!tipo) {
+        return res.status(400).json({ message: "Document type (tipo) is required" });
+      }
+
+      const validTypes = ['licencia', 'matricula', 'cedula_frontal', 'cedula_trasera', 'foto_vehiculo'];
+      if (!validTypes.includes(tipo)) {
+        return res.status(400).json({ message: "Invalid document type" });
+      }
+
+      // Upload to object storage
+      const uploadResult = await uploadDocument({
+        buffer: req.file.buffer,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        userId: req.user!.id,
+        documentType: tipo,
+      });
+
+      // Save to database
+      const documento = await storage.createDocumento({
+        tipo,
+        usuarioId: req.user!.id,
+        url: uploadResult.key,
+        nombreArchivo: uploadResult.fileName,
+        estado: 'pendiente',
+      });
+
+      logDocument.uploaded(req.user!.id, tipo, documento.id);
+
+      res.json({
+        success: true,
+        document: documento,
+      });
+    } catch (error: any) {
+      logSystem.error('Document upload error', error);
+      res.status(500).json({ message: error.message || "Failed to upload document" });
+    }
+  });
+
+  // Get my documents
+  app.get("/api/documents/my-documents", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const documents = await storage.getDocumentosByUserId(req.user!.id);
+      res.json(documents);
+    } catch (error: any) {
+      logSystem.error('Get my documents error', error);
+      res.status(500).json({ message: "Failed to get documents" });
+    }
+  });
+
+  // Get document file (with authorization check)
+  app.get("/api/documents/:id/file", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const documento = await storage.getDocumentoById(req.params.id);
+      
+      if (!documento) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // Check authorization
+      if (req.user!.userType !== 'admin' && documento.usuarioId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      // Retrieve file from object storage
+      const fileBuffer = await getDocument(documento.url);
+      
+      if (!fileBuffer) {
+        return res.status(404).json({ message: "File not found in storage" });
+      }
+
+      // Determine content type from file extension
+      const ext = documento.nombreArchivo.split('.').pop()?.toLowerCase();
+      let contentType = 'application/octet-stream';
+      if (ext === 'pdf') contentType = 'application/pdf';
+      else if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
+      else if (ext === 'png') contentType = 'image/png';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `inline; filename="${documento.nombreArchivo}"`);
+      res.send(fileBuffer);
+    } catch (error: any) {
+      logSystem.error('Get document file error', error);
+      res.status(500).json({ message: "Failed to retrieve document" });
+    }
+  });
+
+  // Get all pending documents (admin only)
+  app.get("/api/admin/documents/pending", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: admin access required" });
+    }
+
+    try {
+      const documents = await storage.getDocumentosByEstado('pendiente');
+      res.json(documents);
+    } catch (error: any) {
+      logSystem.error('Get pending documents error', error);
+      res.status(500).json({ message: "Failed to get pending documents" });
+    }
+  });
+
+  // Review document (approve/reject - admin only)
+  app.patch("/api/admin/documents/:id/review", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: admin access required" });
+    }
+
+    try {
+      const { estado, motivoRechazo } = req.body;
+      
+      if (!estado || (estado !== 'aprobado' && estado !== 'rechazado')) {
+        return res.status(400).json({ message: "Valid estado (aprobado/rechazado) is required" });
+      }
+
+      if (estado === 'rechazado' && !motivoRechazo) {
+        return res.status(400).json({ message: "Motivo de rechazo is required when rejecting" });
+      }
+
+      const documento = await storage.reviewDocumento(
+        req.params.id,
+        estado,
+        req.user!.id,
+        motivoRechazo
+      );
+
+      logDocument.reviewed(req.user!.id, req.params.id, estado);
+
+      res.json(documento);
+    } catch (error: any) {
+      logSystem.error('Review document error', error);
+      res.status(500).json({ message: error.message || "Failed to review document" });
     }
   });
 

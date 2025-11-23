@@ -1,0 +1,183 @@
+import { Client } from '@replit/object-storage';
+import { logger } from '../logger';
+import crypto from 'crypto';
+import path from 'path';
+
+const storage = new Client();
+
+// Allowed MIME types for document uploads
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'application/pdf',
+];
+
+// Maximum file size: 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+export interface UploadResult {
+  key: string;
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+}
+
+export interface UploadOptions {
+  buffer: Buffer;
+  originalName: string;
+  mimeType: string;
+  userId: string;
+  documentType: string;
+}
+
+/**
+ * Validate file before upload
+ */
+export function validateFile(fileSize: number, mimeType: string): { valid: boolean; error?: string } {
+  if (fileSize > MAX_FILE_SIZE) {
+    return { 
+      valid: false, 
+      error: `Archivo muy grande. Tamaño máximo: ${MAX_FILE_SIZE / 1024 / 1024}MB` 
+    };
+  }
+
+  if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+    return { 
+      valid: false, 
+      error: 'Formato de archivo no permitido. Solo se aceptan JPG, PNG y PDF' 
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Generate a unique file key for object storage
+ */
+function generateFileKey(userId: string, documentType: string, originalName: string): string {
+  const ext = path.extname(originalName);
+  const timestamp = Date.now();
+  const randomId = crypto.randomBytes(8).toString('hex');
+  return `documents/${userId}/${documentType}/${timestamp}-${randomId}${ext}`;
+}
+
+/**
+ * Upload a file to Replit Object Storage
+ */
+export async function uploadDocument(options: UploadOptions): Promise<UploadResult> {
+  const { buffer, originalName, mimeType, userId, documentType } = options;
+
+  try {
+    // Validate file
+    const validation = validateFile(buffer.length, mimeType);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    // Generate unique key
+    const key = generateFileKey(userId, documentType, originalName);
+
+    // Upload to object storage using uploadFromBytes
+    const result = await storage.uploadFromBytes(key, buffer);
+    
+    if (!result.ok) {
+      throw new Error(result.error?.message || 'Failed to upload document');
+    }
+
+    logger.info('Document uploaded to object storage', {
+      key,
+      userId,
+      documentType,
+      fileSize: buffer.length,
+      mimeType,
+    });
+
+    // Return result with public URL
+    // Note: Replit object storage URLs are accessible via the storage client
+    return {
+      key,
+      url: key, // We'll store the key as the URL and retrieve via storage client
+      fileName: originalName,
+      fileSize: buffer.length,
+      mimeType,
+    };
+  } catch (error) {
+    logger.error('Error uploading document to object storage', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      userId,
+      documentType,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Retrieve a document from object storage
+ */
+export async function getDocument(key: string): Promise<Buffer | null> {
+  try {
+    const result = await storage.downloadAsBytes(key);
+    
+    if (!result.ok) {
+      logger.warn('Document not found in object storage', { 
+        key,
+        error: result.error?.message 
+      });
+      return null;
+    }
+    
+    return result.value;
+  } catch (error) {
+    logger.error('Error retrieving document from object storage', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      key,
+    });
+    return null;
+  }
+}
+
+/**
+ * Delete a document from object storage
+ */
+export async function deleteDocument(key: string): Promise<boolean> {
+  try {
+    await storage.delete(key);
+    logger.info('Document deleted from object storage', { key });
+    return true;
+  } catch (error) {
+    logger.error('Error deleting document from object storage', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      key,
+    });
+    return false;
+  }
+}
+
+/**
+ * List all documents for a user
+ */
+export async function listUserDocuments(userId: string): Promise<string[]> {
+  try {
+    const prefix = `documents/${userId}/`;
+    const result = await storage.list({ prefix });
+    
+    if (!result.ok) {
+      logger.error('Error listing user documents', {
+        error: result.error?.message,
+        userId,
+      });
+      return [];
+    }
+    
+    // Extract names from StorageObject array
+    return result.value.map((obj) => obj.name);
+  } catch (error) {
+    logger.error('Error listing user documents', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      userId,
+    });
+    return [];
+  }
+}
