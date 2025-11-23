@@ -138,3 +138,42 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 - **Web Push API**: For sending push notifications.
 - **Replit Object Storage**: For document storage.
 - **Twilio**: SMS service for OTP delivery (manual configuration, no Replit integration used - credentials stored as secrets).
+
+## Deployment Notes
+
+### Environment Variables
+
+**Requeridas en Producción:**
+- `DATABASE_URL`: PostgreSQL connection string
+- `SESSION_SECRET`: Secret para manejo de sesiones
+- `ALLOWED_ORIGINS`: **CRÍTICO** - Lista de orígenes permitidos separados por comas (e.g., `https://app.gruard.com,https://www.gruard.com`)
+  - **Si no se configura, todas las peticiones CORS serán bloqueadas en producción**
+- `VITE_STRIPE_PUBLIC_KEY`: Stripe publishable key
+- `STRIPE_SECRET_KEY`: Stripe secret key
+- `VITE_GOOGLE_MAPS_API_KEY`: Google Maps API key
+
+**Opcionales:**
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`: Para SMS (fallback a mock en desarrollo)
+- `VAPID_PRIVATE_KEY`, `VITE_VAPID_PUBLIC_KEY`: Para push notifications
+- `REPLIT_DB_URL`: Para Object Storage (degrada graciosamente si no está disponible)
+
+### Security Configuration
+
+**Helmet.js - Content Security Policy (CSP):**
+- **Desarrollo:** Deshabilitado para facilitar testing
+- **Producción:** Habilitado con whitelist estricta para:
+  - **Google Maps:** `maps.googleapis.com`, `maps.gstatic.com` (scripts, styles, fonts, images)
+  - **Stripe:** `js.stripe.com`, `api.stripe.com`, `m.stripe.network`, `hooks.stripe.com` (scripts, frames, connect)
+  - **WebSockets:** `wss:`, `ws:` (connect)
+- **HSTS:** 1 año (31536000s) con `includeSubDomains` y `preload`
+
+**CORS:**
+- **Desarrollo:** Permite todas las conexiones de localhost
+- **Producción:** Requiere `ALLOWED_ORIGINS` configurado obligatoriamente
+  - Formato: Lista separada por comas: `https://app.gruard.com,https://www.gruard.com`
+  - Si no está configurado, **todas las peticiones serán bloqueadas** con mensaje de error en logs
+
+**Health Check:**
+- Endpoint: `GET /health`
+- Respuesta: `{ status: "healthy", timestamp: ISO8601, uptime: seconds, environment: "development|production" }`
+- Útil para monitoring y orchestration (Kubernetes, Docker, load balancers)
