@@ -1,7 +1,7 @@
 # GruaRD - Plataforma de Servicios de Grúa
 
 ## Overview
-GruaRD is a Progressive Web App (PWA) designed to connect users needing tow truck services with available drivers in real-time within the Dominican Republic, similar to Uber. The platform features three distinct interfaces: Client, Driver, and Admin. Its primary purpose is to streamline tow truck requests, real-time tracking, and service management.
+GruaRD is a Progressive Web App (PWA) designed to connect users needing tow truck services with available drivers in real-time within the Dominican Republic, similar to Uber. The platform features three distinct interfaces: Client, Driver, and Admin. Its primary purpose is to streamline tow truck requests, real-time tracking, and service management, with a vision to revolutionize the tow truck service industry in the region.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -19,275 +19,30 @@ Prioritize performance and scalability in new implementations.
 ## System Architecture
 
 ### UI/UX Decisions
-The design system is based on Inter font, with a primary blue color (`#2563eb`). It utilizes `shadcn/ui` components with Tailwind CSS for a mobile-first, responsive layout. The application currently supports a light mode, with dark mode preparation in place. Client and Driver interfaces use a `MobileLayout` with bottom navigation, while the Admin interface employs an `AdminLayout` with a sidebar. The PWA is configured for standalone installation with appropriate icons and a theme color.
+The design system uses Inter font with a primary blue color (`#2563eb`), leveraging `shadcn/ui` and Tailwind CSS for a mobile-first, responsive PWA. It supports a light mode with dark mode preparation. Client and Driver interfaces utilize a `MobileLayout` with bottom navigation, while the Admin interface uses an `AdminLayout` with a sidebar. The PWA is configured for standalone installation.
 
 ### Technical Implementations
-GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js) backend. PostgreSQL (Neon) with Drizzle ORM handles database operations. Authentication uses Passport.js with a local strategy and bcrypt for password hashing. Real-time functionalities, including GPS tracking, are managed via WebSockets (ws library). Google Maps JavaScript API is integrated for interactive maps, distance calculations, and geocoding. State management is handled by TanStack Query (React Query v5). The project adheres to a modular structure, separating frontend, backend, and shared schema definitions.
+GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js) backend. PostgreSQL (Neon) with Drizzle ORM manages the database. Authentication uses Passport.js with local strategy and bcrypt. Real-time features, including GPS tracking and chat, are powered by WebSockets (`ws` library). Google Maps JavaScript API handles mapping, distance, and geocoding. State management is done with TanStack Query (React Query v5). The project maintains a modular structure.
 
 ### Feature Specifications
-The platform supports comprehensive authentication with role-based access for clients, drivers, and administrators.
-- **Authentication & Security (FASE 0.1 - Implementado)**:
-  - User registration with Dominican Republic cédula validation (11 digits with verification algorithm)
-  - Phone verification via OTP (One-Time Password) system
-  - Account status management (pendiente_verificacion, activo, suspendido, rechazado)
-  - Password recovery via SMS verification code
-  - Zod schema validation for all registration inputs
-  - Brute-force protection with attempt limits (max 3 attempts per OTP code)
-  - Automatic expiration of verification codes (10 minutes)
-- **Client Features**: Service requests with map-based origin/destination, real-time service tracking, service history, user profiles, and automatic price calculation.
-- **Driver Features**: Dashboard with nearby requests, ability to accept/reject services, real-time GPS tracking, service status updates, service history, availability toggle, and truck information management.
-- **Admin Features**: Dashboard with statistics, user and driver management, real-time service monitoring, and dynamic tariff configuration.
-- **Real-time Communication**: WebSocket protocol facilitates real-time location updates for drivers and instant notifications for new service requests and status changes.
-- **PWA Capabilities**: Configured `manifest.json` for installability and a service worker (`sw.js`) for static asset caching with a cache-first strategy.
-- **Robust Error Handling**: Implemented with toasts for descriptive error messages, visual alerts in forms, and immediate feedback on validations.
-- **UX Enhancements**: Includes complete form validations with specific error messages, reusable Skeleton components for loading states, informative Empty States, and confirmation dialogs for critical actions.
-- **Chat Functionality**: Real-time chat between clients and drivers, supported by a dedicated database table, API endpoints, and WebSocket events.
-- **Push Notifications**: Web Push API integration for critical events like service acceptance, start, completion, and new chat messages.
+The platform provides comprehensive role-based authentication and security, including cédula validation, OTP phone verification, and brute-force protection.
+- **Client Features**: Service requests (map-based), real-time tracking, service history, profiles, automatic price calculation.
+- **Driver Features**: Dashboard for requests, accept/reject services, real-time GPS, status updates, service history, availability toggle, truck management.
+- **Admin Features**: Dashboard with statistics, user/driver management, real-time service monitoring, dynamic tariff configuration.
+- **Real-time Communication**: WebSockets for location updates, notifications, and client-driver chat.
+- **PWA Capabilities**: `manifest.json` for installability and a service worker (`sw.js`) for static asset caching.
+- **Robust Error Handling**: Toasts, visual form alerts, skeleton loaders, empty states, and confirmation dialogs.
+- **Document Management**: Secure upload, storage, and management of user and driver documents with admin approval workflows.
+- **Payment Integration**: Stripe for secure payments, automatic commission calculation (70/30 split), and PDF receipt generation.
+- **Monitoring & Logging**: Structured logging with Winston and a health check endpoint for system status.
 
 ### System Design Choices
-The system uses a PostgreSQL database with Drizzle ORM for type-safe data access. WebSocket communication is optimized by using service-specific rooms to efficiently broadcast location updates and service status changes. Security measures include bcrypt for password hashing, HTTP-only session cookies, role-based access control, and Drizzle ORM's protection against SQL injection.
+The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket communication employs service-specific rooms for efficient updates. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage utilizes Replit Object Storage, with strict authorization for uploads. Stripe integration prioritizes server-side processing and webhook verification for security.
 
 ## External Dependencies
-- **PostgreSQL (Neon)**: Main database solution.
-- **Google Maps Platform**:
-    - **Maps JavaScript API**: For interactive map displays.
-    - **Distance Matrix API**: For calculating travel times and distances.
-    - **Geocoding API**: For converting addresses to geographical coordinates and vice-versa.
-- **Stripe**: Payment gateway (configuration prepared, awaiting API keys).
-- **Web Push API**: For sending push notifications (requires VAPID keys).
-- **SMS Service** (Pending): Currently using mock service for OTP delivery. Integration with Twilio/Infobip/MessageBird planned for production.
-
-## Recent Changes
-
-### FASE 0.1 - Identidad y Autenticación ✅ COMPLETADA
-
-#### Database Schema Updates
-- Added `cedula` field to users table with validation for Dominican Republic ID format
-- Added `estadoCuenta` enum field to users table (pendiente_verificacion, activo, suspendido, rechazado)
-- Added `telefonoVerificado` boolean field to users table
-- Created `verification_codes` table for OTP management with fields: telefono, codigo, expiraEn, intentos, verificado, tipoOperacion
-
-#### API Endpoints (Backend)
-- `POST /api/auth/send-otp` - Send OTP verification code via SMS
-- `POST /api/auth/verify-otp` - Verify OTP code and activate account
-- `POST /api/auth/forgot-password` - Request password recovery code
-- `POST /api/auth/reset-password` - Reset password with verification code
-- Updated `POST /api/auth/register` - Now includes cédula validation and Zod schema validation
-
-#### Security Improvements
-- Implemented brute-force protection on OTP verification (max 3 attempts)
-- Automatic cleanup of expired verification codes
-- Deletion of prior active codes when issuing new ones
-- Full Zod validation on registration endpoint for input sanitization
-
----
-
-### FASE 0.2 - Comunicaciones en Tiempo Real ✅ COMPLETADA
-
-#### WebSocket Enhancements
-- **Heartbeat/Ping-Pong**: Implemented heartbeat mechanism with ping every 30 seconds to detect disconnected clients
-- **Secure Authentication**: WebSocket connections now validate Express session on upgrade - reject unauthenticated connections
-- **User Identity**: Server derives userId from session (`request.session.passport.user`) instead of trusting client data
-- **Authorization**: `join_service` messages validate that user is either the service's cliente or conductor before allowing subscription
-- **Real-time Chat**: Chat messages broadcast via WebSocket to service participants (reduced polling from 2s to 30s fallback)
-- **Visual Reconnection Notifications**: Toast notifications show connection status (disconnected/reconnected) to users
-
-#### Frontend Updates
-- Updated `useWebSocket` hook to handle server-driven authentication
-- Added quick message buttons to ChatBox: "¿Cuánto falta?", "Ya llegué", "Gracias", "En camino"
-- ChatBox now sends `join_service` on connection to receive real-time chat updates
-- WebSocket automatically responds to ping with pong to maintain connection health
-- Implemented visual reconnection notifications using toast system
-
----
-
-### FASE 0.3 - Gestión de Documentos ✅ COMPLETADA
-
-#### Database Schema
-- Created `documentos` table with fields: id, tipo, usuarioId, conductorId, servicioId, url, nombreArchivo, estado, validoHasta, revisadoPor, motivoRechazo, createdAt
-- Added `documentoTipoEnum` with values: licencia, matricula, poliza, seguro_grua, foto_vehiculo, foto_perfil, cedula_frontal, cedula_trasera
-- Added `documentoEstadoEnum` with values: pendiente, aprobado, rechazado
-- Full TypeScript types and Zod validation schemas generated
-
-#### Storage Service (Replit Object Storage)
-- Implemented `StorageService` using `@replit/object-storage` SDK
-- Upload files with automatic folder organization (usuarios/, conductores/, servicios/)
-- Download files as Buffer for serving
-- Delete files from storage
-- List files by prefix
-- **⚠️ IMPORTANTE**: Se requiere crear un bucket en el workspace de Replit antes de usar la funcionalidad de carga de documentos. El servicio de almacenamiento se inicializa de forma lazy y lanzará un error descriptivo si no hay bucket disponible.
-
-#### API Endpoints
-- `POST /api/upload` - Upload document with multipart/form-data (max 5MB, JPEG/PNG/PDF only)
-  - **Seguridad**: Solo conductores activos y admins pueden subir documentos
-  - **Autorización**: El conductorId se deriva ESTRICTAMENTE de la sesión del usuario autenticado (ignora cualquier conductorId del cliente)
-  - **Validación de estado**: Solo conductores con estadoCuenta='activo' pueden subir documentos
-  - **Validación de tipos**: Tipos de documento permitidos: licencia, matricula, poliza, seguro_grua, foto_vehiculo, foto_perfil, cedula_frontal, cedula_trasera
-  - **Ownership**: Los conductores solo pueden subir documentos a su propio perfil (verificado mediante sesión)
-  - **Comportamiento Admin**: Los admins suben documentos con conductorId=null (no pueden asignar documentos a conductores mediante este endpoint). Para asignar documentos a conductores específicos, se creará un endpoint separado en el futuro.
-- `GET /api/documentos/:id` - Get document by ID (with authorization)
-- `GET /api/documentos/user/:userId` - Get all documents for a user
-- `GET /api/documentos/conductor/:conductorId` - Get all documents for a driver
-- `GET /api/admin/documentos` - Admin: Get all documents in system
-- `DELETE /api/documentos/:id` - Delete document (removes from storage and database)
-- `PUT /api/admin/documentos/:id/aprobar` - Admin: Approve document
-- `PUT /api/admin/documentos/:id/rechazar` - Admin: Reject document with reason
-- All endpoints include proper authentication and authorization checks
-
-#### Frontend Components
-- **FileUpload Component**: Reusable drag-and-drop file upload component
-  - Drag & drop support
-  - File type validation (JPEG, PNG, PDF)
-  - File size validation (5MB max)
-  - Image preview for uploaded images
-  - Error handling and user feedback
-  - Loading states during upload
-- **Driver Profile Integration**: Document management section added to driver profile
-  - Upload required documents: Licencia, Matrícula, Seguro de Grúa, Foto del Vehículo, Cédula (Frente/Reverso)
-  - Visual status badges: Pendiente (yellow), Aprobado (green), Rechazado (red)
-  - Display rejection reasons for rejected documents
-  - Real-time upload progress and status updates
-  - Ability to replace rejected or expired documents
-  - **Nota técnica**: El upload usa `fetch()` directo en lugar de `apiRequest` porque FormData requiere que el navegador establezca automáticamente el `Content-Type` con el boundary correcto (`multipart/form-data`), mientras que `apiRequest` está configurado para JSON.
-
-#### Storage Methods (Database)
-- `createDocumento(documento)` - Create new document record
-- `getDocumentoById(id)` - Get document with full details
-- `getDocumentosByUsuarioId(userId)` - Get all documents for user
-- `getDocumentosByConductorId(conductorId)` - Get all documents for driver
-- `getAllDocumentos()` - Admin: Get all documents
-- `updateDocumento(id, data)` - Update document metadata
-- `deleteDocumento(id)` - Delete document record
-- `aprobarDocumento(id, adminId)` - Approve document
-- `rechazarDocumento(id, adminId, motivo)` - Reject document with reason
-
----
-
-### FASE 0.4 - Integración de Pagos con Stripe ✅ COMPLETADA
-
-#### Database Schema
-- Created `comisiones` table with commission tracking (70/30 split):
-  - Fields: id, servicioId, montoTotal, montoOperador, montoEmpresa, porcentajeOperador, porcentajeEmpresa
-  - Payment states: estadoPagoOperador, estadoPagoEmpresa (pendiente, procesando, pagado, fallido)
-  - Tracking: stripeTransferId, fechaPagoOperador, fechaPagoEmpresa, notas, createdAt
-- Added `estadoPagoEnum` with values: pendiente, procesando, pagado, fallido
-- Full TypeScript types and Zod validation schemas generated
-
-#### Payment Integration (Stripe)
-- **Currency**: Dominican Peso (DOP) configured for República Dominicana
-- **PaymentIntent API**: Secure server-side payment processing
-- **Webhook Integration**: Automatic commission creation on successful payments
-- **Commission System**: Automatic 70/30 split (70% operator, 30% company)
-- **Environment Variables Required**:
-  - `STRIPE_SECRET_KEY` - Stripe secret API key
-  - `VITE_STRIPE_PUBLIC_KEY` - Stripe publishable key (frontend)
-  - `STRIPE_WEBHOOK_SECRET` - Webhook signing secret for event verification
-
-#### API Endpoints (Payments)
-- `POST /api/payments/create-intent` - Create PaymentIntent for card payment
-  - Request: `{ amount: string, servicioId: string }`
-  - Response: `{ clientSecret: string, paymentIntentId: string }`
-  - Returns 503 if Stripe not configured
-- `POST /api/payments/webhook` - Stripe webhook handler (raw body)
-  - Verifies webhook signature
-  - Creates commission record on `payment_intent.succeeded` event
-  - Automatic 70/30 split calculation
-  - Updates service with Stripe payment ID
-- `GET /api/comisiones` - Admin: Get all commissions
-- `GET /api/comisiones/pendientes/:tipo` - Admin: Get pending commissions by type (operador/empresa)
-- `PUT /api/comisiones/:id/pagar` - Admin: Mark commission as paid
-  - Request: `{ tipo: 'operador' | 'empresa', stripeTransferId?: string }`
-- `GET /api/servicios/:id/recibo` - Generate PDF receipt for service
-  - Authorized for client, driver, and admin
-  - Returns PDF with service details, payment info, fiscal information
-  - Filename: `recibo-{servicioId}.pdf`
-
-#### Frontend Components
-- **StripePayment Component**: Complete payment flow with Stripe Elements
-  - Integration with `@stripe/stripe-js` and `@stripe/react-stripe-js`
-  - PaymentElement for secure card input
-  - Automatic PaymentIntent creation
-  - Real-time payment confirmation
-  - Loading states and error handling
-  - Success/error toast notifications
-  - Configurable callbacks for success/cancel
-  - Test IDs for e2e testing
-
-#### Storage Methods (Database - Comisiones)
-- `createComision(comision)` - Create new commission record
-- `getComisionByServicioId(servicioId)` - Get commission for specific service
-- `getComisionesByEstado(estado, tipo)` - Get commissions by payment state and type
-- `getAllComisiones()` - Admin: Get all commissions with service details
-- `updateComision(id, data)` - Update commission metadata
-- `marcarComisionPagada(id, tipo, stripeTransferId?)` - Mark commission as paid for operator or company
-
-#### Security & Best Practices
-- Stripe API keys stored securely in environment variables
-- Webhook signature verification for event authenticity
-- Server-side PaymentIntent creation (never expose secret key to client)
-- Automatic commission calculation to prevent manipulation
-- Authorization checks on all payment-related endpoints
-- Commission records linked to completed services only
-
-#### Digital Receipts (PDF)
-- Generated using PDFKit library
-- Includes complete service details: client, driver, origin, destination, distance
-- Payment information: total cost, payment method, transaction ID
-- Fiscal information: company name, RNC, legal disclaimer
-- Accessible by service participants (client, driver, admin)
-- Downloadable as PDF attachment
-
----
-
-### FASE 0.5 - Monitoreo y Logging ✅ COMPLETADA
-
-#### System Logging (Winston)
-- **Logger Service**: Structured logging system with Winston (`server/logger.ts`)
-  - Log levels: error, warn, info, debug
-  - Console output with colors
-  - File output: `logs/error.log` and `logs/combined.log`
-  - Automatic log rotation (max 5 files, 5MB each)
-  - Timestamps and contextual metadata
-
-#### Logging Categories
-- **Authentication Logs** (`logAuth`):
-  - Login success/failure
-  - Registration success/failure
-  - OTP sent/verified/failed
-  - Password reset
-- **Transaction Logs** (`logTransaction`):
-  - Payment started/success/failed
-  - Commission created
-  - Receipt generated
-- **Service Logs** (`logService`):
-  - Service created/accepted/started/completed/cancelled
-  - State changes with metadata
-- **Document Logs** (`logDocument`):
-  - Document uploaded/approved/rejected/deleted
-- **System Logs** (`logSystem`):
-  - General info/warn/error/debug messages
-  - Error tracking with stack traces
-
-#### Health Check Endpoint
-- **Endpoint**: `GET /api/health`
-- **Functionality**:
-  - Database connectivity check
-  - Response time measurement
-  - Active services count
-  - Online drivers count
-  - WebSocket connections count
-  - System uptime
-  - Status codes: 200 (healthy) or 503 (degraded/unhealthy)
-
-#### Integration Points
-- Logging integrated in all critical endpoints:
-  - Authentication (login, register, OTP, password reset)
-  - Services (create, accept, start, complete, cancel)
-  - Payments (create-intent, webhook)
-  - Documents (upload, approve, reject)
-  - All error handlers with contextual information
-
-#### Configuration
-- Environment variable: `LOG_LEVEL` (default: 'info')
-- Log files stored in `logs/` directory
-- Automatic cleanup of old logs
+- **PostgreSQL (Neon)**: Main database.
+- **Google Maps Platform**: Maps JavaScript API, Distance Matrix API, Geocoding API.
+- **Stripe**: Payment gateway for processing transactions.
+- **Web Push API**: For sending push notifications.
+- **Replit Object Storage**: For document storage.
+- **SMS Service**: Placeholder for OTP delivery (Twilio/Infobip/MessageBird planned).
