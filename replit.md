@@ -73,4 +73,4 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 - **Stripe**: Payment gateway for processing transactions.
 - **Web Push API**: For sending push notifications.
 - **Replit Object Storage**: For document storage.
-- **SMS Service**: Placeholder for OTP delivery (Twilio/Infobip/MessageBird planned).
+- **Twilio**: SMS service for OTP delivery (manual configuration, no Replit integration used - credentials stored as secrets).
