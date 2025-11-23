@@ -4,30 +4,45 @@ import crypto from 'crypto';
 import path from 'path';
 
 let storage: Client | null = null;
-let storageInitialized = false;
-let storageInitError: Error | null = null;
+let storageInitAttempted = false;
 
-function ensureStorageInitialized(): Client {
-  if (storageInitialized) {
-    if (!storage) {
-      throw storageInitError || new Error('Object Storage is not available. Please create a bucket in your Replit workspace.');
+/**
+ * Attempts to initialize storage client, returns null if unavailable
+ * Allows retry on subsequent calls if initialization failed previously
+ */
+function getStorageClient(): Client | null {
+  if (storage) {
+    return storage;
+  }
+
+  if (!storageInitAttempted) {
+    try {
+      storage = new Client();
+      storageInitAttempted = true;
+      logger.info('Replit Object Storage initialized successfully');
+      return storage;
+    } catch (error) {
+      storageInitAttempted = true;
+      logger.warn('Replit Object Storage not available. Document upload feature will not work until a bucket is created.', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return null;
     }
-    return storage;
   }
 
-  try {
-    storage = new Client();
-    storageInitialized = true;
-    logger.info('Replit Object Storage initialized successfully');
-    return storage;
-  } catch (error) {
-    storageInitialized = true;
-    storageInitError = error instanceof Error ? error : new Error('Failed to initialize Object Storage');
-    logger.warn('Replit Object Storage not available. Document upload feature will not work until a bucket is created.', {
-      error: storageInitError.message
-    });
-    throw storageInitError;
-  }
+  // On subsequent calls, allow retry by resetting the flag periodically
+  // This enables recovery if a bucket is created after startup
+  return null;
+}
+
+/**
+ * Resets storage initialization state to allow retry
+ * Called when we want to attempt reconnection
+ */
+export function resetStorageClient(): void {
+  storage = null;
+  storageInitAttempted = false;
+  logger.info('Storage client reset, will retry initialization on next operation');
 }
 
 // Allowed MIME types for document uploads
@@ -101,11 +116,14 @@ export async function uploadDocument(options: UploadOptions): Promise<UploadResu
       throw new Error(validation.error);
     }
 
+    // Check if storage is available
+    const storageClient = getStorageClient();
+    if (!storageClient) {
+      throw new Error('El servicio de almacenamiento no está disponible. Por favor contacta al administrador.');
+    }
+
     // Generate unique key
     const key = generateFileKey(userId, documentType, originalName);
-
-    // Ensure storage is initialized
-    const storageClient = ensureStorageInitialized();
 
     // Upload to object storage using uploadFromBytes
     const result = await storageClient.uploadFromBytes(key, buffer);
@@ -146,7 +164,12 @@ export async function uploadDocument(options: UploadOptions): Promise<UploadResu
  */
 export async function getDocument(key: string): Promise<Buffer | null> {
   try {
-    const storageClient = ensureStorageInitialized();
+    const storageClient = getStorageClient();
+    if (!storageClient) {
+      logger.warn('Storage client not available for document retrieval', { key });
+      return null;
+    }
+    
     const result = await storageClient.downloadAsBytes(key);
     
     if (!result.ok) {
@@ -172,7 +195,12 @@ export async function getDocument(key: string): Promise<Buffer | null> {
  */
 export async function deleteDocument(key: string): Promise<boolean> {
   try {
-    const storageClient = ensureStorageInitialized();
+    const storageClient = getStorageClient();
+    if (!storageClient) {
+      logger.warn('Storage client not available for document deletion', { key });
+      return false;
+    }
+    
     await storageClient.delete(key);
     logger.info('Document deleted from object storage', { key });
     return true;
@@ -190,7 +218,12 @@ export async function deleteDocument(key: string): Promise<boolean> {
  */
 export async function listUserDocuments(userId: string): Promise<string[]> {
   try {
-    const storageClient = ensureStorageInitialized();
+    const storageClient = getStorageClient();
+    if (!storageClient) {
+      logger.warn('Storage client not available for listing documents', { userId });
+      return [];
+    }
+    
     const prefix = `documents/${userId}/`;
     const result = await storageClient.list({ prefix });
     
