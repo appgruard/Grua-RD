@@ -60,29 +60,49 @@
 ### 🚧 Fase 4 - Producción - EN PROGRESO
 Esta fase prepara la aplicación para lanzamiento en producción, organizando el trabajo en cuatro flujos (workstreams) que se ejecutarán de forma secuencial y parcialmente paralela.
 
-#### **Workstream A: Identidad y Cumplimiento** (Prioridad ALTA)
+#### **Workstream A: Identidad y Cumplimiento** (Prioridad ALTA) - 75% COMPLETADO
 Implementar verificación de identidad robusta para cumplir con regulaciones locales.
 
-- [ ] **Validación de Cédula Dominicana**
-  - [ ] Servicio de validación de cédula (servidor)
-  - [ ] Integración con API de JCE (Junta Central Electoral) o validación local
-  - [ ] UI para manejo de errores de validación
-  - [ ] Actualizar schema para almacenar cédula y estado de verificación
+- [x] **Validación de Cédula Dominicana** (Backend completo, falta UI wizard)
+  - [x] Servicio de validación de cédula (servidor) - `server/services/identity.ts`
+  - [x] Validación local con algoritmo Luhn (checksum)
+  - [x] API endpoint: `/api/identity/verify-cedula` con rate limiting
+  - [x] Actualizar schema para almacenar cédula y estado de verificación
+  - [x] Audit logging de intentos de verificación
+  - [ ] UI dedicada para verificación de cédula en wizard de onboarding
   - [ ] Tests E2E para flujo de verificación
 
-- [ ] **Verificación de Teléfono (OTP via SMS)**
-  - [ ] Integrar proveedor SMS (Twilio, Infobip, o MessageBird)
-  - [ ] Tabla `otp_tokens` con expiración y rate limiting
-  - [ ] API endpoints: `/api/auth/send-otp`, `/api/auth/verify-otp`
-  - [ ] UI para ingreso de OTP con countdown timer
-  - [ ] Rate limiting (máx 3 intentos/hora)
+- [x] **Verificación de Teléfono (OTP via SMS)** (Backend completo, falta UI wizard)
+  - [x] Integrar proveedor SMS - Twilio con fallback a Mock (`server/sms-service.ts`)
+  - [x] Tabla `otp_tokens` con expiración y rate limiting (`server/schema-extensions.ts`)
+  - [x] API endpoints implementados:
+    - [x] `/api/auth/send-otp`, `/api/auth/verify-otp` (legacy)
+    - [x] `/api/identity/send-phone-otp`, `/api/identity/verify-phone-otp` (nuevo)
+    - [x] `/api/identity/status` (verificar estado completo)
+  - [x] UI para ingreso de OTP con countdown timer (`client/src/pages/auth/verify-otp.tsx`)
+  - [x] Rate limiting (3 intentos/hora para envío, 10 para verificación)
+  - [x] Funciones: `createAndSendOTP`, `verifyOTP` con bcrypt hash
+  - [x] Audit logging de intentos OTP
+  - [ ] Integrar UI de OTP en wizard de onboarding
   - [ ] Tests E2E para flujo OTP completo
 
-- [ ] **Flujo de Onboarding Mejorado**
+- [ ] **Flujo de Onboarding Mejorado** (Pendiente)
   - [ ] Wizard multi-paso: Email → Cédula → Teléfono → Datos personales
-  - [ ] Re-intentos y estados de error elegantes
-  - [ ] Auditoría de verificaciones en tabla `verification_audit`
+  - [x] Re-intentos y estados de error (implementado en verify-otp.tsx)
+  - [x] Auditoría de verificaciones en tabla `verification_audit` (`server/schema-extensions.ts`)
   - [ ] Panel admin para ver estado de verificación de usuarios
+
+**Archivos Backend Implementados:**
+- `server/services/identity.ts` - Validación y verificación de cédula
+- `server/sms-service.ts` - Servicio SMS con Twilio y funciones OTP
+- `server/schema-extensions.ts` - Tablas `otp_tokens` y `verification_audit`
+- `server/logger.ts` - Logging estructurado con Winston
+- `server/routes.ts` - Endpoints de API con rate limiting
+
+**Archivos Frontend Implementados:**
+- `client/src/pages/auth/verify-otp.tsx` - UI de verificación OTP standalone
+- `client/src/pages/auth/register.tsx` - Registro con campos cédula y teléfono
+- `client/src/pages/auth/forgot-password.tsx` - Recuperación con OTP
 
 **Acceptance Criteria:**
 - ✅ Usuarios solo pueden completar registro con cédula y teléfono verificados

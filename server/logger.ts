@@ -151,4 +151,5 @@ export const logSystem = {
   }
 };
 
+export { logger };
 export default logger;
