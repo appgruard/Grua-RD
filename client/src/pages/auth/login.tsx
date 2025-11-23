@@ -185,7 +185,7 @@ export default function Login() {
               <Button
                 variant="link"
                 className="p-0 h-auto"
-                onClick={() => setLocation('/register')}
+                onClick={() => setLocation('/onboarding')}
                 data-testid="link-register"
               >
                 Regístrate aquí

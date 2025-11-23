@@ -742,6 +742,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/users/me", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const { nombre, apellido, conductorData } = req.body;
+      const userId = req.user!.id;
+
+      const updateData: any = {};
+      if (nombre !== undefined) updateData.nombre = nombre;
+      if (apellido !== undefined) updateData.apellido = apellido;
+
+      if (Object.keys(updateData).length > 0) {
+        await storage.updateUser(userId, updateData);
+      }
+
+      if (conductorData && req.user!.userType === 'conductor') {
+        const conductor = await storage.getConductorByUserId(userId);
+        if (conductor) {
+          await storage.updateConductor(conductor.id, conductorData);
+        } else {
+          await storage.createConductor({
+            userId,
+            licencia: conductorData.licencia,
+            placaGrua: conductorData.placaGrua,
+            marcaGrua: conductorData.marcaGrua,
+            modeloGrua: conductorData.modeloGrua,
+          });
+        }
+      }
+
+      const updatedUser = await storage.getUserById(userId);
+      logSystem.info('User profile updated', { userId });
+
+      res.json({ user: updatedUser });
+    } catch (error: any) {
+      logSystem.error('Update user profile error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al actualizar perfil" });
+    }
+  });
+
   app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
     try {
       const { telefono } = req.body;

@@ -8,7 +8,7 @@ import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 
 import Login from '@/pages/auth/login';
-import Register from '@/pages/auth/register';
+import OnboardingWizard from '@/pages/auth/onboarding-wizard';
 import VerifyOTP from '@/pages/auth/verify-otp';
 import ForgotPassword from '@/pages/auth/forgot-password';
 
@@ -65,7 +65,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
+      <Route path="/onboarding" component={OnboardingWizard} />
       <Route path="/verify-otp" component={VerifyOTP} />
       <Route path="/forgot-password" component={ForgotPassword} />
       
