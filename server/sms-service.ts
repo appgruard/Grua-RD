@@ -92,8 +92,19 @@ export const smsService: SMSService = initializeSMSService();
 
 /**
  * Generates a 6-digit OTP code
+ * In development with MockSMSService, returns a fixed code for testing
  */
 export function generateOTP(): string {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const hasTwilioCredentials = 
+    process.env.TWILIO_ACCOUNT_SID && 
+    process.env.TWILIO_AUTH_TOKEN && 
+    process.env.TWILIO_PHONE_NUMBER;
+  
+  if (isDevelopment && !hasTwilioCredentials) {
+    return '123456';
+  }
+  
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 

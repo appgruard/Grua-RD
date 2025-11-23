@@ -134,3 +134,44 @@ export async function waitForToast(page: Page, message: string) {
 export async function clearDatabase(page: Page) {
   await page.goto('/');
 }
+
+/**
+ * Generates a valid Dominican Republic cédula using Luhn algorithm
+ * Format: XXX-XXXXXXX-X (11 digits total)
+ */
+export function generateValidCedula(): string {
+  const timestamp = Date.now().toString().slice(-7);
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  const first10 = random + timestamp;
+  
+  let sum = 0;
+  let alternate = false;
+  
+  for (let i = first10.length - 1; i >= 0; i--) {
+    let digit = parseInt(first10[i], 10);
+    
+    if (alternate) {
+      digit *= 2;
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+    
+    sum += digit;
+    alternate = !alternate;
+  }
+  
+  const checkDigit = (10 - (sum % 10)) % 10;
+  const fullNumber = first10 + checkDigit;
+  
+  return `${fullNumber.slice(0, 3)}-${fullNumber.slice(3, 10)}-${fullNumber.slice(10)}`;
+}
+
+/**
+ * Generates a valid Dominican Republic phone number
+ */
+export function generateDominicanPhone(): string {
+  const areaCode = ['809', '829', '849'][Math.floor(Math.random() * 3)];
+  const number = Math.floor(1000000 + Math.random() * 9000000);
+  return `+1${areaCode}${number}`;
+}

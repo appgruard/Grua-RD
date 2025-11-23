@@ -3,7 +3,32 @@ import { logger } from '../logger';
 import crypto from 'crypto';
 import path from 'path';
 
-const storage = new Client();
+let storage: Client | null = null;
+let storageInitialized = false;
+let storageInitError: Error | null = null;
+
+function ensureStorageInitialized(): Client {
+  if (storageInitialized) {
+    if (!storage) {
+      throw storageInitError || new Error('Object Storage is not available. Please create a bucket in your Replit workspace.');
+    }
+    return storage;
+  }
+
+  try {
+    storage = new Client();
+    storageInitialized = true;
+    logger.info('Replit Object Storage initialized successfully');
+    return storage;
+  } catch (error) {
+    storageInitialized = true;
+    storageInitError = error instanceof Error ? error : new Error('Failed to initialize Object Storage');
+    logger.warn('Replit Object Storage not available. Document upload feature will not work until a bucket is created.', {
+      error: storageInitError.message
+    });
+    throw storageInitError;
+  }
+}
 
 // Allowed MIME types for document uploads
 const ALLOWED_MIME_TYPES = [
@@ -79,8 +104,11 @@ export async function uploadDocument(options: UploadOptions): Promise<UploadResu
     // Generate unique key
     const key = generateFileKey(userId, documentType, originalName);
 
+    // Ensure storage is initialized
+    const storageClient = ensureStorageInitialized();
+
     // Upload to object storage using uploadFromBytes
-    const result = await storage.uploadFromBytes(key, buffer);
+    const result = await storageClient.uploadFromBytes(key, buffer);
     
     if (!result.ok) {
       throw new Error(result.error?.message || 'Failed to upload document');
@@ -118,7 +146,8 @@ export async function uploadDocument(options: UploadOptions): Promise<UploadResu
  */
 export async function getDocument(key: string): Promise<Buffer | null> {
   try {
-    const result = await storage.downloadAsBytes(key);
+    const storageClient = ensureStorageInitialized();
+    const result = await storageClient.downloadAsBytes(key);
     
     if (!result.ok) {
       logger.warn('Document not found in object storage', { 
@@ -143,7 +172,8 @@ export async function getDocument(key: string): Promise<Buffer | null> {
  */
 export async function deleteDocument(key: string): Promise<boolean> {
   try {
-    await storage.delete(key);
+    const storageClient = ensureStorageInitialized();
+    await storageClient.delete(key);
     logger.info('Document deleted from object storage', { key });
     return true;
   } catch (error) {
@@ -160,8 +190,9 @@ export async function deleteDocument(key: string): Promise<boolean> {
  */
 export async function listUserDocuments(userId: string): Promise<string[]> {
   try {
+    const storageClient = ensureStorageInitialized();
     const prefix = `documents/${userId}/`;
-    const result = await storage.list({ prefix });
+    const result = await storageClient.list({ prefix });
     
     if (!result.ok) {
       logger.error('Error listing user documents', {
