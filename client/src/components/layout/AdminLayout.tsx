@@ -9,6 +9,7 @@ import {
   FileText,
   LogOut,
   BarChart3,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ const menuItems = [
   { path: '/admin/services', icon: FileText, label: 'Servicios', testId: 'nav-services' },
   { path: '/admin/pricing', icon: DollarSign, label: 'Tarifas', testId: 'nav-pricing' },
   { path: '/admin/monitoring', icon: Map, label: 'Monitoreo', testId: 'nav-monitoring' },
+  { path: '/admin/verifications', icon: ShieldCheck, label: 'Verificaciones', testId: 'nav-verifications' },
 ];
 
 function AppSidebar() {

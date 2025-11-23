@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { storageService } from "./storage-service";
 import { pushService } from "./push-service";
 import { smsService, generateOTP } from "./sms-service";
+import { getVerificationHistory } from "./services/identity";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -14,6 +15,7 @@ import rateLimit from "express-rate-limit";
 import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
+import { z } from "zod";
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -1359,6 +1361,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get active pricing error', error);
       res.status(500).json({ message: "Failed to get active pricing" });
+    }
+  });
+
+  const verificationStatusQuerySchema = z.object({
+    search: z.string().optional(),
+    status: z.enum(['verified', 'pending-phone', 'pending-cedula', 'unverified']).optional(),
+    userType: z.enum(['cliente', 'conductor', 'admin']).optional(),
+    page: z.string().optional(),
+    limit: z.string().optional(),
+  });
+
+  app.get("/api/admin/verification-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const queryValidation = verificationStatusQuerySchema.safeParse(req.query);
+      if (!queryValidation.success) {
+        return res.status(400).json({ message: "Invalid query parameters", errors: queryValidation.error });
+      }
+
+      const { search, status, userType, page = '1', limit = '50' } = queryValidation.data;
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const offset = (pageNum - 1) * limitNum;
+
+      const allUsers = await storage.getAllUsers();
+
+      let filteredUsers = allUsers.filter((user) => {
+        if (search) {
+          const searchLower = search.toLowerCase();
+          const matchesSearch = 
+            user.nombre.toLowerCase().includes(searchLower) ||
+            user.apellido.toLowerCase().includes(searchLower) ||
+            user.email.toLowerCase().includes(searchLower) ||
+            (user.cedula && user.cedula.includes(search));
+          if (!matchesSearch) return false;
+        }
+
+        if (userType && user.userType !== userType) {
+          return false;
+        }
+
+        if (status) {
+          const isFullyVerified = user.cedulaVerificada && user.telefonoVerificado;
+          const hasPendingPhone = !user.telefonoVerificado;
+          const hasPendingCedula = !user.cedulaVerificada;
+          const isUnverified = !user.cedulaVerificada && !user.telefonoVerificado;
+
+          if (status === 'verified' && !isFullyVerified) return false;
+          if (status === 'pending-phone' && !hasPendingPhone) return false;
+          if (status === 'pending-cedula' && !hasPendingCedula) return false;
+          if (status === 'unverified' && !isUnverified) return false;
+        }
+
+        return true;
+      });
+
+      const total = filteredUsers.length;
+      const paginatedUsers = filteredUsers.slice(offset, offset + limitNum);
+
+      const stats = {
+        totalUsers: allUsers.length,
+        fullyVerified: allUsers.filter(u => u.cedulaVerificada && u.telefonoVerificado).length,
+        pendingPhone: allUsers.filter(u => !u.telefonoVerificado).length,
+        pendingCedula: allUsers.filter(u => !u.cedulaVerificada).length,
+      };
+
+      const usersWithLastAttempt = paginatedUsers.map(user => ({
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        cedula: user.cedula,
+        cedulaVerificada: user.cedulaVerificada,
+        telefono: user.phone,
+        telefonoVerificado: user.telefonoVerificado,
+        userType: user.userType,
+        createdAt: user.createdAt,
+      }));
+
+      res.json({
+        users: usersWithLastAttempt,
+        total,
+        stats,
+        page: pageNum,
+        limit: limitNum,
+      });
+    } catch (error: any) {
+      logSystem.error('Get verification status error', error);
+      res.status(500).json({ message: "Failed to get verification status" });
+    }
+  });
+
+  app.get("/api/admin/users/:id/verification-history", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.params.id;
+      const history = await getVerificationHistory(userId);
+      res.json(history);
+    } catch (error: any) {
+      logSystem.error('Get verification history error', error);
+      res.status(500).json({ message: "Failed to get verification history" });
     }
   });
 

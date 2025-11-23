@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { users } from "../../shared/schema";
 import { verificationAudit } from "../schema-extensions";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { logger } from "../logger";
 
 /**
@@ -196,4 +196,22 @@ export async function isIdentityVerified(userId: string): Promise<boolean> {
   });
   
   return !!(user?.cedulaVerificada && user?.telefonoVerificado);
+}
+
+/**
+ * Gets verification history for a user
+ * Returns all verification attempts (cedula, phone, etc.) in chronological order
+ */
+export async function getVerificationHistory(userId: string) {
+  try {
+    const history = await db.query.verificationAudit.findMany({
+      where: eq(verificationAudit.userId, userId),
+      orderBy: desc(verificationAudit.createdAt),
+    });
+    
+    return history;
+  } catch (error) {
+    logger.error("Error fetching verification history:", error);
+    return [];
+  }
 }
