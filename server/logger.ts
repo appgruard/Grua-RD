@@ -69,6 +69,12 @@ export const logAuth = {
   },
   passwordReset: (userId: string) => {
     logger.info('Password reset', { userId, category: 'auth' });
+  },
+  cedulaVerified: (userId: string, cedula: string) => {
+    logger.info('Cedula verified', { userId, cedula, category: 'auth' });
+  },
+  phoneVerified: (userId: string, phone: string) => {
+    logger.info('Phone verified', { userId, phone, category: 'auth' });
   }
 };
 

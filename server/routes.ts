@@ -549,6 +549,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Identity Verification Endpoints (Workstream A - Phase 4)
+  app.post("/api/identity/verify-cedula", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const { cedula } = req.body;
+
+      if (!cedula) {
+        return res.status(400).json({ message: "Cédula es requerida" });
+      }
+
+      const { verifyCedula } = await import("./services/identity");
+      const result = await verifyCedula(
+        req.user!.id,
+        cedula,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      logAuth.cedulaVerified(req.user!.id, result.formatted!);
+
+      res.json({
+        message: "Cédula verificada exitosamente",
+        cedula: result.formatted
+      });
+    } catch (error: any) {
+      logSystem.error('Verify cedula error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al verificar cédula" });
+    }
+  });
+
+  app.post("/api/identity/send-phone-otp", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const { phone } = req.body;
+
+      if (!phone) {
+        return res.status(400).json({ message: "Teléfono es requerido" });
+      }
+
+      // Validate phone format (basic check for Dominican Republic)
+      const phoneRegex = /^\+?1?8\d{9}$/;
+      if (!phoneRegex.test(phone.replace(/[\s-]/g, ''))) {
+        return res.status(400).json({ 
+          message: "Formato de teléfono inválido. Use formato: +1809XXXXXXX o +1829XXXXXXX" 
+        });
+      }
+
+      const { createAndSendOTP } = await import("./sms-service");
+      const result = await createAndSendOTP(
+        req.user!.id,
+        phone,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      res.json({
+        message: "Código enviado exitosamente",
+        expiresIn: result.expiresIn
+      });
+    } catch (error: any) {
+      logSystem.error('Send phone OTP error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al enviar código de verificación" });
+    }
+  });
+
+  app.post("/api/identity/verify-phone-otp", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const { phone, code } = req.body;
+
+      if (!phone || !code) {
+        return res.status(400).json({ message: "Teléfono y código son requeridos" });
+      }
+
+      const { verifyOTP } = await import("./sms-service");
+      const result = await verifyOTP(
+        req.user!.id,
+        phone,
+        code,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      logAuth.phoneVerified(req.user!.id, phone);
+
+      res.json({
+        message: "Teléfono verificado exitosamente",
+        verified: true
+      });
+    } catch (error: any) {
+      logSystem.error('Verify phone OTP error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al verificar código" });
+    }
+  });
+
+  app.get("/api/identity/status", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const { isIdentityVerified } = await import("./services/identity");
+      const verified = await isIdentityVerified(req.user!.id);
+
+      const user = await storage.getUserById(req.user!.id);
+
+      res.json({
+        cedulaVerificada: user?.cedulaVerificada || false,
+        telefonoVerificado: user?.telefonoVerificado || false,
+        fullyVerified: verified,
+        cedula: user?.cedulaVerificada ? user.cedula : null,
+        phone: user?.telefonoVerificado ? user.phone : null
+      });
+    } catch (error: any) {
+      logSystem.error('Get identity status error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al obtener estado de verificación" });
+    }
+  });
+
   app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
     try {
       const { telefono } = req.body;
