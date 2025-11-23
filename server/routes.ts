@@ -10,6 +10,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
@@ -549,8 +550,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rate limiting middleware for identity verification endpoints (Workstream A - Phase 4)
+  const verifyCedulaLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 5, // max 5 requests per hour per IP
+    message: "Demasiados intentos de verificación de cédula. Intenta nuevamente en 1 hora.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logSystem.warn('Rate limit exceeded for cedula verification', { 
+        ip: req.ip, 
+        userId: req.user?.id 
+      });
+      res.status(429).json({ 
+        message: "Demasiados intentos de verificación de cédula. Intenta nuevamente en 1 hora." 
+      });
+    }
+  });
+
+  const sendOTPLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // max 3 requests per hour per IP
+    message: "Demasiados intentos de envío de código. Intenta nuevamente en 1 hora.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logSystem.warn('Rate limit exceeded for OTP sending', { 
+        ip: req.ip, 
+        userId: req.user?.id 
+      });
+      res.status(429).json({ 
+        message: "Demasiados intentos de envío de código. Intenta nuevamente en 1 hora." 
+      });
+    }
+  });
+
+  const verifyOTPLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10, // max 10 requests per hour per IP
+    message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logSystem.warn('Rate limit exceeded for OTP verification', { 
+        ip: req.ip, 
+        userId: req.user?.id 
+      });
+      res.status(429).json({ 
+        message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora." 
+      });
+    }
+  });
+
   // Identity Verification Endpoints (Workstream A - Phase 4)
-  app.post("/api/identity/verify-cedula", async (req: Request, res: Response) => {
+  app.post("/api/identity/verify-cedula", verifyCedulaLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "No autenticado" });
@@ -586,7 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/identity/send-phone-otp", async (req: Request, res: Response) => {
+  app.post("/api/identity/send-phone-otp", sendOTPLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "No autenticado" });
@@ -628,7 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/identity/verify-phone-otp", async (req: Request, res: Response) => {
+  app.post("/api/identity/verify-phone-otp", verifyOTPLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "No autenticado" });
