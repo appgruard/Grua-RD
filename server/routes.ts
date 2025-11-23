@@ -12,6 +12,7 @@ import bcrypt from "bcryptjs";
 import multer from "multer";
 import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
+import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -31,16 +32,20 @@ passport.use(
       try {
         const user = await storage.getUserByEmail(email);
         if (!user) {
+          logAuth.loginFailed(email, "User not found");
           return done(null, false);
         }
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) {
+          logAuth.loginFailed(email, "Invalid password");
           return done(null, false);
         }
 
+        logAuth.loginSuccess(user.id, user.email);
         return done(null, user);
       } catch (error) {
+        logSystem.error("Login error", error);
         return done(error);
       }
     }
@@ -91,18 +96,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const servicio = await storage.getServicioById(servicioId);
           
           if (!servicio) {
-            console.error(`Webhook: Service ${servicioId} not found`);
+            logSystem.error('Webhook: Service not found', null, { servicioId, paymentIntentId: paymentIntent.id });
             return res.json({ received: true });
           }
 
           if (servicio.stripePaymentId === paymentIntent.id) {
-            console.log(`Webhook: Payment ${paymentIntent.id} already processed (idempotent)`);
+            logSystem.info('Webhook: Payment already processed (idempotent)', { paymentIntentId: paymentIntent.id, servicioId });
             return res.json({ received: true });
           }
 
           const existingComision = await storage.getComisionByServicioId(servicioId);
           if (existingComision) {
-            console.log(`Webhook: Commission for service ${servicioId} already exists`);
+            logSystem.warn('Webhook: Commission already exists', { servicioId, comisionId: existingComision.id });
             return res.json({ received: true });
           }
 
@@ -114,20 +119,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const montoOperador = montoTotal * 0.7;
           const montoEmpresa = montoTotal * 0.3;
 
-          await storage.createComision({
+          const comision = await storage.createComision({
             servicioId,
             montoTotal: servicio.costoTotal,
             montoOperador: montoOperador.toFixed(2),
             montoEmpresa: montoEmpresa.toFixed(2),
           });
 
-          console.log(`Webhook: Created commission for service ${servicioId}, payment ${paymentIntent.id}`);
+          logTransaction.paymentSuccess(servicioId, parseFloat(servicio.costoTotal), paymentIntent.id);
+          logTransaction.commissionCreated(comision.id, servicioId, montoOperador, montoEmpresa);
         }
       }
 
       res.json({ received: true });
     } catch (error: any) {
-      console.error('Webhook error:', error);
+      logSystem.error('Webhook error', error);
       res.status(400).json({ message: `Webhook Error: ${error.message}` });
     }
   });
@@ -171,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     sessionParser(request, {} as any, () => {
       if (!request.session || !request.session.passport || !request.session.passport.user) {
-        console.log('WebSocket connection rejected: Not authenticated');
+        logSystem.warn('WebSocket connection rejected: Not authenticated');
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
         return;
@@ -188,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const extWs = ws as ExtendedWebSocket;
       
       if (extWs.isAlive === false) {
-        console.log('WebSocket connection terminated due to no pong response');
+        logSystem.warn('WebSocket connection terminated due to no pong response', { userId: extWs.userId });
         return extWs.terminate();
       }
 
@@ -203,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await storage.getUserById(userId);
       if (!user) {
-        console.log('WebSocket rejected: User not found');
+        logSystem.warn('WebSocket rejected: User not found', { userId });
         ws.close();
         return;
       }
@@ -213,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       extWs.userId = user.id;
       extWs.userType = user.userType;
 
-      console.log(`WebSocket authenticated: user ${user.id} (${user.userType})`);
+      logSystem.info('WebSocket authenticated', { userId: user.id, userType: user.userType });
 
       if (user.userType === 'conductor') {
         driverSessions.set(user.id, ws);
@@ -238,12 +244,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             const servicio = await storage.getServicioById(serviceId);
             if (!servicio) {
-              console.log(`join_service rejected: Service ${serviceId} not found`);
+              logSystem.warn('join_service rejected: Service not found', { serviceId, userId: extWs.userId });
               break;
             }
             
             if (servicio.clienteId !== extWs.userId && servicio.conductorId !== extWs.userId) {
-              console.log(`join_service rejected: User ${extWs.userId} not authorized for service ${serviceId}`);
+              logSystem.warn('join_service rejected: User not authorized', { serviceId, userId: extWs.userId });
               break;
             }
             
@@ -251,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               serviceSessions.set(serviceId, new Set());
             }
             serviceSessions.get(serviceId)!.add(ws);
-            console.log(`User ${extWs.userId} joined service ${serviceId}`);
+            logSystem.info('User joined service', { userId: extWs.userId, serviceId });
             break;
 
           case 'update_location':
@@ -283,12 +289,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
         }
         } catch (error) {
-          console.error('WebSocket message error:', error);
+          logSystem.error('WebSocket message error', error, { userId: extWs.userId });
         }
       });
 
       ws.on('close', () => {
-        console.log(`WebSocket disconnected: user ${extWs.userId}`);
+        logSystem.info('WebSocket disconnected', { userId: extWs.userId });
         
         serviceSessions.forEach((clients, serviceId) => {
           clients.delete(ws);
@@ -302,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error) {
-      console.error('WebSocket connection error:', error);
+      logSystem.error('WebSocket connection error', error);
       ws.close();
     }
   });
@@ -331,12 +337,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existingUser = await storage.getUserByEmail(userData.email);
       if (existingUser) {
+        logAuth.registerFailed(userData.email, "Email already registered");
         return res.status(400).json({ message: "Email ya está registrado" });
       }
 
       if (userData.phone) {
         const existingPhone = await storage.getUserByPhone(userData.phone);
         if (existingPhone) {
+          logAuth.registerFailed(userData.email, "Phone already registered");
           return res.status(400).json({ message: "Teléfono ya está registrado" });
         }
       }
@@ -358,15 +366,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      logAuth.registerSuccess(user.id, user.email, user.userType);
+
       req.login(user, (err) => {
         if (err) {
+          logSystem.error("Login failed after registration", err, { userId: user.id });
           return res.status(500).json({ message: "Login failed after registration" });
         }
         res.json({ user });
       });
     } catch (error: any) {
-      console.error('Registration error:', error);
+      logSystem.error('Registration error', error);
       res.status(500).json({ message: "Error en el registro" });
+    }
+  });
+
+  app.get("/api/health", async (_req: Request, res: Response) => {
+    try {
+      const startTime = Date.now();
+      
+      let dbStatus = 'unknown';
+      let serviciosActivos = 0;
+      let conductoresOnline = 0;
+      
+      try {
+        const servicios = await storage.getAllServicios();
+        const conductores = await storage.getAllConductores();
+        
+        dbStatus = 'connected';
+        serviciosActivos = servicios.filter(s => 
+          s.estado === 'aceptado' || s.estado === 'en_progreso'
+        ).length;
+        conductoresOnline = conductores.filter(c => c.disponible).length;
+      } catch (error) {
+        dbStatus = 'error';
+        logSystem.error('Health check: Database error', error);
+      }
+      
+      const dbResponseTime = Date.now() - startTime;
+      
+      const healthStatus = {
+        status: dbStatus === 'connected' ? 'healthy' : 'degraded',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        database: {
+          status: dbStatus,
+          responseTime: `${dbResponseTime}ms`
+        },
+        metrics: {
+          serviciosActivos,
+          conductoresOnline,
+          websocketConnections: wss.clients.size
+        },
+        version: '1.0.0'
+      };
+      
+      if (healthStatus.status === 'degraded') {
+        logSystem.warn('Health check: System degraded', { 
+          dbStatus, 
+          dbResponseTime,
+          reason: 'Database connection failed'
+        });
+      }
+      
+      const statusCode = healthStatus.status === 'healthy' ? 200 : 503;
+      res.status(statusCode).json(healthStatus);
+    } catch (error: any) {
+      logSystem.error('Health check: Critical error', error);
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: error.message
+      });
     }
   });
 
@@ -416,12 +487,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mensaje = `Tu código de verificación para GruaRD es: ${codigo}. Válido por 10 minutos.`;
       await smsService.sendSMS(telefono, mensaje);
 
+      logAuth.otpSent(telefono);
+
       res.json({ 
         message: "Código enviado exitosamente",
         expiresIn: 600
       });
     } catch (error: any) {
-      console.error('Send OTP error:', error);
+      logSystem.error('Send OTP error', error, { telefono });
       res.status(500).json({ message: "Error al enviar código de verificación" });
     }
   });
@@ -442,11 +515,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (verificationCode.intentos >= 3) {
         await storage.markVerificationCodeAsUsed(verificationCode.id);
+        logAuth.otpFailed(telefono, verificationCode.intentos);
         return res.status(400).json({ message: "Demasiados intentos. Solicita un nuevo código" });
       }
 
       if (verificationCode.codigo !== codigo) {
         await storage.incrementVerificationAttempts(verificationCode.id);
+        logAuth.otpFailed(telefono, verificationCode.intentos + 1);
         return res.status(400).json({ message: "Código incorrecto" });
       }
 
@@ -462,12 +537,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      logAuth.otpVerified(telefono);
+
       res.json({ 
         message: "Código verificado exitosamente",
         verified: true
       });
     } catch (error: any) {
-      console.error('Verify OTP error:', error);
+      logSystem.error('Verify OTP error', error, { telefono });
       res.status(500).json({ message: "Error al verificar código" });
     }
   });
@@ -506,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresIn: 600
       });
     } catch (error: any) {
-      console.error('Forgot password error:', error);
+      logSystem.error('Forgot password error', error);
       res.status(500).json({ message: "Error al enviar código de recuperación" });
     }
   });
@@ -548,9 +625,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUser(user.id, { passwordHash });
       await storage.markVerificationCodeAsUsed(verificationCode.id);
 
+      logAuth.passwordReset(user.id);
+
       res.json({ message: "Contraseña actualizada exitosamente" });
     } catch (error: any) {
-      console.error('Reset password error:', error);
+      logSystem.error('Reset password error', error, { telefono });
       res.status(500).json({ message: "Error al resetear contraseña" });
     }
   });
@@ -565,6 +644,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clienteId: req.user!.id,
         ...req.body,
       });
+
+      logService.created(servicio.id, req.user!.id, req.body.origenDireccion || 'N/A', req.body.destinoDireccion || 'N/A');
 
       const availableDrivers = await storage.getAvailableDrivers();
       availableDrivers.forEach(async (driver) => {
@@ -581,7 +662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(servicio);
     } catch (error: any) {
-      console.error('Create service error:', error);
+      logSystem.error('Create service error', error, { clienteId: req.user!.id });
       res.status(500).json({ message: "Failed to create service" });
     }
   });
@@ -598,7 +679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(servicio);
     } catch (error: any) {
-      console.error('Get service error:', error);
+      logSystem.error('Get service error', error);
       res.status(500).json({ message: "Failed to get service" });
     }
   });
@@ -622,7 +703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(services);
     } catch (error: any) {
-      console.error('Get my services error:', error);
+      logSystem.error('Get my services error', error);
       res.status(500).json({ message: "Failed to get services" });
     }
   });
@@ -636,7 +717,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conductor = await storage.getConductorByUserId(req.user!.id);
       res.json(conductor);
     } catch (error: any) {
-      console.error('Get driver data error:', error);
+      logSystem.error('Get driver data error', error);
       res.status(500).json({ message: "Failed to get driver data" });
     }
   });
@@ -651,7 +732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conductor = await storage.updateDriverAvailability(req.user!.id, disponible);
       res.json(conductor);
     } catch (error: any) {
-      console.error('Update availability error:', error);
+      logSystem.error('Update availability error', error);
       res.status(500).json({ message: "Failed to update availability" });
     }
   });
@@ -666,7 +747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conductor = await storage.updateDriverLocation(req.user!.id, lat, lng);
       res.json(conductor);
     } catch (error: any) {
-      console.error('Update location error:', error);
+      logSystem.error('Update location error', error);
       res.status(500).json({ message: "Failed to update location" });
     }
   });
@@ -680,7 +761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requests = await storage.getPendingServicios();
       res.json(requests);
     } catch (error: any) {
-      console.error('Get nearby requests error:', error);
+      logSystem.error('Get nearby requests error', error);
       res.status(500).json({ message: "Failed to get requests" });
     }
   });
@@ -695,7 +776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeService = services.find(s => s.estado === 'aceptado' || s.estado === 'en_progreso');
       res.json(activeService || null);
     } catch (error: any) {
-      console.error('Get active service error:', error);
+      logSystem.error('Get active service error', error);
       res.status(500).json({ message: "Failed to get active service" });
     }
   });
@@ -707,6 +788,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const servicio = await storage.acceptServicio(req.params.id, req.user!.id);
+      
+      logService.accepted(servicio.id, req.user!.id);
       
       if (serviceSessions.has(servicio.id)) {
         const broadcast = JSON.stringify({
@@ -725,7 +808,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(servicio);
     } catch (error: any) {
-      console.error('Accept service error:', error);
+      logSystem.error('Accept service error', error, { servicioId: req.params.id, conductorId: req.user!.id });
       res.status(500).json({ message: "Failed to accept service" });
     }
   });
@@ -741,11 +824,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         iniciadoAt: new Date(),
       });
 
+      logService.started(servicio.id);
+
       await pushService.notifyServiceStarted(servicio.id, servicio.clienteId);
 
       res.json(servicio);
     } catch (error: any) {
-      console.error('Start service error:', error);
+      logSystem.error('Start service error', error, { servicioId: req.params.id });
       res.status(500).json({ message: "Failed to start service" });
     }
   });
@@ -756,16 +841,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      const oldService = await storage.getServicioById(req.params.id);
+      const startTime = oldService?.iniciadoAt ? new Date(oldService.iniciadoAt).getTime() : Date.now();
+      const duration = Math.floor((Date.now() - startTime) / 1000);
+
       const servicio = await storage.updateServicio(req.params.id, {
         estado: 'completado',
         completadoAt: new Date(),
       });
 
+      logService.completed(servicio.id, duration);
+
       await pushService.notifyServiceCompleted(servicio.id, servicio.clienteId);
 
       res.json(servicio);
     } catch (error: any) {
-      console.error('Complete service error:', error);
+      logSystem.error('Complete service error', error, { servicioId: req.params.id });
       res.status(500).json({ message: "Failed to complete service" });
     }
   });
@@ -813,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(mensaje);
     } catch (error: any) {
-      console.error('Send message error:', error);
+      logSystem.error('Send message error', error);
       res.status(500).json({ message: "Failed to send message" });
     }
   });
@@ -836,7 +927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mensajes = await storage.getMensajesByServicioId(req.params.servicioId);
       res.json(mensajes);
     } catch (error: any) {
-      console.error('Get messages error:', error);
+      logSystem.error('Get messages error', error);
       res.status(500).json({ message: "Failed to get messages" });
     }
   });
@@ -859,7 +950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.marcarMensajesComoLeidos(req.params.servicioId, req.user!.id);
       res.json({ success: true });
     } catch (error: any) {
-      console.error('Mark messages read error:', error);
+      logSystem.error('Mark messages read error', error);
       res.status(500).json({ message: "Failed to mark messages as read" });
     }
   });
@@ -881,7 +972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subscription = await storage.createPushSubscription(validatedData);
       res.json({ success: true, subscription });
     } catch (error: any) {
-      console.error('Subscribe to push error:', error);
+      logSystem.error('Subscribe to push error', error);
       res.status(500).json({ message: "Failed to subscribe to push notifications" });
     }
   });
@@ -895,7 +986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deletePushSubscription(req.body.endpoint);
       res.json({ success: true });
     } catch (error: any) {
-      console.error('Unsubscribe from push error:', error);
+      logSystem.error('Unsubscribe from push error', error);
       res.status(500).json({ message: "Failed to unsubscribe from push notifications" });
     }
   });
@@ -909,7 +1000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subscriptions = await storage.getPushSubscriptionsByUserId(req.user!.id);
       res.json(subscriptions);
     } catch (error: any) {
-      console.error('Get push subscriptions error:', error);
+      logSystem.error('Get push subscriptions error', error);
       res.status(500).json({ message: "Failed to get push subscriptions" });
     }
   });
@@ -923,7 +1014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await storage.getDashboardStats();
       res.json(stats);
     } catch (error: any) {
-      console.error('Get dashboard stats error:', error);
+      logSystem.error('Get dashboard stats error', error);
       res.status(500).json({ message: "Failed to get stats" });
     }
   });
@@ -937,7 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error: any) {
-      console.error('Get users error:', error);
+      logSystem.error('Get users error', error);
       res.status(500).json({ message: "Failed to get users" });
     }
   });
@@ -951,7 +1042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const drivers = await storage.getAllDrivers();
       res.json(drivers);
     } catch (error: any) {
-      console.error('Get drivers error:', error);
+      logSystem.error('Get drivers error', error);
       res.status(500).json({ message: "Failed to get drivers" });
     }
   });
@@ -965,7 +1056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const services = await storage.getAllServicios();
       res.json(services);
     } catch (error: any) {
-      console.error('Get services error:', error);
+      logSystem.error('Get services error', error);
       res.status(500).json({ message: "Failed to get services" });
     }
   });
@@ -979,7 +1070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const drivers = await storage.getAvailableDrivers();
       res.json(drivers);
     } catch (error: any) {
-      console.error('Get active drivers error:', error);
+      logSystem.error('Get active drivers error', error);
       res.status(500).json({ message: "Failed to get active drivers" });
     }
   });
@@ -993,7 +1084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pricing = await storage.getAllTarifas();
       res.json(pricing);
     } catch (error: any) {
-      console.error('Get pricing error:', error);
+      logSystem.error('Get pricing error', error);
       res.status(500).json({ message: "Failed to get pricing" });
     }
   });
@@ -1007,7 +1098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tarifa = await storage.createTarifa(req.body);
       res.json(tarifa);
     } catch (error: any) {
-      console.error('Create pricing error:', error);
+      logSystem.error('Create pricing error', error);
       res.status(500).json({ message: "Failed to create pricing" });
     }
   });
@@ -1021,7 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tarifa = await storage.updateTarifa(req.params.id, req.body);
       res.json(tarifa);
     } catch (error: any) {
-      console.error('Update pricing error:', error);
+      logSystem.error('Update pricing error', error);
       res.status(500).json({ message: "Failed to update pricing" });
     }
   });
@@ -1031,7 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tarifa = await storage.getActiveTarifa();
       res.json(tarifa);
     } catch (error: any) {
-      console.error('Get active pricing error:', error);
+      logSystem.error('Get active pricing error', error);
       res.status(500).json({ message: "Failed to get active pricing" });
     }
   });
@@ -1051,7 +1142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ total, precioBase, tarifaPorKm, distanceKm });
     } catch (error: any) {
-      console.error('Calculate pricing error:', error);
+      logSystem.error('Calculate pricing error', error);
       res.status(500).json({ message: "Failed to calculate pricing" });
     }
   });
@@ -1079,7 +1170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       res.json(data);
     } catch (error: any) {
-      console.error('Get revenue by period error:', error);
+      logSystem.error('Get revenue by period error', error);
       res.status(500).json({ message: "Failed to get revenue data" });
     }
   });
@@ -1107,7 +1198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       res.json(data);
     } catch (error: any) {
-      console.error('Get services by period error:', error);
+      logSystem.error('Get services by period error', error);
       res.status(500).json({ message: "Failed to get services data" });
     }
   });
@@ -1121,7 +1212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = await storage.getDriverRankings();
       res.json(data);
     } catch (error: any) {
-      console.error('Get driver rankings error:', error);
+      logSystem.error('Get driver rankings error', error);
       res.status(500).json({ message: "Failed to get driver rankings" });
     }
   });
@@ -1135,7 +1226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = await storage.getServicesByHour();
       res.json(data);
     } catch (error: any) {
-      console.error('Get services by hour error:', error);
+      logSystem.error('Get services by hour error', error);
       res.status(500).json({ message: "Failed to get peak hours data" });
     }
   });
@@ -1153,7 +1244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       res.json(data);
     } catch (error: any) {
-      console.error('Get service status breakdown error:', error);
+      logSystem.error('Get service status breakdown error', error);
       res.status(500).json({ message: "Failed to get status breakdown" });
     }
   });
@@ -1179,7 +1270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({ message: "Failed to calculate route" });
       }
     } catch (error: any) {
-      console.error('Calculate route error:', error);
+      logSystem.error('Calculate route error', error);
       res.status(500).json({ message: "Failed to calculate route" });
     }
   });
@@ -1200,7 +1291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({ message: "Failed to geocode address" });
       }
     } catch (error: any) {
-      console.error('Geocode error:', error);
+      logSystem.error('Geocode error', error);
       res.status(500).json({ message: "Failed to geocode address" });
     }
   });
@@ -1276,9 +1367,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertDocumentoSchema.parse(documentoData);
       const documento = await storage.createDocumento(validated);
 
+      logDocument.uploaded(documento.id, tipo, req.user!.id);
+
       res.json(documento);
     } catch (error: any) {
-      console.error('Upload error:', error);
+      logSystem.error('Upload error', error, { userId: req.user!.id, tipo: req.body.tipo });
       if (error.name === 'ZodError') {
         return res.status(400).json({ message: "Invalid document data", errors: error.errors });
       }
@@ -1304,7 +1397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(documento);
     } catch (error: any) {
-      console.error('Get document error:', error);
+      logSystem.error('Get document error', error);
       res.status(500).json({ message: "Failed to get document" });
     }
   });
@@ -1322,7 +1415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const documentos = await storage.getDocumentosByUsuarioId(req.params.userId);
       res.json(documentos);
     } catch (error: any) {
-      console.error('Get user documents error:', error);
+      logSystem.error('Get user documents error', error);
       res.status(500).json({ message: "Failed to get documents" });
     }
   });
@@ -1342,7 +1435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const documentos = await storage.getDocumentosByConductorId(req.params.conductorId);
       res.json(documentos);
     } catch (error: any) {
-      console.error('Get driver documents error:', error);
+      logSystem.error('Get driver documents error', error);
       res.status(500).json({ message: "Failed to get documents" });
     }
   });
@@ -1356,7 +1449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const documentos = await storage.getAllDocumentos();
       res.json(documentos);
     } catch (error: any) {
-      console.error('Get all documents error:', error);
+      logSystem.error('Get all documents error', error);
       res.status(500).json({ message: "Failed to get documents" });
     }
   });
@@ -1382,7 +1475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Document deleted successfully" });
     } catch (error: any) {
-      console.error('Delete document error:', error);
+      logSystem.error('Delete document error', error);
       res.status(500).json({ message: "Failed to delete document" });
     }
   });
@@ -1394,9 +1487,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const documento = await storage.aprobarDocumento(req.params.id, req.user!.id);
+      logDocument.approved(req.params.id, req.user!.id);
       res.json(documento);
     } catch (error: any) {
-      console.error('Approve document error:', error);
+      logSystem.error('Approve document error', error, { documentoId: req.params.id, adminId: req.user!.id });
       res.status(500).json({ message: "Failed to approve document" });
     }
   });
@@ -1414,9 +1508,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const documento = await storage.rechazarDocumento(req.params.id, req.user!.id, motivo);
+      logDocument.rejected(req.params.id, req.user!.id, motivo);
       res.json(documento);
     } catch (error: any) {
-      console.error('Reject document error:', error);
+      logSystem.error('Reject document error', error, { documentoId: req.params.id, adminId: req.user!.id });
       res.status(500).json({ message: "Failed to reject document" });
     }
   });
@@ -1472,13 +1567,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
 
+      logTransaction.paymentStarted(servicioId, parseFloat(servicio.costoTotal), 'tarjeta');
+
       res.json({
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
         amount: servicio.costoTotal,
       });
     } catch (error: any) {
-      console.error('Create payment intent error:', error);
+      logTransaction.paymentFailed(req.body.servicioId || 'unknown', 0, error.message);
+      logSystem.error('Create payment intent error', error, { servicioId: req.body.servicioId });
       res.status(500).json({ message: "Failed to create payment intent" });
     }
   });
@@ -1496,7 +1594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const comisiones = await storage.getAllComisiones();
       res.json(comisiones);
     } catch (error: any) {
-      console.error('Get commissions error:', error);
+      logSystem.error('Get commissions error', error);
       res.status(500).json({ message: "Failed to get commissions" });
     }
   });
@@ -1520,7 +1618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const comisiones = await storage.getComisionesByEstado('pendiente', tipo);
       res.json(comisiones);
     } catch (error: any) {
-      console.error('Get pending commissions error:', error);
+      logSystem.error('Get pending commissions error', error);
       res.status(500).json({ message: "Failed to get pending commissions" });
     }
   });
@@ -1544,7 +1642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const comision = await storage.marcarComisionPagada(req.params.id, tipo, stripeTransferId);
       res.json(comision);
     } catch (error: any) {
-      console.error('Mark commission paid error:', error);
+      logSystem.error('Mark commission paid error', error);
       res.status(500).json({ message: "Failed to mark commission as paid" });
     }
   });
@@ -1608,7 +1706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       doc.end();
     } catch (error: any) {
-      console.error('Generate receipt error:', error);
+      logSystem.error('Generate receipt error', error);
       res.status(500).json({ message: "Failed to generate receipt" });
     }
   });

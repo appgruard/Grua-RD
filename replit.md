@@ -236,3 +236,58 @@ The system uses a PostgreSQL database with Drizzle ORM for type-safe data access
 - Fiscal information: company name, RNC, legal disclaimer
 - Accessible by service participants (client, driver, admin)
 - Downloadable as PDF attachment
+
+---
+
+### FASE 0.5 - Monitoreo y Logging ✅ COMPLETADA
+
+#### System Logging (Winston)
+- **Logger Service**: Structured logging system with Winston (`server/logger.ts`)
+  - Log levels: error, warn, info, debug
+  - Console output with colors
+  - File output: `logs/error.log` and `logs/combined.log`
+  - Automatic log rotation (max 5 files, 5MB each)
+  - Timestamps and contextual metadata
+
+#### Logging Categories
+- **Authentication Logs** (`logAuth`):
+  - Login success/failure
+  - Registration success/failure
+  - OTP sent/verified/failed
+  - Password reset
+- **Transaction Logs** (`logTransaction`):
+  - Payment started/success/failed
+  - Commission created
+  - Receipt generated
+- **Service Logs** (`logService`):
+  - Service created/accepted/started/completed/cancelled
+  - State changes with metadata
+- **Document Logs** (`logDocument`):
+  - Document uploaded/approved/rejected/deleted
+- **System Logs** (`logSystem`):
+  - General info/warn/error/debug messages
+  - Error tracking with stack traces
+
+#### Health Check Endpoint
+- **Endpoint**: `GET /api/health`
+- **Functionality**:
+  - Database connectivity check
+  - Response time measurement
+  - Active services count
+  - Online drivers count
+  - WebSocket connections count
+  - System uptime
+  - Status codes: 200 (healthy) or 503 (degraded/unhealthy)
+
+#### Integration Points
+- Logging integrated in all critical endpoints:
+  - Authentication (login, register, OTP, password reset)
+  - Services (create, accept, start, complete, cancel)
+  - Payments (create-intent, webhook)
+  - Documents (upload, approve, reject)
+  - All error handlers with contextual information
+
+#### Configuration
+- Environment variable: `LOG_LEVEL` (default: 'info')
+- Log files stored in `logs/` directory
+- Automatic cleanup of old logs
