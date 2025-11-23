@@ -111,8 +111,12 @@ GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (N
 
 **Workstream B: Gestión Documental & Seguridad Operativa** ⏳ En progreso:
 - ✅ Backend: API endpoints para upload/download de documentos (`server/services/object-storage.ts`)
+- ✅ Security Hardening implementado:
+  - Helmet.js con CSP configurado para Google Maps, Stripe, y WebSockets
+  - CORS mejorado con validación de orígenes y logging
+  - Health check endpoint `/health` con métricas de uptime
+  - HSTS habilitado (31536000s con includeSubDomains y preload)
 - ⏳ Frontend: UI para conductores subir documentos y admin aprobarlos
-- ⏳ Security: Helmet.js, CORS mejorado, health check endpoint
 
 **Workstream C: Pagos y Cumplimiento Financiero** ⏳:
 - Stripe Connect para split automático 70/30
