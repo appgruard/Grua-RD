@@ -82,7 +82,7 @@ The system uses a PostgreSQL database with Drizzle ORM for type-safe data access
 
 ---
 
-### FASE 0.2 - Comunicaciones en Tiempo Real ✅ COMPLETADA PARCIAL
+### FASE 0.2 - Comunicaciones en Tiempo Real ✅ COMPLETADA
 
 #### WebSocket Enhancements
 - **Heartbeat/Ping-Pong**: Implemented heartbeat mechanism with ping every 30 seconds to detect disconnected clients
@@ -90,13 +90,73 @@ The system uses a PostgreSQL database with Drizzle ORM for type-safe data access
 - **User Identity**: Server derives userId from session (`request.session.passport.user`) instead of trusting client data
 - **Authorization**: `join_service` messages validate that user is either the service's cliente or conductor before allowing subscription
 - **Real-time Chat**: Chat messages broadcast via WebSocket to service participants (reduced polling from 2s to 30s fallback)
+- **Visual Reconnection Notifications**: Toast notifications show connection status (disconnected/reconnected) to users
 
 #### Frontend Updates
 - Updated `useWebSocket` hook to handle server-driven authentication
 - Added quick message buttons to ChatBox: "¿Cuánto falta?", "Ya llegué", "Gracias", "En camino"
 - ChatBox now sends `join_service` on connection to receive real-time chat updates
 - WebSocket automatically responds to ping with pong to maintain connection health
+- Implemented visual reconnection notifications using toast system
 
-#### Remaining Items
-- Visual reconnection notifications (in progress)
-- Further optimization of chat real-time updates
+---
+
+### FASE 0.3 - Gestión de Documentos ✅ COMPLETADA
+
+#### Database Schema
+- Created `documentos` table with fields: id, tipo, usuarioId, conductorId, servicioId, url, nombreArchivo, estado, validoHasta, revisadoPor, motivoRechazo, createdAt
+- Added `documentoTipoEnum` with values: licencia, matricula, poliza, seguro_grua, foto_vehiculo, foto_perfil, cedula_frontal, cedula_trasera
+- Added `documentoEstadoEnum` with values: pendiente, aprobado, rechazado
+- Full TypeScript types and Zod validation schemas generated
+
+#### Storage Service (Replit Object Storage)
+- Implemented `StorageService` using `@replit/object-storage` SDK
+- Upload files with automatic folder organization (usuarios/, conductores/, servicios/)
+- Download files as Buffer for serving
+- Delete files from storage
+- List files by prefix
+- **⚠️ IMPORTANTE**: Se requiere crear un bucket en el workspace de Replit antes de usar la funcionalidad de carga de documentos. El servicio de almacenamiento se inicializa de forma lazy y lanzará un error descriptivo si no hay bucket disponible.
+
+#### API Endpoints
+- `POST /api/upload` - Upload document with multipart/form-data (max 5MB, JPEG/PNG/PDF only)
+  - **Seguridad**: Solo conductores activos y admins pueden subir documentos
+  - **Autorización**: El conductorId se deriva ESTRICTAMENTE de la sesión del usuario autenticado (ignora cualquier conductorId del cliente)
+  - **Validación de estado**: Solo conductores con estadoCuenta='activo' pueden subir documentos
+  - **Validación de tipos**: Tipos de documento permitidos: licencia, matricula, poliza, seguro_grua, foto_vehiculo, foto_perfil, cedula_frontal, cedula_trasera
+  - **Ownership**: Los conductores solo pueden subir documentos a su propio perfil (verificado mediante sesión)
+  - **Comportamiento Admin**: Los admins suben documentos con conductorId=null (no pueden asignar documentos a conductores mediante este endpoint). Para asignar documentos a conductores específicos, se creará un endpoint separado en el futuro.
+- `GET /api/documentos/:id` - Get document by ID (with authorization)
+- `GET /api/documentos/user/:userId` - Get all documents for a user
+- `GET /api/documentos/conductor/:conductorId` - Get all documents for a driver
+- `GET /api/admin/documentos` - Admin: Get all documents in system
+- `DELETE /api/documentos/:id` - Delete document (removes from storage and database)
+- `PUT /api/admin/documentos/:id/aprobar` - Admin: Approve document
+- `PUT /api/admin/documentos/:id/rechazar` - Admin: Reject document with reason
+- All endpoints include proper authentication and authorization checks
+
+#### Frontend Components
+- **FileUpload Component**: Reusable drag-and-drop file upload component
+  - Drag & drop support
+  - File type validation (JPEG, PNG, PDF)
+  - File size validation (5MB max)
+  - Image preview for uploaded images
+  - Error handling and user feedback
+  - Loading states during upload
+- **Driver Profile Integration**: Document management section added to driver profile
+  - Upload required documents: Licencia, Matrícula, Seguro de Grúa, Foto del Vehículo, Cédula (Frente/Reverso)
+  - Visual status badges: Pendiente (yellow), Aprobado (green), Rechazado (red)
+  - Display rejection reasons for rejected documents
+  - Real-time upload progress and status updates
+  - Ability to replace rejected or expired documents
+  - **Nota técnica**: El upload usa `fetch()` directo en lugar de `apiRequest` porque FormData requiere que el navegador establezca automáticamente el `Content-Type` con el boundary correcto (`multipart/form-data`), mientras que `apiRequest` está configurado para JSON.
+
+#### Storage Methods (Database)
+- `createDocumento(documento)` - Create new document record
+- `getDocumentoById(id)` - Get document with full details
+- `getDocumentosByUsuarioId(userId)` - Get all documents for user
+- `getDocumentosByConductorId(conductorId)` - Get all documents for driver
+- `getAllDocumentos()` - Admin: Get all documents
+- `updateDocumento(id, data)` - Update document metadata
+- `deleteDocumento(id)` - Delete document record
+- `aprobarDocumento(id, adminId)` - Approve document
+- `rechazarDocumento(id, adminId, motivo)` - Reject document with reason

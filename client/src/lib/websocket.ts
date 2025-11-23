@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 export interface WebSocketMessage {
   type: string;
@@ -9,12 +10,16 @@ export function useWebSocket(
   onMessage?: (message: WebSocketMessage) => void,
   onOpen?: () => void
 ) {
+  const { toast } = useToast();
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout>();
   const messageQueue = useRef<WebSocketMessage[]>([]);
   const onMessageRef = useRef(onMessage);
   const onOpenRef = useRef(onOpen);
   const [connectionId, setConnectionId] = useState(0);
+  const [isConnected, setIsConnected] = useState(false);
+  const reconnectAttempts = useRef(0);
+  const hasShownDisconnectToast = useRef(false);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -33,6 +38,17 @@ export function useWebSocket(
     ws.current.onopen = () => {
       console.log('WebSocket connected');
       setConnectionId(prev => prev + 1);
+      setIsConnected(true);
+      
+      if (reconnectAttempts.current > 0) {
+        toast({
+          title: "Conexión restablecida",
+          description: "La conexión en tiempo real se ha restablecido correctamente.",
+          variant: "default",
+        });
+        hasShownDisconnectToast.current = false;
+      }
+      reconnectAttempts.current = 0;
       
       while (messageQueue.current.length > 0) {
         const message = messageQueue.current.shift();
@@ -63,10 +79,23 @@ export function useWebSocket(
 
     ws.current.onerror = (error) => {
       console.error('WebSocket error:', error);
+      setIsConnected(false);
     };
 
     ws.current.onclose = () => {
       console.log('WebSocket disconnected, reconnecting...');
+      setIsConnected(false);
+      
+      if (!hasShownDisconnectToast.current) {
+        toast({
+          title: "Conexión perdida",
+          description: "Intentando reconectar en tiempo real...",
+          variant: "destructive",
+        });
+        hasShownDisconnectToast.current = true;
+      }
+      
+      reconnectAttempts.current += 1;
       reconnectTimeout.current = setTimeout(connect, 3000);
     };
   }, []);
@@ -92,5 +121,5 @@ export function useWebSocket(
     }
   }, []);
 
-  return { send, isConnected: ws.current?.readyState === WebSocket.OPEN, connectionId };
+  return { send, isConnected, connectionId };
 }

@@ -29,6 +29,21 @@ export const estadoServicioEnum = pgEnum("estado_servicio", [
   "cancelado"
 ]);
 export const metodoPagoEnum = pgEnum("metodo_pago", ["efectivo", "tarjeta"]);
+export const documentoTipoEnum = pgEnum("documento_tipo", [
+  "licencia",
+  "matricula",
+  "poliza",
+  "seguro_grua",
+  "foto_vehiculo",
+  "foto_perfil",
+  "cedula_frontal",
+  "cedula_trasera"
+]);
+export const documentoEstadoEnum = pgEnum("documento_estado", [
+  "pendiente",
+  "aprobado",
+  "rechazado"
+]);
 
 // Users Table
 export const users = pgTable("users", {
@@ -150,6 +165,22 @@ export const verificationCodes = pgTable("verification_codes", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Documentos Table (for file management)
+export const documentos = pgTable("documentos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tipo: documentoTipoEnum("tipo").notNull(),
+  usuarioId: varchar("usuario_id").references(() => users.id, { onDelete: "cascade" }),
+  conductorId: varchar("conductor_id").references(() => conductores.id, { onDelete: "cascade" }),
+  servicioId: varchar("servicio_id").references(() => servicios.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  nombreArchivo: text("nombre_archivo").notNull(),
+  estado: documentoEstadoEnum("estado").default("pendiente").notNull(),
+  validoHasta: timestamp("valido_hasta"),
+  revisadoPor: varchar("revisado_por").references(() => users.id),
+  motivoRechazo: text("motivo_rechazo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   conductor: one(conductores, {
@@ -217,6 +248,25 @@ export const mensajesChatRelations = relations(mensajesChat, ({ one }) => ({
 export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
   user: one(users, {
     fields: [pushSubscriptions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const documentosRelations = relations(documentos, ({ one }) => ({
+  usuario: one(users, {
+    fields: [documentos.usuarioId],
+    references: [users.id],
+  }),
+  conductor: one(conductores, {
+    fields: [documentos.conductorId],
+    references: [conductores.id],
+  }),
+  servicio: one(servicios, {
+    fields: [documentos.servicioId],
+    references: [servicios.id],
+  }),
+  revisadoPorUsuario: one(users, {
+    fields: [documentos.revisadoPor],
     references: [users.id],
   }),
 }));
@@ -331,6 +381,16 @@ export const insertVerificationCodeSchema = createInsertSchema(verificationCodes
   verificado: true,
 });
 
+export const insertDocumentoSchema = createInsertSchema(documentos, {
+  nombreArchivo: z.string().min(1),
+  url: z.string().min(1),
+}).omit({
+  id: true,
+  createdAt: true,
+  estado: true,
+  revisadoPor: true,
+});
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -341,6 +401,7 @@ export const selectUbicacionTrackingSchema = createSelectSchema(ubicacionesTrack
 export const selectMensajeChatSchema = createSelectSchema(mensajesChat);
 export const selectPushSubscriptionSchema = createSelectSchema(pushSubscriptions);
 export const selectVerificationCodeSchema = createSelectSchema(verificationCodes);
+export const selectDocumentoSchema = createSelectSchema(documentos);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -370,6 +431,9 @@ export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertVerificationCode = z.infer<typeof insertVerificationCodeSchema>;
 export type VerificationCode = typeof verificationCodes.$inferSelect;
 
+export type InsertDocumento = z.infer<typeof insertDocumentoSchema>;
+export type Documento = typeof documentos.$inferSelect;
+
 // Helper types for API responses
 export type UserWithConductor = User & {
   conductor?: Conductor;
@@ -383,4 +447,11 @@ export type ServicioWithDetails = Servicio & {
 
 export type MensajeChatWithRemitente = MensajeChat & {
   remitente?: User;
+};
+
+export type DocumentoWithDetails = Documento & {
+  usuario?: User;
+  conductor?: Conductor;
+  servicio?: Servicio;
+  revisadoPorUsuario?: User;
 };

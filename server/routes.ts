@@ -2,13 +2,15 @@ import express, { type Express, type Request, type Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { storageService } from "./storage-service";
 import { pushService } from "./push-service";
 import { smsService, generateOTP } from "./sms-service";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema } from "@shared/schema";
+import multer from "multer";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -1129,6 +1131,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Geocode error:', error);
       res.status(500).json({ message: "Failed to geocode address" });
+    }
+  });
+
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024,
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only JPEG, PNG, and PDF files are allowed.'));
+      }
+    },
+  });
+
+  app.post("/api/upload", upload.single('file'), async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+
+      const { tipo, validoHasta } = req.body;
+      
+      if (!tipo) {
+        return res.status(400).json({ message: "Document type is required" });
+      }
+
+      const validDocumentTypes = ['licencia', 'matricula', 'poliza', 'seguro_grua', 'foto_vehiculo', 'foto_perfil', 'cedula_frontal', 'cedula_trasera'];
+      if (!validDocumentTypes.includes(tipo)) {
+        return res.status(400).json({ message: "Invalid document type" });
+      }
+
+      let conductorId: number | null = null;
+      let folder: string;
+
+      if (req.user!.userType === 'conductor') {
+        if (req.user!.estadoCuenta !== 'activo') {
+          return res.status(403).json({ message: "Only active drivers can upload documents" });
+        }
+
+        const conductor = await storage.getConductorByUserId(req.user!.id);
+        if (!conductor) {
+          return res.status(403).json({ message: "Driver profile not found" });
+        }
+        conductorId = conductor.id;
+        folder = `conductores/${conductorId}/documentos`;
+      } else if (req.user!.userType === 'admin') {
+        folder = `usuarios/${req.user!.id}/documentos`;
+      } else {
+        return res.status(403).json({ message: "Only drivers and admins can upload documents" });
+      }
+
+      const uploadResult = await storageService.uploadFile(req.file, folder);
+
+      const documentoData = {
+        tipo,
+        usuarioId: req.user!.id,
+        conductorId: conductorId,
+        servicioId: null,
+        url: uploadResult.url,
+        nombreArchivo: uploadResult.filename,
+        validoHasta: validoHasta ? new Date(validoHasta) : null,
+      };
+
+      const validated = insertDocumentoSchema.parse(documentoData);
+      const documento = await storage.createDocumento(validated);
+
+      res.json(documento);
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: "Invalid document data", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message || "Failed to upload file" });
+    }
+  });
+
+  app.get("/api/documentos/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const documento = await storage.getDocumentoById(req.params.id);
+      
+      if (!documento) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      if (req.user!.userType !== 'admin' && documento.usuarioId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to view this document" });
+      }
+
+      res.json(documento);
+    } catch (error: any) {
+      console.error('Get document error:', error);
+      res.status(500).json({ message: "Failed to get document" });
+    }
+  });
+
+  app.get("/api/documentos/user/:userId", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      if (req.user!.userType !== 'admin' && req.params.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const documentos = await storage.getDocumentosByUsuarioId(req.params.userId);
+      res.json(documentos);
+    } catch (error: any) {
+      console.error('Get user documents error:', error);
+      res.status(500).json({ message: "Failed to get documents" });
+    }
+  });
+
+  app.get("/api/documentos/conductor/:conductorId", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      
+      if (req.user!.userType !== 'admin' && (!conductor || conductor.id !== req.params.conductorId)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const documentos = await storage.getDocumentosByConductorId(req.params.conductorId);
+      res.json(documentos);
+    } catch (error: any) {
+      console.error('Get driver documents error:', error);
+      res.status(500).json({ message: "Failed to get documents" });
+    }
+  });
+
+  app.get("/api/admin/documentos", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const documentos = await storage.getAllDocumentos();
+      res.json(documentos);
+    } catch (error: any) {
+      console.error('Get all documents error:', error);
+      res.status(500).json({ message: "Failed to get documents" });
+    }
+  });
+
+  app.delete("/api/documentos/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const documento = await storage.getDocumentoById(req.params.id);
+      
+      if (!documento) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      if (req.user!.userType !== 'admin' && documento.usuarioId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      await storageService.deleteFile(documento.url);
+      await storage.deleteDocumento(req.params.id);
+
+      res.json({ message: "Document deleted successfully" });
+    } catch (error: any) {
+      console.error('Delete document error:', error);
+      res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
+  app.put("/api/admin/documentos/:id/aprobar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const documento = await storage.aprobarDocumento(req.params.id, req.user!.id);
+      res.json(documento);
+    } catch (error: any) {
+      console.error('Approve document error:', error);
+      res.status(500).json({ message: "Failed to approve document" });
+    }
+  });
+
+  app.put("/api/admin/documentos/:id/rechazar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { motivo } = req.body;
+      
+      if (!motivo) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+
+      const documento = await storage.rechazarDocumento(req.params.id, req.user!.id, motivo);
+      res.json(documento);
+    } catch (error: any) {
+      console.error('Reject document error:', error);
+      res.status(500).json({ message: "Failed to reject document" });
     }
   });
 

@@ -10,6 +10,7 @@ import {
   mensajesChat,
   pushSubscriptions,
   verificationCodes,
+  documentos,
   type User,
   type InsertUser,
   type Conductor,
@@ -27,9 +28,12 @@ import {
   type PushSubscription,
   type InsertVerificationCode,
   type VerificationCode,
+  type Documento,
+  type InsertDocumento,
   type UserWithConductor,
   type ServicioWithDetails,
   type MensajeChatWithRemitente,
+  type DocumentoWithDetails,
 } from '@shared/schema';
 
 export interface IStorage {
@@ -110,6 +114,17 @@ export interface IStorage {
   getDriverRankings(): Promise<Array<{ driverId: string; driverName: string; completedServices: number; averageRating: number }>>;
   getServicesByHour(): Promise<Array<{ hour: number; count: number }>>;
   getServiceStatusBreakdown(startDate?: string, endDate?: string): Promise<Array<{ status: string; count: number }>>;
+
+  // Documentos
+  createDocumento(documento: InsertDocumento): Promise<Documento>;
+  getDocumentoById(id: string): Promise<DocumentoWithDetails | undefined>;
+  getDocumentosByUsuarioId(usuarioId: string): Promise<DocumentoWithDetails[]>;
+  getDocumentosByConductorId(conductorId: string): Promise<DocumentoWithDetails[]>;
+  getAllDocumentos(): Promise<DocumentoWithDetails[]>;
+  updateDocumento(id: string, data: Partial<Documento>): Promise<Documento>;
+  deleteDocumento(id: string): Promise<void>;
+  aprobarDocumento(id: string, adminId: string): Promise<Documento>;
+  rechazarDocumento(id: string, adminId: string, motivo: string): Promise<Documento>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -655,6 +670,106 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.phone, phone))
       .limit(1);
     return user;
+  }
+
+  async createDocumento(documento: InsertDocumento): Promise<Documento> {
+    const [newDocumento] = await db
+      .insert(documentos)
+      .values(documento)
+      .returning();
+    return newDocumento;
+  }
+
+  async getDocumentoById(id: string): Promise<DocumentoWithDetails | undefined> {
+    const result = await db.query.documentos.findFirst({
+      where: eq(documentos.id, id),
+      with: {
+        usuario: true,
+        conductor: true,
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+    });
+    return result;
+  }
+
+  async getDocumentosByUsuarioId(usuarioId: string): Promise<DocumentoWithDetails[]> {
+    const results = await db.query.documentos.findMany({
+      where: eq(documentos.usuarioId, usuarioId),
+      with: {
+        usuario: true,
+        conductor: true,
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+      orderBy: desc(documentos.createdAt),
+    });
+    return results;
+  }
+
+  async getDocumentosByConductorId(conductorId: string): Promise<DocumentoWithDetails[]> {
+    const results = await db.query.documentos.findMany({
+      where: eq(documentos.conductorId, conductorId),
+      with: {
+        usuario: true,
+        conductor: true,
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+      orderBy: desc(documentos.createdAt),
+    });
+    return results;
+  }
+
+  async getAllDocumentos(): Promise<DocumentoWithDetails[]> {
+    const results = await db.query.documentos.findMany({
+      with: {
+        usuario: true,
+        conductor: true,
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+      orderBy: desc(documentos.createdAt),
+    });
+    return results;
+  }
+
+  async updateDocumento(id: string, data: Partial<Documento>): Promise<Documento> {
+    const [updated] = await db
+      .update(documentos)
+      .set(data)
+      .where(eq(documentos.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDocumento(id: string): Promise<void> {
+    await db.delete(documentos).where(eq(documentos.id, id));
+  }
+
+  async aprobarDocumento(id: string, adminId: string): Promise<Documento> {
+    const [updated] = await db
+      .update(documentos)
+      .set({
+        estado: 'aprobado',
+        revisadoPor: adminId,
+      })
+      .where(eq(documentos.id, id))
+      .returning();
+    return updated;
+  }
+
+  async rechazarDocumento(id: string, adminId: string, motivo: string): Promise<Documento> {
+    const [updated] = await db
+      .update(documentos)
+      .set({
+        estado: 'rechazado',
+        revisadoPor: adminId,
+        motivoRechazo: motivo,
+      })
+      .where(eq(documentos.id, id))
+      .returning();
+    return updated;
   }
 }
 
