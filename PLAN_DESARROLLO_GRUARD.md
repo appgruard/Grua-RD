@@ -57,9 +57,153 @@
   - [x] Documentación completa (NOTIFICACIONES_PUSH_README.md)
   - [ ] Configurar claves VAPID reales (pendiente del usuario)
 
-### ⏳ Pendiente
-- [ ] Stripe API Keys (STRIPE_SECRET_KEY, VITE_STRIPE_PUBLIC_KEY)
-- [ ] Fase 4 - Producción
+### 🚧 Fase 4 - Producción - EN PROGRESO
+Esta fase prepara la aplicación para lanzamiento en producción, organizando el trabajo en cuatro flujos (workstreams) que se ejecutarán de forma secuencial y parcialmente paralela.
+
+#### **Workstream A: Identidad y Cumplimiento** (Prioridad ALTA)
+Implementar verificación de identidad robusta para cumplir con regulaciones locales.
+
+- [ ] **Validación de Cédula Dominicana**
+  - [ ] Servicio de validación de cédula (servidor)
+  - [ ] Integración con API de JCE (Junta Central Electoral) o validación local
+  - [ ] UI para manejo de errores de validación
+  - [ ] Actualizar schema para almacenar cédula y estado de verificación
+  - [ ] Tests E2E para flujo de verificación
+
+- [ ] **Verificación de Teléfono (OTP via SMS)**
+  - [ ] Integrar proveedor SMS (Twilio, Infobip, o MessageBird)
+  - [ ] Tabla `otp_tokens` con expiración y rate limiting
+  - [ ] API endpoints: `/api/auth/send-otp`, `/api/auth/verify-otp`
+  - [ ] UI para ingreso de OTP con countdown timer
+  - [ ] Rate limiting (máx 3 intentos/hora)
+  - [ ] Tests E2E para flujo OTP completo
+
+- [ ] **Flujo de Onboarding Mejorado**
+  - [ ] Wizard multi-paso: Email → Cédula → Teléfono → Datos personales
+  - [ ] Re-intentos y estados de error elegantes
+  - [ ] Auditoría de verificaciones en tabla `verification_audit`
+  - [ ] Panel admin para ver estado de verificación de usuarios
+
+**Acceptance Criteria:**
+- ✅ Usuarios solo pueden completar registro con cédula y teléfono verificados
+- ✅ Admins pueden visualizar estado de verificación en panel de gestión
+- ✅ Sistema previene abuso de OTP con rate limiting
+
+---
+
+#### **Workstream B: Gestión Documental & Seguridad Operativa** (Prioridad ALTA)
+Implementar gestión de documentos y endurecer seguridad del sistema.
+
+- [ ] **Sistema de Upload de Documentos**
+  - [ ] Integración con Replit Object Storage
+  - [ ] Tabla `documentos` (tipo, url, estado, uploadedAt, approvedAt, rejectedAt, adminNotes)
+  - [ ] API endpoints: `/api/documents/upload`, `/api/documents/:id`, `/api/documents/my-documents`
+  - [ ] Validación de formatos (jpg, png, pdf) y tamaño (máx 5MB)
+  - [ ] Componente UploadDocuments para conductores
+  - [ ] Tipos de documentos: licencia, matrícula, cédula, foto_grua
+
+- [ ] **Panel Admin de Aprobación**
+  - [ ] Vista de documentos pendientes con preview
+  - [ ] Acciones: Aprobar / Rechazar con notas
+  - [ ] API endpoint: `/api/admin/documents/:id/review`
+  - [ ] Notificaciones push al conductor cuando documento es aprobado/rechazado
+  - [ ] Historial de cambios de estado
+
+- [ ] **Endurecimiento de Seguridad**
+  - [ ] Instalar y configurar `helmet` para headers de seguridad
+  - [ ] Configurar CORS estricto (whitelist de dominios)
+  - [ ] Implementar `express-rate-limit` en endpoints sensibles
+  - [ ] Audit logging para acciones críticas (login, registro, cambios admin)
+  - [ ] Health check endpoint: `/api/health` con estado de DB, Object Storage, etc.
+  - [ ] Métricas básicas: latencia promedio, tasa de errores
+
+**Acceptance Criteria:**
+- ✅ Conductor no puede activar disponibilidad sin documentos aprobados
+- ✅ Health check devuelve estado de todas las dependencias
+- ✅ Logs estructurados en Winston para todas las operaciones
+- ✅ Rate limiting previene abuso en endpoints de autenticación
+
+---
+
+#### **Workstream C: Pagos y Cumplimiento Financiero** (Prioridad MEDIA)
+Completar sistema de pagos con comisiones y recibos.
+
+- [ ] **Stripe Connect para Split de Comisiones**
+  - [ ] Configurar Stripe Connect Standard (70% conductor, 30% plataforma)
+  - [ ] Actualizar tabla `conductores` con `stripeAccountId`
+  - [ ] Flow de onboarding Stripe para conductores
+  - [ ] API endpoint: `/api/drivers/stripe-onboarding`
+  - [ ] Actualizar tabla `servicios` con `platformFee` y `driverPayout`
+  - [ ] Webhook handler para `account.updated` y `payout.paid`
+
+- [ ] **Gestión de Métodos de Pago**
+  - [ ] Tabla `payment_methods` para guardar métodos recurrentes
+  - [ ] UI para agregar/eliminar tarjetas
+  - [ ] Fallback a efectivo si pago con tarjeta falla
+
+- [ ] **Generación de Recibos PDF**
+  - [ ] Servicio de generación PDF con `pdfkit`
+  - [ ] Template de recibo con branding GruaRD
+  - [ ] Datos: servicio, costo, comisión, conductor, cliente
+  - [ ] Almacenar PDFs en Object Storage
+  - [ ] API endpoint: `/api/services/:id/receipt`
+  - [ ] Botón de descarga en historial
+
+**Acceptance Criteria:**
+- ✅ Cada servicio completado crea payout automático al conductor
+- ✅ Comisión 70/30 registrada correctamente en base de datos
+- ✅ Recibo PDF descargable desde historial
+- ✅ Webhooks de Stripe manejados correctamente
+
+---
+
+#### **Workstream D: Preparación Producción & Deployabilidad** (Prioridad ALTA)
+Optimizar, monitorear y preparar para deployment.
+
+- [ ] **Gestión de Entornos y Secrets**
+  - [ ] Documentar todas las variables de entorno requeridas
+  - [ ] Configurar secrets de producción (Stripe, SMS, VAPID)
+  - [ ] Checklist de infraestructura: SSL, dominio, reverse proxy
+  - [ ] Session secret robusto generado
+
+- [ ] **Pipeline CI/CD y Testing**
+  - [ ] Script de lint: `npm run lint`
+  - [ ] Script de build: `npm run build`
+  - [ ] Tests automatizados en CI
+  - [ ] Smoke tests post-deployment
+  - [ ] Ambiente de staging replicado
+
+- [ ] **Optimización PWA y Monitoreo**
+  - [ ] Auditoría Lighthouse (objetivo: ≥90 en todas las métricas)
+  - [ ] Optimización de bundle size (code splitting, lazy loading)
+  - [ ] Mejoras de caching offline
+  - [ ] Integrar Sentry o LogRocket para monitoreo de errores
+  - [ ] Dashboard de métricas básicas (uptime, errores, latencia)
+
+- [ ] **Preparación Capacitor para APK**
+  - [ ] Actualizar `capacitor.config.ts` con configuración de producción
+  - [ ] Iconos y splash screens para Android
+  - [ ] Configurar firmado de APK
+  - [ ] Build de APK debug para testing
+  - [ ] Documentación de proceso de build
+  - [ ] Play Store assets (descripción, screenshots)
+
+**Acceptance Criteria:**
+- ✅ Deployment reproducible con un comando
+- ✅ Métricas de monitoreo activas en producción
+- ✅ APK debug funcional y testeado en dispositivo real
+- ✅ Lighthouse score ≥ 90 en todas las métricas
+- ✅ Error tracking activo con alertas configuradas
+
+---
+
+#### **Secuenciamiento de Workstreams:**
+1. **Primero:** Workstream A (identidad es prerequisito para aprobaciones)
+2. **Segundo:** Workstream B (requiere identidad verificada para documentos)
+3. **Tercero:** Workstream C (requiere identidad verificada para pagos)
+4. **Paralelo:** Workstream D puede ejecutarse en paralelo con B y C
+
+**Nota:** Algunos elementos de seguridad del Workstream B (helmet, rate limiting) pueden implementarse en paralelo con Workstream A.
 
 ---
 
@@ -543,32 +687,35 @@ shared/
 ## 📝 Checklist de Completitud MVP
 
 ### Funcionalidades Core
-- [ ] Registro/Login (Cliente, Conductor, Admin)
-- [ ] Cliente puede solicitar grúa desde mapa
-- [ ] Sistema calcula costo automáticamente
-- [ ] Conductor ve solicitudes cercanas
-- [ ] Conductor puede aceptar/rechazar
-- [ ] Tracking GPS en tiempo real (ambas partes)
-- [ ] Completar servicio
-- [ ] Pago en efectivo (registro manual)
-- [ ] Pago con tarjeta (Stripe) - requiere API keys
-- [ ] Calificar servicio
-- [ ] Historial completo
-- [ ] Toggle disponibilidad conductor
-- [ ] Admin: Dashboard con stats
-- [ ] Admin: Gestión usuarios/conductores
-- [ ] Admin: Configuración tarifas
-- [ ] Admin: Monitoreo en tiempo real
+- [x] Registro/Login (Cliente, Conductor, Admin)
+- [x] Cliente puede solicitar grúa desde mapa
+- [x] Sistema calcula costo automáticamente
+- [x] Conductor ve solicitudes cercanas
+- [x] Conductor puede aceptar/rechazar
+- [x] Tracking GPS en tiempo real (ambas partes)
+- [x] Completar servicio
+- [x] Pago en efectivo (registro manual)
+- [x] Pago con tarjeta (Stripe) - implementado, requiere API keys para testing
+- [x] Calificar servicio
+- [x] Historial completo
+- [x] Toggle disponibilidad conductor
+- [x] Admin: Dashboard con stats
+- [x] Admin: Gestión usuarios/conductores
+- [x] Admin: Configuración tarifas
+- [x] Admin: Monitoreo en tiempo real
+- [x] Chat en tiempo real (Cliente ↔ Conductor)
+- [x] Notificaciones Push - implementado, requiere claves VAPID
 
 ### Calidad Técnica
-- [ ] Responsive design perfecto
-- [ ] Modo oscuro funcional
-- [ ] Estados de carga elegantes
-- [ ] Manejo de errores robusto
-- [ ] Validación de formularios
-- [ ] WebSocket reconexión automática
-- [ ] PWA instalable
-- [ ] Rendimiento optimizado
+- [x] Responsive design perfecto (Mobile-first)
+- [x] Modo oscuro funcional
+- [x] Estados de carga elegantes (Skeletons)
+- [x] Manejo de errores robusto
+- [x] Validación de formularios
+- [x] WebSocket reconexión automática
+- [x] PWA instalable (manifest.json + service worker)
+- [x] Tests E2E completos (Playwright - 27 tests)
+- [ ] Rendimiento optimizado (pendiente Lighthouse audit en Fase 4)
 
 ---
 
