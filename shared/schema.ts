@@ -44,6 +44,12 @@ export const documentoEstadoEnum = pgEnum("documento_estado", [
   "aprobado",
   "rechazado"
 ]);
+export const estadoPagoEnum = pgEnum("estado_pago", [
+  "pendiente",
+  "procesando",
+  "pagado",
+  "fallido"
+]);
 
 // Users Table
 export const users = pgTable("users", {
@@ -181,6 +187,24 @@ export const documentos = pgTable("documentos", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Comisiones Table (for payment commissions 70/30)
+export const comisiones = pgTable("comisiones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  servicioId: varchar("servicio_id").notNull().references(() => servicios.id, { onDelete: "cascade" }),
+  montoTotal: decimal("monto_total", { precision: 10, scale: 2 }).notNull(),
+  montoOperador: decimal("monto_operador", { precision: 10, scale: 2 }).notNull(),
+  montoEmpresa: decimal("monto_empresa", { precision: 10, scale: 2 }).notNull(),
+  porcentajeOperador: decimal("porcentaje_operador", { precision: 5, scale: 2 }).default("70.00").notNull(),
+  porcentajeEmpresa: decimal("porcentaje_empresa", { precision: 5, scale: 2 }).default("30.00").notNull(),
+  estadoPagoOperador: estadoPagoEnum("estado_pago_operador").default("pendiente").notNull(),
+  estadoPagoEmpresa: estadoPagoEnum("estado_pago_empresa").default("pendiente").notNull(),
+  stripeTransferId: text("stripe_transfer_id"),
+  fechaPagoOperador: timestamp("fecha_pago_operador"),
+  fechaPagoEmpresa: timestamp("fecha_pago_empresa"),
+  notas: text("notas"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   conductor: one(conductores, {
@@ -268,6 +292,13 @@ export const documentosRelations = relations(documentos, ({ one }) => ({
   revisadoPorUsuario: one(users, {
     fields: [documentos.revisadoPor],
     references: [users.id],
+  }),
+}));
+
+export const comisionesRelations = relations(comisiones, ({ one }) => ({
+  servicio: one(servicios, {
+    fields: [comisiones.servicioId],
+    references: [servicios.id],
   }),
 }));
 
@@ -391,6 +422,19 @@ export const insertDocumentoSchema = createInsertSchema(documentos, {
   revisadoPor: true,
 });
 
+export const insertComisionSchema = createInsertSchema(comisiones, {
+  montoTotal: z.string().min(1),
+  montoOperador: z.string().min(1),
+  montoEmpresa: z.string().min(1),
+}).omit({
+  id: true,
+  createdAt: true,
+  estadoPagoOperador: true,
+  estadoPagoEmpresa: true,
+  fechaPagoOperador: true,
+  fechaPagoEmpresa: true,
+});
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -402,6 +446,7 @@ export const selectMensajeChatSchema = createSelectSchema(mensajesChat);
 export const selectPushSubscriptionSchema = createSelectSchema(pushSubscriptions);
 export const selectVerificationCodeSchema = createSelectSchema(verificationCodes);
 export const selectDocumentoSchema = createSelectSchema(documentos);
+export const selectComisionSchema = createSelectSchema(comisiones);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -434,6 +479,9 @@ export type VerificationCode = typeof verificationCodes.$inferSelect;
 export type InsertDocumento = z.infer<typeof insertDocumentoSchema>;
 export type Documento = typeof documentos.$inferSelect;
 
+export type InsertComision = z.infer<typeof insertComisionSchema>;
+export type Comision = typeof comisiones.$inferSelect;
+
 // Helper types for API responses
 export type UserWithConductor = User & {
   conductor?: Conductor;
@@ -454,4 +502,8 @@ export type DocumentoWithDetails = Documento & {
   conductor?: Conductor;
   servicio?: Servicio;
   revisadoPorUsuario?: User;
+};
+
+export type ComisionWithDetails = Comision & {
+  servicio?: ServicioWithDetails;
 };

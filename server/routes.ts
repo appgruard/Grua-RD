@@ -61,6 +61,77 @@ passport.deserializeUser(async (id: string, done) => {
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!stripeSecretKey || !webhookSecret) {
+      return res.status(503).json({ message: "Payment service not configured" });
+    }
+
+    try {
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2024-11-20.acacia' as any,
+      });
+
+      const sig = req.headers['stripe-signature'];
+      
+      if (!sig) {
+        return res.status(400).json({ message: "No signature" });
+      }
+
+      const event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+
+      if (event.type === 'payment_intent.succeeded') {
+        const paymentIntent = event.data.object;
+        const servicioId = paymentIntent.metadata.servicioId;
+
+        if (servicioId) {
+          const servicio = await storage.getServicioById(servicioId);
+          
+          if (!servicio) {
+            console.error(`Webhook: Service ${servicioId} not found`);
+            return res.json({ received: true });
+          }
+
+          if (servicio.stripePaymentId === paymentIntent.id) {
+            console.log(`Webhook: Payment ${paymentIntent.id} already processed (idempotent)`);
+            return res.json({ received: true });
+          }
+
+          const existingComision = await storage.getComisionByServicioId(servicioId);
+          if (existingComision) {
+            console.log(`Webhook: Commission for service ${servicioId} already exists`);
+            return res.json({ received: true });
+          }
+
+          await storage.updateServicio(servicioId, {
+            stripePaymentId: paymentIntent.id,
+          });
+
+          const montoTotal = parseFloat(servicio.costoTotal);
+          const montoOperador = montoTotal * 0.7;
+          const montoEmpresa = montoTotal * 0.3;
+
+          await storage.createComision({
+            servicioId,
+            montoTotal: servicio.costoTotal,
+            montoOperador: montoOperador.toFixed(2),
+            montoEmpresa: montoEmpresa.toFixed(2),
+          });
+
+          console.log(`Webhook: Created commission for service ${servicioId}, payment ${paymentIntent.id}`);
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error('Webhook error:', error);
+      res.status(400).json({ message: `Webhook Error: ${error.message}` });
+    }
+  });
+
   app.use(express.json());
 
   const sessionParser = session({
@@ -1347,6 +1418,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Reject document error:', error);
       res.status(500).json({ message: "Failed to reject document" });
+    }
+  });
+
+  app.post("/api/payments/create-intent", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { servicioId } = req.body;
+
+      if (!servicioId) {
+        return res.status(400).json({ message: "servicioId is required" });
+      }
+
+      const servicio = await storage.getServicioById(servicioId);
+
+      if (!servicio) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (servicio.clienteId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to pay for this service" });
+      }
+
+      if (servicio.estado !== 'pendiente') {
+        return res.status(400).json({ message: "Service is not in pending state" });
+      }
+
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      
+      if (!stripeSecretKey) {
+        return res.status(503).json({ 
+          message: "Payment service not configured. Please contact administrator.",
+          configured: false 
+        });
+      }
+
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2024-11-20.acacia' as any,
+      });
+
+      const amount = Math.round(parseFloat(servicio.costoTotal) * 100);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount,
+        currency: 'dop',
+        metadata: {
+          servicioId,
+          userId: req.user!.id,
+        },
+      });
+
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: servicio.costoTotal,
+      });
+    } catch (error: any) {
+      console.error('Create payment intent error:', error);
+      res.status(500).json({ message: "Failed to create payment intent" });
+    }
+  });
+
+  app.get("/api/comisiones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    if (req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: admin access required" });
+    }
+
+    try {
+      const comisiones = await storage.getAllComisiones();
+      res.json(comisiones);
+    } catch (error: any) {
+      console.error('Get commissions error:', error);
+      res.status(500).json({ message: "Failed to get commissions" });
+    }
+  });
+
+  app.get("/api/comisiones/pendientes/:tipo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    if (req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: admin access required" });
+    }
+
+    try {
+      const { tipo } = req.params;
+      
+      if (tipo !== 'operador' && tipo !== 'empresa') {
+        return res.status(400).json({ message: "Invalid tipo parameter" });
+      }
+
+      const comisiones = await storage.getComisionesByEstado('pendiente', tipo);
+      res.json(comisiones);
+    } catch (error: any) {
+      console.error('Get pending commissions error:', error);
+      res.status(500).json({ message: "Failed to get pending commissions" });
+    }
+  });
+
+  app.put("/api/comisiones/:id/pagar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    if (req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: admin access required" });
+    }
+
+    try {
+      const { tipo, stripeTransferId } = req.body;
+      
+      if (!tipo || (tipo !== 'operador' && tipo !== 'empresa')) {
+        return res.status(400).json({ message: "Valid tipo (operador/empresa) is required" });
+      }
+
+      const comision = await storage.marcarComisionPagada(req.params.id, tipo, stripeTransferId);
+      res.json(comision);
+    } catch (error: any) {
+      console.error('Mark commission paid error:', error);
+      res.status(500).json({ message: "Failed to mark commission as paid" });
+    }
+  });
+
+  app.get("/api/servicios/:id/recibo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const servicio = await storage.getServicioById(req.params.id);
+
+      if (!servicio) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (req.user!.userType !== 'admin' && 
+          servicio.clienteId !== req.user!.id && 
+          servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const PDFDocument = (await import('pdfkit')).default;
+      const doc = new PDFDocument();
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=recibo-${servicio.id}.pdf`);
+
+      doc.pipe(res);
+
+      doc.fontSize(20).text('GruaRD', { align: 'center' });
+      doc.fontSize(16).text('Recibo de Servicio', { align: 'center' });
+      doc.moveDown();
+
+      doc.fontSize(12).text(`Número de Servicio: ${servicio.id}`);
+      doc.text(`Fecha: ${new Date(servicio.createdAt).toLocaleDateString('es-DO')}`);
+      doc.moveDown();
+
+      doc.text(`Cliente: ${servicio.cliente?.nombre} ${servicio.cliente?.apellido}`);
+      if (servicio.conductor) {
+        doc.text(`Conductor: ${servicio.conductor.nombre} ${servicio.conductor.apellido}`);
+      }
+      doc.moveDown();
+
+      doc.text(`Origen: ${servicio.origenDireccion}`);
+      doc.text(`Destino: ${servicio.destinoDireccion}`);
+      doc.text(`Distancia: ${servicio.distanciaKm} km`);
+      doc.moveDown();
+
+      doc.fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`, { bold: true });
+      doc.fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
+      if (servicio.stripePaymentId) {
+        doc.text(`ID de Transacción: ${servicio.stripePaymentId}`);
+      }
+      doc.moveDown();
+
+      doc.fontSize(10).text('Información Fiscal', { underline: true });
+      doc.text('GruaRD - República Dominicana');
+      doc.text('RNC: XXXXXXXXX');
+      doc.text('Este documento es válido como comprobante de pago');
+
+      doc.end();
+    } catch (error: any) {
+      console.error('Generate receipt error:', error);
+      res.status(500).json({ message: "Failed to generate receipt" });
     }
   });
 

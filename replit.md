@@ -160,3 +160,79 @@ The system uses a PostgreSQL database with Drizzle ORM for type-safe data access
 - `deleteDocumento(id)` - Delete document record
 - `aprobarDocumento(id, adminId)` - Approve document
 - `rechazarDocumento(id, adminId, motivo)` - Reject document with reason
+
+---
+
+### FASE 0.4 - Integración de Pagos con Stripe ✅ COMPLETADA
+
+#### Database Schema
+- Created `comisiones` table with commission tracking (70/30 split):
+  - Fields: id, servicioId, montoTotal, montoOperador, montoEmpresa, porcentajeOperador, porcentajeEmpresa
+  - Payment states: estadoPagoOperador, estadoPagoEmpresa (pendiente, procesando, pagado, fallido)
+  - Tracking: stripeTransferId, fechaPagoOperador, fechaPagoEmpresa, notas, createdAt
+- Added `estadoPagoEnum` with values: pendiente, procesando, pagado, fallido
+- Full TypeScript types and Zod validation schemas generated
+
+#### Payment Integration (Stripe)
+- **Currency**: Dominican Peso (DOP) configured for República Dominicana
+- **PaymentIntent API**: Secure server-side payment processing
+- **Webhook Integration**: Automatic commission creation on successful payments
+- **Commission System**: Automatic 70/30 split (70% operator, 30% company)
+- **Environment Variables Required**:
+  - `STRIPE_SECRET_KEY` - Stripe secret API key
+  - `VITE_STRIPE_PUBLIC_KEY` - Stripe publishable key (frontend)
+  - `STRIPE_WEBHOOK_SECRET` - Webhook signing secret for event verification
+
+#### API Endpoints (Payments)
+- `POST /api/payments/create-intent` - Create PaymentIntent for card payment
+  - Request: `{ amount: string, servicioId: string }`
+  - Response: `{ clientSecret: string, paymentIntentId: string }`
+  - Returns 503 if Stripe not configured
+- `POST /api/payments/webhook` - Stripe webhook handler (raw body)
+  - Verifies webhook signature
+  - Creates commission record on `payment_intent.succeeded` event
+  - Automatic 70/30 split calculation
+  - Updates service with Stripe payment ID
+- `GET /api/comisiones` - Admin: Get all commissions
+- `GET /api/comisiones/pendientes/:tipo` - Admin: Get pending commissions by type (operador/empresa)
+- `PUT /api/comisiones/:id/pagar` - Admin: Mark commission as paid
+  - Request: `{ tipo: 'operador' | 'empresa', stripeTransferId?: string }`
+- `GET /api/servicios/:id/recibo` - Generate PDF receipt for service
+  - Authorized for client, driver, and admin
+  - Returns PDF with service details, payment info, fiscal information
+  - Filename: `recibo-{servicioId}.pdf`
+
+#### Frontend Components
+- **StripePayment Component**: Complete payment flow with Stripe Elements
+  - Integration with `@stripe/stripe-js` and `@stripe/react-stripe-js`
+  - PaymentElement for secure card input
+  - Automatic PaymentIntent creation
+  - Real-time payment confirmation
+  - Loading states and error handling
+  - Success/error toast notifications
+  - Configurable callbacks for success/cancel
+  - Test IDs for e2e testing
+
+#### Storage Methods (Database - Comisiones)
+- `createComision(comision)` - Create new commission record
+- `getComisionByServicioId(servicioId)` - Get commission for specific service
+- `getComisionesByEstado(estado, tipo)` - Get commissions by payment state and type
+- `getAllComisiones()` - Admin: Get all commissions with service details
+- `updateComision(id, data)` - Update commission metadata
+- `marcarComisionPagada(id, tipo, stripeTransferId?)` - Mark commission as paid for operator or company
+
+#### Security & Best Practices
+- Stripe API keys stored securely in environment variables
+- Webhook signature verification for event authenticity
+- Server-side PaymentIntent creation (never expose secret key to client)
+- Automatic commission calculation to prevent manipulation
+- Authorization checks on all payment-related endpoints
+- Commission records linked to completed services only
+
+#### Digital Receipts (PDF)
+- Generated using PDFKit library
+- Includes complete service details: client, driver, origin, destination, distance
+- Payment information: total cost, payment method, transaction ID
+- Fiscal information: company name, RNC, legal disclaimer
+- Accessible by service participants (client, driver, admin)
+- Downloadable as PDF attachment
