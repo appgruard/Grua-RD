@@ -132,7 +132,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           logTransaction.paymentSuccess(servicioId, parseFloat(servicio.costoTotal), paymentIntent.id);
           logTransaction.commissionCreated(comision.id, servicioId, montoOperador, montoEmpresa);
+
+          if (servicio.conductorId) {
+            try {
+              const { stripeConnectService } = await import('./services/stripe-connect');
+              const conductor = await storage.getConductorById(servicio.conductorId);
+              
+              if (conductor && stripeConnectService.isConfigured()) {
+                const stripeTransferId = await stripeConnectService.createTransfer(
+                  montoOperador,
+                  conductor.id,
+                  servicioId
+                );
+
+                await storage.marcarComisionPagada(comision.id, 'operador', stripeTransferId);
+                logSystem.info('Stripe Connect transfer created and commission marked as paid', {
+                  transferId: stripeTransferId,
+                  servicioId,
+                  conductorId: conductor.id,
+                  amount: montoOperador,
+                  comisionId: comision.id,
+                });
+              } else if (!stripeConnectService.isConfigured()) {
+                logSystem.warn('Stripe Connect not configured - cannot create transfer', {
+                  servicioId,
+                  conductorId: conductor?.id,
+                });
+              }
+            } catch (error: any) {
+              logSystem.error('Error creating Stripe Connect transfer', error, { servicioId, conductorId: servicio.conductorId });
+            }
+          }
         }
+      } else if (event.type === 'account.updated') {
+        try {
+          const { stripeConnectService } = await import('./services/stripe-connect');
+          await stripeConnectService.handleAccountUpdated(event);
+          logSystem.info('Stripe Connect account updated webhook processed', {
+            accountId: (event.data.object as any).id,
+          });
+        } catch (error: any) {
+          logSystem.error('Error processing account.updated webhook', error);
+        }
+      } else if (event.type === 'payout.paid') {
+        logSystem.info('Payout paid webhook received', {
+          payoutId: (event.data.object as any).id,
+        });
       }
 
       res.json({ received: true });
@@ -2053,6 +2098,252 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Generate receipt error', error);
       res.status(500).json({ message: "Failed to generate receipt" });
+    }
+  });
+
+  // ========================================
+  // STRIPE CONNECT ENDPOINTS
+  // ========================================
+
+  app.post("/api/drivers/stripe-onboarding", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can access this endpoint" });
+    }
+
+    try {
+      const { stripeConnectService } = await import('./services/stripe-connect');
+      
+      if (!stripeConnectService.isConfigured()) {
+        return res.status(503).json({ 
+          message: "Stripe Connect not configured",
+          configured: false 
+        });
+      }
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Driver profile not found" });
+      }
+
+      const result = await stripeConnectService.createConnectedAccount(conductor.id);
+      
+      logSystem.info('Stripe Connect onboarding started', { 
+        conductorId: conductor.id,
+        userId: req.user!.id 
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Stripe Connect onboarding error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Failed to start Stripe onboarding" });
+    }
+  });
+
+  app.get("/api/drivers/stripe-account-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can access this endpoint" });
+    }
+
+    try {
+      const { stripeConnectService } = await import('./services/stripe-connect');
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Driver profile not found" });
+      }
+
+      const status = await stripeConnectService.getAccountStatus(conductor.id);
+      res.json(status);
+    } catch (error: any) {
+      logSystem.error('Get Stripe account status error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get account status" });
+    }
+  });
+
+  // ========================================
+  // PAYMENT METHODS ENDPOINTS
+  // ========================================
+
+  app.post("/api/payment-methods", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { paymentMethodId } = req.body;
+
+      if (!paymentMethodId) {
+        return res.status(400).json({ message: "paymentMethodId is required" });
+      }
+
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      if (!stripeSecretKey) {
+        return res.status(503).json({ 
+          message: "Payment service not configured",
+          configured: false 
+        });
+      }
+
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2024-11-20.acacia' as any,
+      });
+
+      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+
+      if (paymentMethod.type !== 'card') {
+        return res.status(400).json({ message: "Only card payment methods are supported" });
+      }
+
+      const { db } = await import('./db');
+      const { paymentMethods } = await import('./schema-extensions');
+      const { eq } = await import('drizzle-orm');
+
+      const existingMethods = await db.query.paymentMethods.findMany({
+        where: eq(paymentMethods.userId, req.user!.id),
+      });
+
+      const isFirst = existingMethods.length === 0;
+
+      const savedMethod = await db.insert(paymentMethods).values({
+        userId: req.user!.id,
+        stripePaymentMethodId: paymentMethodId,
+        brand: paymentMethod.card!.brand,
+        last4: paymentMethod.card!.last4,
+        expiryMonth: paymentMethod.card!.exp_month,
+        expiryYear: paymentMethod.card!.exp_year,
+        isDefault: isFirst,
+      }).returning();
+
+      logSystem.info('Payment method added', { 
+        userId: req.user!.id,
+        methodId: paymentMethodId 
+      });
+
+      res.json(savedMethod[0]);
+    } catch (error: any) {
+      logSystem.error('Add payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to add payment method" });
+    }
+  });
+
+  app.get("/api/payment-methods", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { db } = await import('./db');
+      const { paymentMethods } = await import('./schema-extensions');
+      const { eq } = await import('drizzle-orm');
+
+      const methods = await db.query.paymentMethods.findMany({
+        where: eq(paymentMethods.userId, req.user!.id),
+      });
+
+      res.json(methods);
+    } catch (error: any) {
+      logSystem.error('Get payment methods error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get payment methods" });
+    }
+  });
+
+  app.delete("/api/payment-methods/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { db } = await import('./db');
+      const { paymentMethods } = await import('./schema-extensions');
+      const { eq, and } = await import('drizzle-orm');
+
+      const method = await db.query.paymentMethods.findFirst({
+        where: and(
+          eq(paymentMethods.id, req.params.id),
+          eq(paymentMethods.userId, req.user!.id)
+        ),
+      });
+
+      if (!method) {
+        return res.status(404).json({ message: "Payment method not found" });
+      }
+
+      await db.delete(paymentMethods).where(eq(paymentMethods.id, req.params.id));
+
+      if (method.isDefault) {
+        const remainingMethods = await db.query.paymentMethods.findMany({
+          where: eq(paymentMethods.userId, req.user!.id),
+        });
+
+        if (remainingMethods.length > 0) {
+          await db
+            .update(paymentMethods)
+            .set({ isDefault: true })
+            .where(eq(paymentMethods.id, remainingMethods[0].id));
+        }
+      }
+
+      logSystem.info('Payment method deleted', { 
+        userId: req.user!.id,
+        methodId: req.params.id 
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      logSystem.error('Delete payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to delete payment method" });
+    }
+  });
+
+  app.put("/api/payment-methods/:id/default", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { db } = await import('./db');
+      const { paymentMethods } = await import('./schema-extensions');
+      const { eq, and } = await import('drizzle-orm');
+
+      const method = await db.query.paymentMethods.findFirst({
+        where: and(
+          eq(paymentMethods.id, req.params.id),
+          eq(paymentMethods.userId, req.user!.id)
+        ),
+      });
+
+      if (!method) {
+        return res.status(404).json({ message: "Payment method not found" });
+      }
+
+      await db
+        .update(paymentMethods)
+        .set({ isDefault: false })
+        .where(eq(paymentMethods.userId, req.user!.id));
+
+      await db
+        .update(paymentMethods)
+        .set({ isDefault: true })
+        .where(eq(paymentMethods.id, req.params.id));
+
+      logSystem.info('Payment method set as default', { 
+        userId: req.user!.id,
+        methodId: req.params.id 
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      logSystem.error('Set default payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to set default payment method" });
     }
   });
 

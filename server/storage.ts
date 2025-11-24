@@ -39,6 +39,11 @@ import {
   type DocumentoWithDetails,
   type ComisionWithDetails,
 } from '@shared/schema';
+import {
+  conductorStripeAccounts,
+  paymentMethods,
+  serviceReceipts,
+} from './schema-extensions';
 
 export interface IStorage {
   // Users
@@ -50,6 +55,7 @@ export interface IStorage {
 
   // Conductores
   createConductor(conductor: InsertConductor): Promise<Conductor>;
+  getConductorById(id: string): Promise<Conductor | undefined>;
   getConductorByUserId(userId: string): Promise<Conductor | undefined>;
   updateConductor(id: string, data: Partial<Conductor>): Promise<Conductor>;
   updateDriverAvailability(userId: string, disponible: boolean): Promise<Conductor>;
@@ -137,6 +143,22 @@ export interface IStorage {
   getAllComisiones(): Promise<ComisionWithDetails[]>;
   updateComision(id: string, data: Partial<Comision>): Promise<Comision>;
   marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', stripeTransferId?: string): Promise<Comision>;
+
+  // Stripe Connect Accounts
+  createConductorStripeAccount(data: { conductorId: string; stripeAccountId: string }): Promise<any>;
+  getConductorStripeAccount(conductorId: string): Promise<any | undefined>;
+  getConductorStripeAccountByAccountId(stripeAccountId: string): Promise<any | undefined>;
+  updateConductorStripeAccount(conductorId: string, data: any): Promise<any>;
+
+  // Payment Methods
+  createPaymentMethod(data: { userId: string; stripePaymentMethodId: string; brand: string; last4: string; expiryMonth: number; expiryYear: number; isDefault?: boolean }): Promise<any>;
+  getPaymentMethodsByUserId(userId: string): Promise<any[]>;
+  deletePaymentMethod(id: string): Promise<void>;
+  setDefaultPaymentMethod(userId: string, paymentMethodId: string): Promise<void>;
+
+  // Service Receipts
+  createServiceReceipt(data: { servicioId: string; receiptNumber: string; pdfUrl: string | null; metadata: any }): Promise<any>;
+  getServiceReceiptByServiceId(servicioId: string): Promise<any | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -178,6 +200,11 @@ export class DatabaseStorage implements IStorage {
   // Conductores
   async createConductor(insertConductor: InsertConductor): Promise<Conductor> {
     const [conductor] = await db.insert(conductores).values(insertConductor).returning();
+    return conductor;
+  }
+
+  async getConductorById(id: string): Promise<Conductor | undefined> {
+    const [conductor] = await db.select().from(conductores).where(eq(conductores.id, id));
     return conductor;
   }
 
@@ -864,6 +891,122 @@ export class DatabaseStorage implements IStorage {
       .where(eq(comisiones.id, id))
       .returning();
     return updated;
+  }
+
+  // Stripe Connect Accounts
+  async createConductorStripeAccount(data: { conductorId: string; stripeAccountId: string }): Promise<any> {
+    const [account] = await db
+      .insert(conductorStripeAccounts)
+      .values({
+        conductorId: data.conductorId,
+        stripeAccountId: data.stripeAccountId,
+        accountStatus: 'pending',
+        onboardingComplete: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        detailsSubmitted: false,
+      })
+      .returning();
+    return account;
+  }
+
+  async getConductorStripeAccount(conductorId: string): Promise<any | undefined> {
+    const [account] = await db
+      .select()
+      .from(conductorStripeAccounts)
+      .where(eq(conductorStripeAccounts.conductorId, conductorId))
+      .limit(1);
+    return account;
+  }
+
+  async getConductorStripeAccountByAccountId(stripeAccountId: string): Promise<any | undefined> {
+    const [account] = await db
+      .select()
+      .from(conductorStripeAccounts)
+      .where(eq(conductorStripeAccounts.stripeAccountId, stripeAccountId))
+      .limit(1);
+    return account;
+  }
+
+  async updateConductorStripeAccount(conductorId: string, data: any): Promise<any> {
+    const [updated] = await db
+      .update(conductorStripeAccounts)
+      .set(data)
+      .where(eq(conductorStripeAccounts.conductorId, conductorId))
+      .returning();
+    return updated;
+  }
+
+  // Payment Methods
+  async createPaymentMethod(data: { userId: string; stripePaymentMethodId: string; brand: string; last4: string; expiryMonth: number; expiryYear: number; isDefault?: boolean }): Promise<any> {
+    if (data.isDefault) {
+      await db
+        .update(paymentMethods)
+        .set({ isDefault: false })
+        .where(eq(paymentMethods.userId, data.userId));
+    }
+
+    const [paymentMethod] = await db
+      .insert(paymentMethods)
+      .values({
+        userId: data.userId,
+        stripePaymentMethodId: data.stripePaymentMethodId,
+        brand: data.brand,
+        last4: data.last4,
+        expiryMonth: data.expiryMonth,
+        expiryYear: data.expiryYear,
+        isDefault: data.isDefault ?? false,
+      })
+      .returning();
+    return paymentMethod;
+  }
+
+  async getPaymentMethodsByUserId(userId: string): Promise<any[]> {
+    const methods = await db
+      .select()
+      .from(paymentMethods)
+      .where(eq(paymentMethods.userId, userId))
+      .orderBy(desc(paymentMethods.isDefault), desc(paymentMethods.createdAt));
+    return methods;
+  }
+
+  async deletePaymentMethod(id: string): Promise<void> {
+    await db.delete(paymentMethods).where(eq(paymentMethods.id, id));
+  }
+
+  async setDefaultPaymentMethod(userId: string, paymentMethodId: string): Promise<void> {
+    await db
+      .update(paymentMethods)
+      .set({ isDefault: false })
+      .where(eq(paymentMethods.userId, userId));
+
+    await db
+      .update(paymentMethods)
+      .set({ isDefault: true })
+      .where(eq(paymentMethods.id, paymentMethodId));
+  }
+
+  // Service Receipts
+  async createServiceReceipt(data: { servicioId: string; receiptNumber: string; pdfUrl: string | null; metadata: any }): Promise<any> {
+    const [receipt] = await db
+      .insert(serviceReceipts)
+      .values({
+        servicioId: data.servicioId,
+        receiptNumber: data.receiptNumber,
+        pdfUrl: data.pdfUrl,
+        metadata: data.metadata,
+      })
+      .returning();
+    return receipt;
+  }
+
+  async getServiceReceiptByServiceId(servicioId: string): Promise<any | undefined> {
+    const [receipt] = await db
+      .select()
+      .from(serviceReceipts)
+      .where(eq(serviceReceipts.servicioId, servicioId))
+      .limit(1);
+    return receipt;
   }
 }
 

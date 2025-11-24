@@ -169,35 +169,51 @@ Implementar gestión de documentos y endurecer seguridad del sistema.
 
 ---
 
-#### **Workstream C: Pagos y Cumplimiento Financiero** (Prioridad MEDIA)
+#### **Workstream C: Pagos y Cumplimiento Financiero** (Prioridad MEDIA) - ✅ 95% COMPLETADO
+
 Completar sistema de pagos con comisiones y recibos.
 
-- [ ] **Stripe Connect para Split de Comisiones**
-  - [ ] Configurar Stripe Connect Standard (70% conductor, 30% plataforma)
-  - [ ] Actualizar tabla `conductores` con `stripeAccountId`
-  - [ ] Flow de onboarding Stripe para conductores
-  - [ ] API endpoint: `/api/drivers/stripe-onboarding`
-  - [ ] Actualizar tabla `servicios` con `platformFee` y `driverPayout`
-  - [ ] Webhook handler para `account.updated` y `payout.paid`
+- [x] **Stripe Connect para Split de Comisiones** ✅ COMPLETO
+  - [x] Configurar Stripe Connect Standard (70% conductor, 30% plataforma)
+  - [x] Tabla `conductor_stripe_accounts` con campos de estado (`server/schema-extensions.ts`)
+  - [x] Flow de onboarding Stripe para conductores
+  - [x] API endpoints: POST `/api/drivers/stripe-onboarding`, GET `/api/drivers/stripe-account-status`
+  - [x] Servicio `server/services/stripe-connect.ts` con funciones de creación, onboarding, status
+  - [x] Tabla `service_receipts` para recibos PDF
+  - [x] Webhook handler para `account.updated` y `payout.paid`
+  - [x] Transfers automáticos con `stripe.transfers.create()` al completar servicio
 
-- [ ] **Gestión de Métodos de Pago**
-  - [ ] Tabla `payment_methods` para guardar métodos recurrentes
-  - [ ] UI para agregar/eliminar tarjetas
-  - [ ] Fallback a efectivo si pago con tarjeta falla
+- [x] **Gestión de Métodos de Pago** ✅ COMPLETO (Backend)
+  - [x] Tabla `payment_methods` para guardar métodos recurrentes
+  - [x] API endpoints: POST/GET/DELETE `/api/payment-methods`, PUT `/api/payment-methods/:id/default`
+  - [x] Integración con Stripe Payment Methods API
+  - [x] Soporte para múltiples tarjetas con marcado de predeterminada
+  - [ ] UI para agregar/eliminar tarjetas (pendiente - puede usar Stripe Elements existente)
+  - [x] Fallback a efectivo si pago con tarjeta falla (ya implementado en flujo de pago)
 
-- [ ] **Generación de Recibos PDF**
-  - [ ] Servicio de generación PDF con `pdfkit`
-  - [ ] Template de recibo con branding GruaRD
-  - [ ] Datos: servicio, costo, comisión, conductor, cliente
-  - [ ] Almacenar PDFs en Object Storage
-  - [ ] API endpoint: `/api/services/:id/receipt`
-  - [ ] Botón de descarga en historial
+- [x] **Generación de Recibos PDF** ✅ COMPLETO
+  - [x] Servicio de generación PDF con `pdfkit` (`server/services/pdf-service.ts`)
+  - [x] Template de recibo con branding GruaRD (colores, logo, footer)
+  - [x] Datos completos: servicio, costo, comisión 70/30, conductor, cliente
+  - [x] Números de recibo únicos con formato `GRD-{timestamp}-{random}`
+  - [x] Tabla `service_receipts` en base de datos
+  - [x] API endpoint `/api/servicios/:id/recibo` actualizado (genera PDF en memoria)
+  - [ ] Botón de descarga en historial (pendiente)
+
+**Archivos Implementados:**
+- Backend:
+  - `server/services/stripe-connect.ts` - Servicio Stripe Connect (creación cuentas, onboarding, transfers)
+  - `server/services/pdf-service.ts` - Servicio generación PDFs con template profesional
+  - `server/schema-extensions.ts` - Tablas: `conductor_stripe_accounts`, `payment_methods`, `service_receipts`
+  - `server/routes.ts` - Endpoints Stripe Connect, métodos de pago, webhooks mejorados
+- Frontend:
+  - `client/src/pages/driver/profile.tsx` - Sección "Cuenta de Pagos" con UI onboarding Stripe Connect
 
 **Acceptance Criteria:**
-- ✅ Cada servicio completado crea payout automático al conductor
-- ✅ Comisión 70/30 registrada correctamente en base de datos
-- ✅ Recibo PDF descargable desde historial
-- ✅ Webhooks de Stripe manejados correctamente
+- ✅ Cada servicio completado crea payout automático al conductor (implementado en webhook)
+- ✅ Comisión 70/30 registrada correctamente en base de datos (tabla `comisiones`)
+- ⏳ Recibo PDF descargable desde historial (endpoint existe, falta botón en UI)
+- ✅ Webhooks de Stripe manejados correctamente (`payment_intent.succeeded`, `account.updated`, `payout.paid`)
 
 ---
 

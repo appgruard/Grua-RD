@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Phone, Star, Truck, LogOut, FileText, Upload, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { User, Mail, Phone, Star, Truck, LogOut, FileText, Upload, CheckCircle, XCircle, Clock, CreditCard, ArrowRight } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -21,6 +21,15 @@ const REQUIRED_DOCUMENTS = [
   { tipo: 'cedula_trasera', label: 'Cédula (Reverso)' },
 ];
 
+interface StripeAccountStatus {
+  configured: boolean;
+  accountStatus?: string;
+  onboardingComplete?: boolean;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  detailsSubmitted?: boolean;
+}
+
 export default function DriverProfile() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -34,6 +43,12 @@ export default function DriverProfile() {
   const { data: documentos = [] } = useQuery<Documento[]>({
     queryKey: ['/api/documentos/user', user?.id],
     enabled: !!user,
+  });
+
+  const { data: stripeStatus, isLoading: isLoadingStripe, error: stripeError } = useQuery<StripeAccountStatus>({
+    queryKey: ['/api/drivers/stripe-account-status'],
+    enabled: !!driverData,
+    retry: 2,
   });
 
   const uploadMutation = useMutation({
@@ -86,6 +101,47 @@ export default function DriverProfile() {
     setUploadingDoc(tipo);
     uploadMutation.mutate({ file, tipo });
   };
+
+  const stripeOnboardingMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('/api/drivers/stripe-onboarding', {
+        method: 'POST',
+      });
+      return response as { accountId: string; onboardingUrl: string };
+    },
+    onSuccess: (data) => {
+      window.location.href = data.onboardingUrl;
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error al configurar cuenta de pagos',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeSuccess = urlParams.get('stripe_success');
+    const stripeRefresh = urlParams.get('stripe_refresh');
+
+    if (stripeSuccess === 'true') {
+      toast({
+        title: 'Cuenta configurada',
+        description: 'Tu cuenta de pagos se ha configurado correctamente',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/stripe-account-status'] });
+      window.history.replaceState({}, '', '/driver/profile');
+    } else if (stripeRefresh === 'true') {
+      toast({
+        title: 'Configuración pendiente',
+        description: 'Debes completar la configuración de tu cuenta de pagos',
+        variant: 'destructive',
+      });
+      window.history.replaceState({}, '', '/driver/profile');
+    }
+  }, [toast]);
 
   if (!user) return null;
 
@@ -243,6 +299,106 @@ export default function DriverProfile() {
                 );
               })}
             </div>
+          </Card>
+
+          <Card className="p-6 mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <CreditCard className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Cuenta de Pagos</h3>
+            </div>
+
+            {isLoadingStripe ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : stripeError ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-destructive mb-2">Error al cargar información de pagos</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/drivers/stripe-account-status'] })}
+                  data-testid="button-retry-stripe-status"
+                >
+                  Reintentar
+                </Button>
+              </div>
+            ) : !stripeStatus?.configured ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Configura tu cuenta de pagos para recibir el 70% de cada servicio completado directamente en tu cuenta bancaria.
+                </p>
+                <Button
+                  className="w-full"
+                  onClick={() => stripeOnboardingMutation.mutate()}
+                  disabled={stripeOnboardingMutation.isPending}
+                  data-testid="button-setup-payments"
+                >
+                  {stripeOnboardingMutation.isPending ? (
+                    'Configurando...'
+                  ) : (
+                    <>
+                      Configurar Cuenta de Pagos
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : stripeStatus.onboardingComplete ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Estado de la cuenta</span>
+                  <Badge variant="default" className="gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Activa
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Recibir pagos</span>
+                  <Badge variant={stripeStatus.chargesEnabled ? 'default' : 'secondary'}>
+                    {stripeStatus.chargesEnabled ? 'Habilitado' : 'Pendiente'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Transferencias bancarias</span>
+                  <Badge variant={stripeStatus.payoutsEnabled ? 'default' : 'secondary'}>
+                    {stripeStatus.payoutsEnabled ? 'Habilitado' : 'Pendiente'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-4">
+                  Recibes automáticamente el 70% del costo de cada servicio completado.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Estado</span>
+                  <Badge variant="secondary" className="gap-1">
+                    <Clock className="w-3 h-3" />
+                    Configuración pendiente
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Debes completar la configuración de tu cuenta para poder recibir pagos.
+                </p>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => stripeOnboardingMutation.mutate()}
+                  disabled={stripeOnboardingMutation.isPending}
+                  data-testid="button-continue-setup"
+                >
+                  {stripeOnboardingMutation.isPending ? (
+                    'Redirigiendo...'
+                  ) : (
+                    <>
+                      Continuar Configuración
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </Card>
         </>
       )}

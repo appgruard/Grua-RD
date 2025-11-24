@@ -73,8 +73,9 @@ Prioritize performance and scalability in new implementations.
 - **UI/UX:** ✅ Responsive design, modo oscuro, estados de carga, manejo de errores
 - **Integraciones:** ✅ Google Maps, WebSocket, Web Push API, Stripe (requiere API keys)
 - **Fase 4 - Workstream A:** ✅ 100% completado (backend + frontend + testing utilities)
-- **Fase 4 - Workstream B:** ⏳ En progreso (mejoras de seguridad)
-- **Pendiente:** Gestión documentos UI (Workstream B), Stripe Connect (Workstream C), optimización y APK (Workstream D)
+- **Fase 4 - Workstream B:** ✅ 100% completado (gestión documental + security hardening)
+- **Fase 4 - Workstream C:** ✅ 95% completado (Stripe Connect + PDF + webhooks)
+- **Pendiente:** Testing E2E (Workstream C), optimización y APK (Workstream D)
 
 ## System Architecture
 
@@ -130,10 +131,38 @@ GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (N
   - Formulario de rechazo con motivo obligatorio
   - Integración completa con sistema de notificaciones push
 
-**Workstream C: Pagos y Cumplimiento Financiero** ⏳:
-- Stripe Connect para split automático 70/30
-- Generación de recibos PDF
-- Webhook handling robusto
+**Workstream C: Pagos y Cumplimiento Financiero** ✅ 95%:
+- ✅ **Stripe Connect Implementado:**
+  - Servicio `server/services/stripe-connect.ts` para gestión de cuentas Connect
+  - Creación automática de cuentas Stripe Connect Standard para conductores
+  - Onboarding flow completo con redirects de éxito/error
+  - Transfers automáticos del 70% al conductor tras completar servicio
+  - Tabla `conductor_stripe_accounts` con estado de onboarding y capacidades
+- ✅ **Generación de Recibos PDF:**
+  - Servicio `server/services/pdf-service.ts` con PDFKit
+  - Template profesional con branding GruaRD
+  - Desglose completo: costo total, pago conductor (70%), comisión plataforma (30%)
+  - Tabla `service_receipts` para metadatos de recibos
+  - Endpoint `/api/servicios/:id/recibo` actualizado
+- ✅ **Gestión de Métodos de Pago:**
+  - Tabla `payment_methods` para tarjetas guardadas
+  - API endpoints: POST/GET/DELETE `/api/payment-methods`, PUT `/api/payment-methods/:id/default`
+  - Integración con Stripe Payment Methods API
+  - Soporte para múltiples tarjetas con marcado de predeterminada
+- ✅ **Webhooks Mejorados:**
+  - Handler para `payment_intent.succeeded` con creación automática de comisiones y transfers
+  - Handler para `account.updated` (actualización estado cuentas Connect)
+  - Handler para `payout.paid` (logging de pagos completados)
+  - Integración completa con sistema de comisiones existente
+- ✅ **Frontend:**
+  - `client/src/pages/driver/profile.tsx`: Sección "Cuenta de Pagos" con onboarding Stripe Connect
+  - Estados visuales: no configurado, configuración pendiente, activo
+  - Badges para estado de charges/payouts
+  - Redirect handling para success/refresh URLs
+- ⏳ **Pendiente:**
+  - UI de gestión de métodos de pago en perfil de cliente
+  - Botón de descarga de recibo PDF en historial
+  - Tests E2E para flujo completo
 
 **Workstream D: Preparación Producción** ⏳:
 - Capacitor configuration para Android APK
