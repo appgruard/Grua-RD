@@ -121,11 +121,20 @@ export const logDocument = {
   uploaded: (documentoId: string, tipo: string, userId: string) => {
     logger.info('Document uploaded', { documentoId, tipo, userId, category: 'document' });
   },
+  uploadFailed: (tipo: string, userId: string, error: string) => {
+    logger.error('Document upload failed', { tipo, userId, error, category: 'document' });
+  },
+  downloaded: (documentoId: string, userId: string) => {
+    logger.info('Document downloaded', { documentoId, userId, category: 'document' });
+  },
   approved: (documentoId: string, adminId: string) => {
     logger.info('Document approved', { documentoId, adminId, category: 'document' });
   },
   rejected: (documentoId: string, adminId: string, motivo: string) => {
     logger.warn('Document rejected', { documentoId, adminId, motivo, category: 'document' });
+  },
+  reviewed: (adminId: string, documentoId: string, estado: string) => {
+    logger.info('Document reviewed', { adminId, documentoId, estado, category: 'document' });
   },
   deleted: (documentoId: string) => {
     logger.info('Document deleted', { documentoId, category: 'document' });

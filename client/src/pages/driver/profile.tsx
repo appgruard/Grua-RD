@@ -42,7 +42,8 @@ export default function DriverProfile() {
       formData.append('file', file);
       formData.append('tipo', tipo);
 
-      const response = await fetch('/api/upload', {
+      // Use fetch directly for FormData (apiRequest expects JSON)
+      const response = await fetch('/api/documents/upload', {
         method: 'POST',
         credentials: 'include',
         body: formData,
@@ -56,7 +57,10 @@ export default function DriverProfile() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidate both document endpoints for cache consistency
       queryClient.invalidateQueries({ queryKey: ['/api/documentos/user', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/documents/my-documents'] });
+      
       toast({
         title: 'Documento subido',
         description: 'El documento se ha subido correctamente y está pendiente de revisión',

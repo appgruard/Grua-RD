@@ -16,7 +16,7 @@ import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensa
 import type { User, Servicio } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
-import { uploadDocument, getDocument } from "./services/object-storage";
+import { uploadDocument, getDocument, isStorageInitialized } from "./services/object-storage";
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -2074,16 +2074,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "No file provided" });
     }
 
+    const { tipo } = req.body;
+
     try {
-      const { tipo } = req.body;
-      
       if (!tipo) {
+        logDocument.uploadFailed(tipo || 'unknown', req.user!.id, 'Document type not provided');
         return res.status(400).json({ message: "Document type (tipo) is required" });
       }
 
-      const validTypes = ['licencia', 'matricula', 'cedula_frontal', 'cedula_trasera', 'foto_vehiculo'];
+      const validTypes = ['licencia', 'matricula', 'cedula_frontal', 'cedula_trasera', 'foto_vehiculo', 'seguro_grua'];
       if (!validTypes.includes(tipo)) {
+        logDocument.uploadFailed(tipo, req.user!.id, 'Invalid document type');
         return res.status(400).json({ message: "Invalid document type" });
+      }
+
+      // Check if storage is available
+      if (!isStorageInitialized()) {
+        logDocument.uploadFailed(tipo, req.user!.id, 'Object storage not available');
+        return res.status(503).json({ 
+          message: "El sistema de almacenamiento de documentos no está disponible temporalmente. Por favor intenta más tarde." 
+        });
       }
 
       // Upload to object storage
@@ -2104,13 +2114,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: 'pendiente',
       });
 
-      logDocument.uploaded(req.user!.id, tipo, documento.id);
+      logDocument.uploaded(documento.id, tipo, req.user!.id);
 
       res.json({
         success: true,
         document: documento,
       });
     } catch (error: any) {
+      logDocument.uploadFailed(tipo || 'unknown', req.user!.id, error.message || 'Unknown error');
       logSystem.error('Document upload error', error);
       res.status(500).json({ message: error.message || "Failed to upload document" });
     }
@@ -2144,9 +2155,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      // Check authorization
-      if (req.user!.userType !== 'admin' && documento.usuarioId !== req.user!.id) {
-        return res.status(403).json({ message: "Not authorized" });
+      // PROBLEMA 3: Validación de seguridad mejorada
+      const isAdmin = req.user!.userType === 'admin';
+      const isOwner = documento.usuarioId === req.user!.id;
+      
+      if (!isAdmin && !isOwner) {
+        logSystem.warn('Unauthorized document access attempt', {
+          userId: req.user!.id,
+          userType: req.user!.userType,
+          documentoId: req.params.id,
+          documentOwner: documento.usuarioId,
+        });
+        return res.status(403).json({ message: "Forbidden: You do not have permission to access this document" });
+      }
+
+      // Check if storage is available
+      if (!isStorageInitialized()) {
+        return res.status(503).json({ 
+          message: "El sistema de almacenamiento de documentos no está disponible temporalmente. Por favor intenta más tarde." 
+        });
       }
 
       // Retrieve file from object storage
@@ -2155,6 +2182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!fileBuffer) {
         return res.status(404).json({ message: "File not found in storage" });
       }
+
+      // PROBLEMA 2: Audit logging para downloads
+      logDocument.downloaded(documento.id, req.user!.id);
 
       // Determine content type from file extension
       const ext = documento.nombreArchivo.split('.').pop()?.toLowerCase();

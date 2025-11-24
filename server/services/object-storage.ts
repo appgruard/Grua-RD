@@ -45,6 +45,13 @@ export function resetStorageClient(): void {
   logger.info('Storage client reset, will retry initialization on next operation');
 }
 
+/**
+ * Check if storage client is initialized and available
+ */
+export function isStorageInitialized(): boolean {
+  return storage !== null || (!storageInitAttempted && getStorageClient() !== null);
+}
+
 // Allowed MIME types for document uploads
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -180,7 +187,8 @@ export async function getDocument(key: string): Promise<Buffer | null> {
       return null;
     }
     
-    return result.value;
+    // Convert Uint8Array to Buffer for compatibility
+    return Buffer.from(result.value);
   } catch (error) {
     logger.error('Error retrieving document from object storage', {
       error: error instanceof Error ? error.message : 'Unknown error',
