@@ -41,7 +41,7 @@ export default function DriverProfile() {
   });
 
   const { data: documentos = [] } = useQuery<Documento[]>({
-    queryKey: ['/api/documentos/user', user?.id],
+    queryKey: ['/api/documents/my-documents'],
     enabled: !!user,
   });
 
@@ -54,8 +54,8 @@ export default function DriverProfile() {
   const uploadMutation = useMutation({
     mutationFn: async ({ file, tipo }: { file: File; tipo: string }) => {
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('tipo', tipo);
+      formData.append('document', file);
+      formData.append('tipoDocumento', tipo);
 
       // Use fetch directly for FormData (apiRequest expects JSON)
       const response = await fetch('/api/documents/upload', {
@@ -72,8 +72,6 @@ export default function DriverProfile() {
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate both document endpoints for cache consistency
-      queryClient.invalidateQueries({ queryKey: ['/api/documentos/user', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['/api/documents/my-documents'] });
       
       toast({
