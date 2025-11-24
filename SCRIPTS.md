@@ -313,6 +313,56 @@ curl http://localhost:5000/health
 
 ---
 
+## 📊 Lighthouse Audit
+
+### Auditoría de Performance
+
+#### `scripts/run-lighthouse.sh`
+```bash
+bash scripts/run-lighthouse.sh [URL]
+```
+
+Ejecuta auditorías Lighthouse completas (mobile y desktop).
+
+**Parámetros:**
+- `URL` (opcional): URL a auditar. Default: `http://localhost:5000`
+
+**Requiere:**
+- Lighthouse CLI instalado globalmente:
+  ```bash
+  npm install -g lighthouse
+  ```
+
+**Auditorías ejecutadas:**
+1. **Mobile**: PWA, performance en dispositivos móviles
+2. **Desktop**: Performance en escritorio
+
+**Reportes generados:**
+- `lighthouse-reports/mobile_TIMESTAMP.html`
+- `lighthouse-reports/mobile_TIMESTAMP.json`
+- `lighthouse-reports/desktop_TIMESTAMP.html`
+- `lighthouse-reports/desktop_TIMESTAMP.json`
+
+**Métricas evaluadas:**
+- Performance (objetivo: 90+)
+- Accessibility (objetivo: 95+)
+- Best Practices (objetivo: 95+)
+- SEO (objetivo: 100)
+- PWA (debe pasar todos los checks)
+
+**Ejemplo:**
+```bash
+# Local
+bash scripts/run-lighthouse.sh http://localhost:5000
+
+# Producción
+bash scripts/run-lighthouse.sh https://gruard.replit.app
+```
+
+Ver [LIGHTHOUSE_AUDIT.md](LIGHTHOUSE_AUDIT.md) para detalles completos de interpretación de resultados y optimizaciones.
+
+---
+
 ## 📚 Referencias
 
 - [ENV_VARS.md](ENV_VARS.md) - Variables de entorno requeridas
