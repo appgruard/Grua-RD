@@ -923,10 +923,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const servicio = await storage.createServicio({
-        clienteId: req.user!.id,
-        ...req.body,
+      const validationSchema = insertServicioSchema.extend({
+        clienteId: z.string().optional(),
+      }).refine((data) => {
+        if (data.metodoPago === "aseguradora") {
+          return !!(data.aseguradoraNombre && data.aseguradoraPoliza);
+        }
+        return true;
+      }, {
+        message: "Nombre de aseguradora y número de póliza son requeridos cuando el método de pago es aseguradora",
       });
+
+      const validatedData = validationSchema.parse(req.body);
+
+      const servicioData: any = {
+        clienteId: req.user!.id,
+        ...validatedData,
+      };
+
+      if (validatedData.metodoPago === "aseguradora") {
+        servicioData.aseguradoraEstado = "pendiente";
+      }
+
+      const servicio = await storage.createServicio(servicioData);
 
       logService.created(servicio.id, req.user!.id, req.body.origenDireccion || 'N/A', req.body.destinoDireccion || 'N/A');
 
@@ -945,6 +964,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(servicio);
     } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0]?.message || "Validation error" });
+      }
       logSystem.error('Create service error', error, { clienteId: req.user!.id });
       res.status(500).json({ message: "Failed to create service" });
     }

@@ -28,7 +28,9 @@ export const estadoServicioEnum = pgEnum("estado_servicio", [
   "completado",
   "cancelado"
 ]);
-export const metodoPagoEnum = pgEnum("metodo_pago", ["efectivo", "tarjeta"]);
+export const metodoPagoEnum = pgEnum("metodo_pago", ["efectivo", "tarjeta", "aseguradora"]);
+export const tipoVehiculoEnum = pgEnum("tipo_vehiculo", ["carro", "motor", "jeep", "camion"]);
+export const aseguradoraEstadoEnum = pgEnum("aseguradora_estado", ["pendiente", "aprobado", "rechazado"]);
 export const documentoTipoEnum = pgEnum("documento_tipo", [
   "licencia",
   "matricula",
@@ -99,6 +101,10 @@ export const servicios = pgTable("servicios", {
   estado: estadoServicioEnum("estado").default("pendiente").notNull(),
   metodoPago: metodoPagoEnum("metodo_pago").default("efectivo").notNull(),
   stripePaymentId: text("stripe_payment_id"),
+  tipoVehiculo: tipoVehiculoEnum("tipo_vehiculo"),
+  aseguradoraNombre: text("aseguradora_nombre"),
+  aseguradoraPoliza: text("aseguradora_poliza"),
+  aseguradoraEstado: aseguradoraEstadoEnum("aseguradora_estado"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   aceptadoAt: timestamp("aceptado_at"),
   iniciadoAt: timestamp("iniciado_at"),
@@ -359,6 +365,10 @@ export const insertConductorSchema = createInsertSchema(conductores, {
 export const insertServicioSchema = createInsertSchema(servicios, {
   origenDireccion: z.string().min(1),
   destinoDireccion: z.string().min(1),
+  tipoVehiculo: z.enum(["carro", "motor", "jeep", "camion"]).optional(),
+  aseguradoraNombre: z.string().optional(),
+  aseguradoraPoliza: z.string().optional(),
+  aseguradoraEstado: z.enum(["pendiente", "aprobado", "rechazado"]).optional(),
 }).omit({
   id: true,
   createdAt: true,
