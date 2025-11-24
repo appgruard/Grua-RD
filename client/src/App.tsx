@@ -29,6 +29,7 @@ import AdminServices from '@/pages/admin/services';
 import AdminPricing from '@/pages/admin/pricing';
 import AdminMonitoring from '@/pages/admin/monitoring';
 import AdminVerifications from '@/pages/admin/verifications';
+import AdminDocuments from '@/pages/admin/documents';
 
 import NotFound from '@/pages/not-found';
 
@@ -182,6 +183,13 @@ function Router() {
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
             <AdminVerifications />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/documents">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminDocuments />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

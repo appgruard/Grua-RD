@@ -2221,6 +2221,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       logDocument.reviewed(req.user!.id, req.params.id, estado);
 
+      // Send push notification to the user
+      if (documento.usuarioId) {
+        try {
+          const notificationTitle = estado === 'aprobado' 
+            ? '✅ Documento Aprobado' 
+            : '❌ Documento Rechazado';
+          
+          const notificationBody = estado === 'aprobado'
+            ? `Tu documento ha sido aprobado y está listo para usar.`
+            : `Tu documento ha sido rechazado. Motivo: ${motivoRechazo}`;
+
+          await pushService.sendNotification(documento.usuarioId, {
+            title: notificationTitle,
+            body: notificationBody,
+            data: {
+              type: 'document_review',
+              documentoId: documento.id,
+              estado,
+            },
+          });
+
+          logSystem.info('Document review notification sent', {
+            userId: documento.usuarioId,
+            documentoId: documento.id,
+            estado,
+          });
+        } catch (notifError) {
+          // Don't fail the request if notification fails
+          logSystem.warn('Failed to send document review notification', {
+            error: notifError instanceof Error ? notifError.message : 'Unknown error',
+            userId: documento.usuarioId,
+          });
+        }
+      }
+
       res.json(documento);
     } catch (error: any) {
       logSystem.error('Review document error', error);
