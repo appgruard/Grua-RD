@@ -52,6 +52,57 @@ export function isStorageInitialized(): boolean {
   return storage !== null || (!storageInitAttempted && getStorageClient() !== null);
 }
 
+/**
+ * Health check for Object Storage
+ * Tests basic connectivity by attempting to list with a minimal prefix
+ * Resets storage client on each check to allow recovery if storage becomes available
+ */
+export async function checkStorageHealth(): Promise<{ 
+  status: string; 
+  responseTime: number; 
+  error?: string;
+}> {
+  const start = Date.now();
+  
+  // Reset storage client to allow retry on each health check
+  // This enables recovery if storage becomes available after a previous failure
+  resetStorageClient();
+  
+  try {
+    const storageClient = getStorageClient();
+    if (!storageClient) {
+      return { 
+        status: "unhealthy", 
+        responseTime: Date.now() - start,
+        error: "Storage not initialized: STORAGE_BUCKET environment variable not set"
+      };
+    }
+    
+    // Try a simple list operation with a minimal prefix to test connectivity
+    const result = await storageClient.list({ prefix: '_health_', limit: 1 });
+    const responseTime = Date.now() - start;
+    
+    if (!result.ok) {
+      return {
+        status: "unhealthy",
+        responseTime,
+        error: result.error?.message || "Storage operation failed"
+      };
+    }
+    
+    return { 
+      status: "healthy", 
+      responseTime 
+    };
+  } catch (error) {
+    return { 
+      status: "unhealthy", 
+      responseTime: Date.now() - start,
+      error: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+}
+
 // Allowed MIME types for document uploads
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',

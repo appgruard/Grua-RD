@@ -4,6 +4,8 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { logger } from "./logger";
+import { pool } from "./db";
+import { checkStorageHealth } from "./services/object-storage";
 
 const app = express();
 
@@ -102,12 +104,77 @@ app.use(
   })
 );
 
-app.get("/health", (_req: Request, res: Response) => {
-  res.status(200).json({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || "development",
+app.get("/health", async (_req: Request, res: Response) => {
+  const timestamp = new Date().toISOString();
+  const uptime = process.uptime();
+  const environment = process.env.NODE_ENV || "development";
+
+  // Check database health
+  let databaseStatus = "healthy";
+  let databaseResponseTime = 0;
+  let databaseError: string | undefined;
+  const dbStart = Date.now();
+  try {
+    await pool.query('SELECT 1');
+    databaseResponseTime = Date.now() - dbStart;
+  } catch (error) {
+    databaseStatus = "unhealthy";
+    databaseResponseTime = Date.now() - dbStart;
+    databaseError = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Database health check failed', {
+      error: databaseError
+    });
+  }
+
+  // Check object storage health
+  let objectStorageStatus = "healthy";
+  let objectStorageResponseTime = 0;
+  let objectStorageError: string | undefined;
+  try {
+    const storageHealth = await checkStorageHealth();
+    objectStorageStatus = storageHealth.status;
+    objectStorageResponseTime = storageHealth.responseTime;
+    objectStorageError = storageHealth.error;
+  } catch (error) {
+    objectStorageStatus = "unhealthy";
+    objectStorageResponseTime = 0;
+    objectStorageError = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Object Storage health check failed', {
+      error: objectStorageError
+    });
+  }
+
+  // Determine overall status
+  let overallStatus = "healthy";
+  let httpStatus = 200;
+  
+  if (databaseStatus === "unhealthy") {
+    // Database is critical - return 503
+    overallStatus = "unhealthy";
+    httpStatus = 503;
+  } else if (objectStorageStatus === "unhealthy") {
+    // Object storage is not critical - degraded but still operational
+    overallStatus = "degraded";
+    httpStatus = 200;
+  }
+
+  res.status(httpStatus).json({
+    status: overallStatus,
+    timestamp,
+    uptime,
+    environment,
+    dependencies: {
+      database: {
+        status: databaseStatus,
+        responseTime: databaseResponseTime,
+        ...(databaseError && { error: databaseError }),
+      },
+      objectStorage: {
+        status: objectStorageStatus,
+        responseTime: objectStorageResponseTime,
+        ...(objectStorageError && { error: objectStorageError }),
+      },
+    },
   });
 });
 
