@@ -181,11 +181,15 @@ export const documentos = pgTable("documentos", {
   servicioId: varchar("servicio_id").references(() => servicios.id, { onDelete: "cascade" }),
   url: text("url").notNull(),
   nombreArchivo: text("nombre_archivo").notNull(),
+  tamanoArchivo: integer("tamano_archivo"),
+  mimeType: text("mime_type"),
   estado: documentoEstadoEnum("estado").default("pendiente").notNull(),
   validoHasta: timestamp("valido_hasta"),
   revisadoPor: varchar("revisado_por").references(() => users.id),
+  fechaRevision: timestamp("fecha_revision"),
   motivoRechazo: text("motivo_rechazo"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Comisiones Table (for payment commissions 70/30)

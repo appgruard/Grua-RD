@@ -18,6 +18,7 @@ export const stripeAccountStatusEnum = pgEnum("stripe_account_status", [
   "disabled"
 ]);
 
+
 // OTP Tokens Table - Stores one-time passwords for phone verification
 export const otpTokens = pgTable("otp_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

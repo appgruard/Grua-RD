@@ -159,6 +159,14 @@ export interface IStorage {
   // Service Receipts
   createServiceReceipt(data: { servicioId: string; receiptNumber: string; pdfUrl: string | null; metadata: any }): Promise<any>;
   getServiceReceiptByServiceId(servicioId: string): Promise<any | undefined>;
+
+  // Documentos
+  createDocumento(documento: InsertDocumento): Promise<Documento>;
+  getDocumentoById(id: string): Promise<Documento | undefined>;
+  getDocumentosByConductor(conductorId: string): Promise<Documento[]>;
+  deleteDocumento(id: string): Promise<void>;
+  updateDocumentoStatus(id: string, estado: 'pendiente' | 'aprobado' | 'rechazado', revisadoPor: string, motivoRechazo?: string): Promise<Documento | undefined>;
+  getPendingDocuments(): Promise<DocumentoWithDetails[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1007,6 +1015,79 @@ export class DatabaseStorage implements IStorage {
       .where(eq(serviceReceipts.servicioId, servicioId))
       .limit(1);
     return receipt;
+  }
+
+  // Documentos
+  async createDocumento(documento: InsertDocumento): Promise<Documento> {
+    const [newDocumento] = await db.insert(documentos).values(documento).returning();
+    return newDocumento;
+  }
+
+  async getDocumentoById(id: string): Promise<Documento | undefined> {
+    const [documento] = await db
+      .select()
+      .from(documentos)
+      .where(eq(documentos.id, id))
+      .limit(1);
+    return documento;
+  }
+
+  async getDocumentosByConductor(conductorId: string): Promise<Documento[]> {
+    return db
+      .select()
+      .from(documentos)
+      .where(eq(documentos.conductorId, conductorId))
+      .orderBy(desc(documentos.createdAt));
+  }
+
+  async deleteDocumento(id: string): Promise<void> {
+    const documento = await this.getDocumentoById(id);
+    if (documento) {
+      // Delete from object storage
+      const { deleteDocument } = await import('./services/object-storage');
+      await deleteDocument(documento.url);
+      
+      // Delete from database
+      await db.delete(documentos).where(eq(documentos.id, id));
+    }
+  }
+
+  async updateDocumentoStatus(
+    id: string,
+    estado: 'pendiente' | 'aprobado' | 'rechazado',
+    revisadoPor: string,
+    motivoRechazo?: string
+  ): Promise<Documento | undefined> {
+    const [updated] = await db
+      .update(documentos)
+      .set({
+        estado,
+        revisadoPor,
+        motivoRechazo,
+        fechaRevision: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(documentos.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getPendingDocuments(): Promise<DocumentoWithDetails[]> {
+    const results = await db.query.documentos.findMany({
+      where: eq(documentos.estado, 'pendiente'),
+      with: {
+        usuario: true,
+        conductor: {
+          with: {
+            user: true,
+          },
+        },
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+      orderBy: desc(documentos.createdAt),
+    });
+    return results;
   }
 }
 
