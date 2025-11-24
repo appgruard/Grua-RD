@@ -1,0 +1,411 @@
+# Variables de Entorno - Grúa RD
+
+Este documento detalla todas las variables de entorno requeridas para ejecutar Grúa RD en desarrollo y producción.
+
+## 📋 Índice
+- [Variables Críticas (Requeridas)](#variables-críticas-requeridas)
+- [Variables de Servicios Externos](#variables-de-servicios-externos)
+- [Variables de Configuración](#variables-de-configuración)
+- [Configuración por Ambiente](#configuración-por-ambiente)
+- [Guía de Configuración](#guía-de-configuración)
+
+---
+
+## Variables Críticas (Requeridas)
+
+### 🔐 Seguridad y Sesiones
+
+#### `SESSION_SECRET`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared (Development + Production)
+- **Requerido**: ✅ Sí
+- **Descripción**: Clave secreta para firmar cookies de sesión de Express
+- **Formato**: String aleatorio de mínimo 32 caracteres
+- **Generación**:
+  ```bash
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  ```
+- **Ejemplo**: `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6`
+- **Uso**: `server/routes.ts` - Configuración de express-session
+- **Nota**: ⚠️ NUNCA usar valores por defecto en producción
+
+---
+
+### 🗄️ Base de Datos
+
+#### `DATABASE_URL`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Managed by Replit (auto-configured)
+- **Requerido**: ✅ Sí
+- **Descripción**: URL de conexión a PostgreSQL (Neon)
+- **Formato**: `postgresql://user:password@host:port/database?sslmode=require`
+- **Ejemplo**: `postgresql://gruard_user:pass123@db.neon.tech:5432/gruard_db?sslmode=require`
+- **Uso**: `server/db.ts` - Configuración de Drizzle ORM y pool de conexiones
+- **Nota**: Automáticamente configurado por Replit Database integration
+
+#### Variables PostgreSQL (Auto-configuradas)
+Las siguientes variables son configuradas automáticamente por Replit Database:
+- `PGHOST` - Host del servidor PostgreSQL
+- `PGPORT` - Puerto (generalmente 5432)
+- `PGUSER` - Usuario de la base de datos
+- `PGPASSWORD` - Contraseña del usuario
+- `PGDATABASE` - Nombre de la base de datos
+
+---
+
+## Variables de Servicios Externos
+
+### 💳 Stripe (Pagos)
+
+#### `STRIPE_SECRET_KEY`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared (con valores diferentes en dev/prod)
+- **Requerido**: ✅ Sí
+- **Descripción**: Clave secreta de Stripe para procesamiento de pagos
+- **Formato**: `sk_test_...` (testing) o `sk_live_...` (production)
+- **Obtención**: https://dashboard.stripe.com/apikeys
+- **Uso**: 
+  - `server/routes.ts` - Procesamiento de pagos
+  - `server/services/stripe-connect.ts` - Stripe Connect
+- **Seguridad**: ⚠️ NUNCA exponer en frontend
+
+#### `VITE_STRIPE_PUBLIC_KEY`
+- **Tipo**: Environment Variable (Público)
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: Clave pública de Stripe para Stripe Elements
+- **Formato**: `pk_test_...` (testing) o `pk_live_...` (production)
+- **Obtención**: https://dashboard.stripe.com/apikeys
+- **Uso**:
+  - `client/src/components/PaymentMethodsManager.tsx`
+  - `client/src/components/StripePayment.tsx`
+- **Nota**: Prefijo `VITE_` es necesario para acceso desde frontend
+
+#### `STRIPE_WEBHOOK_SECRET`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Production (principalmente)
+- **Requerido**: ✅ Sí (en producción)
+- **Descripción**: Secret para verificar webhooks de Stripe
+- **Formato**: `whsec_...`
+- **Obtención**: https://dashboard.stripe.com/webhooks (después de crear endpoint)
+- **Uso**: `server/routes.ts` - Validación de webhooks
+- **Endpoint webhook**: `/api/stripe-webhook`
+- **Eventos suscritos**: `payment_intent.succeeded`, `account.updated`, `payout.paid`
+
+---
+
+### 📱 Twilio (SMS/OTP)
+
+#### `TWILIO_ACCOUNT_SID`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ⚠️ Opcional (fallback a mock en desarrollo)
+- **Descripción**: Account SID de Twilio
+- **Formato**: `AC...` (34 caracteres)
+- **Obtención**: https://console.twilio.com/
+- **Uso**: `server/sms-service.ts` - Envío de códigos OTP
+
+#### `TWILIO_AUTH_TOKEN`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ⚠️ Opcional (fallback a mock en desarrollo)
+- **Descripción**: Auth Token de Twilio
+- **Formato**: String de 32 caracteres
+- **Obtención**: https://console.twilio.com/
+- **Uso**: `server/sms-service.ts` - Autenticación con API de Twilio
+
+#### `TWILIO_PHONE_NUMBER`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ⚠️ Opcional (fallback a mock en desarrollo)
+- **Descripción**: Número de teléfono Twilio verificado
+- **Formato**: Formato E.164: `+18095551234`
+- **Obtención**: https://console.twilio.com/phone-numbers
+- **Uso**: `server/sms-service.ts` - Número remitente de SMS
+- **Nota**: Debe estar verificado en Twilio y habilitado para SMS
+
+---
+
+### 🗺️ Google Maps
+
+#### `VITE_GOOGLE_MAPS_API_KEY`
+- **Tipo**: Environment Variable (Semi-público)
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: API Key de Google Maps Platform
+- **Obtención**: https://console.cloud.google.com/google/maps-apis
+- **APIs habilitadas requeridas**:
+  - Maps JavaScript API
+  - Geocoding API
+  - Distance Matrix API
+  - Places API
+- **Uso**:
+  - Frontend: `client/src/lib/maps.ts` - Carga del SDK
+  - Backend: `server/routes.ts` - Cálculo de distancias y geocoding
+- **Restricciones recomendadas**:
+  - HTTP referrers para frontend
+  - IP addresses para backend
+- **Nota**: Prefijo `VITE_` permite uso tanto en frontend como backend
+
+---
+
+### 🔔 Web Push (Notificaciones)
+
+#### `VITE_VAPID_PUBLIC_KEY`
+- **Tipo**: Environment Variable (Público)
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: Clave VAPID pública para Web Push
+- **Generación**:
+  ```bash
+  npx web-push generate-vapid-keys
+  ```
+- **Formato**: String base64 de ~87 caracteres
+- **Uso**: 
+  - `client/src/lib/usePushNotifications.ts`
+  - `server/push-service.ts`
+
+#### `VAPID_PRIVATE_KEY`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: Clave VAPID privada para Web Push
+- **Generación**: Mismo comando que la clave pública
+- **Formato**: String base64 de ~43 caracteres
+- **Uso**: `server/push-service.ts` - Firma de notificaciones push
+- **Seguridad**: ⚠️ NUNCA exponer o commitear
+
+---
+
+## Variables de Configuración
+
+### 🌐 Servidor y Red
+
+#### `PORT`
+- **Tipo**: Environment Variable
+- **Ambiente**: Production
+- **Requerido**: ⚠️ Opcional
+- **Descripción**: Puerto donde corre el servidor Express
+- **Default**: `5000`
+- **Uso**: `server/index.ts`
+- **Nota**: Replit puede asignar puerto automáticamente
+
+#### `NODE_ENV`
+- **Tipo**: Environment Variable
+- **Ambiente**: Auto-detected
+- **Requerido**: ⚠️ Opcional
+- **Descripción**: Ambiente de ejecución
+- **Valores**: `development` | `production`
+- **Default**: `development`
+- **Uso**: Multiple archivos para comportamiento condicional
+- **Efectos**:
+  - Seguridad de cookies (secure flag)
+  - CORS policies
+  - Logging level
+  - Mock services (Twilio)
+
+#### `ALLOWED_ORIGINS`
+- **Tipo**: Environment Variable
+- **Ambiente**: Production
+- **Requerido**: ✅ Sí (en producción)
+- **Descripción**: Lista de orígenes permitidos para CORS
+- **Formato**: URLs separadas por comas
+- **Ejemplo**: `https://gruard.com,https://www.gruard.com,https://gruard.replit.app`
+- **Uso**: 
+  - `server/index.ts` - Configuración CORS
+  - `server/services/stripe-connect.ts` - Return URLs
+- **Default desarrollo**: `http://localhost:5000`
+
+#### `LOG_LEVEL`
+- **Tipo**: Environment Variable
+- **Ambiente**: Shared
+- **Requerido**: ⚠️ Opcional
+- **Descripción**: Nivel de logging con Winston
+- **Valores**: `error` | `warn` | `info` | `debug`
+- **Default**: `info`
+- **Uso**: `server/logger.ts`
+- **Recomendación**: `info` en producción, `debug` en desarrollo
+
+---
+
+### 🔧 Variables Replit (Auto-configuradas)
+
+Estas variables son automáticamente configuradas por Replit:
+
+#### `REPLIT_DOMAINS`
+- **Descripción**: Dominio(s) de la Repl
+- **Uso**: Replit platform
+
+#### `REPLIT_DEV_DOMAIN`
+- **Descripción**: Dominio de desarrollo de la Repl
+- **Uso**: Replit platform
+
+#### `REPL_ID`
+- **Descripción**: ID único de la Repl
+- **Uso**: Replit platform
+
+---
+
+## Configuración por Ambiente
+
+### 🧪 Development (Desarrollo)
+
+**Mínimas requeridas:**
+```bash
+# Base de datos (auto-configurada por Replit)
+DATABASE_URL=postgresql://...
+
+# Sesión (usar default SOLO en dev)
+SESSION_SECRET=dev-secret-change-in-production
+
+# Google Maps (requerida)
+VITE_GOOGLE_MAPS_API_KEY=AIza...
+
+# Stripe (usar claves de test)
+STRIPE_SECRET_KEY=sk_test_...
+VITE_STRIPE_PUBLIC_KEY=pk_test_...
+
+# Web Push (generar con web-push)
+VITE_VAPID_PUBLIC_KEY=BC...
+VAPID_PRIVATE_KEY=...
+
+# Twilio (OPCIONAL - fallback a mock)
+# TWILIO_ACCOUNT_SID=AC...
+# TWILIO_AUTH_TOKEN=...
+# TWILIO_PHONE_NUMBER=+1...
+```
+
+**Comportamiento en desarrollo:**
+- CORS permite localhost:5000
+- Cookies sin secure flag
+- Mock SMS si Twilio no está configurado
+- Logs en nivel `debug` o `info`
+
+---
+
+### 🚀 Production (Producción)
+
+**Todas requeridas:**
+```bash
+# Base de datos
+DATABASE_URL=postgresql://... (Neon production)
+
+# Seguridad
+SESSION_SECRET=<GENERAR-SECRETO-FUERTE-32-CHARS>
+NODE_ENV=production
+
+# Red
+PORT=5000
+ALLOWED_ORIGINS=https://gruard.com,https://www.gruard.com
+
+# Google Maps
+VITE_GOOGLE_MAPS_API_KEY=AIza... (con restricciones)
+
+# Stripe (usar claves LIVE)
+STRIPE_SECRET_KEY=sk_live_...
+VITE_STRIPE_PUBLIC_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Twilio (REQUERIDO en producción)
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=+1809...
+
+# Web Push
+VITE_VAPID_PUBLIC_KEY=BC...
+VAPID_PRIVATE_KEY=...
+
+# Logging
+LOG_LEVEL=info
+```
+
+**Requerimientos adicionales:**
+- SSL/TLS habilitado (HTTPS)
+- Session secret único y fuerte
+- CORS estrictamente configurado
+- Rate limiting activo
+- Stripe webhooks configurados
+- Twilio account con créditos
+
+---
+
+## Guía de Configuración
+
+### 🔧 Configurar en Replit
+
+1. **Secrets (Variables confidenciales)**
+   - Ir a "Secrets" en el panel izquierdo
+   - Click "Add new secret"
+   - Agregar cada secret con su valor
+
+2. **Environment Variables (Variables públicas)**
+   - Usar la herramienta de configuración de Replit
+   - O definir en `.env` (NO commitear)
+
+### ✅ Checklist Pre-Deploy
+
+- [ ] `SESSION_SECRET` generado con 32+ caracteres aleatorios
+- [ ] `DATABASE_URL` apunta a base de datos de producción
+- [ ] Stripe keys son claves LIVE (`sk_live_`, `pk_live_`)
+- [ ] `STRIPE_WEBHOOK_SECRET` configurado y endpoint verificado
+- [ ] Twilio configurado con número verificado y créditos
+- [ ] `VITE_GOOGLE_MAPS_API_KEY` con restricciones de IP/referrer
+- [ ] VAPID keys generadas y guardadas de forma segura
+- [ ] `ALLOWED_ORIGINS` incluye todos los dominios de producción
+- [ ] `NODE_ENV=production`
+- [ ] `LOG_LEVEL=info` (no debug en producción)
+
+### 🧪 Validar Configuración
+
+Ejecutar health check:
+```bash
+curl http://localhost:5000/health
+```
+
+Respuesta esperada:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-11-24T...",
+  "environment": "production",
+  "database": {
+    "status": "healthy",
+    "responseTime": 45
+  },
+  "objectStorage": {
+    "status": "healthy",
+    "responseTime": 120
+  }
+}
+```
+
+### 🔐 Seguridad
+
+**NUNCA:**
+- ❌ Commitear secrets en Git
+- ❌ Usar valores por defecto en producción
+- ❌ Compartir secrets en canales inseguros
+- ❌ Usar claves de desarrollo en producción
+- ❌ Exponer VAPID private key o Stripe secret key
+
+**SIEMPRE:**
+- ✅ Usar Replit Secrets para datos confidenciales
+- ✅ Rotar secrets regularmente
+- ✅ Generar SESSION_SECRET único por ambiente
+- ✅ Configurar restricciones en Google Maps API
+- ✅ Usar HTTPS en producción
+- ✅ Verificar webhooks de Stripe con signature
+
+---
+
+## 📞 Soporte
+
+Si tienes dudas sobre la configuración de variables de entorno:
+1. Revisa la documentación de cada servicio externo
+2. Verifica los logs en `logs/combined.log` y `logs/error.log`
+3. Usa el endpoint `/health` para diagnóstico
+
+---
+
+**Última actualización**: Noviembre 24, 2025  
+**Versión**: 1.0.0 - Workstream D
