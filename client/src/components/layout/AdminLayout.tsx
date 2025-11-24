@@ -27,6 +27,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import logoUrl from '@assets/Grúa_20251124_024218_0000_1763966543810.png';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -52,9 +53,16 @@ function AppSidebar() {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-bold px-4 py-4">
-            GruaRD Admin
-          </SidebarGroupLabel>
+          <div className="px-4 py-4 flex items-center gap-3">
+            <img 
+              src={logoUrl} 
+              alt="GruaRD Logo" 
+              className="w-12 h-12 object-contain"
+            />
+            <SidebarGroupLabel className="text-lg font-bold">
+              GruaRD Admin
+            </SidebarGroupLabel>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {

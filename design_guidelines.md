@@ -14,6 +14,25 @@
 
 ---
 
+## Brand Colors
+
+**Primary Brand Colors:**
+- **Navy Blue (Primary)**: `hsl(210, 65%, 17%)` - Dark navy blue from GruaRD logo, used for primary buttons, headers, and key UI elements
+- **Orange Accent**: `hsl(38, 91%, 55%)` - Vibrant orange from logo arc, used for accents, highlights, and call-to-action elements
+
+**Supporting Colors:**
+- Secondary Gray: Neutral gray tones for backgrounds and less prominent UI elements
+- Muted Tones: Subtle grays for secondary information
+- Charts: Combination of navy blue and orange with supporting greens
+
+**Application:**
+- Logo: Full-color GruaRD logo (navy blue + orange) displayed in login screens, admin sidebar, and key branding touchpoints
+- Primary Actions: Navy blue for main buttons and navigation
+- Highlights & CTAs: Orange for important actions and status indicators
+- Backgrounds: Subtle grays and whites for optimal readability
+
+---
+
 ## Typography
 
 **Font Family:** Inter (via Google Fonts) for all interfaces

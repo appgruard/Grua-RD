@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import logoUrl from '@assets/Grúa_20251124_024218_0000_1763966543810.png';
 
 export default function Login() {
   const [location, setLocation] = useLocation();
@@ -92,9 +93,11 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
-              <Truck className="w-8 h-8 text-primary-foreground" />
-            </div>
+            <img 
+              src={logoUrl} 
+              alt="GruaRD Logo" 
+              className="w-32 h-32 object-contain"
+            />
           </div>
           <CardTitle className="text-2xl font-bold">GruaRD</CardTitle>
           <CardDescription>
