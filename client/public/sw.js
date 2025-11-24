@@ -63,14 +63,24 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(RUNTIME_CACHE).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
-          const fetchPromise = fetch(request).then((networkResponse) => {
+          if (cachedResponse) {
+            const cacheDate = new Date(cachedResponse.headers.get('date') || 0);
+            const now = new Date();
+            const age = now - cacheDate;
+            
+            if (age < CACHE_DURATION.runtime) {
+              return cachedResponse;
+            }
+          }
+
+          return fetch(request).then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
               cache.put(request, networkResponse.clone());
             }
             return networkResponse;
-          }).catch(() => cachedResponse);
-
-          return cachedResponse || fetchPromise;
+          }).catch(() => {
+            return cachedResponse || new Response('Offline', { status: 503 });
+          });
         });
       })
     );

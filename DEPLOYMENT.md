@@ -510,6 +510,21 @@ Monitorear en Google Cloud Console:
 - Errores API
 - Costos estimados
 
+### 6. SEO Meta Tags
+
+**URLs Dinámicas**: La aplicación usa un script (`client/public/seo-meta.js`) que actualiza automáticamente las meta tags SEO basándose en el hostname actual:
+- Canonical URL
+- Open Graph URL
+- Twitter Card URL
+- Absolute image URLs
+
+**Funcionamiento**:
+- **Development**: Usa `http://localhost:5000`
+- **Staging**: Usa `https://staging.gruard.com` (o el hostname configurado)
+- **Production**: Usa `https://gruard.com` (o dominio custom)
+
+No es necesario cambiar configuración entre ambientes.
+
 ---
 
 ## Checklist Final
