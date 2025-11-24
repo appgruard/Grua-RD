@@ -109,14 +109,26 @@ GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (N
 - Testing utilities para E2E (cédulas válidas, teléfonos, OTP mock)
 - Object Storage con degradación graciosa
 
-**Workstream B: Gestión Documental & Seguridad Operativa** ⏳ En progreso:
+**Workstream B: Gestión Documental & Seguridad Operativa** ✅ 100%:
 - ✅ Backend: API endpoints para upload/download de documentos (`server/services/object-storage.ts`)
+  - Upload de documentos con validación de tipo y tamaño
+  - Download seguro con presigned URLs temporales (1 hora de expiración)
+  - Sistema de revisión admin (aprobar/rechazar) con motivos de rechazo
+  - Notificaciones push automáticas cuando documentos son revisados
+  - Audit logging completo de todas las operaciones
 - ✅ Security Hardening implementado:
   - Helmet.js con CSP configurado para Google Maps, Stripe, y WebSockets
   - CORS mejorado con validación de orígenes y logging
   - Health check endpoint `/health` con métricas de uptime
   - HSTS habilitado (31536000s con includeSubDomains y preload)
-- ⏳ Frontend: UI para conductores subir documentos y admin aprobarlos
+  - Rate limiting en endpoints críticos
+- ✅ Frontend: UI completa para conductores y admin
+  - `client/src/pages/driver/profile.tsx`: Sección de documentos con upload, lista, estados
+  - `client/src/pages/admin/documents.tsx`: Panel admin con preview, filtros, aprobar/rechazar
+  - Badges visuales de estado (pendiente, aprobado, rechazado)
+  - Preview de documentos con imagen modal
+  - Formulario de rechazo con motivo obligatorio
+  - Integración completa con sistema de notificaciones push
 
 **Workstream C: Pagos y Cumplimiento Financiero** ⏳:
 - Stripe Connect para split automático 70/30
