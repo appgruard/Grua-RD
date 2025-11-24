@@ -53,6 +53,15 @@ interface ExtendedDocumento extends Documento {
     apellido: string;
     email: string;
   };
+  conductor?: {
+    id: string;
+    user: {
+      id: string;
+      nombre: string;
+      apellido: string;
+      email: string;
+    };
+  };
 }
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
@@ -79,18 +88,18 @@ export default function AdminDocuments() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const { data: allDocuments = [], isLoading } = useQuery<ExtendedDocumento[]>({
-    queryKey: ['/api/admin/documentos'],
+    queryKey: ['/api/admin/documents/all'],
   });
 
   const reviewMutation = useMutation({
     mutationFn: async ({ id, estado, motivoRechazo }: { id: string; estado: 'aprobado' | 'rechazado'; motivoRechazo?: string }) => {
-      return apiRequest('PATCH', `/api/admin/documents/${id}/review`, {
+      return apiRequest('PUT', `/api/documents/${id}/status`, {
         estado,
         motivoRechazo,
       });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/documentos'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/documents/all'] });
       toast({
         title: variables.estado === 'aprobado' ? 'Documento aprobado' : 'Documento rechazado',
         description: `El documento ha sido ${variables.estado} correctamente`,
@@ -114,7 +123,7 @@ export default function AdminDocuments() {
     setIsPreviewOpen(true);
     
     try {
-      const response = await fetch(`/api/documents/${doc.id}/file`, {
+      const response = await fetch(`/api/documents/download/${doc.id}`, {
         credentials: 'include',
       });
       
@@ -162,11 +171,12 @@ export default function AdminDocuments() {
 
   const filteredDocuments = allDocuments.filter((doc) => {
     const matchesStatus = statusFilter === 'all' || doc.estado === statusFilter;
+    const user = doc.conductor?.user || doc.usuario;
     const matchesSearch =
       !searchTerm ||
-      doc.usuario?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.usuario?.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.usuario?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user?.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user?.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       DOCUMENT_TYPE_LABELS[doc.tipo]?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
@@ -314,17 +324,19 @@ export default function AdminDocuments() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDocuments.map((doc) => (
+                {filteredDocuments.map((doc) => {
+                  const user = doc.conductor?.user || doc.usuario;
+                  return (
                   <TableRow key={doc.id} data-testid={`row-document-${doc.id}`}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4 text-muted-foreground" />
                         <div>
                           <p className="font-medium">
-                            {doc.usuario?.nombre} {doc.usuario?.apellido}
+                            {user?.nombre} {user?.apellido}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {doc.usuario?.email}
+                            {user?.email}
                           </p>
                         </div>
                       </div>
@@ -355,7 +367,8 @@ export default function AdminDocuments() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -369,15 +382,18 @@ export default function AdminDocuments() {
               {selectedDoc && DOCUMENT_TYPE_LABELS[selectedDoc.tipo]}
             </DialogTitle>
             <DialogDescription>
-              {selectedDoc && (
-                <>
-                  Subido por {selectedDoc.usuario?.nombre}{' '}
-                  {selectedDoc.usuario?.apellido} el{' '}
-                  {format(new Date(selectedDoc.createdAt), 'dd MMM yyyy', {
-                    locale: es,
-                  })}
-                </>
-              )}
+              {selectedDoc && (() => {
+                const user = selectedDoc.conductor?.user || selectedDoc.usuario;
+                return (
+                  <>
+                    Subido por {user?.nombre}{' '}
+                    {user?.apellido} el{' '}
+                    {format(new Date(selectedDoc.createdAt), 'dd MMM yyyy', {
+                      locale: es,
+                    })}
+                  </>
+                );
+              })()}
             </DialogDescription>
           </DialogHeader>
 

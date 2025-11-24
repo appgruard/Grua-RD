@@ -167,6 +167,7 @@ export interface IStorage {
   deleteDocumento(id: string): Promise<void>;
   updateDocumentoStatus(id: string, estado: 'pendiente' | 'aprobado' | 'rechazado', revisadoPor: string, motivoRechazo?: string): Promise<Documento | undefined>;
   getPendingDocuments(): Promise<DocumentoWithDetails[]>;
+  getAllDocuments(): Promise<DocumentoWithDetails[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1075,6 +1076,23 @@ export class DatabaseStorage implements IStorage {
   async getPendingDocuments(): Promise<DocumentoWithDetails[]> {
     const results = await db.query.documentos.findMany({
       where: eq(documentos.estado, 'pendiente'),
+      with: {
+        usuario: true,
+        conductor: {
+          with: {
+            user: true,
+          },
+        },
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+      orderBy: desc(documentos.createdAt),
+    });
+    return results;
+  }
+
+  async getAllDocuments(): Promise<DocumentoWithDetails[]> {
+    const results = await db.query.documentos.findMany({
       with: {
         usuario: true,
         conductor: {

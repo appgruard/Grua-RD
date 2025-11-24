@@ -1889,6 +1889,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all documents (admin only)
+  app.get("/api/admin/documents/all", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const documentos = await storage.getAllDocuments();
+      res.json(documentos);
+    } catch (error: any) {
+      logSystem.error('Get all documents error', error);
+      res.status(500).json({ message: "Failed to get all documents" });
+    }
+  });
+
   app.post("/api/maps/calculate-route", async (req: Request, res: Response) => {
     try {
       const { origin, destination } = req.body;
