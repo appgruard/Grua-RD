@@ -95,11 +95,11 @@ export default function Login() {
           <div className="flex justify-center mb-4">
             <img 
               src={logoUrl} 
-              alt="GruaRD Logo" 
+              alt="Grúa RD Logo" 
               className="w-32 h-32 object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold">GruaRD</CardTitle>
+          <CardTitle className="text-2xl font-bold">Grúa RD</CardTitle>
           <CardDescription>
             Inicia sesión para acceder a tu cuenta
           </CardDescription>

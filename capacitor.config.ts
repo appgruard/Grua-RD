@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.gruard.app',
-  appName: 'GruaRD',
+  appName: 'Grúa RD',
   webDir: 'dist/public',
   
   server: {

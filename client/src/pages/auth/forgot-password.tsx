@@ -148,7 +148,7 @@ export default function ForgotPassword() {
           <div className="flex justify-center mb-4">
             <img 
               src={logoUrl} 
-              alt="GruaRD Logo" 
+              alt="Grúa RD Logo" 
               className="w-32 h-32 object-contain"
             />
           </div>

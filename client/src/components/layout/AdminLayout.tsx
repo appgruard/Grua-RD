@@ -56,11 +56,11 @@ function AppSidebar() {
           <div className="px-4 py-4 flex items-center gap-3">
             <img 
               src={logoUrl} 
-              alt="GruaRD Logo" 
+              alt="Grúa RD Logo" 
               className="w-12 h-12 object-contain"
             />
             <SidebarGroupLabel className="text-lg font-bold">
-              GruaRD Admin
+              Grúa RD Admin
             </SidebarGroupLabel>
           </div>
           <SidebarGroupContent>

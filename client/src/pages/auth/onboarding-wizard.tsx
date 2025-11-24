@@ -297,7 +297,7 @@ export default function OnboardingWizard() {
 
       toast({
         title: '¡Registro completado!',
-        description: 'Bienvenido a GruaRD',
+        description: 'Bienvenido a Grúa RD',
       });
       
       const redirectPath = formData.userType === 'conductor' ? '/driver' : '/client';
@@ -959,7 +959,7 @@ export default function OnboardingWizard() {
           <div className="flex justify-center mb-4">
             <img 
               src={logoUrl} 
-              alt="GruaRD Logo" 
+              alt="Grúa RD Logo" 
               className="w-32 h-32 object-contain"
             />
           </div>

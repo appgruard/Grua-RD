@@ -1,6 +1,6 @@
 {
-  "name": "GruaRD - Servicio de Grúas",
-  "short_name": "GruaRD",
+  "name": "Grúa RD - Servicio de Grúas",
+  "short_name": "Grúa RD",
   "description": "Solicita servicios de grúa en tiempo real en República Dominicana",
   "start_url": "/",
   "display": "standalone",

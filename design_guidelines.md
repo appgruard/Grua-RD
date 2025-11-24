@@ -1,4 +1,4 @@
-# Design Guidelines: GruaRD - Tow Truck Service PWA
+# Design Guidelines: Grúa RD - Tow Truck Service PWA
 
 ## Design Approach: Functional Utility with Ride-Hailing Patterns
 
@@ -17,7 +17,7 @@
 ## Brand Colors
 
 **Primary Brand Colors:**
-- **Navy Blue (Primary)**: `hsl(210, 65%, 17%)` - Dark navy blue from GruaRD logo, used for primary buttons, headers, and key UI elements
+- **Navy Blue (Primary)**: `hsl(210, 65%, 17%)` - Dark navy blue from Grúa RD logo, used for primary buttons, headers, and key UI elements
 - **Orange Accent**: `hsl(38, 91%, 55%)` - Vibrant orange from logo arc, used for accents, highlights, and call-to-action elements
 
 **Supporting Colors:**
@@ -26,7 +26,7 @@
 - Charts: Combination of navy blue and orange with supporting greens
 
 **Application:**
-- Logo: Full-color GruaRD logo (navy blue + orange) displayed in login screens, admin sidebar, and key branding touchpoints
+- Logo: Full-color Grúa RD logo (navy blue + orange) displayed in login screens, admin sidebar, and key branding touchpoints
 - Primary Actions: Navy blue for main buttons and navigation
 - Highlights & CTAs: Orange for important actions and status indicators
 - Backgrounds: Subtle grays and whites for optimal readability

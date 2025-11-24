@@ -176,13 +176,13 @@ export default function Register() {
           <div className="flex justify-center mb-4">
             <img 
               src={logoUrl} 
-              alt="GruaRD Logo" 
+              alt="Grúa RD Logo" 
               className="w-32 h-32 object-contain"
             />
           </div>
           <CardTitle className="text-2xl font-bold">Crear Cuenta</CardTitle>
           <CardDescription>
-            Regístrate en GruaRD
+            Regístrate en Grúa RD
           </CardDescription>
         </CardHeader>
         <CardContent>

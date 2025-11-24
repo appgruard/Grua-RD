@@ -1,7 +1,7 @@
-# GruaRD - Plataforma de Servicios de Grúa
+# Grúa RD - Plataforma de Servicios de Grúa
 
 ## Overview
-GruaRD is a Progressive Web App (PWA) designed to connect users needing tow truck services with available drivers in real-time within the Dominican Republic, similar to Uber. Its primary purpose is to streamline tow truck requests, real-time tracking, and service management, with a vision to revolutionize the tow truck service industry in the region. The platform features distinct interfaces for Clients, Drivers, and Administrators.
+Grúa RD is a Progressive Web App (PWA) designed to connect users needing tow truck services with available drivers in real-time within the Dominican Republic, similar to Uber. Its primary purpose is to streamline tow truck requests, real-time tracking, and service management, with a vision to revolutionize the tow truck service industry in the region. The platform features distinct interfaces for Clients, Drivers, and Administrators.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -19,10 +19,10 @@ Prioritize performance and scalability in new implementations.
 ## System Architecture
 
 ### UI/UX Decisions
-The design system uses Inter font with GruaRD brand colors: navy blue (`#0F2947`) as primary and orange (`#F5A623`) as accent, leveraging `shadcn/ui` and Tailwind CSS for a mobile-first, responsive PWA. It supports a light mode with dark mode preparation. Client and Driver interfaces utilize a `MobileLayout` with bottom navigation, while the Admin interface uses an `AdminLayout` with a sidebar. The PWA is configured for standalone installation with the GruaRD logo integrated across all interfaces.
+The design system uses Inter font with Grúa RD brand colors: navy blue (`#0F2947`) as primary and orange (`#F5A623`) as accent, leveraging `shadcn/ui` and Tailwind CSS for a mobile-first, responsive PWA. It supports a light mode with dark mode preparation. Client and Driver interfaces utilize a `MobileLayout` with bottom navigation, while the Admin interface uses an `AdminLayout` with a sidebar. The PWA is configured for standalone installation with the Grúa RD logo integrated across all interfaces.
 
 ### Technical Implementations
-GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js) backend. PostgreSQL (Neon) with Drizzle ORM manages the database. Authentication uses Passport.js with local strategy and bcrypt. Real-time features, including GPS tracking and chat, are powered by WebSockets (`ws` library). Google Maps JavaScript API handles mapping, distance, and geocoding. State management is done with TanStack Query (React Query v5). The project maintains a modular structure.
+Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js) backend. PostgreSQL (Neon) with Drizzle ORM manages the database. Authentication uses Passport.js with local strategy and bcrypt. Real-time features, including GPS tracking and chat, are powered by WebSockets (`ws` library). Google Maps JavaScript API handles mapping, distance, and geocoding. State management is done with TanStack Query (React Query v5). The project maintains a modular structure.
 
 ### Feature Specifications
 **Core Features:**
@@ -50,7 +50,7 @@ GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (N
   - Security hardening with Helmet.js (CSP, HSTS), enhanced CORS configuration, and rate limiting on critical endpoints (identity verification, OTP)
   - Comprehensive audit logging for all document operations
 - **Workstream C - Financial Compliance & Payments**: Stripe Connect for automated driver payouts (70%), professional PDF receipt generation with branding and financial breakdown, comprehensive payment method management (Stripe Payment Methods API) for clients, and robust webhook handling for payment events.
-- **Branding Applied**: GruaRD logo and brand colors (navy blue #0F2947, orange #F5A623) integrated across all interfaces including login pages, admin sidebar, and client/driver mobile layouts.
+- **Branding Applied**: Grúa RD logo and brand colors (navy blue #0F2947, orange #F5A623) integrated across all interfaces including login pages, admin sidebar, and client/driver mobile layouts.
 - **Production Preparation (Pending)**: Capacitor configuration for Android APK, Lighthouse optimization, error monitoring (Sentry).
 
 ### System Design Choices

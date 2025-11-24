@@ -91,7 +91,7 @@ export class PDFService {
       .fontSize(28)
       .fillColor(this.BRAND_COLOR)
       .font("Helvetica-Bold")
-      .text("GruaRD", 50, 50);
+      .text("Grúa RD", 50, 50);
 
     doc
       .fontSize(10)
