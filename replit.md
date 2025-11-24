@@ -56,6 +56,30 @@ Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js 
 ### System Design Choices
 The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket communication employs service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage utilizes Replit Object Storage with strict authorization. Stripe integration prioritizes server-side processing and webhook verification.
 
+## Recent Changes
+
+### November 24, 2025 - Brand Name Update
+- **Complete rebranding from "GruaRD" to "Grúa RD"** across the entire application
+  - Updated all configuration files (manifest.json, capacitor.config.ts, index.html)
+  - Updated all React components (AdminLayout, authentication pages: login, register, forgot-password, verify-otp, onboarding-wizard)
+  - Updated all documentation files (API.md, all README files, development plans)
+  - Updated server-side files (PDF service, routes, SMS service)
+  - Brand name now consistently displayed as "Grúa RD" (with space and accent) throughout the application
+
+### Phase 0: Platform Fundamentals - 100% Complete (November 23, 2025)
+- Identity verification system with Dominican ID validation
+- Document management system with Replit Object Storage
+- Payment integration with Stripe Connect
+- Security hardening with Helmet.js and rate limiting
+- Complete authentication and onboarding flow
+
+### Next Phase: Phase 1 - MVP Operacional
+**Module 1.1: MÓDULO CLIENTE - Solicitar Grúa** (Pending)
+1. Enhanced vehicle type selection
+2. Improved location system with Google Maps
+3. Payment method selection (cash, card, insurance)
+4. Request confirmation and submission
+
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
 - **Google Maps Platform**: Maps JavaScript API, Distance Matrix API, Geocoding API.
