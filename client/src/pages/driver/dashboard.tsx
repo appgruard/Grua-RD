@@ -13,8 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/lib/websocket';
 import { ChatBox } from '@/components/chat/ChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle } from 'lucide-react';
-import type { Servicio, Conductor, ServicioWithDetails } from '@shared/schema';
+import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
 
 export default function DriverDashboard() {
@@ -31,6 +31,11 @@ export default function DriverDashboard() {
 
   const { data: driverData } = useQuery<Conductor>({
     queryKey: ['/api/drivers/me'],
+  });
+
+  const { data: driverDocuments } = useQuery<Documento[]>({
+    queryKey: ['/api/documents/my-documents'],
+    enabled: !!driverData?.id,
   });
 
   const { data: nearbyRequests } = useQuery<Servicio[]>({
@@ -86,7 +91,12 @@ export default function DriverDashboard() {
   const toggleAvailability = useMutation({
     mutationFn: async (disponible: boolean) => {
       const res = await apiRequest('PUT', '/api/drivers/availability', { disponible });
-      if (!res.ok) throw new Error('Failed to update availability');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const error = new Error('Failed to update availability') as Error & { response?: any };
+        error.response = errorData;
+        throw error;
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -96,12 +106,29 @@ export default function DriverDashboard() {
         description: driverData?.disponible ? 'No recibirás nuevas solicitudes' : 'Puedes recibir solicitudes',
       });
     },
-    onError: () => {
-      toast({
-        title: 'Error',
-        description: 'No se pudo cambiar el estado de disponibilidad',
-        variant: 'destructive',
-      });
+    onError: (error: any) => {
+      const errorResponse = error?.response;
+      
+      if (errorResponse?.missingDocuments && errorResponse.missingDocuments.length > 0) {
+        const documentsList = errorResponse.missingDocuments.join(', ');
+        toast({
+          title: 'Documentos pendientes',
+          description: `Debes tener todos tus documentos aprobados. Documentos pendientes: ${documentsList}`,
+          variant: 'destructive',
+        });
+      } else if (errorResponse?.message) {
+        toast({
+          title: 'Error',
+          description: errorResponse.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'No se pudo cambiar el estado de disponibilidad',
+          variant: 'destructive',
+        });
+      }
     },
   });
 
@@ -184,6 +211,22 @@ export default function DriverDashboard() {
     }
   };
 
+  const checkDocumentsComplete = () => {
+    if (!driverDocuments) return { complete: false, missing: 0 };
+    
+    const requiredTypes = ['licencia', 'matricula', 'seguro_grua', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
+    let missingCount = 0;
+    
+    for (const requiredType of requiredTypes) {
+      const doc = driverDocuments.find(d => d.tipo === requiredType);
+      if (!doc || doc.estado !== 'aprobado') {
+        missingCount++;
+      }
+    }
+    
+    return { complete: missingCount === 0, missing: missingCount };
+  };
+
   useEffect(() => {
     if ('geolocation' in navigator && driverData?.disponible) {
       const watchId = navigator.geolocation.watchPosition(
@@ -223,13 +266,31 @@ export default function DriverDashboard() {
       <div className="absolute top-4 left-4 right-4">
         <Card className="p-4">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <Label htmlFor="availability" className="text-lg font-semibold">
                 Estado
               </Label>
               <p className="text-sm text-muted-foreground">
                 {driverData?.disponible ? 'Disponible para servicios' : 'No disponible'}
               </p>
+              {driverDocuments && (() => {
+                const { complete, missing } = checkDocumentsComplete();
+                return (
+                  <div className="mt-2">
+                    {complete ? (
+                      <Badge variant="secondary" className="gap-1" data-testid="badge-documents-complete">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Documentos completos
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive" className="gap-1" data-testid="badge-documents-pending">
+                        <AlertCircle className="w-3 h-3" />
+                        {missing} documento{missing !== 1 ? 's' : ''} pendiente{missing !== 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             <Switch
               id="availability"

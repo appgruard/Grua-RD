@@ -1012,6 +1012,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const { disponible } = req.body;
+      
+      // If trying to go online, validate all required documents are approved
+      if (disponible === true) {
+        const conductor = await storage.getConductorByUserId(req.user!.id);
+        
+        if (!conductor) {
+          return res.status(404).json({ message: "Conductor no encontrado" });
+        }
+
+        // Fetch all documents for this conductor
+        const documentos = await storage.getDocumentosByConductor(conductor.id);
+        
+        // Required document types
+        const requiredTypes = ['licencia', 'matricula', 'seguro_grua', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
+        
+        // Map document types to Spanish names for user-friendly messages
+        const documentTypeNames: Record<string, string> = {
+          'licencia': 'Licencia de Conducir',
+          'matricula': 'Matrícula del Vehículo',
+          'seguro_grua': 'Seguro de Grúa',
+          'foto_vehiculo': 'Foto del Vehículo',
+          'cedula_frontal': 'Cédula (Frente)',
+          'cedula_trasera': 'Cédula (Atrás)',
+        };
+        
+        // Check which required documents are missing or not approved
+        const missingDocuments: string[] = [];
+        
+        for (const requiredType of requiredTypes) {
+          const doc = documentos.find(d => d.tipo === requiredType);
+          
+          if (!doc) {
+            // Document doesn't exist
+            missingDocuments.push(documentTypeNames[requiredType]);
+          } else if (doc.estado !== 'aprobado') {
+            // Document exists but not approved
+            missingDocuments.push(documentTypeNames[requiredType]);
+          }
+        }
+        
+        // If any documents are missing or not approved, reject the request
+        if (missingDocuments.length > 0) {
+          return res.status(403).json({
+            message: "No puedes activar disponibilidad sin documentos aprobados",
+            missingDocuments: missingDocuments,
+          });
+        }
+      }
+      
+      // All validations passed or going offline - proceed with update
       const conductor = await storage.updateDriverAvailability(req.user!.id, disponible);
       res.json(conductor);
     } catch (error: any) {
