@@ -169,7 +169,7 @@ Implementar gestión de documentos y endurecer seguridad del sistema.
 
 ---
 
-#### **Workstream C: Pagos y Cumplimiento Financiero** (Prioridad MEDIA) - ✅ 95% COMPLETADO
+#### **Workstream C: Pagos y Cumplimiento Financiero** (Prioridad MEDIA) - ✅ 100% COMPLETADO
 
 Completar sistema de pagos con comisiones y recibos.
 
@@ -183,12 +183,13 @@ Completar sistema de pagos con comisiones y recibos.
   - [x] Webhook handler para `account.updated` y `payout.paid`
   - [x] Transfers automáticos con `stripe.transfers.create()` al completar servicio
 
-- [x] **Gestión de Métodos de Pago** ✅ COMPLETO (Backend)
+- [x] **Gestión de Métodos de Pago** ✅ COMPLETO
   - [x] Tabla `payment_methods` para guardar métodos recurrentes
   - [x] API endpoints: POST/GET/DELETE `/api/payment-methods`, PUT `/api/payment-methods/:id/default`
   - [x] Integración con Stripe Payment Methods API
   - [x] Soporte para múltiples tarjetas con marcado de predeterminada
-  - [ ] UI para agregar/eliminar tarjetas (pendiente - puede usar Stripe Elements existente)
+  - [x] UI completa para agregar/eliminar tarjetas con Stripe Elements (`client/src/components/PaymentMethodsManager.tsx`)
+  - [x] Integración en perfil del cliente (`client/src/pages/client/profile.tsx`)
   - [x] Fallback a efectivo si pago con tarjeta falla (ya implementado en flujo de pago)
 
 - [x] **Generación de Recibos PDF** ✅ COMPLETO
@@ -198,7 +199,8 @@ Completar sistema de pagos con comisiones y recibos.
   - [x] Números de recibo únicos con formato `GRD-{timestamp}-{random}`
   - [x] Tabla `service_receipts` en base de datos
   - [x] API endpoint `/api/servicios/:id/recibo` actualizado (genera PDF en memoria)
-  - [ ] Botón de descarga en historial (pendiente)
+  - [x] Botón de descarga en historial del cliente (`client/src/pages/client/history.tsx`)
+  - [x] Botón de descarga en historial del conductor (`client/src/pages/driver/history.tsx`)
 
 **Archivos Implementados:**
 - Backend:
@@ -207,12 +209,17 @@ Completar sistema de pagos con comisiones y recibos.
   - `server/schema-extensions.ts` - Tablas: `conductor_stripe_accounts`, `payment_methods`, `service_receipts`
   - `server/routes.ts` - Endpoints Stripe Connect, métodos de pago, webhooks mejorados
 - Frontend:
+  - `client/src/components/PaymentMethodsManager.tsx` - Componente completo de gestión de tarjetas
+  - `client/src/pages/client/profile.tsx` - Integración de PaymentMethodsManager
   - `client/src/pages/driver/profile.tsx` - Sección "Cuenta de Pagos" con UI onboarding Stripe Connect
+  - `client/src/pages/client/history.tsx` - Botón de descarga de recibos para clientes
+  - `client/src/pages/driver/history.tsx` - Botón de descarga de recibos para conductores
 
 **Acceptance Criteria:**
 - ✅ Cada servicio completado crea payout automático al conductor (implementado en webhook)
 - ✅ Comisión 70/30 registrada correctamente en base de datos (tabla `comisiones`)
-- ⏳ Recibo PDF descargable desde historial (endpoint existe, falta botón en UI)
+- ✅ Recibo PDF descargable desde historial (cliente y conductor)
+- ✅ UI completa para gestión de métodos de pago
 - ✅ Webhooks de Stripe manejados correctamente (`payment_intent.succeeded`, `account.updated`, `payout.paid`)
 
 ---
