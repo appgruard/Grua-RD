@@ -67,7 +67,7 @@ Los siguientes paquetes ya están en `package.json`:
 
 El archivo `capacitor.config.ts` ya está creado con:
 - **appId**: `com.gruard.app`
-- **appName**: GruaRD
+- **appName**: Grúa RD
 - **webDir**: `dist/public`
 - **Plugins configurados**: SplashScreen, PushNotifications, Geolocation, etc.
 
@@ -131,7 +131,7 @@ npx cap sync android --clean
 
 ### Editar `android/app/src/main/AndroidManifest.xml`
 
-Los siguientes permisos son necesarios para GruaRD:
+Los siguientes permisos son necesarios para Grúa RD:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -208,7 +208,7 @@ const permissions = await Geolocation.requestPermissions();
 
 2. **Implementar Foreground Service** (recomendado para tracking continuo):
    - Cuando el conductor active "disponible", iniciar un foreground service
-   - Mostrar una notificación persistente: "GruaRD: Estás disponible"
+   - Mostrar una notificación persistente: "Grúa RD: Estás disponible"
    - Esto previene que Android mate el proceso
 
 3. **Código de ejemplo** (en el frontend):
@@ -244,7 +244,7 @@ Las notificaciones push en Android requieren Firebase Cloud Messaging (FCM). Sig
 
 1. Ir a [Firebase Console](https://console.firebase.google.com/)
 2. Crear nuevo proyecto o usar uno existente
-3. Nombrar proyecto: `GruaRD` o similar
+3. Nombrar proyecto: `Grúa RD` o similar
 4. Desactivar Google Analytics (opcional para este caso)
 
 ### Paso 2: Agregar App Android a Firebase
@@ -252,7 +252,7 @@ Las notificaciones push en Android requieren Firebase Cloud Messaging (FCM). Sig
 1. En Firebase Console, click "Agregar app" → Android
 2. Datos requeridos:
    - **Package name**: `com.gruard.app` (debe coincidir con `appId` en `capacitor.config.ts`)
-   - **App nickname**: GruaRD (opcional)
+   - **App nickname**: Grúa RD (opcional)
    - **SHA-1**: Opcional para notificaciones (requerido para Google Sign-In)
 
 3. Descargar `google-services.json`
@@ -321,7 +321,7 @@ Después de hacer sync en Android Studio:
 
 ### Variables de Entorno para Backend
 
-El backend de GruaRD ya usa `web-push` con VAPID keys, pero para completitud:
+El backend de Grúa RD ya usa `web-push` con VAPID keys, pero para completitud:
 
 ```bash
 # .env (backend)
@@ -475,7 +475,7 @@ cd android
    - https://play.google.com/console/signup
 
 2. **Información de la App**
-   - Nombre: GruaRD - Servicio de Grúas
+   - Nombre: Grúa RD - Servicio de Grúas
    - Descripción corta y larga
    - Capturas de pantalla (mínimo 2, tamaños específicos)
    - Icono 512x512 PNG

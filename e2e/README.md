@@ -1,8 +1,8 @@
-# Testing E2E con Playwright - GruaRD
+# Testing E2E con Playwright - Grúa RD
 
 ## 📋 Descripción
 
-Este directorio contiene tests end-to-end (E2E) completos para la aplicación GruaRD usando Playwright. Los tests cubren todos los flujos principales de la aplicación para Cliente, Conductor y Admin.
+Este directorio contiene tests end-to-end (E2E) completos para la aplicación Grúa RD usando Playwright. Los tests cubren todos los flujos principales de la aplicación para Cliente, Conductor y Admin.
 
 ## 🗂️ Estructura de Tests
 

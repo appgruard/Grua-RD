@@ -1,4 +1,4 @@
-# 🚀 Capacitor Quick Start - GruaRD
+# 🚀 Capacitor Quick Start - Grúa RD
 
 ## ⚡ Inicio Rápido (3 pasos)
 

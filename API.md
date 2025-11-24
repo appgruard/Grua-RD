@@ -1,6 +1,6 @@
-# GruaRD API Documentation
+# Grúa RD API Documentation
 
-Documentación completa de la API REST y WebSocket del sistema GruaRD.
+Documentación completa de la API REST y WebSocket del sistema Grúa RD.
 
 ## Tabla de Contenidos
 

@@ -1,4 +1,4 @@
-# 🚛 Plan de Desarrollo - GruaRD
+# 🚛 Plan de Desarrollo - Grúa RD
 ## Aplicación de Grúas Estilo Uber para República Dominicana
 
 ---
@@ -193,7 +193,7 @@ Completar sistema de pagos con comisiones y recibos.
 
 - [x] **Generación de Recibos PDF** ✅ COMPLETO
   - [x] Servicio de generación PDF con `pdfkit` (`server/services/pdf-service.ts`)
-  - [x] Template de recibo con branding GruaRD (colores, logo, footer)
+  - [x] Template de recibo con branding Grúa RD (colores, logo, footer)
   - [x] Datos completos: servicio, costo, comisión 70/30, conductor, cliente
   - [x] Números de recibo únicos con formato `GRD-{timestamp}-{random}`
   - [x] Tabla `service_receipts` en base de datos
@@ -558,8 +558,8 @@ shared/
 ```json
 // public/manifest.json
 {
-  "name": "GruaRD - Servicio de Grúas",
-  "short_name": "GruaRD",
+  "name": "Grúa RD - Servicio de Grúas",
+  "short_name": "Grúa RD",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

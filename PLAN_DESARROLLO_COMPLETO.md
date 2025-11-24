@@ -1,4 +1,4 @@
-# Plan de Desarrollo Completo - GruaRD
+# Plan de Desarrollo Completo - Grúa RD
 **Plataforma de Servicios de Grúa - República Dominicana**
 
 ---
@@ -437,7 +437,7 @@
 
 3. **Recibo digital**
    - Generar PDF con:
-     - Logo de GruaRD
+     - Logo de Grúa RD
      - Fecha y hora
      - Cliente y conductor
      - Desglose de costos

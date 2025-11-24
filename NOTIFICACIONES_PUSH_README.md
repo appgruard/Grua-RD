@@ -1,8 +1,8 @@
-# Sistema de Notificaciones Push - GruaRD
+# Sistema de Notificaciones Push - Grúa RD
 
 ## Descripción
 
-GruaRD implementa un sistema completo de notificaciones push usando la Web Push API estándar. Las notificaciones se envían automáticamente en eventos clave del ciclo de vida del servicio.
+Grúa RD implementa un sistema completo de notificaciones push usando la Web Push API estándar. Las notificaciones se envían automáticamente en eventos clave del ciclo de vida del servicio.
 
 ## Configuración Requerida
 
