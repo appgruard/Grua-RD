@@ -1,18 +1,52 @@
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Calendar, DollarSign, ClipboardList } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MapPin, Navigation, Calendar, DollarSign, ClipboardList, Download } from 'lucide-react';
 import type { ServicioWithDetails } from '@shared/schema';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ServiceCardSkeletonList } from '@/components/skeletons/ServiceCardSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DriverHistory() {
+  const { toast } = useToast();
   const { data: services, isLoading } = useQuery<ServicioWithDetails[]>({
     queryKey: ['/api/services/my-services'],
   });
+
+  const handleDownloadReceipt = async (serviceId: string) => {
+    try {
+      const response = await fetch(`/api/servicios/${serviceId}/recibo`);
+      
+      if (!response.ok) {
+        throw new Error('Error al descargar el recibo');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recibo-${serviceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: 'Recibo descargado',
+        description: 'El recibo se ha descargado correctamente',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo descargar el recibo',
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -135,6 +169,21 @@ export default function DriverHistory() {
                       {service.cliente.nombre} {service.cliente.apellido}
                     </span>
                   </p>
+                </div>
+              )}
+
+              {service.estado === 'completado' && (
+                <div className="mt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleDownloadReceipt(service.id)}
+                    data-testid={`button-download-receipt-${service.id}`}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar Recibo
+                  </Button>
                 </div>
               )}
             </Card>
