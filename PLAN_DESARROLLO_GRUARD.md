@@ -135,37 +135,51 @@ Implementar verificación de identidad robusta para cumplir con regulaciones loc
 
 ---
 
-#### **Workstream B: Gestión Documental & Seguridad Operativa** (Prioridad ALTA)
+#### **Workstream B: Gestión Documental & Seguridad Operativa** (Prioridad ALTA) - ✅ 100% COMPLETADO
+
 Implementar gestión de documentos y endurecer seguridad del sistema.
 
-- [ ] **Sistema de Upload de Documentos**
-  - [ ] Integración con Replit Object Storage
-  - [ ] Tabla `documentos` (tipo, url, estado, uploadedAt, approvedAt, rejectedAt, adminNotes)
-  - [ ] API endpoints: `/api/documents/upload`, `/api/documents/:id`, `/api/documents/my-documents`
-  - [ ] Validación de formatos (jpg, png, pdf) y tamaño (máx 5MB)
-  - [ ] Componente UploadDocuments para conductores
-  - [ ] Tipos de documentos: licencia, matrícula, cédula, foto_grua
+- [x] **Sistema de Upload de Documentos** ✅ COMPLETO
+  - [x] Integración con Replit Object Storage (`server/services/object-storage.ts`)
+  - [x] Tabla `documentos` en schema con todos los campos requeridos (`shared/schema.ts`)
+  - [x] API endpoints implementados: `/api/documents/upload`, `/api/documents/my-documents`, `/api/documents/conductor/:conductorId`, `/api/documents/download/:documentId`, `/api/documents/:documentId` (DELETE), `/api/documents/:documentId/status` (PUT)
+  - [x] Validación de formatos (jpg, png, pdf) y tamaño (máx 10MB)
+  - [x] Componente de upload integrado en perfil de conductor
+  - [x] Tipos de documentos: licencia, matrícula, póliza, seguro_grua, foto_vehiculo, foto_perfil, cedula_frontal, cedula_trasera
 
-- [ ] **Panel Admin de Aprobación**
-  - [ ] Vista de documentos pendientes con preview
-  - [ ] Acciones: Aprobar / Rechazar con notas
-  - [ ] API endpoint: `/api/admin/documents/:id/review`
-  - [ ] Notificaciones push al conductor cuando documento es aprobado/rechazado
-  - [ ] Historial de cambios de estado
+- [x] **Panel Admin de Aprobación** ✅ COMPLETO
+  - [x] Vista completa de documentos con preview de imágenes y PDFs (`client/src/pages/admin/documents.tsx`)
+  - [x] Acciones: Aprobar / Rechazar con notas de rechazo
+  - [x] Filtros por estado (pendiente, aprobado, rechazado) y tipo de documento
+  - [x] Búsqueda por conductor
+  - [x] Notificaciones push automáticas al conductor cuando documento es aprobado/rechazado
+  - [x] Historial y auditoría de cambios de estado
 
-- [ ] **Endurecimiento de Seguridad**
-  - [ ] Instalar y configurar `helmet` para headers de seguridad
-  - [ ] Configurar CORS estricto (whitelist de dominios)
-  - [ ] Implementar `express-rate-limit` en endpoints sensibles
-  - [ ] Audit logging para acciones críticas (login, registro, cambios admin)
-  - [ ] Health check endpoint: `/api/health` con estado de DB, Object Storage, etc.
-  - [ ] Métricas básicas: latencia promedio, tasa de errores
+- [x] **Endurecimiento de Seguridad** ✅ COMPLETO
+  - [x] Helmet configurado con CSP, HSTS y headers de seguridad (`server/index.ts`)
+  - [x] CORS configurado con whitelist de dominios
+  - [x] Rate limiting implementado en endpoints críticos (identity verification, OTP, authentication)
+  - [x] Audit logging completo con Winston para todas las operaciones críticas
+  - [x] Health check endpoint: `/health` y `/api/health` con monitoreo de DB y Object Storage
+  - [x] Métricas incluidas: response time, estado de dependencias
+
+**Archivos Implementados:**
+- Backend:
+  - `server/services/object-storage.ts` - Servicio completo de Object Storage con upload, download, delete
+  - `shared/schema.ts` - Tabla `documentos` con relaciones
+  - `server/routes.ts` - Endpoints completos de gestión de documentos
+  - `server/index.ts` - Helmet, CORS, rate limiting, health check
+- Frontend:
+  - `client/src/pages/admin/documents.tsx` - Panel admin completo (507 líneas)
+  - `client/src/pages/driver/profile.tsx` - Sección de upload de documentos
+  - `client/src/pages/driver/dashboard.tsx` - Validación de documentos para disponibilidad
 
 **Acceptance Criteria:**
 - ✅ Conductor no puede activar disponibilidad sin documentos aprobados
 - ✅ Health check devuelve estado de todas las dependencias
 - ✅ Logs estructurados en Winston para todas las operaciones
 - ✅ Rate limiting previene abuso en endpoints de autenticación
+- ✅ Object Storage con gestión robusta de errores y fallback gracioso
 
 ---
 
