@@ -67,15 +67,15 @@ Prioritize performance and scalability in new implementations.
 - ✅ **Mock SMS:** Código OTP fijo "123456" en desarrollo para facilitar testing
 - ✅ **Object Storage resiliente:** Inicialización lazy con degradación graciosa cuando no hay bucket configurado
 
-### Estado Actual (Post-Fase 3 + Workstream A):
+### Estado Actual (Post-Fase 3 + Workstreams A, B, C):
 - **Funcionalidades Core:** ✅ 100% implementadas (autenticación, servicios, tracking, chat, notificaciones)
-- **Testing:** ✅ 27+ tests E2E con Playwright (cobertura completa de flujos Fases 1-3 + wizard onboarding preparado)
+- **Testing:** ✅ 28 tests E2E con Playwright (cobertura completa de todos los flujos)
 - **UI/UX:** ✅ Responsive design, modo oscuro, estados de carga, manejo de errores
-- **Integraciones:** ✅ Google Maps, WebSocket, Web Push API, Stripe (requiere API keys)
-- **Fase 4 - Workstream A:** ✅ 100% completado (backend + frontend + testing utilities)
+- **Integraciones:** ✅ Google Maps, WebSocket, Web Push API, Stripe Connect, Twilio
+- **Fase 4 - Workstream A:** ✅ 100% completado (identidad y cumplimiento)
 - **Fase 4 - Workstream B:** ✅ 100% completado (gestión documental + security hardening)
-- **Fase 4 - Workstream C:** ✅ 95% completado (Stripe Connect + PDF + webhooks)
-- **Pendiente:** Testing E2E (Workstream C), optimización y APK (Workstream D)
+- **Fase 4 - Workstream C:** ✅ 100% completado (Stripe Connect + pagos + recibos PDF)
+- **Pendiente:** Workstream D (Capacitor/APK + optimización producción)
 
 ## System Architecture
 
@@ -131,7 +131,7 @@ GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (N
   - Formulario de rechazo con motivo obligatorio
   - Integración completa con sistema de notificaciones push
 
-**Workstream C: Pagos y Cumplimiento Financiero** ✅ 95%:
+**Workstream C: Pagos y Cumplimiento Financiero** ✅ 100%:
 - ✅ **Stripe Connect Implementado:**
   - Servicio `server/services/stripe-connect.ts` para gestión de cuentas Connect
   - Creación automática de cuentas Stripe Connect Standard para conductores
@@ -143,26 +143,32 @@ GruaRD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (N
   - Template profesional con branding GruaRD
   - Desglose completo: costo total, pago conductor (70%), comisión plataforma (30%)
   - Tabla `service_receipts` para metadatos de recibos
-  - Endpoint `/api/servicios/:id/recibo` actualizado
+  - Endpoint `/api/servicios/:id/recibo` actualizado con descarga desde historial del cliente
 - ✅ **Gestión de Métodos de Pago:**
   - Tabla `payment_methods` para tarjetas guardadas
   - API endpoints: POST/GET/DELETE `/api/payment-methods`, PUT `/api/payment-methods/:id/default`
+  - Endpoint `/api/payments/create-setup-intent` para SetupIntent de Stripe
   - Integración con Stripe Payment Methods API
   - Soporte para múltiples tarjetas con marcado de predeterminada
+  - UI completa en perfil del cliente (`client/src/components/PaymentMethodsManager.tsx`)
 - ✅ **Webhooks Mejorados:**
   - Handler para `payment_intent.succeeded` con creación automática de comisiones y transfers
   - Handler para `account.updated` (actualización estado cuentas Connect)
   - Handler para `payout.paid` (logging de pagos completados)
   - Integración completa con sistema de comisiones existente
-- ✅ **Frontend:**
+- ✅ **Frontend Completo:**
   - `client/src/pages/driver/profile.tsx`: Sección "Cuenta de Pagos" con onboarding Stripe Connect
+  - `client/src/pages/client/profile.tsx`: Sección de gestión de métodos de pago (agregar, listar, eliminar, predeterminada)
+  - `client/src/pages/client/history.tsx`: Botón de descarga de recibo PDF para servicios completados
   - Estados visuales: no configurado, configuración pendiente, activo
-  - Badges para estado de charges/payouts
+  - Badges para estado de charges/payouts y métodos de pago
   - Redirect handling para success/refresh URLs
-- ⏳ **Pendiente:**
-  - UI de gestión de métodos de pago en perfil de cliente
-  - Botón de descarga de recibo PDF en historial
-  - Tests E2E para flujo completo
+- ✅ **Testing E2E:**
+  - Suite completa `e2e/07-stripe-connect-payment-flow.spec.ts` para verificar:
+    - UI de gestión de métodos de pago en perfil de cliente
+    - Botón de descarga de recibo en historial de servicios
+    - Sección de Stripe Connect en perfil del conductor
+    - Flujo de integración de pagos
 
 **Workstream D: Preparación Producción** ⏳:
 - Capacitor configuration para Android APK

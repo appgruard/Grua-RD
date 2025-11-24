@@ -1971,6 +1971,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/payments/create-setup-intent", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      
+      if (!stripeSecretKey) {
+        return res.status(503).json({ 
+          message: "Payment service not configured. Please contact administrator.",
+          configured: false 
+        });
+      }
+
+      const Stripe = (await import('stripe')).default;
+      const stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2024-11-20.acacia' as any,
+      });
+
+      const setupIntent = await stripe.setupIntents.create({
+        payment_method_types: ['card'],
+        metadata: {
+          userId: req.user!.id,
+        },
+      });
+
+      logSystem.info('Setup intent created', { userId: req.user!.id, setupIntentId: setupIntent.id });
+
+      res.json({
+        clientSecret: setupIntent.client_secret,
+      });
+    } catch (error: any) {
+      logSystem.error('Create setup intent error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to create setup intent" });
+    }
+  });
+
   app.get("/api/comisiones", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });

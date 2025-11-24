@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { User, Mail, Phone, Star, LogOut } from 'lucide-react';
 import { useLocation } from 'wouter';
+import PaymentMethodsManager from '@/components/PaymentMethodsManager';
 
 export default function ClientProfile() {
   const { user, logout } = useAuth();
@@ -70,6 +71,10 @@ export default function ClientProfile() {
           </div>
         </div>
       </Card>
+
+      <div className="mb-4">
+        <PaymentMethodsManager />
+      </div>
 
       <Button
         variant="destructive"
