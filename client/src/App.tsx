@@ -1,4 +1,5 @@
 import { Switch, Route, Redirect } from 'wouter';
+import { lazy, Suspense } from 'react';
 import { queryClient } from './lib/queryClient';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -7,31 +8,42 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 
-import Login from '@/pages/auth/login';
-import OnboardingWizard from '@/pages/auth/onboarding-wizard';
-import VerifyOTP from '@/pages/auth/verify-otp';
-import ForgotPassword from '@/pages/auth/forgot-password';
+const Login = lazy(() => import('@/pages/auth/login'));
+const OnboardingWizard = lazy(() => import('@/pages/auth/onboarding-wizard'));
+const VerifyOTP = lazy(() => import('@/pages/auth/verify-otp'));
+const ForgotPassword = lazy(() => import('@/pages/auth/forgot-password'));
 
-import ClientHome from '@/pages/client/home';
-import ClientTracking from '@/pages/client/tracking';
-import ClientHistory from '@/pages/client/history';
-import ClientProfile from '@/pages/client/profile';
+const ClientHome = lazy(() => import('@/pages/client/home'));
+const ClientTracking = lazy(() => import('@/pages/client/tracking'));
+const ClientHistory = lazy(() => import('@/pages/client/history'));
+const ClientProfile = lazy(() => import('@/pages/client/profile'));
 
-import DriverDashboard from '@/pages/driver/dashboard';
-import DriverHistory from '@/pages/driver/history';
-import DriverProfile from '@/pages/driver/profile';
+const DriverDashboard = lazy(() => import('@/pages/driver/dashboard'));
+const DriverHistory = lazy(() => import('@/pages/driver/history'));
+const DriverProfile = lazy(() => import('@/pages/driver/profile'));
 
-import AdminDashboard from '@/pages/admin/dashboard';
-import AdminAnalytics from '@/pages/admin/analytics';
-import AdminUsers from '@/pages/admin/users';
-import AdminDrivers from '@/pages/admin/drivers';
-import AdminServices from '@/pages/admin/services';
-import AdminPricing from '@/pages/admin/pricing';
-import AdminMonitoring from '@/pages/admin/monitoring';
-import AdminVerifications from '@/pages/admin/verifications';
-import AdminDocuments from '@/pages/admin/documents';
+const AdminDashboard = lazy(() => import('@/pages/admin/dashboard'));
+const AdminAnalytics = lazy(() => import('@/pages/admin/analytics'));
+const AdminUsers = lazy(() => import('@/pages/admin/users'));
+const AdminDrivers = lazy(() => import('@/pages/admin/drivers'));
+const AdminServices = lazy(() => import('@/pages/admin/services'));
+const AdminPricing = lazy(() => import('@/pages/admin/pricing'));
+const AdminMonitoring = lazy(() => import('@/pages/admin/monitoring'));
+const AdminVerifications = lazy(() => import('@/pages/admin/verifications'));
+const AdminDocuments = lazy(() => import('@/pages/admin/documents'));
 
-import NotFound from '@/pages/not-found';
+const NotFound = lazy(() => import('@/pages/not-found'));
+
+function LoadingFallback() {
+  return (
+    <div className="h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full" />
+        <p className="text-sm text-muted-foreground">Cargando...</p>
+      </div>
+    </div>
+  );
+}
 
 function ProtectedRoute({ 
   children, 
@@ -65,11 +77,12 @@ function Router() {
   const { user } = useAuth();
 
   return (
-    <Switch>
-      <Route path="/login" component={Login} />
-      <Route path="/onboarding" component={OnboardingWizard} />
-      <Route path="/verify-otp" component={VerifyOTP} />
-      <Route path="/forgot-password" component={ForgotPassword} />
+    <Suspense fallback={<LoadingFallback />}>
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/onboarding" component={OnboardingWizard} />
+        <Route path="/verify-otp" component={VerifyOTP} />
+        <Route path="/forgot-password" component={ForgotPassword} />
       
       {/* Client Routes - Most specific first */}
       <Route path="/client/tracking/:id">
@@ -215,8 +228,9 @@ function Router() {
         )}
       </Route>
 
-      <Route component={NotFound} />
-    </Switch>
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

@@ -1,13 +1,40 @@
 {
   "name": "Grúa RD - Servicio de Grúas",
   "short_name": "Grúa RD",
-  "description": "Solicita servicios de grúa en tiempo real en República Dominicana",
+  "description": "Solicita servicios de grúa en tiempo real en República Dominicana. Tracking GPS, pago seguro y conductores verificados.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2563eb",
-  "orientation": "portrait",
+  "theme_color": "#0F2947",
+  "orientation": "portrait-primary",
+  "lang": "es-DO",
+  "dir": "ltr",
   "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/favicon.png",
       "sizes": "192x192",
@@ -25,17 +52,28 @@
     {
       "src": "/favicon.png",
       "sizes": "540x720",
-      "type": "image/png"
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ],
-  "categories": ["travel", "utilities"],
+  "categories": ["travel", "utilities", "business"],
   "shortcuts": [
     {
       "name": "Solicitar Grúa",
       "short_name": "Solicitar",
-      "description": "Solicitar servicio de grúa",
+      "description": "Solicitar servicio de grúa rápidamente",
       "url": "/client",
       "icons": [{ "src": "/favicon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mis Servicios",
+      "short_name": "Servicios",
+      "description": "Ver historial de servicios",
+      "url": "/client/history",
+      "icons": [{ "src": "/favicon.png", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "iarc_rating_id": ""
 }

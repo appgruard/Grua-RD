@@ -1,5 +1,13 @@
-const STATIC_CACHE = 'gruard-static-v3';
-const DYNAMIC_CACHE = 'gruard-dynamic-v3';
+const VERSION = '4.0';
+const STATIC_CACHE = `gruard-static-v${VERSION}`;
+const DYNAMIC_CACHE = `gruard-dynamic-v${VERSION}`;
+const RUNTIME_CACHE = `gruard-runtime-v${VERSION}`;
+
+const CACHE_DURATION = {
+  static: 30 * 24 * 60 * 60 * 1000,
+  dynamic: 7 * 24 * 60 * 60 * 1000,
+  runtime: 24 * 60 * 60 * 1000
+};
 
 const urlsToCache = [
   '/',
@@ -22,11 +30,18 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+          if (
+            cacheName !== STATIC_CACHE && 
+            cacheName !== DYNAMIC_CACHE &&
+            cacheName !== RUNTIME_CACHE
+          ) {
+            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
+    }).then(() => {
+      console.log('[SW] Activated version', VERSION);
     })
   );
   self.clients.claim();
@@ -44,10 +59,50 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (url.hostname === 'maps.googleapis.com' || url.hostname === 'maps.gstatic.com') {
+    event.respondWith(
+      caches.open(RUNTIME_CACHE).then((cache) => {
+        return cache.match(request).then((cachedResponse) => {
+          const fetchPromise = fetch(request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              cache.put(request, networkResponse.clone());
+            }
+            return networkResponse;
+          }).catch(() => cachedResponse);
+
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
+    return;
+  }
+
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) => {
+        return cache.match(request).then((cachedResponse) => {
+          return cachedResponse || fetch(request).then((response) => {
+            if (response && response.status === 200) {
+              cache.put(request, response.clone());
+            }
+            return response;
+          });
+        });
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
-        return cachedResponse;
+        const cacheDate = new Date(cachedResponse.headers.get('date') || 0);
+        const now = new Date();
+        const age = now - cacheDate;
+        
+        if (age < CACHE_DURATION.dynamic) {
+          return cachedResponse;
+        }
       }
 
       return fetch(request).then((response) => {
@@ -75,6 +130,18 @@ self.addEventListener('fetch', (event) => {
         if (request.destination === 'document') {
           return caches.match('/index.html');
         }
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'Offline', 
+            message: 'No hay conexión a internet. Por favor, intenta de nuevo más tarde.' 
+          }),
+          {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: new Headers({ 'Content-Type': 'application/json' })
+          }
+        );
       });
     })
   );
