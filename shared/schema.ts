@@ -23,7 +23,9 @@ export const estadoCuentaEnum = pgEnum("estado_cuenta", [
 ]);
 export const estadoServicioEnum = pgEnum("estado_servicio", [
   "pendiente",
-  "aceptado", 
+  "aceptado",
+  "conductor_en_sitio",
+  "cargando",
   "en_progreso",
   "completado",
   "cancelado"

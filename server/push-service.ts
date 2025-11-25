@@ -80,7 +80,7 @@ export class PushNotificationService {
 
   async notifyServiceAccepted(servicioId: string, clienteId: string, conductorName: string): Promise<void> {
     await this.sendToUser(clienteId, {
-      title: '¡Grúa en camino! 🚛',
+      title: 'Grúa en camino',
       body: `${conductorName} ha aceptado tu solicitud`,
       data: { type: 'service_accepted', servicioId },
       tag: `service-${servicioId}`,
@@ -89,7 +89,7 @@ export class PushNotificationService {
 
   async notifyNewServiceRequest(conductorId: string, origenDireccion: string): Promise<void> {
     await this.sendToUser(conductorId, {
-      title: 'Nueva solicitud de servicio 📍',
+      title: 'Nueva solicitud de servicio',
       body: `Solicitud desde ${origenDireccion}`,
       data: { type: 'new_request' },
       tag: 'new-requests',
@@ -98,8 +98,8 @@ export class PushNotificationService {
 
   async notifyServiceStarted(servicioId: string, clienteId: string): Promise<void> {
     await this.sendToUser(clienteId, {
-      title: 'Servicio iniciado 🚀',
-      body: 'El conductor ha iniciado el servicio',
+      title: 'Servicio iniciado',
+      body: 'El conductor va en camino al destino',
       data: { type: 'service_started', servicioId },
       tag: `service-${servicioId}`,
     });
@@ -107,8 +107,8 @@ export class PushNotificationService {
 
   async notifyServiceCompleted(servicioId: string, clienteId: string): Promise<void> {
     await this.sendToUser(clienteId, {
-      title: 'Servicio completado ✅',
-      body: '¡Tu vehículo ha sido entregado! Por favor califica el servicio',
+      title: 'Servicio completado',
+      body: 'Tu vehículo ha sido entregado. Por favor califica el servicio',
       data: { type: 'service_completed', servicioId },
       tag: `service-${servicioId}`,
     });
@@ -116,10 +116,19 @@ export class PushNotificationService {
 
   async notifyNewMessage(recipientId: string, senderName: string, message: string): Promise<void> {
     await this.sendToUser(recipientId, {
-      title: `Nuevo mensaje de ${senderName} 💬`,
+      title: `Nuevo mensaje de ${senderName}`,
       body: message.substring(0, 100),
       data: { type: 'new_message' },
       tag: 'chat',
+    });
+  }
+
+  async notifyServiceUpdate(servicioId: string, clienteId: string, updateMessage: string): Promise<void> {
+    await this.sendToUser(clienteId, {
+      title: 'Actualización del servicio',
+      body: updateMessage,
+      data: { type: 'service_update', servicioId },
+      tag: `service-${servicioId}`,
     });
   }
 }

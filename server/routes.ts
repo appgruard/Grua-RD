@@ -1168,6 +1168,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/services/:id/arrived", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const servicio = await storage.updateServicio(req.params.id, {
+        estado: 'conductor_en_sitio',
+      });
+
+      logService.info('Driver arrived at origin', { servicioId: servicio.id });
+
+      await pushService.notifyServiceUpdate(servicio.id, servicio.clienteId, 'El conductor ha llegado al punto de origen');
+
+      res.json(servicio);
+    } catch (error: any) {
+      logSystem.error('Arrived service error', error, { servicioId: req.params.id });
+      res.status(500).json({ message: "Failed to update service status" });
+    }
+  });
+
+  app.post("/api/services/:id/loading", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const servicio = await storage.updateServicio(req.params.id, {
+        estado: 'cargando',
+      });
+
+      logService.info('Driver loading vehicle', { servicioId: servicio.id });
+
+      await pushService.notifyServiceUpdate(servicio.id, servicio.clienteId, 'El conductor está cargando tu vehículo');
+
+      res.json(servicio);
+    } catch (error: any) {
+      logSystem.error('Loading service error', error, { servicioId: req.params.id });
+      res.status(500).json({ message: "Failed to update service status" });
+    }
+  });
+
   app.post("/api/services/:id/start", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
       return res.status(401).json({ message: "Not authorized" });

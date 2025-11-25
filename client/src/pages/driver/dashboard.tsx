@@ -155,6 +155,50 @@ export default function DriverDashboard() {
     },
   });
 
+  const arrivedService = useMutation({
+    mutationFn: async (serviceId: string) => {
+      const res = await apiRequest('POST', `/api/services/${serviceId}/arrived`, {});
+      if (!res.ok) throw new Error('Failed to update service');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
+      toast({
+        title: 'Llegada confirmada',
+        description: 'El cliente ha sido notificado',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el estado',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const loadingService = useMutation({
+    mutationFn: async (serviceId: string) => {
+      const res = await apiRequest('POST', `/api/services/${serviceId}/loading`, {});
+      if (!res.ok) throw new Error('Failed to update service');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
+      toast({
+        title: 'Estado actualizado',
+        description: 'El cliente ha sido notificado que estás cargando el vehículo',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el estado',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const startService = useMutation({
     mutationFn: async (serviceId: string) => {
       const res = await apiRequest('POST', `/api/services/${serviceId}/start`, {});
@@ -165,7 +209,7 @@ export default function DriverDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
       toast({
         title: 'Servicio iniciado',
-        description: 'El servicio está en progreso',
+        description: 'En ruta al destino',
       });
     },
     onError: () => {
@@ -205,9 +249,6 @@ export default function DriverDashboard() {
     
     if (confirmDialog.action === 'complete') {
       await completeService.mutateAsync(confirmDialog.serviceId);
-    } else if (confirmDialog.action === 'start') {
-      await startService.mutateAsync(confirmDialog.serviceId);
-      setConfirmDialog({ open: false, action: null, serviceId: null });
     }
   };
 
@@ -308,7 +349,13 @@ export default function DriverDashboard() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Servicio Activo</h3>
-                <Badge variant="default">{activeService.estado}</Badge>
+                <Badge variant="default">
+                  {activeService.estado === 'aceptado' && 'Aceptado'}
+                  {activeService.estado === 'conductor_en_sitio' && 'En sitio'}
+                  {activeService.estado === 'cargando' && 'Cargando'}
+                  {activeService.estado === 'en_progreso' && 'En ruta'}
+                  {activeService.estado === 'completado' && 'Completado'}
+                </Badge>
               </div>
 
               {activeService.cliente && (
@@ -362,11 +409,48 @@ export default function DriverDashboard() {
               {activeService.estado === 'aceptado' && (
                 <Button 
                   className="w-full" 
-                  onClick={() => setConfirmDialog({ open: true, action: 'start', serviceId: activeService.id })}
+                  onClick={() => arrivedService.mutate(activeService.id)}
+                  disabled={arrivedService.isPending}
+                  data-testid="button-arrived"
+                >
+                  {arrivedService.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <MapPin className="w-4 h-4 mr-2" />
+                  )}
+                  He Llegado al Punto
+                </Button>
+              )}
+
+              {activeService.estado === 'conductor_en_sitio' && (
+                <Button 
+                  className="w-full" 
+                  onClick={() => loadingService.mutate(activeService.id)}
+                  disabled={loadingService.isPending || arrivedService.isPending}
+                  data-testid="button-loading"
+                >
+                  {loadingService.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4 mr-2" />
+                  )}
+                  Cargando Vehículo
+                </Button>
+              )}
+
+              {activeService.estado === 'cargando' && (
+                <Button 
+                  className="w-full" 
+                  onClick={() => startService.mutate(activeService.id)}
+                  disabled={startService.isPending || loadingService.isPending || arrivedService.isPending}
                   data-testid="button-start-service"
                 >
-                  <Play className="w-4 h-4 mr-2" />
-                  Iniciar Servicio
+                  {startService.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Navigation className="w-4 h-4 mr-2" />
+                  )}
+                  En Ruta al Destino
                 </Button>
               )}
 

@@ -61,6 +61,8 @@ export default function ClientHistory() {
   const statusColors = {
     pendiente: 'secondary',
     aceptado: 'default',
+    conductor_en_sitio: 'default',
+    cargando: 'default',
     en_progreso: 'default',
     completado: 'default',
     cancelado: 'destructive',
@@ -69,6 +71,8 @@ export default function ClientHistory() {
   const statusLabels = {
     pendiente: 'Pendiente',
     aceptado: 'Aceptado',
+    conductor_en_sitio: 'Conductor en sitio',
+    cargando: 'Cargando',
     en_progreso: 'En Progreso',
     completado: 'Completado',
     cancelado: 'Cancelado',

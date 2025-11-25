@@ -61,6 +61,8 @@ export default function ClientTracking() {
   const statusColors = {
     pendiente: 'secondary',
     aceptado: 'default',
+    conductor_en_sitio: 'default',
+    cargando: 'default',
     en_progreso: 'default',
     completado: 'default',
     cancelado: 'destructive',
@@ -69,7 +71,9 @@ export default function ClientTracking() {
   const statusLabels = {
     pendiente: 'Buscando conductor...',
     aceptado: 'Conductor en camino',
-    en_progreso: 'Servicio en progreso',
+    conductor_en_sitio: 'Conductor en el punto',
+    cargando: 'Cargando vehículo',
+    en_progreso: 'En ruta al destino',
     completado: 'Servicio completado',
     cancelado: 'Servicio cancelado',
   };
