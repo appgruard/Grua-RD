@@ -58,6 +58,24 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 
 ## Recent Changes
 
+### November 25, 2025 - Module 1.8: Admin Dashboard with Real-Time Map
+- **Module 1.8 - MÓDULO ADMIN - Dashboard Principal - ✅ COMPLETE**
+  - Implemented real-time map with Google Maps API integration
+  - Added color-coded markers for drivers:
+    - 🟢 Green: Available drivers
+    - 🟡 Yellow: Drivers in active service
+  - Added red markers for active service requests
+  - Implemented interactive InfoWindows showing:
+    - Driver details (name, vehicle, license plate, status)
+    - Service details (client, status, origin, assigned driver)
+  - Integrated WebSocket for real-time location updates
+  - Enhanced dashboard metrics with live data:
+    - Conductors online (real-time count)
+    - Active services (filtered from all services)
+  - Auto-refresh every 10 seconds for accuracy
+  - Added map legend for marker colors
+  - Responsive design with flex layout
+
 ### November 25, 2025 - Module 1.6: Intermediate Service States
 - **Module 1.6 - Driver Service State Granularity - ✅ COMPLETE**
   - Added intermediate service states: `conductor_en_sitio` and `cargando`
@@ -127,8 +145,16 @@ Optimized and prepared the application for production deployment with:
   - Push notifications for each state transition
   - Enhanced UX for both drivers and clients
 
+- ✅ **Module 1.8: MÓDULO ADMIN - Dashboard Principal** (100% Complete)
+  - Real-time map with Google Maps showing all online drivers and active services
+  - Color-coded markers (green = available, yellow = in service, red = active request)
+  - Interactive InfoWindows with detailed driver and service information
+  - WebSocket integration for real-time location updates
+  - Enhanced metrics showing live counts (conductors online, active services)
+  - Auto-refresh every 10 seconds for data accuracy
+  - Responsive map interface with legend
+
 **Pending Modules:**
-- **Module 1.8**: Admin dashboard with real-time map of online drivers and active services
 - **Module 1.9**: Insurance validation system (admin manual approval/rejection)
 
 ## External Dependencies
