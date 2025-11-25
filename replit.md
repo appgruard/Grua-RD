@@ -58,6 +58,17 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 
 ## Recent Changes
 
+### November 25, 2025 - Module 1.6: Intermediate Service States
+- **Module 1.6 - Driver Service State Granularity - ✅ COMPLETE**
+  - Added intermediate service states: `conductor_en_sitio` and `cargando`
+  - Created new API endpoints: `/api/services/:id/arrived` and `/api/services/:id/loading`
+  - Implemented linear state machine: aceptado → conductor_en_sitio → cargando → en_progreso → completado
+  - Updated driver dashboard with dedicated buttons for each transition
+  - Enhanced client tracking interface to display all intermediate states
+  - Added push notifications for state transitions
+  - Clean database migration targeting only estado_servicio enum changes
+  - All code reviewed and approved by architect
+
 ### November 24, 2025 - Workstream D Completion
 - **Workstream D - Production Readiness & Deployability - 100% Complete**
   - Created comprehensive environment variables documentation (`ENV_VARS.md`)
@@ -101,12 +112,24 @@ Optimized and prepared the application for production deployment with:
 
 **Completed November 24, 2025**
 
-### Next Phase: Phase 1 - MVP Operacional
-**Module 1.1: MÓDULO CLIENTE - Solicitar Grúa** (Future)
-1. Enhanced vehicle type selection
-2. Improved location system with Google Maps
-3. Payment method selection (cash, card, insurance)
-4. Request confirmation and submission
+### Current Phase: Phase 1 - MVP Operacional
+
+**Completed Modules:**
+- ✅ **Module 1.1: MÓDULO CLIENTE - Solicitar Grúa** (100% Complete)
+  - Enhanced vehicle type selection (carro, motor, jeep, camión)
+  - Location system with Google Maps integration
+  - Payment method selection (cash, card, insurance)
+  - Request confirmation and submission flow
+
+- ✅ **Module 1.6: Driver Service State Granularity** (100% Complete)
+  - Intermediate service states for improved tracking
+  - Linear state machine with 7 total states
+  - Push notifications for each state transition
+  - Enhanced UX for both drivers and clients
+
+**Pending Modules:**
+- **Module 1.8**: Admin dashboard with real-time map of online drivers and active services
+- **Module 1.9**: Insurance validation system (admin manual approval/rejection)
 
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
