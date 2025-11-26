@@ -2266,19 +2266,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Documento no encontrado" });
       }
 
-      // Send push notification to driver
-      const conductor = await storage.getConductorById(documento.conductorId);
-      if (conductor) {
-        const user = await storage.getUserById(conductor.userId);
-        if (user) {
-          const estadoTexto = estado === 'aprobado' ? 'aprobado' : 'rechazado';
-          await pushService.sendNotification(
-            user.id,
-            `Documento ${estadoTexto}`,
-            `Tu ${documento.tipo} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
-            { type: 'document_review', documentId }
-          );
+      // Send push notification to document owner (driver or client)
+      const estadoTexto = estado === 'aprobado' ? 'aprobado' : 'rechazado';
+      const tipoLabel = documento.tipo === 'seguro_cliente' ? 'seguro' : documento.tipo;
+      
+      if (documento.conductorId) {
+        // Document belongs to a driver
+        const conductor = await storage.getConductorById(documento.conductorId);
+        if (conductor) {
+          const user = await storage.getUserById(conductor.userId);
+          if (user) {
+            await pushService.sendNotification(
+              user.id,
+              `Documento ${estadoTexto}`,
+              `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
+              { type: 'document_review', documentId }
+            );
+          }
         }
+      } else if (documento.usuarioId) {
+        // Document belongs to a client (e.g., seguro_cliente)
+        await pushService.sendNotification(
+          documento.usuarioId,
+          `Documento ${estadoTexto}`,
+          `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
+          { type: 'document_review', documentId }
+        );
       }
 
       logDocument.reviewed(req.user!.id, documentId, estado);
@@ -2316,6 +2329,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get all documents error', error);
       res.status(500).json({ message: "Failed to get all documents" });
+    }
+  });
+
+  // Client Insurance Document Management
+  // Upload client insurance document
+  app.post("/api/client/insurance", upload.single('document'), async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'cliente') {
+      return res.status(403).json({ message: "Solo clientes pueden subir documentos de seguro" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No se proporcionó ningún archivo" });
+    }
+
+    try {
+      const { aseguradoraNombre, numeroPoliza, fechaVencimiento } = req.body;
+      
+      if (!aseguradoraNombre || !numeroPoliza) {
+        return res.status(400).json({ message: "Nombre de aseguradora y número de póliza son requeridos" });
+      }
+
+      // Check if client already has an insurance document
+      const existingInsurance = await storage.getClientInsuranceDocument(req.user!.id);
+      if (existingInsurance) {
+        // Delete existing document first
+        const { deleteDocument } = await import('./services/object-storage');
+        await deleteDocument(existingInsurance.url);
+        await storage.deleteDocumento(existingInsurance.id);
+      }
+
+      // Upload to object storage
+      const uploadResult = await uploadDocument({
+        buffer: req.file.buffer,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        userId: req.user!.id,
+        documentType: 'seguro_cliente',
+      });
+
+      // Parse expiration date if provided
+      let validoHasta: Date | undefined = undefined;
+      if (fechaVencimiento) {
+        const parsedDate = new Date(fechaVencimiento);
+        if (!isNaN(parsedDate.getTime())) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (parsedDate <= today) {
+            return res.status(400).json({ message: "La fecha de vencimiento debe ser una fecha futura" });
+          }
+          validoHasta = parsedDate;
+        }
+      }
+
+      // Save document metadata to database
+      const documento = await storage.createDocumento({
+        usuarioId: req.user!.id,
+        tipo: 'seguro_cliente',
+        url: uploadResult.key,
+        nombreArchivo: `${aseguradoraNombre} - ${numeroPoliza}`,
+        tamanoArchivo: uploadResult.fileSize,
+        mimeType: uploadResult.mimeType,
+        estado: 'pendiente',
+        validoHasta: validoHasta,
+      });
+
+      logDocument.uploaded(documento.id, 'seguro_cliente', req.user!.id);
+      res.json(documento);
+    } catch (error: any) {
+      logSystem.error('Upload client insurance error', error);
+      res.status(500).json({ message: error.message || "Error al subir documento de seguro" });
+    }
+  });
+
+  // Get client insurance document
+  app.get("/api/client/insurance", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'cliente') {
+      return res.status(403).json({ message: "Solo clientes pueden ver su seguro" });
+    }
+
+    try {
+      const documento = await storage.getClientInsuranceDocument(req.user!.id);
+      res.json(documento || null);
+    } catch (error: any) {
+      logSystem.error('Get client insurance error', error);
+      res.status(500).json({ message: "Error al obtener documento de seguro" });
+    }
+  });
+
+  // Check if client has approved insurance (for payment method validation)
+  app.get("/api/client/insurance/status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'cliente') {
+      return res.status(403).json({ message: "Solo clientes pueden verificar su seguro" });
+    }
+
+    try {
+      const hasApprovedInsurance = await storage.hasApprovedClientInsurance(req.user!.id);
+      const insuranceDoc = await storage.getClientInsuranceDocument(req.user!.id);
+      
+      res.json({
+        hasApprovedInsurance,
+        insuranceStatus: insuranceDoc?.estado || null,
+        insuranceDocument: insuranceDoc || null,
+      });
+    } catch (error: any) {
+      logSystem.error('Check client insurance status error', error);
+      res.status(500).json({ message: "Error al verificar estado del seguro" });
+    }
+  });
+
+  // Delete client insurance document
+  app.delete("/api/client/insurance", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'cliente') {
+      return res.status(403).json({ message: "Solo clientes pueden eliminar su seguro" });
+    }
+
+    try {
+      const documento = await storage.getClientInsuranceDocument(req.user!.id);
+      
+      if (!documento) {
+        return res.status(404).json({ message: "No se encontró documento de seguro" });
+      }
+
+      // Delete from object storage
+      const { deleteDocument } = await import('./services/object-storage');
+      await deleteDocument(documento.url);
+      
+      // Delete from database
+      await storage.deleteDocumento(documento.id);
+      
+      logDocument.deleted(req.user!.id, documento.id);
+      res.json({ message: "Documento de seguro eliminado correctamente" });
+    } catch (error: any) {
+      logSystem.error('Delete client insurance error', error);
+      res.status(500).json({ message: "Error al eliminar documento de seguro" });
     }
   });
 

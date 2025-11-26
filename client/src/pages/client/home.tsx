@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { calculateRoute, type Coordinates } from '@/lib/maps';
 import { MapPin, Loader2, Navigation, ArrowLeft, CheckCircle } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { VehicleTypeSelector } from '@/components/VehicleTypeSelector';
 import { PaymentMethodSelector } from '@/components/PaymentMethodSelector';
 import { InsuranceForm } from '@/components/InsuranceForm';
@@ -31,6 +31,13 @@ export default function ClientHome() {
   const [aseguradoraNombre, setAseguradoraNombre] = useState<string>('');
   const [aseguradoraPoliza, setAseguradoraPoliza] = useState<string>('');
   const distanceRef = useRef<number | null>(null);
+
+  const { data: insuranceStatus } = useQuery<{
+    hasApprovedInsurance: boolean;
+    insuranceStatus: 'pendiente' | 'aprobado' | 'rechazado' | null;
+  }>({
+    queryKey: ['/api/client/insurance/status'],
+  });
 
   const calculatePricingMutation = useMutation({
     mutationFn: async (distanceKm: number) => {
@@ -353,7 +360,7 @@ export default function ClientHome() {
                 <h3 className="text-lg font-bold mb-1">Método de Pago</h3>
                 <p className="text-sm text-muted-foreground">Selecciona cómo deseas pagar el servicio</p>
               </div>
-              <PaymentMethodSelector value={metodoPago} onChange={setMetodoPago} />
+              <PaymentMethodSelector value={metodoPago} onChange={setMetodoPago} insuranceStatus={insuranceStatus} />
               
               {metodoPago === 'aseguradora' && (
                 <div className="mt-4">

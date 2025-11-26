@@ -151,6 +151,10 @@ export interface IStorage {
   aprobarDocumento(id: string, adminId: string): Promise<Documento>;
   rechazarDocumento(id: string, adminId: string, motivo: string): Promise<Documento>;
 
+  // Seguro del Cliente
+  getClientInsuranceDocument(userId: string): Promise<DocumentoWithDetails | undefined>;
+  hasApprovedClientInsurance(userId: string): Promise<boolean>;
+
   // Servicios con Aseguradora
   getServiciosPendientesAseguradora(): Promise<ServicioWithDetails[]>;
   aprobarAseguradora(id: string, adminId: string): Promise<Servicio>;
@@ -950,6 +954,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(documentos.id, id))
       .returning();
     return updated;
+  }
+
+  // Seguro del Cliente
+  async getClientInsuranceDocument(userId: string): Promise<DocumentoWithDetails | undefined> {
+    const result = await db.query.documentos.findFirst({
+      where: and(
+        eq(documentos.usuarioId, userId),
+        eq(documentos.tipo, 'seguro_cliente')
+      ),
+      with: {
+        usuario: true,
+        conductor: true,
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+      orderBy: desc(documentos.createdAt),
+    });
+    return result;
+  }
+
+  async hasApprovedClientInsurance(userId: string): Promise<boolean> {
+    const result = await db.query.documentos.findFirst({
+      where: and(
+        eq(documentos.usuarioId, userId),
+        eq(documentos.tipo, 'seguro_cliente'),
+        eq(documentos.estado, 'aprobado')
+      ),
+    });
+    return !!result;
   }
 
   // Comisiones

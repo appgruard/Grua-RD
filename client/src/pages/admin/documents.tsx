@@ -73,6 +73,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   foto_perfil: 'Foto de Perfil',
   cedula_frontal: 'Cédula (Frente)',
   cedula_trasera: 'Cédula (Reverso)',
+  seguro_cliente: 'Seguro del Cliente',
 };
 
 type StatusFilter = 'all' | 'pendiente' | 'aprobado' | 'rechazado';
