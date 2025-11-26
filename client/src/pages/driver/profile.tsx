@@ -4,7 +4,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Phone, Star, Truck, LogOut, FileText, Upload, CheckCircle, XCircle, Clock, CreditCard, ArrowRight } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { User, Mail, Phone, Star, Truck, LogOut, FileText, Upload, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -13,13 +15,15 @@ import { FileUpload } from '@/components/FileUpload';
 import type { Conductor, Documento } from '@shared/schema';
 
 const REQUIRED_DOCUMENTS = [
-  { tipo: 'licencia', label: 'Licencia de Conducir' },
-  { tipo: 'matricula', label: 'Matrícula del Vehículo' },
-  { tipo: 'seguro_grua', label: 'Seguro de la Grúa' },
-  { tipo: 'foto_vehiculo', label: 'Foto del Vehículo' },
-  { tipo: 'cedula_frontal', label: 'Cédula (Frente)' },
-  { tipo: 'cedula_trasera', label: 'Cédula (Reverso)' },
+  { tipo: 'licencia', label: 'Licencia de Conducir', requiereVencimiento: true },
+  { tipo: 'matricula', label: 'Matrícula del Vehículo', requiereVencimiento: true },
+  { tipo: 'seguro_grua', label: 'Seguro de la Grúa', requiereVencimiento: true },
+  { tipo: 'foto_vehiculo', label: 'Foto del Vehículo', requiereVencimiento: false },
+  { tipo: 'cedula_frontal', label: 'Cédula (Frente)', requiereVencimiento: false },
+  { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false },
 ];
+
+const DOCUMENTOS_CON_VENCIMIENTO = ['seguro_grua', 'licencia', 'matricula'];
 
 interface StripeAccountStatus {
   configured: boolean;
@@ -35,6 +39,8 @@ export default function DriverProfile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [fechasVencimiento, setFechasVencimiento] = useState<Record<string, string>>({});
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, File>>({});
 
   const { data: driverData } = useQuery<Conductor>({
     queryKey: ['/api/drivers/me'],
@@ -52,12 +58,14 @@ export default function DriverProfile() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ file, tipo }: { file: File; tipo: string }) => {
+    mutationFn: async ({ file, tipo, fechaVencimiento }: { file: File; tipo: string; fechaVencimiento?: string }) => {
       const formData = new FormData();
       formData.append('document', file);
       formData.append('tipoDocumento', tipo);
+      if (fechaVencimiento) {
+        formData.append('fechaVencimiento', fechaVencimiento);
+      }
 
-      // Use fetch directly for FormData (apiRequest expects JSON)
       const response = await fetch('/api/documents/upload', {
         method: 'POST',
         credentials: 'include',
@@ -71,7 +79,7 @@ export default function DriverProfile() {
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/documents/my-documents'] });
       
       toast({
@@ -79,6 +87,16 @@ export default function DriverProfile() {
         description: 'El documento se ha subido correctamente y está pendiente de revisión',
       });
       setUploadingDoc(null);
+      setSelectedFiles(prev => {
+        const newFiles = { ...prev };
+        delete newFiles[variables.tipo];
+        return newFiles;
+      });
+      setFechasVencimiento(prev => {
+        const newDates = { ...prev };
+        delete newDates[variables.tipo];
+        return newDates;
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -96,8 +114,76 @@ export default function DriverProfile() {
   };
 
   const handleFileSelect = (file: File, tipo: string) => {
+    if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo)) {
+      setSelectedFiles(prev => ({ ...prev, [tipo]: file }));
+    } else {
+      setUploadingDoc(tipo);
+      uploadMutation.mutate({ file, tipo });
+    }
+  };
+
+  const handleUploadWithExpiration = (tipo: string) => {
+    const file = selectedFiles[tipo];
+    const fechaVencimiento = fechasVencimiento[tipo];
+    
+    if (!file) return;
+    
+    // Validate that all documents with expiration require a date
+    if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo) && !fechaVencimiento) {
+      toast({
+        title: 'Fecha requerida',
+        description: 'La fecha de vencimiento es requerida para este tipo de documento',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Validate that expiration date is in the future for all documents with expiration
+    if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo) && fechaVencimiento) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expirationDate = new Date(fechaVencimiento);
+      if (expirationDate <= today) {
+        toast({
+          title: 'Fecha inválida',
+          description: 'La fecha de vencimiento debe ser una fecha futura',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+    
     setUploadingDoc(tipo);
-    uploadMutation.mutate({ file, tipo });
+    uploadMutation.mutate({ file, tipo, fechaVencimiento });
+  };
+
+  const isDocumentExpiringSoon = (documento: Documento): boolean => {
+    if (!documento.validoHasta) return false;
+    const expirationDate = new Date(documento.validoHasta);
+    const now = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    return expirationDate > now && expirationDate <= thirtyDaysFromNow;
+  };
+
+  const isDocumentExpired = (documento: Documento): boolean => {
+    if (!documento.validoHasta) return false;
+    const expirationDate = new Date(documento.validoHasta);
+    return expirationDate < new Date();
+  };
+
+  const formatDate = (date: string | Date | null | undefined): string => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  const getDaysUntilExpiration = (documento: Documento): number | null => {
+    if (!documento.validoHasta) return null;
+    const expirationDate = new Date(documento.validoHasta);
+    const now = new Date();
+    const diffTime = expirationDate.getTime() - now.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
   const stripeOnboardingMutation = useMutation({
@@ -243,42 +329,68 @@ export default function DriverProfile() {
               {REQUIRED_DOCUMENTS.map((docType) => {
                 const documento = getDocumentStatus(docType.tipo);
                 const isUploading = uploadingDoc === docType.tipo;
+                const hasSelectedFile = !!selectedFiles[docType.tipo];
+                const expiringSoon = documento ? isDocumentExpiringSoon(documento) : false;
+                const expired = documento ? isDocumentExpired(documento) : false;
+                const daysLeft = documento ? getDaysUntilExpiration(documento) : null;
 
                 return (
                   <div key={docType.tipo} className="space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       <label className="text-sm font-medium">
                         {docType.label}
                       </label>
-                      {documento && (
-                        <Badge
-                          variant={
-                            documento.estado === 'aprobado'
-                              ? 'default'
-                              : documento.estado === 'rechazado'
-                              ? 'destructive'
-                              : 'secondary'
-                          }
-                          className="gap-1"
-                        >
-                          {documento.estado === 'aprobado' && (
-                            <CheckCircle className="w-3 h-3" />
-                          )}
-                          {documento.estado === 'rechazado' && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {documento && expired && (
+                          <Badge variant="destructive" className="gap-1" data-testid={`badge-expired-${docType.tipo}`}>
                             <XCircle className="w-3 h-3" />
-                          )}
-                          {documento.estado === 'pendiente' && (
-                            <Clock className="w-3 h-3" />
-                          )}
-                          {documento.estado === 'aprobado' ? 'Aprobado' : documento.estado === 'rechazado' ? 'Rechazado' : 'Pendiente'}
-                        </Badge>
-                      )}
+                            Vencido
+                          </Badge>
+                        )}
+                        {documento && expiringSoon && !expired && daysLeft !== null && (
+                          <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" data-testid={`badge-expiring-${docType.tipo}`}>
+                            <AlertTriangle className="w-3 h-3" />
+                            Vence en {daysLeft} días
+                          </Badge>
+                        )}
+                        {documento && (
+                          <Badge
+                            variant={
+                              documento.estado === 'aprobado'
+                                ? 'default'
+                                : documento.estado === 'rechazado'
+                                ? 'destructive'
+                                : 'secondary'
+                            }
+                            className="gap-1"
+                            data-testid={`badge-status-${docType.tipo}`}
+                          >
+                            {documento.estado === 'aprobado' && (
+                              <CheckCircle className="w-3 h-3" />
+                            )}
+                            {documento.estado === 'rechazado' && (
+                              <XCircle className="w-3 h-3" />
+                            )}
+                            {documento.estado === 'pendiente' && (
+                              <Clock className="w-3 h-3" />
+                            )}
+                            {documento.estado === 'aprobado' ? 'Aprobado' : documento.estado === 'rechazado' ? 'Rechazado' : 'Pendiente'}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
                     {documento?.estado === 'rechazado' && documento.motivoRechazo && (
                       <p className="text-sm text-destructive">
                         Motivo: {documento.motivoRechazo}
                       </p>
+                    )}
+
+                    {documento?.validoHasta && DOCUMENTOS_CON_VENCIMIENTO.includes(docType.tipo) && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid={`text-expiration-${docType.tipo}`}>
+                        <Calendar className="w-4 h-4" />
+                        <span>Vence: {formatDate(documento.validoHasta)}</span>
+                      </div>
                     )}
 
                     <FileUpload
@@ -293,6 +405,41 @@ export default function DriverProfile() {
                           : 'Arrastra un archivo o haz clic para seleccionar'
                       }
                     />
+
+                    {hasSelectedFile && DOCUMENTOS_CON_VENCIMIENTO.includes(docType.tipo) && (
+                      <div className="space-y-3 p-3 border rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <FileText className="w-4 h-4" />
+                          <span className="truncate">{selectedFiles[docType.tipo]?.name}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`fecha-${docType.tipo}`} className="text-sm">
+                            Fecha de vencimiento {DOCUMENTOS_CON_VENCIMIENTO.includes(docType.tipo) && <span className="text-destructive">*</span>}
+                          </Label>
+                          <Input
+                            id={`fecha-${docType.tipo}`}
+                            type="date"
+                            value={fechasVencimiento[docType.tipo] || ''}
+                            onChange={(e) => setFechasVencimiento(prev => ({ ...prev, [docType.tipo]: e.target.value }))}
+                            min={new Date().toISOString().split('T')[0]}
+                            data-testid={`input-expiration-${docType.tipo}`}
+                          />
+                          {DOCUMENTOS_CON_VENCIMIENTO.includes(docType.tipo) && !fechasVencimiento[docType.tipo] && (
+                            <p className="text-xs text-destructive" data-testid={`text-required-${docType.tipo}`}>
+                              La fecha de vencimiento es requerida para este documento
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          onClick={() => handleUploadWithExpiration(docType.tipo)}
+                          disabled={isUploading || (DOCUMENTOS_CON_VENCIMIENTO.includes(docType.tipo) && !fechasVencimiento[docType.tipo])}
+                          className="w-full"
+                          data-testid={`button-upload-${docType.tipo}`}
+                        >
+                          {isUploading ? 'Subiendo...' : 'Subir documento'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

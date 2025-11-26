@@ -1049,6 +1049,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Required document types
         const requiredTypes = ['licencia', 'matricula', 'seguro_grua', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
         
+        // Document types that can expire
+        const documentosConVencimiento = ['seguro_grua', 'licencia', 'matricula'];
+        
         // Map document types to Spanish names for user-friendly messages
         const documentTypeNames: Record<string, string> = {
           'licencia': 'Licencia de Conducir',
@@ -1061,6 +1064,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check which required documents are missing or not approved
         const missingDocuments: string[] = [];
+        const expiredDocuments: string[] = [];
+        const now = new Date();
         
         for (const requiredType of requiredTypes) {
           const doc = documentos.find(d => d.tipo === requiredType);
@@ -1071,6 +1076,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else if (doc.estado !== 'aprobado') {
             // Document exists but not approved
             missingDocuments.push(documentTypeNames[requiredType]);
+          } else if (documentosConVencimiento.includes(requiredType) && doc.validoHasta) {
+            // Check if document has expired
+            const expirationDate = new Date(doc.validoHasta);
+            if (expirationDate < now) {
+              expiredDocuments.push(documentTypeNames[requiredType]);
+            }
           }
         }
         
@@ -1079,6 +1090,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({
             message: "No puedes activar disponibilidad sin documentos aprobados",
             missingDocuments: missingDocuments,
+          });
+        }
+        
+        // Check for expired documents (specifically insurance)
+        if (expiredDocuments.length > 0) {
+          // Special message for insurance
+          const seguroVencido = expiredDocuments.includes('Seguro de Grúa');
+          const message = seguroVencido 
+            ? "Tu seguro de grúa ha vencido. Por favor, sube un documento actualizado."
+            : `Los siguientes documentos han vencido: ${expiredDocuments.join(', ')}. Por favor, sube documentos actualizados.`;
+          
+          return res.status(403).json({
+            message: message,
+            expiredDocuments: expiredDocuments,
           });
         }
       }
@@ -1784,7 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { tipoDocumento } = req.body;
+      const { tipoDocumento, fechaVencimiento } = req.body;
       
       if (!tipoDocumento) {
         return res.status(400).json({ message: "Tipo de documento es requerido" });
@@ -1804,6 +1829,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         documentType: tipoDocumento,
       });
 
+      // Document types that require expiration date
+      const documentosConVencimiento = ['seguro_grua', 'licencia', 'matricula'];
+      
+      // Validate expiration date is required for all documents with expiration
+      if (documentosConVencimiento.includes(tipoDocumento) && !fechaVencimiento) {
+        return res.status(400).json({ message: "La fecha de vencimiento es requerida para este tipo de documento" });
+      }
+      
+      // Parse expiration date if provided and document type supports it
+      let validoHasta: Date | undefined = undefined;
+      if (fechaVencimiento && documentosConVencimiento.includes(tipoDocumento)) {
+        const parsedDate = new Date(fechaVencimiento);
+        if (!isNaN(parsedDate.getTime())) {
+          // Validate that expiration date is in the future for all documents with expiration
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (parsedDate <= today) {
+            return res.status(400).json({ message: "La fecha de vencimiento debe ser una fecha futura" });
+          }
+          validoHasta = parsedDate;
+        }
+      }
+
       // Save document metadata to database
       const documento = await storage.createDocumento({
         conductorId: conductor.id,
@@ -1813,6 +1861,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tamanoArchivo: uploadResult.fileSize,
         mimeType: uploadResult.mimeType,
         estado: 'pendiente',
+        validoHasta: validoHasta,
       });
 
       logDocument.uploaded(documento.id, tipoDocumento, conductor.id);
