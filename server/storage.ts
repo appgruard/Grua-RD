@@ -125,6 +125,20 @@ export interface IStorage {
   getServicesByHour(): Promise<Array<{ hour: number; count: number }>>;
   getServiceStatusBreakdown(startDate?: string, endDate?: string): Promise<Array<{ status: string; count: number }>>;
 
+  // Advanced Analytics (Module 2.3)
+  getServiceLocationsForHeatmap(startDate?: string, endDate?: string, precision?: number): Promise<Array<{ lat: number; lng: number; count: number; weight: number }>>;
+  getAdvancedKPIs(startDate?: string, endDate?: string): Promise<{
+    avgResponseMinutes: number;
+    avgServiceDurationMinutes: number;
+    acceptanceRate: number;
+    cancellationRate: number;
+    avgRevenuePerService: number;
+    totalServices: number;
+    completedServices: number;
+    cancelledServices: number;
+  }>;
+  getVehicleTypeDistribution(startDate?: string, endDate?: string): Promise<Array<{ tipoVehiculo: string; count: number; revenue: number }>>;
+
   // Documentos
   createDocumento(documento: InsertDocumento): Promise<Documento>;
   getDocumentoById(id: string): Promise<DocumentoWithDetails | undefined>;
@@ -643,6 +657,118 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(sql`COUNT(*)`));
 
     return results.map(r => ({ status: r.status as string, count: r.count }));
+  }
+
+  // Advanced Analytics (Module 2.3)
+  async getServiceLocationsForHeatmap(startDate?: string, endDate?: string, precision: number = 3): Promise<Array<{ lat: number; lng: number; count: number; weight: number }>> {
+    const roundFactor = Math.pow(10, precision);
+    
+    let query = db
+      .select({
+        lat: sql<number>`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision})`.as('lat'),
+        lng: sql<number>`ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`.as('lng'),
+        count: sql<number>`COUNT(*)::int`.as('count'),
+      })
+      .from(servicios);
+
+    if (startDate && endDate) {
+      query = query.where(
+        and(
+          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
+          sql`${servicios.createdAt} <= ${endDate}::timestamp`
+        )
+      ) as any;
+    }
+
+    const results = await query
+      .groupBy(sql`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision}), ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`)
+      .orderBy(desc(sql`COUNT(*)`));
+
+    const maxCount = Math.max(...results.map(r => r.count), 1);
+    
+    return results.map(r => ({
+      lat: Number(r.lat),
+      lng: Number(r.lng),
+      count: r.count,
+      weight: r.count / maxCount,
+    }));
+  }
+
+  async getAdvancedKPIs(startDate?: string, endDate?: string): Promise<{
+    avgResponseMinutes: number;
+    avgServiceDurationMinutes: number;
+    acceptanceRate: number;
+    cancellationRate: number;
+    avgRevenuePerService: number;
+    totalServices: number;
+    completedServices: number;
+    cancelledServices: number;
+  }> {
+    let dateFilter = sql`1=1`;
+    if (startDate && endDate) {
+      dateFilter = and(
+        sql`${servicios.createdAt} >= ${startDate}::timestamp`,
+        sql`${servicios.createdAt} <= ${endDate}::timestamp`
+      )!;
+    }
+
+    const [stats] = await db
+      .select({
+        totalServices: sql<number>`COUNT(*)::int`,
+        completedServices: sql<number>`COUNT(*) FILTER (WHERE ${servicios.estado} = 'completado')::int`,
+        cancelledServices: sql<number>`COUNT(*) FILTER (WHERE ${servicios.estado} = 'cancelado')::int`,
+        acceptedServices: sql<number>`COUNT(*) FILTER (WHERE ${servicios.aceptadoAt} IS NOT NULL)::int`,
+        avgResponseMinutes: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${servicios.aceptadoAt} - ${servicios.createdAt})) / 60) FILTER (WHERE ${servicios.aceptadoAt} IS NOT NULL), 0)`,
+        avgServiceDurationMinutes: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${servicios.completadoAt} - ${servicios.aceptadoAt})) / 60) FILTER (WHERE ${servicios.completadoAt} IS NOT NULL AND ${servicios.aceptadoAt} IS NOT NULL), 0)`,
+        totalRevenue: sql<number>`COALESCE(SUM(CAST(${servicios.costoTotal} AS NUMERIC)) FILTER (WHERE ${servicios.estado} = 'completado'), 0)`,
+      })
+      .from(servicios)
+      .where(dateFilter);
+
+    const totalServices = stats.totalServices || 0;
+    const completedServices = stats.completedServices || 0;
+    const cancelledServices = stats.cancelledServices || 0;
+    const acceptedServices = stats.acceptedServices || 0;
+
+    return {
+      avgResponseMinutes: Number(stats.avgResponseMinutes) || 0,
+      avgServiceDurationMinutes: Number(stats.avgServiceDurationMinutes) || 0,
+      acceptanceRate: totalServices > 0 ? (acceptedServices / totalServices) * 100 : 0,
+      cancellationRate: totalServices > 0 ? (cancelledServices / totalServices) * 100 : 0,
+      avgRevenuePerService: completedServices > 0 ? Number(stats.totalRevenue) / completedServices : 0,
+      totalServices,
+      completedServices,
+      cancelledServices,
+    };
+  }
+
+  async getVehicleTypeDistribution(startDate?: string, endDate?: string): Promise<Array<{ tipoVehiculo: string; count: number; revenue: number }>> {
+    let query = db
+      .select({
+        tipoVehiculo: sql<string>`COALESCE(${servicios.tipoVehiculo}, 'no_especificado')`.as('tipo_vehiculo'),
+        count: sql<number>`COUNT(*)::int`.as('count'),
+        revenue: sql<number>`COALESCE(SUM(CAST(${servicios.costoTotal} AS NUMERIC)) FILTER (WHERE ${servicios.estado} = 'completado'), 0)`.as('revenue'),
+      })
+      .from(servicios);
+
+    if (startDate && endDate) {
+      query = query.where(
+        and(
+          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
+          sql`${servicios.createdAt} <= ${endDate}::timestamp`
+        )
+      ) as any;
+    }
+
+    const results = await query
+      .groupBy(sql`COALESCE(${servicios.tipoVehiculo}, 'no_especificado')`)
+      .orderBy(desc(sql`COUNT(*)`));
+
+    return results.map(r => ({
+      tipoVehiculo: r.tipoVehiculo,
+      count: r.count,
+      revenue: Number(r.revenue),
+    }));
   }
 
   // Verification Codes

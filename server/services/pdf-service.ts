@@ -370,6 +370,329 @@ export class PDFService {
       .padStart(4, "0");
     return `GRD-${timestamp}-${random}`;
   }
+
+  async generateAnalyticsReport(data: AnalyticsReportData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          size: "LETTER",
+          margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        });
+
+        const buffers: Buffer[] = [];
+        const stream = new Writable({
+          write(chunk, encoding, callback) {
+            buffers.push(chunk);
+            callback();
+          },
+        });
+
+        doc.pipe(stream);
+
+        this.addAnalyticsHeader(doc, data);
+        this.addKPISection(doc, data);
+        this.addVehicleSection(doc, data);
+        this.addStatusSection(doc, data);
+        this.addDriverRankingSection(doc, data);
+        this.addAnalyticsFooter(doc);
+
+        doc.end();
+
+        stream.on("finish", () => {
+          const pdfBuffer = Buffer.concat(buffers);
+          logger.info("Analytics PDF report generated successfully", {
+            period: `${data.startDate} to ${data.endDate}`,
+            size: pdfBuffer.length,
+          });
+          resolve(pdfBuffer);
+        });
+
+        stream.on("error", (error) => {
+          logger.error("Error generating analytics PDF report", { error });
+          reject(error);
+        });
+      } catch (error) {
+        logger.error("Error creating analytics PDF document", { error });
+        reject(error);
+      }
+    });
+  }
+
+  private addAnalyticsHeader(doc: PDFKit.PDFDocument, data: AnalyticsReportData): void {
+    doc
+      .fontSize(28)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Grua RD", 50, 50);
+
+    doc
+      .fontSize(10)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text("Servicios de Grua Republica Dominicana", 50, 85);
+
+    doc
+      .fontSize(20)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("REPORTE DE ANALYTICS", 350, 50, { align: "right" });
+
+    doc
+      .fontSize(10)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text(`Periodo: ${data.startDate} - ${data.endDate}`, 350, 80, { align: "right" });
+
+    doc
+      .fontSize(9)
+      .text(`Generado: ${new Date().toLocaleDateString("es-DO")}`, 350, 95, { align: "right" });
+
+    doc
+      .moveTo(50, 120)
+      .lineTo(550, 120)
+      .strokeColor("#e2e8f0")
+      .stroke();
+  }
+
+  private addKPISection(doc: PDFKit.PDFDocument, data: AnalyticsReportData): void {
+    const startY = 140;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Indicadores Clave de Rendimiento (KPIs)", 50, startY);
+
+    const kpiY = startY + 30;
+    const kpiWidth = 125;
+    const kpiHeight = 60;
+
+    const kpis = [
+      { label: "Tiempo Respuesta", value: `${data.kpis.avgResponseMinutes.toFixed(1)} min` },
+      { label: "Tasa Aceptacion", value: `${data.kpis.acceptanceRate.toFixed(1)}%` },
+      { label: "Tasa Cancelacion", value: `${data.kpis.cancellationRate.toFixed(1)}%` },
+      { label: "Ingreso Promedio", value: `RD$ ${data.kpis.avgRevenuePerService.toFixed(0)}` },
+    ];
+
+    kpis.forEach((kpi, index) => {
+      const x = 50 + (index * (kpiWidth + 10));
+      
+      doc.fillColor("#f8fafc").roundedRect(x, kpiY, kpiWidth, kpiHeight, 5).fill();
+      
+      doc
+        .fontSize(9)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(kpi.label, x + 10, kpiY + 10, { width: kpiWidth - 20 });
+      
+      doc
+        .fontSize(16)
+        .fillColor("#000000")
+        .font("Helvetica-Bold")
+        .text(kpi.value, x + 10, kpiY + 30, { width: kpiWidth - 20 });
+    });
+
+    doc
+      .fontSize(10)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text(`Total Servicios: ${data.kpis.totalServices} | Completados: ${data.kpis.completedServices} | Cancelados: ${data.kpis.cancelledServices}`, 50, kpiY + 75);
+  }
+
+  private addVehicleSection(doc: PDFKit.PDFDocument, data: AnalyticsReportData): void {
+    const startY = 280;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Distribucion por Tipo de Vehiculo", 50, startY);
+
+    const vehicleLabels: Record<string, string> = {
+      carro: "Carro",
+      motor: "Motor",
+      jeep: "Jeep",
+      camion: "Camion",
+      no_especificado: "No Especificado",
+    };
+
+    let currentY = startY + 25;
+    
+    doc
+      .fillColor("#f8fafc")
+      .rect(50, currentY, 500, 20)
+      .fill();
+    
+    doc
+      .fontSize(9)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("Tipo de Vehiculo", 60, currentY + 5)
+      .text("Cantidad", 300, currentY + 5)
+      .text("Ingresos", 420, currentY + 5);
+
+    currentY += 25;
+
+    data.vehicles.forEach((vehicle, index) => {
+      if (index % 2 === 0) {
+        doc.fillColor("#ffffff").rect(50, currentY - 3, 500, 20).fill();
+      }
+      
+      doc
+        .fontSize(9)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(vehicleLabels[vehicle.tipoVehiculo] || vehicle.tipoVehiculo, 60, currentY)
+        .text(vehicle.count.toString(), 300, currentY)
+        .text(`RD$ ${vehicle.revenue.toFixed(2)}`, 420, currentY);
+      
+      currentY += 20;
+    });
+  }
+
+  private addStatusSection(doc: PDFKit.PDFDocument, data: AnalyticsReportData): void {
+    const startY = 420;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Distribucion por Estado", 50, startY);
+
+    const statusLabels: Record<string, string> = {
+      pendiente: "Pendiente",
+      aceptado: "Aceptado",
+      conductor_en_sitio: "En Sitio",
+      cargando: "Cargando",
+      en_progreso: "En Progreso",
+      completado: "Completado",
+      cancelado: "Cancelado",
+    };
+
+    let currentY = startY + 25;
+
+    data.statusBreakdown.forEach((status, index) => {
+      const percentage = data.kpis.totalServices > 0 
+        ? ((status.count / data.kpis.totalServices) * 100).toFixed(1)
+        : "0";
+      
+      doc
+        .fontSize(9)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(`${statusLabels[status.status] || status.status}: ${status.count} (${percentage}%)`, 60, currentY);
+      
+      currentY += 15;
+    });
+  }
+
+  private addDriverRankingSection(doc: PDFKit.PDFDocument, data: AnalyticsReportData): void {
+    if (data.driverRankings.length === 0) return;
+
+    doc.addPage();
+    const startY = 50;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Ranking de Conductores (Top 10)", 50, startY);
+
+    let currentY = startY + 25;
+
+    doc
+      .fillColor("#f8fafc")
+      .rect(50, currentY, 500, 20)
+      .fill();
+    
+    doc
+      .fontSize(9)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("#", 60, currentY + 5)
+      .text("Conductor", 90, currentY + 5)
+      .text("Servicios", 350, currentY + 5)
+      .text("Calificacion", 450, currentY + 5);
+
+    currentY += 25;
+
+    data.driverRankings.slice(0, 10).forEach((driver, index) => {
+      if (index % 2 === 0) {
+        doc.fillColor("#ffffff").rect(50, currentY - 3, 500, 20).fill();
+      }
+      
+      doc
+        .fontSize(9)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text((index + 1).toString(), 60, currentY)
+        .text(driver.driverName, 90, currentY)
+        .text(driver.completedServices.toString(), 350, currentY)
+        .text(driver.averageRating > 0 ? driver.averageRating.toFixed(2) : "N/A", 450, currentY);
+      
+      currentY += 20;
+    });
+  }
+
+  private addAnalyticsFooter(doc: PDFKit.PDFDocument): void {
+    const pageHeight = doc.page.height;
+    const footerY = pageHeight - 60;
+
+    doc
+      .moveTo(50, footerY - 20)
+      .lineTo(550, footerY - 20)
+      .strokeColor("#e2e8f0")
+      .stroke();
+
+    doc
+      .fontSize(9)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text("Reporte generado automaticamente por Grua RD Analytics", 50, footerY, {
+        align: "center",
+        width: 500,
+      });
+
+    doc
+      .fontSize(8)
+      .fillColor("#94a3b8")
+      .text(
+        "Este documento es confidencial y de uso interno.",
+        50,
+        footerY + 15,
+        { align: "center", width: 500 }
+      );
+  }
+}
+
+export interface AnalyticsReportData {
+  startDate: string;
+  endDate: string;
+  kpis: {
+    avgResponseMinutes: number;
+    avgServiceDurationMinutes: number;
+    acceptanceRate: number;
+    cancellationRate: number;
+    avgRevenuePerService: number;
+    totalServices: number;
+    completedServices: number;
+    cancelledServices: number;
+  };
+  vehicles: Array<{
+    tipoVehiculo: string;
+    count: number;
+    revenue: number;
+  }>;
+  statusBreakdown: Array<{
+    status: string;
+    count: number;
+  }>;
+  driverRankings: Array<{
+    driverId: string;
+    driverName: string;
+    completedServices: number;
+    averageRating: number;
+  }>;
 }
 
 export const pdfService = new PDFService();

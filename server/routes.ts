@@ -17,6 +17,8 @@ import type { User, Servicio } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
 import { uploadDocument, getDocument, isStorageInitialized } from "./services/object-storage";
+import { pdfService } from "./services/pdf-service";
+import { insuranceValidationService, getSupportedInsurers, InsurerCode } from "./services/insurance";
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -1775,6 +1777,256 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get service status breakdown error', error);
       res.status(500).json({ message: "Failed to get status breakdown" });
+    }
+  });
+
+  // Advanced Analytics Endpoints (Module 2.3)
+  app.get("/api/admin/analytics/heatmap", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { startDate, endDate, precision } = req.query;
+      const data = await storage.getServiceLocationsForHeatmap(
+        startDate as string | undefined,
+        endDate as string | undefined,
+        precision ? parseInt(precision as string) : 3
+      );
+      res.json(data);
+    } catch (error: any) {
+      logSystem.error('Get heatmap data error', error);
+      res.status(500).json({ message: "Failed to get heatmap data" });
+    }
+  });
+
+  app.get("/api/admin/analytics/kpis", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { startDate, endDate } = req.query;
+      const data = await storage.getAdvancedKPIs(
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      res.json(data);
+    } catch (error: any) {
+      logSystem.error('Get KPIs error', error);
+      res.status(500).json({ message: "Failed to get KPIs" });
+    }
+  });
+
+  app.get("/api/admin/analytics/vehicles", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { startDate, endDate } = req.query;
+      const data = await storage.getVehicleTypeDistribution(
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      res.json(data);
+    } catch (error: any) {
+      logSystem.error('Get vehicle distribution error', error);
+      res.status(500).json({ message: "Failed to get vehicle distribution" });
+    }
+  });
+
+  app.get("/api/admin/analytics/pdf", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Start date and end date are required" });
+      }
+
+      const [kpis, vehicles, statusBreakdown, driverRankings] = await Promise.all([
+        storage.getAdvancedKPIs(startDate as string, endDate as string),
+        storage.getVehicleTypeDistribution(startDate as string, endDate as string),
+        storage.getServiceStatusBreakdown(startDate as string, endDate as string),
+        storage.getDriverRankings(),
+      ]);
+
+      const pdfBuffer = await pdfService.generateAnalyticsReport({
+        startDate: startDate as string,
+        endDate: endDate as string,
+        kpis,
+        vehicles,
+        statusBreakdown,
+        driverRankings,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="analytics-gruard-${startDate}-${endDate}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      logSystem.error('Generate analytics PDF error', error);
+      res.status(500).json({ message: "Failed to generate analytics PDF" });
+    }
+  });
+
+  // Insurance Validation Endpoints (Module 2.1)
+  app.get("/api/insurance/insurers", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const insurers = getSupportedInsurers();
+      res.json(insurers);
+    } catch (error: any) {
+      logSystem.error('Get insurers error', error);
+      res.status(500).json({ message: "Failed to get insurers list" });
+    }
+  });
+
+  app.post("/api/insurance/validate-policy", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { policyNumber, vehiclePlate, insurerCode } = req.body;
+
+      if (!policyNumber || !vehiclePlate) {
+        return res.status(400).json({ message: "Policy number and vehicle plate are required" });
+      }
+
+      const result = await insuranceValidationService.validatePolicyByNumber(
+        policyNumber,
+        vehiclePlate,
+        insurerCode as InsurerCode | undefined
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Validate policy error', error);
+      res.status(500).json({ message: "Failed to validate policy" });
+    }
+  });
+
+  app.post("/api/insurance/validate-by-cedula", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { cedula, vehiclePlate } = req.body;
+
+      if (!cedula || !vehiclePlate) {
+        return res.status(400).json({ message: "Cedula and vehicle plate are required" });
+      }
+
+      const result = await insuranceValidationService.validatePolicyByCedula(cedula, vehiclePlate);
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Validate by cedula error', error);
+      res.status(500).json({ message: "Failed to validate by cedula" });
+    }
+  });
+
+  app.post("/api/insurance/request-authorization", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { policyNumber, vehiclePlate, insurerCode } = req.body;
+
+      if (!policyNumber || !vehiclePlate || !insurerCode) {
+        return res.status(400).json({ 
+          message: "Policy number, vehicle plate, and insurer code are required" 
+        });
+      }
+
+      const authorization = await insuranceValidationService.requestTowingAuthorization(
+        policyNumber,
+        vehiclePlate,
+        insurerCode as InsurerCode
+      );
+
+      res.json(authorization);
+    } catch (error: any) {
+      logSystem.error('Request authorization error', error);
+      res.status(500).json({ message: "Failed to request towing authorization" });
+    }
+  });
+
+  app.post("/api/insurance/submit-claim", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || !['admin', 'conductor'].includes(req.user!.userType)) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { insurerCode, claimData } = req.body;
+
+      if (!insurerCode || !claimData) {
+        return res.status(400).json({ message: "Insurer code and claim data are required" });
+      }
+
+      const result = await insuranceValidationService.submitTowingClaim(
+        insurerCode as InsurerCode,
+        claimData
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Submit claim error', error);
+      res.status(500).json({ message: "Failed to submit insurance claim" });
+    }
+  });
+
+  app.post("/api/insurance/cancel-authorization", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { insurerCode, authorizationCode } = req.body;
+
+      if (!insurerCode || !authorizationCode) {
+        return res.status(400).json({ 
+          message: "Insurer code and authorization code are required" 
+        });
+      }
+
+      const cancelled = await insuranceValidationService.cancelAuthorization(
+        insurerCode as InsurerCode,
+        authorizationCode
+      );
+
+      res.json({ cancelled });
+    } catch (error: any) {
+      logSystem.error('Cancel authorization error', error);
+      res.status(500).json({ message: "Failed to cancel authorization" });
+    }
+  });
+
+  app.get("/api/insurance/health", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const healthResults = await insuranceValidationService.checkAllAdaptersHealth();
+      const resultsObject: Record<string, any> = {};
+      
+      healthResults.forEach((health, code) => {
+        resultsObject[code] = health;
+      });
+
+      res.json(resultsObject);
+    } catch (error: any) {
+      logSystem.error('Health check error', error);
+      res.status(500).json({ message: "Failed to check adapter health" });
     }
   });
 
