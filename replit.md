@@ -16,6 +16,8 @@ I expect the agent to write clear and concise code with comments where necessary
 Ensure all new features have corresponding tests.
 Prioritize performance and scalability in new implementations.
 
+**NOTA IMPORTANTE - Claves API:** No configurar claves API (Stripe, Google Maps, Twilio, etc.) hasta finalizar todo el plan de desarrollo. Las pruebas E2E que requieran estas claves deben omitirse durante el desarrollo y ejecutarse solo cuando el proyecto esté listo para producción.
+
 ## System Architecture
 
 ### UI/UX Decisions
