@@ -2018,6 +2018,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Insurance Validation Endpoints (Module 1.9)
+  app.get("/api/admin/servicios/pendientes-aseguradora", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const servicios = await storage.getServiciosPendientesAseguradora();
+      res.json(servicios);
+    } catch (error: any) {
+      logSystem.error('Get pending insurance services error', error);
+      res.status(500).json({ message: "Failed to get pending insurance services" });
+    }
+  });
+
+  app.get("/api/admin/servicios/:id/documentos", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { id } = req.params;
+      const documentos = await storage.getDocumentosByServicioId(id);
+      res.json(documentos);
+    } catch (error: any) {
+      logSystem.error('Get service documents error', error);
+      res.status(500).json({ message: "Failed to get service documents" });
+    }
+  });
+
+  app.post("/api/admin/servicios/:id/aseguradora/aprobar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { id } = req.params;
+      
+      const servicio = await storage.getServicioById(id);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.metodoPago !== 'aseguradora') {
+        return res.status(400).json({ message: "Este servicio no es de aseguradora" });
+      }
+
+      if (servicio.aseguradoraEstado !== 'pendiente') {
+        return res.status(400).json({ message: "Este servicio ya fue procesado" });
+      }
+
+      const updatedServicio = await storage.aprobarAseguradora(id, req.user!.id);
+      
+      logService.updated(req.user!.id, id, { action: 'insurance_approved' });
+
+      // Send push notification to client (with error handling)
+      try {
+        await pushService.sendNotification(
+          servicio.clienteId,
+          'Póliza de seguro aprobada',
+          'Tu solicitud de servicio con aseguradora ha sido aprobada. Los conductores ya pueden aceptar tu solicitud.',
+          { type: 'insurance_approved', servicioId: id }
+        );
+      } catch (pushError) {
+        logSystem.warn('Push notification failed for insurance approval', { servicioId: id, error: pushError });
+      }
+
+      res.json(updatedServicio);
+    } catch (error: any) {
+      logSystem.error('Approve insurance error', error);
+      res.status(500).json({ message: "Failed to approve insurance" });
+    }
+  });
+
+  app.post("/api/admin/servicios/:id/aseguradora/rechazar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { motivoRechazo } = req.body;
+
+      if (!motivoRechazo || motivoRechazo.trim() === '') {
+        return res.status(400).json({ message: "Motivo de rechazo es requerido" });
+      }
+      
+      const servicio = await storage.getServicioById(id);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.metodoPago !== 'aseguradora') {
+        return res.status(400).json({ message: "Este servicio no es de aseguradora" });
+      }
+
+      if (servicio.aseguradoraEstado !== 'pendiente') {
+        return res.status(400).json({ message: "Este servicio ya fue procesado" });
+      }
+
+      const updatedServicio = await storage.rechazarAseguradora(id, req.user!.id, motivoRechazo);
+      
+      logService.updated(req.user!.id, id, { action: 'insurance_rejected', reason: motivoRechazo });
+
+      // Send push notification to client (with error handling)
+      try {
+        await pushService.sendNotification(
+          servicio.clienteId,
+          'Póliza de seguro rechazada',
+          `Tu solicitud de servicio con aseguradora fue rechazada: ${motivoRechazo}`,
+          { type: 'insurance_rejected', servicioId: id, reason: motivoRechazo }
+        );
+      } catch (pushError) {
+        logSystem.warn('Push notification failed for insurance rejection', { servicioId: id, error: pushError });
+      }
+
+      res.json(updatedServicio);
+    } catch (error: any) {
+      logSystem.error('Reject insurance error', error);
+      res.status(500).json({ message: "Failed to reject insurance" });
+    }
+  });
+
+  // Get all services with insurance for admin stats
+  app.get("/api/admin/servicios/aseguradora/all", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allServicios = await storage.getAllServicios();
+      const serviciosAseguradora = allServicios.filter(s => s.metodoPago === 'aseguradora');
+      res.json(serviciosAseguradora);
+    } catch (error: any) {
+      logSystem.error('Get all insurance services error', error);
+      res.status(500).json({ message: "Failed to get all insurance services" });
+    }
+  });
+
   app.post("/api/maps/calculate-route", async (req: Request, res: Response) => {
     try {
       const { origin, destination } = req.body;

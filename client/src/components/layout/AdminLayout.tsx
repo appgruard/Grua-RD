@@ -11,6 +11,7 @@ import {
   BarChart3,
   ShieldCheck,
   FolderOpen,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ const menuItems = [
   { path: '/admin/monitoring', icon: Map, label: 'Monitoreo', testId: 'nav-monitoring' },
   { path: '/admin/verifications', icon: ShieldCheck, label: 'Verificaciones', testId: 'nav-verifications' },
   { path: '/admin/documents', icon: FolderOpen, label: 'Documentos', testId: 'nav-documents' },
+  { path: '/admin/insurance', icon: Shield, label: 'Aseguradoras', testId: 'nav-insurance' },
 ];
 
 function AppSidebar() {

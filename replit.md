@@ -60,6 +60,31 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 
 ## Recent Changes
 
+### November 26, 2025 - Module 1.9: Insurance Validation System
+- **Module 1.9 - Insurance Validation - ✅ COMPLETE**
+  - Implemented admin panel for insurance claim validation at `/admin/insurance`
+  - Created storage methods for insurance service management:
+    - `getServiciosPendientesAseguradora()`: Fetch services awaiting insurance validation
+    - `getDocumentosByServicioId()`: Get documents associated with a specific service
+    - `aprobarAseguradora()`: Approve insurance claim and notify client
+    - `rechazarAseguradora()`: Reject insurance claim with reason and cancel service
+  - Created API endpoints:
+    - `GET /api/admin/servicios/pendientes-aseguradora`: Get pending insurance services
+    - `GET /api/admin/servicios/:id/documentos`: Get documents for a service
+    - `POST /api/admin/servicios/:id/aseguradora/aprobar`: Approve insurance claim
+    - `POST /api/admin/servicios/:id/aseguradora/rechazar`: Reject insurance claim
+    - `GET /api/admin/servicios/aseguradora/all`: Get all insurance services for stats
+  - Admin interface features:
+    - Statistics cards showing total, pending, approved, and rejected claims
+    - Searchable table with client info, insurance company, policy number, vehicle type
+    - Status badges with color coding (pending/approved/rejected)
+    - Filter by status
+    - Review dialog with client details, insurance info, service details
+    - Document preview for uploaded files (póliza, matrícula, licencia)
+    - Approve/Reject workflow with rejection reason requirement
+  - Push notifications sent to clients on approval or rejection
+  - Added navigation item in AdminLayout sidebar
+
 ### November 25, 2025 - Module 1.8: Admin Dashboard with Real-Time Map
 - **Module 1.8 - MÓDULO ADMIN - Dashboard Principal - ✅ COMPLETE**
   - Implemented real-time map with Google Maps API integration
@@ -156,8 +181,14 @@ Optimized and prepared the application for production deployment with:
   - Auto-refresh every 10 seconds for data accuracy
   - Responsive map interface with legend
 
-**Pending Modules:**
-- **Module 1.9**: Insurance validation system (admin manual approval/rejection)
+- ✅ **Module 1.9: Insurance Validation System** (100% Complete)
+  - Admin panel for reviewing insurance claims at `/admin/insurance`
+  - Manual approval/rejection workflow with reason requirement
+  - Document preview for uploaded insurance files
+  - Push notifications to clients on status change
+  - Statistics dashboard with pending/approved/rejected counts
+
+**Phase 1 - MVP Operacional: 100% COMPLETE**
 
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.

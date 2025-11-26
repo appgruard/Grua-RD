@@ -31,6 +31,7 @@ const AdminPricing = lazy(() => import('@/pages/admin/pricing'));
 const AdminMonitoring = lazy(() => import('@/pages/admin/monitoring'));
 const AdminVerifications = lazy(() => import('@/pages/admin/verifications'));
 const AdminDocuments = lazy(() => import('@/pages/admin/documents'));
+const AdminInsurance = lazy(() => import('@/pages/admin/insurance'));
 
 const NotFound = lazy(() => import('@/pages/not-found'));
 
@@ -203,6 +204,13 @@ function Router() {
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
             <AdminDocuments />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/insurance">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminInsurance />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

@@ -130,11 +130,17 @@ export interface IStorage {
   getDocumentoById(id: string): Promise<DocumentoWithDetails | undefined>;
   getDocumentosByUsuarioId(usuarioId: string): Promise<DocumentoWithDetails[]>;
   getDocumentosByConductorId(conductorId: string): Promise<DocumentoWithDetails[]>;
+  getDocumentosByServicioId(servicioId: string): Promise<DocumentoWithDetails[]>;
   getAllDocumentos(): Promise<DocumentoWithDetails[]>;
   updateDocumento(id: string, data: Partial<Documento>): Promise<Documento>;
   deleteDocumento(id: string): Promise<void>;
   aprobarDocumento(id: string, adminId: string): Promise<Documento>;
   rechazarDocumento(id: string, adminId: string, motivo: string): Promise<Documento>;
+
+  // Servicios con Aseguradora
+  getServiciosPendientesAseguradora(): Promise<ServicioWithDetails[]>;
+  aprobarAseguradora(id: string, adminId: string): Promise<Servicio>;
+  rechazarAseguradora(id: string, adminId: string, motivo: string): Promise<Servicio>;
 
   // Comisiones
   createComision(comision: InsertComision): Promise<Comision>;
@@ -1106,6 +1112,64 @@ export class DatabaseStorage implements IStorage {
       orderBy: desc(documentos.createdAt),
     });
     return results;
+  }
+
+  async getDocumentosByServicioId(servicioId: string): Promise<DocumentoWithDetails[]> {
+    const results = await db.query.documentos.findMany({
+      where: eq(documentos.servicioId, servicioId),
+      with: {
+        usuario: true,
+        conductor: {
+          with: {
+            user: true,
+          },
+        },
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+      orderBy: desc(documentos.createdAt),
+    });
+    return results;
+  }
+
+  async getServiciosPendientesAseguradora(): Promise<ServicioWithDetails[]> {
+    const results = await db.query.servicios.findMany({
+      where: and(
+        eq(servicios.metodoPago, 'aseguradora'),
+        eq(servicios.aseguradoraEstado, 'pendiente')
+      ),
+      with: {
+        cliente: true,
+        conductor: true,
+        calificacion: true,
+      },
+      orderBy: desc(servicios.createdAt),
+    });
+    return results as any;
+  }
+
+  async aprobarAseguradora(id: string, adminId: string): Promise<Servicio> {
+    const [servicio] = await db
+      .update(servicios)
+      .set({
+        aseguradoraEstado: 'aprobado',
+      })
+      .where(eq(servicios.id, id))
+      .returning();
+    return servicio;
+  }
+
+  async rechazarAseguradora(id: string, adminId: string, motivo: string): Promise<Servicio> {
+    const [servicio] = await db
+      .update(servicios)
+      .set({
+        aseguradoraEstado: 'rechazado',
+        estado: 'cancelado',
+        canceladoAt: new Date(),
+      })
+      .where(eq(servicios.id, id))
+      .returning();
+    return servicio;
   }
 }
 
