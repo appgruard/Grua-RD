@@ -7,7 +7,7 @@ Grúa RD is a Progressive Web App (PWA) designed to connect users needing tow tr
 I prefer detailed explanations.
 I want iterative development.
 Ask before making major changes.
-Do not make changes to the folder `shared/`.
+Modificaciones al schema (`shared/schema.ts`) están permitidas cuando sean necesarias para nuevas funcionalidades.
 Do not make changes to the file `client/src/App.tsx`.
 I like functional programming.
 I prefer simple language.

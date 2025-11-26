@@ -41,7 +41,8 @@ export const documentoTipoEnum = pgEnum("documento_tipo", [
   "foto_vehiculo",
   "foto_perfil",
   "cedula_frontal",
-  "cedula_trasera"
+  "cedula_trasera",
+  "seguro_cliente"
 ]);
 export const documentoEstadoEnum = pgEnum("documento_estado", [
   "pendiente",
