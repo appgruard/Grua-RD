@@ -8,7 +8,7 @@ I prefer detailed explanations.
 I want iterative development.
 Ask before making major changes.
 Modificaciones al schema (`shared/schema.ts`) están permitidas cuando sean necesarias para nuevas funcionalidades.
-Do not make changes to the file `client/src/App.tsx`.
+App.tsx puede ser modificado para agregar nuevas rutas cuando sea necesario para nuevas funcionalidades.
 I like functional programming.
 I prefer simple language.
 I want to be kept informed about the progress regularly.
