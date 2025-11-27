@@ -20,6 +20,52 @@ import { uploadDocument, getDocument, isStorageInitialized } from "./services/ob
 import { pdfService } from "./services/pdf-service";
 import { insuranceValidationService, getSupportedInsurers, InsurerCode } from "./services/insurance";
 
+// Zod validation schemas for aseguradora/admin endpoints
+const updateAseguradoraPerfilSchema = z.object({
+  telefono: z.string().min(1, "Teléfono es requerido").optional().nullable(),
+  direccion: z.string().min(1, "Dirección es requerida").optional().nullable(),
+  emailContacto: z.string().email("Email de contacto inválido").optional().nullable(),
+  personaContacto: z.string().min(1, "Persona de contacto es requerida").optional().nullable(),
+});
+
+const aprobarServicioSchema = z.object({
+  montoAprobado: z.union([
+    z.string().min(1, "Monto aprobado es requerido").refine(
+      (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
+      "Monto aprobado debe ser un número positivo"
+    ),
+    z.number().positive("Monto aprobado debe ser un número positivo"),
+  ]),
+});
+
+const rechazarServicioSchema = z.object({
+  motivo: z.string().min(1, "Motivo de rechazo es requerido").max(500, "Motivo no puede exceder 500 caracteres"),
+});
+
+const facturarServicioSchema = z.object({
+  numeroFactura: z.string().min(1, "Número de factura es requerido").max(100, "Número de factura no puede exceder 100 caracteres"),
+});
+
+const createAseguradoraSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  nombreEmpresa: z.string().min(1, "Nombre de empresa es requerido").max(200, "Nombre de empresa no puede exceder 200 caracteres"),
+  rnc: z.string().min(1, "RNC es requerido").max(50, "RNC no puede exceder 50 caracteres"),
+  telefono: z.string().min(1, "Teléfono es requerido").optional().nullable(),
+  direccion: z.string().min(1, "Dirección es requerida").optional().nullable(),
+  emailContacto: z.string().email("Email de contacto inválido").optional().nullable(),
+  personaContacto: z.string().min(1, "Persona de contacto es requerida").optional().nullable(),
+});
+
+const updateAseguradoraAdminSchema = z.object({
+  nombreEmpresa: z.string().min(1, "Nombre de empresa es requerido").max(200, "Nombre de empresa no puede exceder 200 caracteres").optional(),
+  rnc: z.string().min(1, "RNC es requerido").max(50, "RNC no puede exceder 50 caracteres").optional(),
+  telefono: z.string().min(1, "Teléfono es requerido").optional().nullable(),
+  direccion: z.string().min(1, "Dirección es requerida").optional().nullable(),
+  emailContacto: z.string().email("Email de contacto inválido").optional().nullable(),
+  personaContacto: z.string().min(1, "Persona de contacto es requerida").optional().nullable(),
+});
+
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
 
 declare global {
@@ -3144,6 +3190,504 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Set default payment method error', error, { userId: req.user!.id });
       res.status(500).json({ message: "Failed to set default payment method" });
+    }
+  });
+
+  // ============================================
+  // ASEGURADORA PORTAL ENDPOINTS
+  // ============================================
+
+  // Get current aseguradora profile
+  app.get("/api/aseguradora/perfil", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+      res.json(aseguradora);
+    } catch (error: any) {
+      logSystem.error('Get insurance profile error', error);
+      res.status(500).json({ message: "Failed to get profile" });
+    }
+  });
+
+  // Update aseguradora profile
+  app.put("/api/aseguradora/perfil", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const validationResult = updateAseguradoraPerfilSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de perfil inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const { telefono, direccion, emailContacto, personaContacto } = validationResult.data;
+      const updated = await storage.updateAseguradora(aseguradora.id, {
+        telefono,
+        direccion,
+        emailContacto,
+        personaContacto,
+      });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Update insurance profile error', error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Get aseguradora dashboard stats
+  app.get("/api/aseguradora/dashboard", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const { startDate, endDate } = req.query;
+      const resumen = await storage.getResumenAseguradora(
+        aseguradora.id,
+        startDate as string,
+        endDate as string
+      );
+      res.json(resumen);
+    } catch (error: any) {
+      logSystem.error('Get insurance dashboard error', error);
+      res.status(500).json({ message: "Failed to get dashboard" });
+    }
+  });
+
+  // Get pending services for aseguradora approval
+  app.get("/api/aseguradora/servicios/pendientes", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const servicios = await storage.getServiciosAseguradoraPendientes(aseguradora.id);
+      res.json(servicios);
+    } catch (error: any) {
+      logSystem.error('Get pending insurance services error', error);
+      res.status(500).json({ message: "Failed to get pending services" });
+    }
+  });
+
+  // Get all services for aseguradora
+  app.get("/api/aseguradora/servicios", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const servicios = await storage.getServiciosAseguradoraByAseguradoraId(aseguradora.id);
+      res.json(servicios);
+    } catch (error: any) {
+      logSystem.error('Get insurance services error', error);
+      res.status(500).json({ message: "Failed to get services" });
+    }
+  });
+
+  // Get single service for aseguradora
+  app.get("/api/aseguradora/servicios/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const servicio = await storage.getServicioAseguradoraById(req.params.id);
+      if (!servicio || servicio.aseguradoraId !== aseguradora.id) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+      res.json(servicio);
+    } catch (error: any) {
+      logSystem.error('Get insurance service error', error);
+      res.status(500).json({ message: "Failed to get service" });
+    }
+  });
+
+  // Approve service by aseguradora
+  app.post("/api/aseguradora/servicios/:id/aprobar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const validationResult = aprobarServicioSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de aprobación inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const servicio = await storage.getServicioAseguradoraById(req.params.id);
+      if (!servicio || servicio.aseguradoraId !== aseguradora.id) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (servicio.aprobadoPor || servicio.rechazadoPor) {
+        return res.status(400).json({ message: "Service already processed" });
+      }
+
+      const { montoAprobado } = validationResult.data;
+      const updated = await storage.aprobarServicioAseguradora(req.params.id, req.user!.id, String(montoAprobado));
+      
+      logService.updated(req.user!.id, req.params.id, { action: 'insurance_approved_by_insurer', monto: montoAprobado });
+
+      // Send notification to client
+      if (servicio.servicio?.clienteId) {
+        try {
+          await pushService.sendNotification(
+            servicio.servicio.clienteId,
+            'Servicio aprobado por aseguradora',
+            `Tu servicio de grúa ha sido aprobado por ${aseguradora.nombreEmpresa}`,
+            { type: 'insurance_approved', servicioId: servicio.servicioId }
+          );
+        } catch (pushError) {
+          logSystem.warn('Push notification failed for insurance approval', { servicioId: req.params.id });
+        }
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Approve insurance service error', error);
+      res.status(500).json({ message: "Failed to approve service" });
+    }
+  });
+
+  // Reject service by aseguradora
+  app.post("/api/aseguradora/servicios/:id/rechazar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const validationResult = rechazarServicioSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de rechazo inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const servicio = await storage.getServicioAseguradoraById(req.params.id);
+      if (!servicio || servicio.aseguradoraId !== aseguradora.id) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (servicio.aprobadoPor || servicio.rechazadoPor) {
+        return res.status(400).json({ message: "Service already processed" });
+      }
+
+      const { motivo } = validationResult.data;
+      const updated = await storage.rechazarServicioAseguradora(req.params.id, req.user!.id, motivo);
+      
+      logService.updated(req.user!.id, req.params.id, { action: 'insurance_rejected_by_insurer', motivo });
+
+      // Send notification to client
+      if (servicio.servicio?.clienteId) {
+        try {
+          await pushService.sendNotification(
+            servicio.servicio.clienteId,
+            'Servicio rechazado por aseguradora',
+            `Tu servicio de grúa fue rechazado: ${motivo}`,
+            { type: 'insurance_rejected', servicioId: servicio.servicioId, reason: motivo }
+          );
+        } catch (pushError) {
+          logSystem.warn('Push notification failed for insurance rejection', { servicioId: req.params.id });
+        }
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Reject insurance service error', error);
+      res.status(500).json({ message: "Failed to reject service" });
+    }
+  });
+
+  // Mark service as billed
+  app.post("/api/aseguradora/servicios/:id/facturar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const validationResult = facturarServicioSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de facturación inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const servicio = await storage.getServicioAseguradoraById(req.params.id);
+      if (!servicio || servicio.aseguradoraId !== aseguradora.id) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (!servicio.aprobadoPor) {
+        return res.status(400).json({ message: "Service not approved yet" });
+      }
+
+      const { numeroFactura } = validationResult.data;
+      const updated = await storage.marcarServicioAseguradoraFacturado(req.params.id, numeroFactura);
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Bill insurance service error', error);
+      res.status(500).json({ message: "Failed to bill service" });
+    }
+  });
+
+  // Mark service as paid
+  app.post("/api/aseguradora/servicios/:id/pagar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'aseguradora') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraByUserId(req.user!.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company profile not found" });
+      }
+
+      const servicio = await storage.getServicioAseguradoraById(req.params.id);
+      if (!servicio || servicio.aseguradoraId !== aseguradora.id) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (servicio.estadoPago !== 'facturado') {
+        return res.status(400).json({ message: "Service not billed yet" });
+      }
+
+      const updated = await storage.marcarServicioAseguradoraPagado(req.params.id);
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Pay insurance service error', error);
+      res.status(500).json({ message: "Failed to mark service as paid" });
+    }
+  });
+
+  // ============================================
+  // ADMIN - ASEGURADORA MANAGEMENT
+  // ============================================
+
+  // List all aseguradoras (admin only)
+  app.get("/api/admin/aseguradoras", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const aseguradoras = await storage.getAllAseguradoras();
+      res.json(aseguradoras);
+    } catch (error: any) {
+      logSystem.error('Get all insurance companies error', error);
+      res.status(500).json({ message: "Failed to get insurance companies" });
+    }
+  });
+
+  // Get single aseguradora (admin only)
+  app.get("/api/admin/aseguradoras/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraById(req.params.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company not found" });
+      }
+      res.json(aseguradora);
+    } catch (error: any) {
+      logSystem.error('Get insurance company error', error);
+      res.status(500).json({ message: "Failed to get insurance company" });
+    }
+  });
+
+  // Create aseguradora (admin only)
+  app.post("/api/admin/aseguradoras", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const validationResult = createAseguradoraSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de aseguradora inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      const { email, password, nombreEmpresa, rnc, telefono, direccion, emailContacto, personaContacto } = validationResult.data;
+
+      // Check if RNC already exists
+      const existingByRnc = await storage.getAseguradoraByRnc(rnc);
+      if (existingByRnc) {
+        return res.status(400).json({ message: "An insurance company with this RNC already exists" });
+      }
+
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      // Create user account for the insurance company
+      const passwordHash = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        nombre: nombreEmpresa,
+        apellido: 'Aseguradora',
+        userType: 'aseguradora',
+        estadoCuenta: 'activo',
+      } as any);
+
+      // Create aseguradora profile
+      const aseguradora = await storage.createAseguradora({
+        userId: user.id,
+        nombreEmpresa,
+        rnc,
+        telefono,
+        direccion,
+        emailContacto,
+        personaContacto,
+      });
+
+      logSystem.info('Insurance company created', { aseguradoraId: aseguradora.id, rnc });
+      res.json({ user, aseguradora });
+    } catch (error: any) {
+      logSystem.error('Create insurance company error', error);
+      res.status(500).json({ message: "Failed to create insurance company" });
+    }
+  });
+
+  // Update aseguradora (admin only)
+  app.put("/api/admin/aseguradoras/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const validationResult = updateAseguradoraAdminSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de aseguradora inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      const aseguradora = await storage.getAseguradoraById(req.params.id);
+      if (!aseguradora) {
+        return res.status(404).json({ message: "Insurance company not found" });
+      }
+
+      const { nombreEmpresa, rnc, telefono, direccion, emailContacto, personaContacto } = validationResult.data;
+      
+      // Check if RNC is being changed and if new RNC already exists
+      if (rnc && rnc !== aseguradora.rnc) {
+        const existingByRnc = await storage.getAseguradoraByRnc(rnc);
+        if (existingByRnc && existingByRnc.id !== aseguradora.id) {
+          return res.status(400).json({ message: "An insurance company with this RNC already exists" });
+        }
+      }
+
+      const updated = await storage.updateAseguradora(req.params.id, {
+        nombreEmpresa,
+        rnc,
+        telefono,
+        direccion,
+        emailContacto,
+        personaContacto,
+      });
+
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Update insurance company error', error);
+      res.status(500).json({ message: "Failed to update insurance company" });
+    }
+  });
+
+  // Toggle aseguradora active status (admin only)
+  app.put("/api/admin/aseguradoras/:id/toggle-activo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const updated = await storage.toggleAseguradoraActivo(req.params.id);
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Toggle insurance company status error', error);
+      res.status(500).json({ message: "Failed to toggle status" });
+    }
+  });
+
+  // Get list of active aseguradoras (for client dropdown)
+  app.get("/api/aseguradoras/activas", async (req: Request, res: Response) => {
+    try {
+      const aseguradoras = await storage.getActiveAseguradoras();
+      res.json(aseguradoras.map(a => ({
+        id: a.id,
+        nombre: a.nombreEmpresa,
+      })));
+    } catch (error: any) {
+      logSystem.error('Get active insurance companies error', error);
+      res.status(500).json({ message: "Failed to get insurance companies" });
     }
   });
 

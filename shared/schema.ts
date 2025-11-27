@@ -14,7 +14,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userTypeEnum = pgEnum("user_type", ["cliente", "conductor", "admin"]);
+export const userTypeEnum = pgEnum("user_type", ["cliente", "conductor", "admin", "aseguradora"]);
 export const estadoCuentaEnum = pgEnum("estado_cuenta", [
   "pendiente_verificacion",
   "activo",
@@ -54,6 +54,12 @@ export const estadoPagoEnum = pgEnum("estado_pago", [
   "procesando",
   "pagado",
   "fallido"
+]);
+
+export const estadoPagoAseguradoraEnum = pgEnum("estado_pago_aseguradora", [
+  "pendiente_facturar",
+  "facturado",
+  "pagado"
 ]);
 
 // Users Table
@@ -219,6 +225,42 @@ export const comisiones = pgTable("comisiones", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Aseguradoras Table (Insurance Companies)
+export const aseguradoras = pgTable("aseguradoras", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  nombreEmpresa: text("nombre_empresa").notNull(),
+  rnc: text("rnc").notNull(),
+  direccion: text("direccion"),
+  telefono: text("telefono"),
+  emailContacto: text("email_contacto"),
+  personaContacto: text("persona_contacto"),
+  logoUrl: text("logo_url"),
+  activo: boolean("activo").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Servicios Aseguradora Table (Insurance service tracking for billing)
+export const serviciosAseguradora = pgTable("servicios_aseguradora", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  servicioId: varchar("servicio_id").notNull().references(() => servicios.id, { onDelete: "cascade" }),
+  aseguradoraId: varchar("aseguradora_id").notNull().references(() => aseguradoras.id),
+  numeroPoliza: text("numero_poliza").notNull(),
+  tipoCobertura: text("tipo_cobertura"),
+  montoAprobado: decimal("monto_aprobado", { precision: 10, scale: 2 }),
+  estadoPago: estadoPagoAseguradoraEnum("estado_pago").default("pendiente_facturar").notNull(),
+  numeroFactura: text("numero_factura"),
+  fechaFactura: timestamp("fecha_factura"),
+  fechaPago: timestamp("fecha_pago"),
+  notas: text("notas"),
+  aprobadoPor: varchar("aprobado_por").references(() => users.id),
+  fechaAprobacion: timestamp("fecha_aprobacion"),
+  rechazadoPor: varchar("rechazado_por").references(() => users.id),
+  fechaRechazo: timestamp("fecha_rechazo"),
+  motivoRechazo: text("motivo_rechazo"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   conductor: one(conductores, {
@@ -313,6 +355,33 @@ export const comisionesRelations = relations(comisiones, ({ one }) => ({
   servicio: one(servicios, {
     fields: [comisiones.servicioId],
     references: [servicios.id],
+  }),
+}));
+
+export const aseguradorasRelations = relations(aseguradoras, ({ one, many }) => ({
+  user: one(users, {
+    fields: [aseguradoras.userId],
+    references: [users.id],
+  }),
+  servicios: many(serviciosAseguradora),
+}));
+
+export const serviciosAseguradoraRelations = relations(serviciosAseguradora, ({ one }) => ({
+  servicio: one(servicios, {
+    fields: [serviciosAseguradora.servicioId],
+    references: [servicios.id],
+  }),
+  aseguradora: one(aseguradoras, {
+    fields: [serviciosAseguradora.aseguradoraId],
+    references: [aseguradoras.id],
+  }),
+  aprobadoPorUsuario: one(users, {
+    fields: [serviciosAseguradora.aprobadoPor],
+    references: [users.id],
+  }),
+  rechazadoPorUsuario: one(users, {
+    fields: [serviciosAseguradora.rechazadoPor],
+    references: [users.id],
   }),
 }));
 
@@ -453,6 +522,28 @@ export const insertComisionSchema = createInsertSchema(comisiones, {
   fechaPagoEmpresa: true,
 });
 
+export const insertAseguradoraSchema = createInsertSchema(aseguradoras, {
+  nombreEmpresa: z.string().min(1, "Nombre de empresa es requerido"),
+  rnc: z.string().min(1, "RNC es requerido"),
+}).omit({
+  id: true,
+  createdAt: true,
+  activo: true,
+});
+
+export const insertServicioAseguradoraSchema = createInsertSchema(serviciosAseguradora, {
+  numeroPoliza: z.string().min(1, "Número de póliza es requerido"),
+}).omit({
+  id: true,
+  createdAt: true,
+  estadoPago: true,
+  aprobadoPor: true,
+  fechaAprobacion: true,
+  rechazadoPor: true,
+  fechaRechazo: true,
+  motivoRechazo: true,
+});
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -465,6 +556,8 @@ export const selectPushSubscriptionSchema = createSelectSchema(pushSubscriptions
 export const selectVerificationCodeSchema = createSelectSchema(verificationCodes);
 export const selectDocumentoSchema = createSelectSchema(documentos);
 export const selectComisionSchema = createSelectSchema(comisiones);
+export const selectAseguradoraSchema = createSelectSchema(aseguradoras);
+export const selectServicioAseguradoraSchema = createSelectSchema(serviciosAseguradora);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -500,6 +593,12 @@ export type Documento = typeof documentos.$inferSelect;
 export type InsertComision = z.infer<typeof insertComisionSchema>;
 export type Comision = typeof comisiones.$inferSelect;
 
+export type InsertAseguradora = z.infer<typeof insertAseguradoraSchema>;
+export type Aseguradora = typeof aseguradoras.$inferSelect;
+
+export type InsertServicioAseguradora = z.infer<typeof insertServicioAseguradoraSchema>;
+export type ServicioAseguradora = typeof serviciosAseguradora.$inferSelect;
+
 // Helper types for API responses
 export type UserWithConductor = User & {
   conductor?: Conductor;
@@ -524,4 +623,15 @@ export type DocumentoWithDetails = Documento & {
 
 export type ComisionWithDetails = Comision & {
   servicio?: ServicioWithDetails;
+};
+
+export type AseguradoraWithDetails = Aseguradora & {
+  user?: User;
+};
+
+export type ServicioAseguradoraWithDetails = ServicioAseguradora & {
+  servicio?: ServicioWithDetails;
+  aseguradora?: Aseguradora;
+  aprobadoPorUsuario?: User;
+  rechazadoPorUsuario?: User;
 };

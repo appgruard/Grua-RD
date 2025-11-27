@@ -32,6 +32,15 @@ const AdminMonitoring = lazy(() => import('@/pages/admin/monitoring'));
 const AdminVerifications = lazy(() => import('@/pages/admin/verifications'));
 const AdminDocuments = lazy(() => import('@/pages/admin/documents'));
 const AdminInsurance = lazy(() => import('@/pages/admin/insurance'));
+const AdminAseguradoras = lazy(() => import('@/pages/admin/aseguradoras'));
+
+const AseguradoraDashboard = lazy(() => import('@/pages/aseguradora/AseguradoraDashboard'));
+const AseguradoraPendientes = lazy(() => import('@/pages/aseguradora/AseguradoraPendientes'));
+const AseguradoraAprobados = lazy(() => import('@/pages/aseguradora/AseguradoraAprobados'));
+const AseguradoraServicios = lazy(() => import('@/pages/aseguradora/AseguradoraServicios'));
+const AseguradoraFacturacion = lazy(() => import('@/pages/aseguradora/AseguradoraFacturacion'));
+const AseguradoraReportes = lazy(() => import('@/pages/aseguradora/AseguradoraReportes'));
+const AseguradoraPerfil = lazy(() => import('@/pages/aseguradora/AseguradoraPerfil'));
 
 const NotFound = lazy(() => import('@/pages/not-found'));
 
@@ -214,11 +223,55 @@ function Router() {
           </AdminLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/admin/aseguradoras">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminAseguradoras />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/admin">
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
             <AdminDashboard />
           </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Aseguradora Routes */}
+      <Route path="/aseguradora/pendientes">
+        <ProtectedRoute allowedTypes={['aseguradora']}>
+          <AseguradoraPendientes />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/aseguradora/aprobados">
+        <ProtectedRoute allowedTypes={['aseguradora']}>
+          <AseguradoraAprobados />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/aseguradora/servicios">
+        <ProtectedRoute allowedTypes={['aseguradora']}>
+          <AseguradoraServicios />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/aseguradora/facturacion">
+        <ProtectedRoute allowedTypes={['aseguradora']}>
+          <AseguradoraFacturacion />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/aseguradora/reportes">
+        <ProtectedRoute allowedTypes={['aseguradora']}>
+          <AseguradoraReportes />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/aseguradora/perfil">
+        <ProtectedRoute allowedTypes={['aseguradora']}>
+          <AseguradoraPerfil />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/aseguradora">
+        <ProtectedRoute allowedTypes={['aseguradora']}>
+          <AseguradoraDashboard />
         </ProtectedRoute>
       </Route>
 
@@ -228,6 +281,8 @@ function Router() {
             <Redirect to="/admin" />
           ) : user.userType === 'conductor' ? (
             <Redirect to="/driver" />
+          ) : user.userType === 'aseguradora' ? (
+            <Redirect to="/aseguradora" />
           ) : (
             <Redirect to="/client" />
           )

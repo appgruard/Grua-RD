@@ -2,17 +2,13 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   LayoutDashboard,
-  Users,
-  Truck,
-  Map,
-  DollarSign,
   FileText,
   LogOut,
   BarChart3,
-  ShieldCheck,
-  FolderOpen,
-  Shield,
   Building2,
+  CheckCircle,
+  Clock,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -31,22 +27,18 @@ import {
 import { cn } from '@/lib/utils';
 import logoUrl from '@assets/Grúa_20251124_024218_0000_1763966543810.png';
 
-interface AdminLayoutProps {
+interface AseguradoraLayoutProps {
   children: ReactNode;
 }
 
 const menuItems = [
-  { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' },
-  { path: '/admin/analytics', icon: BarChart3, label: 'Analytics', testId: 'nav-analytics' },
-  { path: '/admin/users', icon: Users, label: 'Usuarios', testId: 'nav-users' },
-  { path: '/admin/drivers', icon: Truck, label: 'Conductores', testId: 'nav-drivers' },
-  { path: '/admin/services', icon: FileText, label: 'Servicios', testId: 'nav-services' },
-  { path: '/admin/pricing', icon: DollarSign, label: 'Tarifas', testId: 'nav-pricing' },
-  { path: '/admin/monitoring', icon: Map, label: 'Monitoreo', testId: 'nav-monitoring' },
-  { path: '/admin/verifications', icon: ShieldCheck, label: 'Verificaciones', testId: 'nav-verifications' },
-  { path: '/admin/documents', icon: FolderOpen, label: 'Documentos', testId: 'nav-documents' },
-  { path: '/admin/insurance', icon: Shield, label: 'Validación Seguros', testId: 'nav-insurance' },
-  { path: '/admin/aseguradoras', icon: Building2, label: 'Gestión Aseguradoras', testId: 'nav-aseguradoras' },
+  { path: '/aseguradora', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' },
+  { path: '/aseguradora/pendientes', icon: Clock, label: 'Pendientes', testId: 'nav-pending' },
+  { path: '/aseguradora/aprobados', icon: CheckCircle, label: 'Aprobados', testId: 'nav-approved' },
+  { path: '/aseguradora/servicios', icon: FileText, label: 'Todos los Servicios', testId: 'nav-services' },
+  { path: '/aseguradora/facturacion', icon: Receipt, label: 'Facturación', testId: 'nav-billing' },
+  { path: '/aseguradora/reportes', icon: BarChart3, label: 'Reportes', testId: 'nav-reports' },
+  { path: '/aseguradora/perfil', icon: Building2, label: 'Perfil Empresa', testId: 'nav-profile' },
 ];
 
 function AppSidebar() {
@@ -64,7 +56,7 @@ function AppSidebar() {
               className="w-12 h-12 object-contain"
             />
             <SidebarGroupLabel className="text-lg font-bold">
-              Grúa RD Admin
+              Portal Aseguradora
             </SidebarGroupLabel>
           </div>
           <SidebarGroupContent>
@@ -94,8 +86,8 @@ function AppSidebar() {
 
         <div className="mt-auto p-4 border-t border-sidebar-border">
           <div className="mb-3 px-2">
-            <p className="text-sm font-medium">{user?.nombre} {user?.apellido}</p>
-            <p className="text-xs text-muted-foreground">{user?.email}</p>
+            <p className="text-sm font-medium" data-testid="text-user-name">{user?.nombre}</p>
+            <p className="text-xs text-muted-foreground" data-testid="text-user-email">{user?.email}</p>
           </div>
           <Button
             variant="outline"
@@ -112,7 +104,7 @@ function AppSidebar() {
   );
 }
 
-export function AdminLayout({ children }: AdminLayoutProps) {
+export function AseguradoraLayout({ children }: AseguradoraLayoutProps) {
   const style = {
     '--sidebar-width': '16rem',
     '--sidebar-width-icon': '3rem',
@@ -125,7 +117,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <div className="flex flex-col flex-1">
           <header className="flex items-center justify-between p-4 border-b border-border">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <h1 className="text-xl font-semibold">Panel Administrativo</h1>
+            <h1 className="text-xl font-semibold">Portal de Aseguradora</h1>
             <div className="w-10" />
           </header>
           <main className="flex-1 overflow-auto p-6">

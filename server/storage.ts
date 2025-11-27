@@ -1,5 +1,5 @@
 import { db } from './db';
-import { eq, and, desc, isNull, sql } from 'drizzle-orm';
+import { eq, and, desc, isNull, sql, gte, lte, between } from 'drizzle-orm';
 import {
   users,
   conductores,
@@ -12,6 +12,8 @@ import {
   verificationCodes,
   documentos,
   comisiones,
+  aseguradoras,
+  serviciosAseguradora,
   type User,
   type InsertUser,
   type Conductor,
@@ -33,11 +35,17 @@ import {
   type InsertDocumento,
   type Comision,
   type InsertComision,
+  type Aseguradora,
+  type InsertAseguradora,
+  type ServicioAseguradora,
+  type InsertServicioAseguradora,
   type UserWithConductor,
   type ServicioWithDetails,
   type MensajeChatWithRemitente,
   type DocumentoWithDetails,
   type ComisionWithDetails,
+  type AseguradoraWithDetails,
+  type ServicioAseguradoraWithDetails,
 } from '@shared/schema';
 import {
   conductorStripeAccounts,
@@ -192,6 +200,37 @@ export interface IStorage {
   updateDocumentoStatus(id: string, estado: 'pendiente' | 'aprobado' | 'rechazado', revisadoPor: string, motivoRechazo?: string): Promise<Documento | undefined>;
   getPendingDocuments(): Promise<DocumentoWithDetails[]>;
   getAllDocuments(): Promise<DocumentoWithDetails[]>;
+
+  // Aseguradoras (Insurance Companies)
+  createAseguradora(aseguradora: InsertAseguradora): Promise<Aseguradora>;
+  getAseguradoraById(id: string): Promise<AseguradoraWithDetails | undefined>;
+  getAseguradoraByUserId(userId: string): Promise<AseguradoraWithDetails | undefined>;
+  getAseguradoraByRnc(rnc: string): Promise<Aseguradora | undefined>;
+  getAllAseguradoras(): Promise<AseguradoraWithDetails[]>;
+  getActiveAseguradoras(): Promise<AseguradoraWithDetails[]>;
+  updateAseguradora(id: string, data: Partial<Aseguradora>): Promise<Aseguradora>;
+  toggleAseguradoraActivo(id: string): Promise<Aseguradora>;
+
+  // Servicios Aseguradora (Insurance Services)
+  createServicioAseguradora(servicio: InsertServicioAseguradora): Promise<ServicioAseguradora>;
+  getServicioAseguradoraById(id: string): Promise<ServicioAseguradoraWithDetails | undefined>;
+  getServicioAseguradoraByServicioId(servicioId: string): Promise<ServicioAseguradoraWithDetails | undefined>;
+  getServiciosAseguradoraByAseguradoraId(aseguradoraId: string): Promise<ServicioAseguradoraWithDetails[]>;
+  getServiciosAseguradoraPendientes(aseguradoraId: string): Promise<ServicioAseguradoraWithDetails[]>;
+  aprobarServicioAseguradora(id: string, userId: string, montoAprobado: string): Promise<ServicioAseguradora>;
+  rechazarServicioAseguradora(id: string, userId: string, motivo: string): Promise<ServicioAseguradora>;
+  marcarServicioAseguradoraFacturado(id: string, numeroFactura: string): Promise<ServicioAseguradora>;
+  marcarServicioAseguradoraPagado(id: string): Promise<ServicioAseguradora>;
+  getResumenAseguradora(aseguradoraId: string, startDate?: string, endDate?: string): Promise<{
+    totalServicios: number;
+    pendientes: number;
+    aprobados: number;
+    rechazados: number;
+    montoTotal: number;
+    montoPendiente: number;
+    montoFacturado: number;
+    montoPagado: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1329,6 +1368,287 @@ export class DatabaseStorage implements IStorage {
       .where(eq(servicios.id, id))
       .returning();
     return servicio;
+  }
+
+  // Aseguradoras (Insurance Companies)
+  async createAseguradora(aseguradora: InsertAseguradora): Promise<Aseguradora> {
+    const [newAseguradora] = await db.insert(aseguradoras).values(aseguradora).returning();
+    return newAseguradora;
+  }
+
+  async getAseguradoraById(id: string): Promise<AseguradoraWithDetails | undefined> {
+    const result = await db.query.aseguradoras.findFirst({
+      where: eq(aseguradoras.id, id),
+      with: {
+        user: true,
+      },
+    });
+    return result;
+  }
+
+  async getAseguradoraByUserId(userId: string): Promise<AseguradoraWithDetails | undefined> {
+    const result = await db.query.aseguradoras.findFirst({
+      where: eq(aseguradoras.userId, userId),
+      with: {
+        user: true,
+      },
+    });
+    return result;
+  }
+
+  async getAseguradoraByRnc(rnc: string): Promise<Aseguradora | undefined> {
+    const [result] = await db
+      .select()
+      .from(aseguradoras)
+      .where(eq(aseguradoras.rnc, rnc))
+      .limit(1);
+    return result;
+  }
+
+  async getAllAseguradoras(): Promise<AseguradoraWithDetails[]> {
+    const results = await db.query.aseguradoras.findMany({
+      with: {
+        user: true,
+      },
+      orderBy: desc(aseguradoras.createdAt),
+    });
+    return results;
+  }
+
+  async getActiveAseguradoras(): Promise<AseguradoraWithDetails[]> {
+    const results = await db.query.aseguradoras.findMany({
+      where: eq(aseguradoras.activo, true),
+      with: {
+        user: true,
+      },
+      orderBy: desc(aseguradoras.nombreEmpresa),
+    });
+    return results;
+  }
+
+  async updateAseguradora(id: string, data: Partial<Aseguradora>): Promise<Aseguradora> {
+    const [updated] = await db
+      .update(aseguradoras)
+      .set(data)
+      .where(eq(aseguradoras.id, id))
+      .returning();
+    return updated;
+  }
+
+  async toggleAseguradoraActivo(id: string): Promise<Aseguradora> {
+    const aseguradora = await this.getAseguradoraById(id);
+    if (!aseguradora) {
+      throw new Error('Aseguradora not found');
+    }
+    const [updated] = await db
+      .update(aseguradoras)
+      .set({ activo: !aseguradora.activo })
+      .where(eq(aseguradoras.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Servicios Aseguradora (Insurance Services)
+  async createServicioAseguradora(servicio: InsertServicioAseguradora): Promise<ServicioAseguradora> {
+    const [newServicio] = await db.insert(serviciosAseguradora).values(servicio).returning();
+    return newServicio;
+  }
+
+  async getServicioAseguradoraById(id: string): Promise<ServicioAseguradoraWithDetails | undefined> {
+    const result = await db.query.serviciosAseguradora.findFirst({
+      where: eq(serviciosAseguradora.id, id),
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
+          },
+        },
+        aseguradora: true,
+        aprobadoPorUsuario: true,
+        rechazadoPorUsuario: true,
+      },
+    });
+    return result as ServicioAseguradoraWithDetails | undefined;
+  }
+
+  async getServicioAseguradoraByServicioId(servicioId: string): Promise<ServicioAseguradoraWithDetails | undefined> {
+    const result = await db.query.serviciosAseguradora.findFirst({
+      where: eq(serviciosAseguradora.servicioId, servicioId),
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
+          },
+        },
+        aseguradora: true,
+        aprobadoPorUsuario: true,
+        rechazadoPorUsuario: true,
+      },
+    });
+    return result as ServicioAseguradoraWithDetails | undefined;
+  }
+
+  async getServiciosAseguradoraByAseguradoraId(aseguradoraId: string): Promise<ServicioAseguradoraWithDetails[]> {
+    const results = await db.query.serviciosAseguradora.findMany({
+      where: eq(serviciosAseguradora.aseguradoraId, aseguradoraId),
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
+          },
+        },
+        aseguradora: true,
+        aprobadoPorUsuario: true,
+        rechazadoPorUsuario: true,
+      },
+      orderBy: desc(serviciosAseguradora.createdAt),
+    });
+    return results as ServicioAseguradoraWithDetails[];
+  }
+
+  async getServiciosAseguradoraPendientes(aseguradoraId: string): Promise<ServicioAseguradoraWithDetails[]> {
+    const results = await db.query.serviciosAseguradora.findMany({
+      where: and(
+        eq(serviciosAseguradora.aseguradoraId, aseguradoraId),
+        isNull(serviciosAseguradora.aprobadoPor),
+        isNull(serviciosAseguradora.rechazadoPor)
+      ),
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
+          },
+        },
+        aseguradora: true,
+        aprobadoPorUsuario: true,
+        rechazadoPorUsuario: true,
+      },
+      orderBy: desc(serviciosAseguradora.createdAt),
+    });
+    return results as ServicioAseguradoraWithDetails[];
+  }
+
+  async aprobarServicioAseguradora(id: string, userId: string, montoAprobado: string): Promise<ServicioAseguradora> {
+    const [updated] = await db
+      .update(serviciosAseguradora)
+      .set({
+        aprobadoPor: userId,
+        fechaAprobacion: new Date(),
+        montoAprobado: montoAprobado,
+      })
+      .where(eq(serviciosAseguradora.id, id))
+      .returning();
+    
+    // Update the service status in servicios table
+    const servicioAseg = await this.getServicioAseguradoraById(id);
+    if (servicioAseg?.servicioId) {
+      await db
+        .update(servicios)
+        .set({ aseguradoraEstado: 'aprobado' })
+        .where(eq(servicios.id, servicioAseg.servicioId));
+    }
+    
+    return updated;
+  }
+
+  async rechazarServicioAseguradora(id: string, userId: string, motivo: string): Promise<ServicioAseguradora> {
+    const [updated] = await db
+      .update(serviciosAseguradora)
+      .set({
+        rechazadoPor: userId,
+        fechaRechazo: new Date(),
+        motivoRechazo: motivo,
+      })
+      .where(eq(serviciosAseguradora.id, id))
+      .returning();
+    
+    // Update the service status in servicios table
+    const servicioAseg = await this.getServicioAseguradoraById(id);
+    if (servicioAseg?.servicioId) {
+      await db
+        .update(servicios)
+        .set({ aseguradoraEstado: 'rechazado' })
+        .where(eq(servicios.id, servicioAseg.servicioId));
+    }
+    
+    return updated;
+  }
+
+  async marcarServicioAseguradoraFacturado(id: string, numeroFactura: string): Promise<ServicioAseguradora> {
+    const [updated] = await db
+      .update(serviciosAseguradora)
+      .set({
+        estadoPago: 'facturado',
+        numeroFactura: numeroFactura,
+        fechaFactura: new Date(),
+      })
+      .where(eq(serviciosAseguradora.id, id))
+      .returning();
+    return updated;
+  }
+
+  async marcarServicioAseguradoraPagado(id: string): Promise<ServicioAseguradora> {
+    const [updated] = await db
+      .update(serviciosAseguradora)
+      .set({
+        estadoPago: 'pagado',
+        fechaPago: new Date(),
+      })
+      .where(eq(serviciosAseguradora.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getResumenAseguradora(aseguradoraId: string, startDate?: string, endDate?: string): Promise<{
+    totalServicios: number;
+    pendientes: number;
+    aprobados: number;
+    rechazados: number;
+    montoTotal: number;
+    montoPendiente: number;
+    montoFacturado: number;
+    montoPagado: number;
+  }> {
+    let query = db
+      .select()
+      .from(serviciosAseguradora)
+      .where(eq(serviciosAseguradora.aseguradoraId, aseguradoraId));
+    
+    const allServicios = await query;
+    
+    let filteredServicios = allServicios;
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      filteredServicios = allServicios.filter(s => {
+        const created = new Date(s.createdAt);
+        return created >= start && created <= end;
+      });
+    }
+    
+    const pendientes = filteredServicios.filter(s => !s.aprobadoPor && !s.rechazadoPor);
+    const aprobados = filteredServicios.filter(s => s.aprobadoPor);
+    const rechazados = filteredServicios.filter(s => s.rechazadoPor);
+    
+    const montoTotal = aprobados.reduce((sum, s) => sum + (parseFloat(s.montoAprobado || '0')), 0);
+    const montoPendiente = aprobados.filter(s => s.estadoPago === 'pendiente_facturar').reduce((sum, s) => sum + (parseFloat(s.montoAprobado || '0')), 0);
+    const montoFacturado = aprobados.filter(s => s.estadoPago === 'facturado').reduce((sum, s) => sum + (parseFloat(s.montoAprobado || '0')), 0);
+    const montoPagado = aprobados.filter(s => s.estadoPago === 'pagado').reduce((sum, s) => sum + (parseFloat(s.montoAprobado || '0')), 0);
+    
+    return {
+      totalServicios: filteredServicios.length,
+      pendientes: pendientes.length,
+      aprobados: aprobados.length,
+      rechazados: rechazados.length,
+      montoTotal,
+      montoPendiente,
+      montoFacturado,
+      montoPagado,
+    };
   }
 }
 
