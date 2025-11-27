@@ -385,6 +385,41 @@ export const serviciosAseguradoraRelations = relations(serviciosAseguradora, ({ 
   }),
 }));
 
+// Enum for document reminder types
+export const tipoRecordatorioEnum = pgEnum("tipo_recordatorio", [
+  "30_dias",
+  "15_dias",
+  "7_dias",
+  "vencido"
+]);
+
+// Document Reminders Table (tracks sent reminders to avoid duplicates)
+export const documentoRecordatorios = pgTable("documento_recordatorios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentoId: varchar("documento_id").notNull().references(() => documentos.id, { onDelete: "cascade" }),
+  tipoRecordatorio: tipoRecordatorioEnum("tipo_recordatorio").notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
+// System Jobs Table (tracks background job execution)
+export const systemJobs = pgTable("system_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobName: text("job_name").notNull().unique(),
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at"),
+  isRunning: boolean("is_running").default(false).notNull(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Document reminder relations
+export const documentoRecordatoriosRelations = relations(documentoRecordatorios, ({ one }) => ({
+  documento: one(documentos, {
+    fields: [documentoRecordatorios.documentoId],
+    references: [documentos.id],
+  }),
+}));
+
 // Validation functions
 const validarCedulaRD = (cedula: string): boolean => {
   if (!/^\d{11}$/.test(cedula)) return false;
@@ -634,4 +669,33 @@ export type ServicioAseguradoraWithDetails = ServicioAseguradora & {
   aseguradora?: Aseguradora;
   aprobadoPorUsuario?: User;
   rechazadoPorUsuario?: User;
+};
+
+// Document Reminder Types
+export const insertDocumentoRecordatorioSchema = createInsertSchema(documentoRecordatorios).omit({
+  id: true,
+  sentAt: true,
+});
+
+export const selectDocumentoRecordatorioSchema = createSelectSchema(documentoRecordatorios);
+
+export type InsertDocumentoRecordatorio = z.infer<typeof insertDocumentoRecordatorioSchema>;
+export type DocumentoRecordatorio = typeof documentoRecordatorios.$inferSelect;
+
+// System Jobs Types
+export const insertSystemJobSchema = createInsertSchema(systemJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const selectSystemJobSchema = createSelectSchema(systemJobs);
+
+export type InsertSystemJob = z.infer<typeof insertSystemJobSchema>;
+export type SystemJob = typeof systemJobs.$inferSelect;
+
+// Helper types for document validation
+export type DocumentoWithReminderStatus = Documento & {
+  diasRestantes?: number;
+  recordatoriosEnviados?: DocumentoRecordatorio[];
+  conductor?: Conductor;
 };

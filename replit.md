@@ -60,6 +60,37 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 
 ## Recent Changes
 
+### November 27, 2025 - Module 2.6: Annual Document Validation System
+- **Module 2.6 - Sistema de Validaciones Anuales - ✅ COMPLETE**
+  - Implemented background document validation service:
+    - Runs every 6 hours to check document expirations
+    - Sends push notification reminders at 30, 15, and 7 days before expiration
+    - Automatically suspends drivers with expired required documents
+  - Database schema additions:
+    - `documento_recordatorios`: Tracks sent expiration reminders
+    - `system_jobs`: Tracks background job execution status
+  - New storage methods:
+    - `getDocumentosProximosAVencer(dias)`: Get expiring documents
+    - `getDocumentosVencidos()`: Get expired documents
+    - `getConductoresConDocumentosVencidos()`: Get drivers with expired docs
+    - `suspenderConductorPorDocumento()`: Suspend driver for expired documents
+    - `reactivarConductor()`: Reactivate suspended driver
+    - `getDriverDocumentStatusSummary()`: Document status summary for driver
+  - New API endpoints:
+    - `GET /api/admin/documents/expiring`: Documents expiring within X days
+    - `GET /api/admin/documents/expired`: All expired documents
+    - `GET /api/admin/drivers/expired-documents`: Drivers with expired docs
+    - `POST /api/admin/documents/run-validation`: Manually trigger validation
+    - `GET /api/admin/documents/validation-status`: Get job status
+    - `POST /api/admin/drivers/:driverId/suspend`: Suspend driver manually
+    - `POST /api/admin/drivers/:driverId/reactivate`: Reactivate driver
+    - `GET /api/drivers/me/document-status`: Driver document summary
+  - Driver renewal page at `/driver/renovar-documentos`:
+    - Document status summary with progress indicator
+    - Alerts for expired and expiring documents
+    - Upload interface for document renewal with expiration dates
+  - Route added to App.tsx
+
 ### November 26, 2025 - Module 1.9: Insurance Validation System
 - **Module 1.9 - Insurance Validation - ✅ COMPLETE**
   - Implemented admin panel for insurance claim validation at `/admin/insurance`

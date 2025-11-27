@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertCircle, Clock } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiRequest } from '@/lib/queryClient';
-import logoUrl from '@assets/Grúa_20251124_024218_0000_1763966543810.png';
+import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 export default function VerifyOTP() {
   const [location, setLocation] = useLocation();

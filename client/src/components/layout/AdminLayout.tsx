@@ -29,7 +29,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import logoUrl from '@assets/Grúa_20251124_024218_0000_1763966543810.png';
+import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 interface AdminLayoutProps {
   children: ReactNode;

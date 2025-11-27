@@ -33,14 +33,14 @@
 - ✅ Módulo Admin: Gestión de tarifas dinámicas
 
 ### 🔄 FASE 2 - AUTOMATIZACIONES Y PORTALES AVANZADOS (EN PROGRESO)
-- 📋 Integración APIs de aseguradoras dominicanas
-- 📋 Portal web para aseguradoras (nuevo rol)
-- 📋 Analítica avanzada con gráficas y KPIs
-- 📋 Sistema de comisiones automático mejorado
-- 📋 Portal de socios/inversores
-- 📋 Sistema de validaciones anuales
-- 📋 Centro de soporte con tickets
-- 📋 Mensajes predefinidos en chat
+- ✅ Integración APIs de aseguradoras dominicanas (Módulo 2.1)
+- ✅ Portal web para aseguradoras con nuevo rol (Módulo 2.2)
+- ✅ Analítica avanzada con gráficas y KPIs (Módulo 2.3)
+- 📋 Sistema de comisiones automático mejorado (Módulo 2.4)
+- 📋 Portal de socios/inversores (Módulo 2.5)
+- ✅ Sistema de validaciones anuales de documentos (Módulo 2.6)
+- 📋 Centro de soporte con tickets (Módulo 2.7)
+- 📋 Mensajes predefinidos en chat (Módulo 2.8)
 
 ### ❌ FASE 3 - CALIDAD, TESTING Y OPTIMIZACIÓN (PENDIENTE)
 - Testing E2E completo con Playwright
@@ -1150,15 +1150,15 @@
 
 ---
 
-## 2.6 Sistema de Validaciones Anuales
+## 2.6 Sistema de Validaciones Anuales ✅ COMPLETADO
 
-### Tareas:
+### Implementación:
 
-#### 2.6.1 Recordatorios de vencimiento
-1. **Job de verificación diaria**
-   - Usar cron job o similar
-   - Revisar documentos próximos a vencer
-   - Enviar notificaciones:
+#### 2.6.1 Recordatorios de vencimiento ✅
+1. **Servicio de verificación automático**
+   - Servicio en background que se ejecuta cada 6 horas
+   - Revisa documentos próximos a vencer
+   - Envía notificaciones push:
      - 30 días antes
      - 15 días antes
      - 7 días antes
@@ -1170,17 +1170,26 @@
      - Notificar al conductor
      - No recibe más solicitudes hasta renovar
 
-#### 2.6.2 Portal de renovación
+#### 2.6.2 Portal de renovación ✅
 1. **Conductor puede renovar**
-   - Página `/driver/renovar-documentos`
-   - Subir nuevos documentos
-   - Fecha de vencimiento actualizada
-   - Admin debe aprobar nuevamente
+   - ✅ Página `/driver/renovar-documentos` implementada
+   - ✅ Subir nuevos documentos con fecha de vencimiento
+   - ✅ Vista de estado de todos los documentos
+   - ✅ Alertas para documentos vencidos/por vencer
+   - ✅ Admin debe aprobar nuevamente
+
+### Componentes implementados:
+- `server/services/document-validation.ts`: Servicio de validación automático
+- `client/src/pages/driver/document-renewal.tsx`: Página de renovación de documentos
+- Tablas: `documento_recordatorios`, `system_jobs`
+- APIs: `/api/admin/documents/expiring`, `/api/admin/documents/expired`, `/api/admin/documents/run-validation`, etc.
 
 ### Criterios de aceptación:
-- ✅ Sistema envía recordatorios automáticos
-- ✅ Conductores con documentos vencidos son suspendidos
-- ✅ Conductor puede renovar documentos
+- ✅ Sistema envía recordatorios automáticos (30, 15, 7 días antes)
+- ✅ Conductores con documentos vencidos son suspendidos automáticamente
+- ✅ Conductor puede renovar documentos desde su portal
+- ✅ Admin puede ver documentos vencidos/por vencer
+- ✅ Admin puede suspender/reactivar conductores manualmente
 - ✅ Admin valida renovaciones
 
 ---

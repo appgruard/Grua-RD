@@ -21,6 +21,7 @@ const ClientProfile = lazy(() => import('@/pages/client/profile'));
 const DriverDashboard = lazy(() => import('@/pages/driver/dashboard'));
 const DriverHistory = lazy(() => import('@/pages/driver/history'));
 const DriverProfile = lazy(() => import('@/pages/driver/profile'));
+const DriverDocumentRenewal = lazy(() => import('@/pages/driver/document-renewal'));
 
 const AdminDashboard = lazy(() => import('@/pages/admin/dashboard'));
 const AdminAnalytics = lazy(() => import('@/pages/admin/analytics'));
@@ -137,6 +138,13 @@ function Router() {
       </Route>
 
       {/* Driver Routes - Most specific first */}
+      <Route path="/driver/renovar-documentos">
+        <ProtectedRoute allowedTypes={['conductor']}>
+          <MobileLayout userType="conductor">
+            <DriverDocumentRenewal />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/driver/history">
         <ProtectedRoute allowedTypes={['conductor']}>
           <MobileLayout userType="conductor">

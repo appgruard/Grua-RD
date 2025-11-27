@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import logoUrl from '@assets/Grúa_20251124_024218_0000_1763966543810.png';
+import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 type FormErrors = {
   email?: string;

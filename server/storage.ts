@@ -14,6 +14,8 @@ import {
   comisiones,
   aseguradoras,
   serviciosAseguradora,
+  documentoRecordatorios,
+  systemJobs,
   type User,
   type InsertUser,
   type Conductor,
@@ -39,6 +41,10 @@ import {
   type InsertAseguradora,
   type ServicioAseguradora,
   type InsertServicioAseguradora,
+  type DocumentoRecordatorio,
+  type InsertDocumentoRecordatorio,
+  type SystemJob,
+  type InsertSystemJob,
   type UserWithConductor,
   type ServicioWithDetails,
   type MensajeChatWithRemitente,
@@ -231,6 +237,33 @@ export interface IStorage {
     montoFacturado: number;
     montoPagado: number;
   }>;
+
+  // Document Validation System (Module 2.6)
+  getDocumentosProximosAVencer(dias: number): Promise<Array<Documento & { conductor?: Conductor; user?: User }>>;
+  getDocumentosVencidos(): Promise<Array<Documento & { conductor?: Conductor; user?: User }>>;
+  getRecordatoriosEnviados(documentoId: string): Promise<DocumentoRecordatorio[]>;
+  registrarRecordatorioEnviado(documentoId: string, tipoRecordatorio: '30_dias' | '15_dias' | '7_dias' | 'vencido'): Promise<DocumentoRecordatorio>;
+  hasRecordatorioSent(documentoId: string, tipoRecordatorio: '30_dias' | '15_dias' | '7_dias' | 'vencido'): Promise<boolean>;
+  
+  // Driver Suspension/Reactivation
+  suspenderConductorPorDocumento(conductorId: string, motivo: string): Promise<void>;
+  reactivarConductor(conductorId: string): Promise<void>;
+  getConductoresConDocumentosVencidos(): Promise<Array<Conductor & { user: User; documentosVencidos: Documento[] }>>;
+  getDriverDocumentStatusSummary(conductorId: string): Promise<{
+    totalDocumentos: number;
+    documentosAprobados: number;
+    documentosPendientes: number;
+    documentosRechazados: number;
+    documentosVencidos: number;
+    documentosProximosAVencer: number;
+    puedeEstarEnLinea: boolean;
+    documentos: Documento[];
+  }>;
+
+  // System Jobs
+  getSystemJob(jobName: string): Promise<SystemJob | undefined>;
+  createOrUpdateSystemJob(jobName: string, data: Partial<SystemJob>): Promise<SystemJob>;
+  setJobRunning(jobName: string, isRunning: boolean): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1649,6 +1682,222 @@ export class DatabaseStorage implements IStorage {
       montoFacturado,
       montoPagado,
     };
+  }
+
+  // Document Validation System (Module 2.6)
+  async getDocumentosProximosAVencer(dias: number): Promise<Array<Documento & { conductor?: Conductor; user?: User }>> {
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + dias);
+    
+    const results = await db.query.documentos.findMany({
+      where: and(
+        eq(documentos.estado, 'aprobado'),
+        gte(documentos.validoHasta, now),
+        lte(documentos.validoHasta, futureDate)
+      ),
+      with: {
+        conductor: true,
+        usuario: true,
+      },
+    });
+    
+    return results.map(doc => ({
+      ...doc,
+      user: doc.usuario,
+    }));
+  }
+
+  async getDocumentosVencidos(): Promise<Array<Documento & { conductor?: Conductor; user?: User }>> {
+    const now = new Date();
+    
+    const results = await db.query.documentos.findMany({
+      where: and(
+        eq(documentos.estado, 'aprobado'),
+        lte(documentos.validoHasta, now)
+      ),
+      with: {
+        conductor: true,
+        usuario: true,
+      },
+    });
+    
+    return results.map(doc => ({
+      ...doc,
+      user: doc.usuario,
+    }));
+  }
+
+  async getRecordatoriosEnviados(documentoId: string): Promise<DocumentoRecordatorio[]> {
+    return db
+      .select()
+      .from(documentoRecordatorios)
+      .where(eq(documentoRecordatorios.documentoId, documentoId))
+      .orderBy(desc(documentoRecordatorios.sentAt));
+  }
+
+  async registrarRecordatorioEnviado(documentoId: string, tipoRecordatorio: '30_dias' | '15_dias' | '7_dias' | 'vencido'): Promise<DocumentoRecordatorio> {
+    const [recordatorio] = await db
+      .insert(documentoRecordatorios)
+      .values({
+        documentoId,
+        tipoRecordatorio,
+      })
+      .returning();
+    return recordatorio;
+  }
+
+  async hasRecordatorioSent(documentoId: string, tipoRecordatorio: '30_dias' | '15_dias' | '7_dias' | 'vencido'): Promise<boolean> {
+    const [existing] = await db
+      .select()
+      .from(documentoRecordatorios)
+      .where(and(
+        eq(documentoRecordatorios.documentoId, documentoId),
+        eq(documentoRecordatorios.tipoRecordatorio, tipoRecordatorio)
+      ))
+      .limit(1);
+    return !!existing;
+  }
+
+  async suspenderConductorPorDocumento(conductorId: string, motivo: string): Promise<void> {
+    const conductor = await this.getConductorById(conductorId);
+    if (!conductor) return;
+    
+    await db
+      .update(conductores)
+      .set({ disponible: false })
+      .where(eq(conductores.id, conductorId));
+    
+    await db
+      .update(users)
+      .set({ estadoCuenta: 'suspendido' })
+      .where(eq(users.id, conductor.userId));
+  }
+
+  async reactivarConductor(conductorId: string): Promise<void> {
+    const conductor = await this.getConductorById(conductorId);
+    if (!conductor) return;
+    
+    await db
+      .update(users)
+      .set({ estadoCuenta: 'activo' })
+      .where(eq(users.id, conductor.userId));
+  }
+
+  async getConductoresConDocumentosVencidos(): Promise<Array<Conductor & { user: User; documentosVencidos: Documento[] }>> {
+    const now = new Date();
+    const allConductores = await db.query.conductores.findMany({
+      with: {
+        user: true,
+      },
+    });
+    
+    const result: Array<Conductor & { user: User; documentosVencidos: Documento[] }> = [];
+    
+    for (const conductor of allConductores) {
+      const docs = await db
+        .select()
+        .from(documentos)
+        .where(and(
+          eq(documentos.conductorId, conductor.id),
+          eq(documentos.estado, 'aprobado'),
+          lte(documentos.validoHasta, now)
+        ));
+      
+      if (docs.length > 0) {
+        result.push({
+          ...conductor,
+          documentosVencidos: docs,
+        });
+      }
+    }
+    
+    return result;
+  }
+
+  async getDriverDocumentStatusSummary(conductorId: string): Promise<{
+    totalDocumentos: number;
+    documentosAprobados: number;
+    documentosPendientes: number;
+    documentosRechazados: number;
+    documentosVencidos: number;
+    documentosProximosAVencer: number;
+    puedeEstarEnLinea: boolean;
+    documentos: Documento[];
+  }> {
+    const now = new Date();
+    const in30Days = new Date();
+    in30Days.setDate(in30Days.getDate() + 30);
+    
+    const docs = await db
+      .select()
+      .from(documentos)
+      .where(eq(documentos.conductorId, conductorId));
+    
+    const aprobados = docs.filter(d => d.estado === 'aprobado');
+    const pendientes = docs.filter(d => d.estado === 'pendiente');
+    const rechazados = docs.filter(d => d.estado === 'rechazado');
+    
+    const vencidos = aprobados.filter(d => d.validoHasta && new Date(d.validoHasta) < now);
+    const proximosAVencer = aprobados.filter(d => {
+      if (!d.validoHasta) return false;
+      const expDate = new Date(d.validoHasta);
+      return expDate >= now && expDate <= in30Days;
+    });
+    
+    const requiredTypes = ['licencia', 'matricula', 'seguro_grua', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
+    const validDocs = aprobados.filter(d => {
+      if (!d.validoHasta) return true;
+      return new Date(d.validoHasta) >= now;
+    });
+    const validDocTypes = validDocs.map(d => d.tipo);
+    const hasAllRequired = requiredTypes.every(t => validDocTypes.includes(t as any));
+    
+    return {
+      totalDocumentos: docs.length,
+      documentosAprobados: aprobados.length,
+      documentosPendientes: pendientes.length,
+      documentosRechazados: rechazados.length,
+      documentosVencidos: vencidos.length,
+      documentosProximosAVencer: proximosAVencer.length,
+      puedeEstarEnLinea: hasAllRequired,
+      documentos: docs,
+    };
+  }
+
+  async getSystemJob(jobName: string): Promise<SystemJob | undefined> {
+    const [job] = await db
+      .select()
+      .from(systemJobs)
+      .where(eq(systemJobs.jobName, jobName))
+      .limit(1);
+    return job;
+  }
+
+  async createOrUpdateSystemJob(jobName: string, data: Partial<SystemJob>): Promise<SystemJob> {
+    const existing = await this.getSystemJob(jobName);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(systemJobs)
+        .set(data)
+        .where(eq(systemJobs.jobName, jobName))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(systemJobs)
+        .values({
+          jobName,
+          ...data,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async setJobRunning(jobName: string, isRunning: boolean): Promise<void> {
+    await this.createOrUpdateSystemJob(jobName, { isRunning });
   }
 }
 

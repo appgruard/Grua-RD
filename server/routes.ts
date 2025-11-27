@@ -19,6 +19,7 @@ import { z } from "zod";
 import { uploadDocument, getDocument, isStorageInitialized } from "./services/object-storage";
 import { pdfService } from "./services/pdf-service";
 import { insuranceValidationService, getSupportedInsurers, InsurerCode } from "./services/insurance";
+import { documentValidationService } from "./services/document-validation";
 
 // Zod validation schemas for aseguradora/admin endpoints
 const updateAseguradoraPerfilSchema = z.object({
@@ -2375,6 +2376,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get all documents error', error);
       res.status(500).json({ message: "Failed to get all documents" });
+    }
+  });
+
+  // ============================================
+  // Document Validation System (Module 2.6)
+  // ============================================
+
+  // Get documents expiring within X days (admin only)
+  app.get("/api/admin/documents/expiring", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const dias = parseInt(req.query.dias as string) || 30;
+      const documentos = await storage.getDocumentosProximosAVencer(dias);
+      res.json(documentos);
+    } catch (error: any) {
+      logSystem.error('Get expiring documents error', error);
+      res.status(500).json({ message: "Failed to get expiring documents" });
+    }
+  });
+
+  // Get expired documents (admin only)
+  app.get("/api/admin/documents/expired", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const documentos = await storage.getDocumentosVencidos();
+      res.json(documentos);
+    } catch (error: any) {
+      logSystem.error('Get expired documents error', error);
+      res.status(500).json({ message: "Failed to get expired documents" });
+    }
+  });
+
+  // Get drivers with expired documents (admin only)
+  app.get("/api/admin/drivers/expired-documents", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductores = await storage.getConductoresConDocumentosVencidos();
+      res.json(conductores);
+    } catch (error: any) {
+      logSystem.error('Get drivers with expired documents error', error);
+      res.status(500).json({ message: "Failed to get drivers with expired documents" });
+    }
+  });
+
+  // Manually trigger document validation check (admin only)
+  app.post("/api/admin/documents/run-validation", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const result = await documentValidationService.forceRunCheck();
+      logSystem.info('Manual document validation triggered by admin', { adminId: req.user!.id, result });
+      res.json({
+        message: "Validación de documentos ejecutada",
+        ...result,
+      });
+    } catch (error: any) {
+      logSystem.error('Manual document validation error', error);
+      res.status(500).json({ message: "Failed to run document validation" });
+    }
+  });
+
+  // Get document validation job status (admin only)
+  app.get("/api/admin/documents/validation-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const status = await documentValidationService.getJobStatus();
+      res.json(status);
+    } catch (error: any) {
+      logSystem.error('Get validation status error', error);
+      res.status(500).json({ message: "Failed to get validation status" });
+    }
+  });
+
+  // Suspend driver for expired documents (admin only)
+  app.post("/api/admin/drivers/:driverId/suspend", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { driverId } = req.params;
+      const { motivo } = req.body;
+      
+      if (!motivo) {
+        return res.status(400).json({ message: "Motivo de suspensión es requerido" });
+      }
+
+      await storage.suspenderConductorPorDocumento(driverId, motivo);
+      
+      const conductor = await storage.getConductorById(driverId);
+      if (conductor) {
+        await pushService.sendNotification(
+          conductor.userId,
+          'Cuenta Suspendida',
+          `Tu cuenta ha sido suspendida: ${motivo}`,
+          { type: 'account_suspended', reason: 'admin_action' }
+        );
+      }
+      
+      logSystem.info('Driver suspended by admin', { adminId: req.user!.id, driverId, motivo });
+      res.json({ message: "Conductor suspendido exitosamente" });
+    } catch (error: any) {
+      logSystem.error('Suspend driver error', error);
+      res.status(500).json({ message: "Failed to suspend driver" });
+    }
+  });
+
+  // Reactivate driver (admin only)
+  app.post("/api/admin/drivers/:driverId/reactivate", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { driverId } = req.params;
+      
+      await storage.reactivarConductor(driverId);
+      
+      const conductor = await storage.getConductorById(driverId);
+      if (conductor) {
+        await pushService.sendNotification(
+          conductor.userId,
+          'Cuenta Reactivada',
+          'Tu cuenta ha sido reactivada. Ya puedes volver a aceptar servicios.',
+          { type: 'account_reactivated' }
+        );
+      }
+      
+      logSystem.info('Driver reactivated by admin', { adminId: req.user!.id, driverId });
+      res.json({ message: "Conductor reactivado exitosamente" });
+    } catch (error: any) {
+      logSystem.error('Reactivate driver error', error);
+      res.status(500).json({ message: "Failed to reactivate driver" });
+    }
+  });
+
+  // Driver document status summary (for driver dashboard)
+  app.get("/api/drivers/me/document-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const summary = await storage.getDriverDocumentStatusSummary(conductor.id);
+      res.json(summary);
+    } catch (error: any) {
+      logSystem.error('Get driver document status error', error);
+      res.status(500).json({ message: "Failed to get document status" });
     }
   });
 
