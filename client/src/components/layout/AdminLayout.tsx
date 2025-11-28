@@ -13,6 +13,7 @@ import {
   FolderOpen,
   Shield,
   Building2,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ const menuItems = [
   { path: '/admin/documents', icon: FolderOpen, label: 'Documentos', testId: 'nav-documents' },
   { path: '/admin/insurance', icon: Shield, label: 'Validación Seguros', testId: 'nav-insurance' },
   { path: '/admin/aseguradoras', icon: Building2, label: 'Gestión Aseguradoras', testId: 'nav-aseguradoras' },
+  { path: '/admin/tickets', icon: MessageCircle, label: 'Tickets Soporte', testId: 'nav-tickets' },
 ];
 
 function AppSidebar() {

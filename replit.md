@@ -29,7 +29,7 @@ Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js 
 - **Authentication & Security**: Role-based authentication (Client/Driver/Admin) with Passport.js, bcrypt, session management.
 - **Client Features**: Map-based service requests, real-time GPS tracking, service history, user profiles, automatic price calculation.
 - **Driver Features**: Dashboard with requests, accept/reject services, real-time GPS updates, status management, service history, availability toggle, truck information.
-- **Admin Features**: Dashboard with statistics, user/driver management, real-time service monitoring, dynamic tariff configuration (CRUD), insurance claim validation, analytics with heatmap and KPIs, annual document validation.
+- **Admin Features**: Dashboard with statistics, user/driver management, real-time service monitoring, dynamic tariff configuration (CRUD), insurance claim validation, analytics with heatmap and KPIs, annual document validation, ticket support system management.
 - **Real-time Communication**: WebSockets for location updates and client-driver chat with message persistence.
 - **Push Notifications**: Web Push API integration for service updates and chat messages.
 - **PWA Capabilities**: `manifest.json` for installability, service worker (`sw.js`) for static asset caching and offline support.
@@ -41,6 +41,7 @@ Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js 
 - **Production Readiness**: Environment variables documentation, pre-deployment validation, deployment guide, Capacitor configuration for Android APK, Lighthouse optimization.
 - **Insurance Integration**: Adapter pattern for multiple insurance company APIs (e.g., ASSA, Connect), policy validation, towing authorization requests, claim submission.
 - **Intermediate Service States**: Granular service states (`conductor_en_sitio`, `cargando`) for detailed tracking.
+- **Support Ticket System**: Complete ticket management for clients and drivers (/client/support, /driver/support) with category-based tickets (technical, service inquiry, complaint, suggestion, payment issue), priority levels (low, medium, high, urgent), state tracking (open, in_process, resolved, closed), message threading, and admin panel (/admin/tickets) for queue management, ticket assignment, and statistics.
 
 ### System Design Choices
 The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket communication employs service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage utilizes Replit Object Storage with strict authorization. Stripe integration prioritizes server-side processing and webhook verification. Insurance API integrations use an Adapter pattern.

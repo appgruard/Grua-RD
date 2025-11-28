@@ -3,7 +3,7 @@
 
 ---
 
-## 📊 Estado Actual del Proyecto (Actualizado: 26 Noviembre 2025)
+## 📊 Estado Actual del Proyecto (Actualizado: 28 Noviembre 2025)
 
 ### ✅ FASE 0 - FUNDAMENTOS DE PLATAFORMA (100% COMPLETO)
 - ✅ Autenticación con Passport.js (email/contraseña)
@@ -39,7 +39,7 @@
 - 📋 Sistema de comisiones automático mejorado (Módulo 2.4)
 - 📋 Portal de socios/inversores (Módulo 2.5)
 - ✅ Sistema de validaciones anuales de documentos (Módulo 2.6)
-- 📋 Centro de soporte con tickets (Módulo 2.7)
+- ✅ Centro de soporte con tickets (Módulo 2.7)
 - 📋 Mensajes predefinidos en chat (Módulo 2.8)
 
 ### ❌ FASE 3 - CALIDAD, TESTING Y OPTIMIZACIÓN (PENDIENTE)
@@ -1194,25 +1194,28 @@
 
 ---
 
-## 2.7 Centro de Soporte con Tickets
+## 2.7 Centro de Soporte con Tickets ✅ (Completado 28 Nov 2025)
 
 ### Tareas:
 
-#### 2.7.1 Sistema de tickets
-1. **Schema de tickets**
+#### 2.7.1 Sistema de tickets ✅
+1. **Schema de tickets** ✅
    ```typescript
    export const tickets = pgTable("tickets", {
      id: varchar("id").primaryKey(),
      usuarioId: varchar("usuario_id").references(() => users.id),
      categoria: ticketCategoriaEnum("categoria"), 
-     // problema_tecnico, consulta_servicio, queja, sugerencia
+     // problema_tecnico, consulta_servicio, queja, sugerencia, problema_pago, otro
      titulo: text("titulo"),
      descripcion: text("descripcion"),
-     prioridad: ticketPrioridadEnum("prioridad"), // baja, media, alta
+     prioridad: ticketPrioridadEnum("prioridad"), // baja, media, alta, urgente
      estado: ticketEstadoEnum("estado"), // abierto, en_proceso, resuelto, cerrado
      asignadoA: varchar("asignado_a").references(() => users.id),
+     servicioRelacionadoId: varchar("servicio_relacionado_id").references(() => servicios.id),
      createdAt: timestamp("created_at").defaultNow(),
+     updatedAt: timestamp("updated_at").defaultNow(),
      resueltoAt: timestamp("resuelto_at"),
+     cerradoAt: timestamp("cerrado_at"),
    });
 
    export const mensajesTicket = pgTable("mensajes_ticket", {
@@ -1221,40 +1224,60 @@
      usuarioId: varchar("usuario_id").references(() => users.id),
      mensaje: text("mensaje"),
      esStaff: boolean("es_staff"),
+     leido: boolean("leido"),
      createdAt: timestamp("created_at").defaultNow(),
    });
    ```
 
-2. **Endpoints**
+2. **Endpoints** ✅
    - `POST /api/tickets` - Crear ticket
    - `GET /api/tickets` - Listar mis tickets
-   - `GET /api/tickets/:id` - Ver ticket
-   - `POST /api/tickets/:id/mensaje` - Responder
+   - `GET /api/tickets/:id` - Ver ticket con detalles
+   - `GET /api/tickets/:id/mensajes` - Obtener mensajes del ticket
+   - `POST /api/tickets/:id/mensaje` - Responder ticket
    - `PUT /api/tickets/:id/cerrar` - Cerrar ticket
+   - `GET /api/admin/tickets` - Listar todos los tickets (admin)
+   - `GET /api/admin/tickets/stats` - Estadísticas de tickets
+   - `GET /api/admin/tickets/mis-asignados` - Tickets asignados al admin
+   - `PUT /api/admin/tickets/:id/asignar` - Asignar ticket a admin
+   - `PUT /api/admin/tickets/:id/estado` - Cambiar estado del ticket
+   - `PUT /api/admin/tickets/:id/prioridad` - Cambiar prioridad del ticket
 
-#### 2.7.2 UI para clientes y conductores
-1. **Botón de soporte en app**
-   - Acceso desde menú principal
-   - Formulario de nuevo ticket
-   - Ver mis tickets abiertos
-   - Chat de ticket
+#### 2.7.2 UI para clientes y conductores ✅
+1. **Botón de soporte en app** ✅
+   - ✅ Acceso desde menú principal (/client/support, /driver/support)
+   - ✅ Formulario de nuevo ticket con categoría, título, descripción, prioridad
+   - ✅ Ver mis tickets abiertos con estado y prioridad visual
+   - ✅ Vista detallada con conversación de mensajes
+   - ✅ Posibilidad de cerrar ticket por el usuario
 
-#### 2.7.3 Panel admin de tickets
-1. **Cola de tickets**
-   - Ver todos los tickets
-   - Filtros:
-     - Estado
-     - Prioridad
-     - Categoría
-   - Asignar a staff
-   - Responder tickets
-   - Cerrar tickets
+#### 2.7.3 Panel admin de tickets ✅
+1. **Cola de tickets** ✅
+   - ✅ Ver todos los tickets con estadísticas (total, abiertos, en proceso, resueltos, cerrados, urgentes, sin asignar)
+   - ✅ Filtros por estado, prioridad y categoría
+   - ✅ Tab "Mis Asignados" para tickets del admin actual
+   - ✅ Asignar ticket a sí mismo
+   - ✅ Cambiar estado y prioridad del ticket
+   - ✅ Responder tickets con mensajes
+   - ✅ Vista detallada con información del usuario y conversación completa
+
+### Componentes implementados:
+- `shared/schema.ts`: Tablas tickets, mensajesTicket con enums y relaciones
+- `server/storage.ts`: Métodos CRUD para tickets y mensajes
+- `server/routes.ts`: 12 endpoints para gestión de tickets
+- `client/src/pages/support.tsx`: Página de soporte para clientes/conductores
+- `client/src/pages/admin/tickets.tsx`: Panel de gestión de tickets para admin
+- `client/src/components/layout/AdminLayout.tsx`: Enlace a tickets en navegación
+- Migración: `migrations/0003_ticket_support_system.sql`
 
 ### Criterios de aceptación:
-- ✅ Usuarios pueden crear tickets
-- ✅ Admin ve y gestiona tickets
-- ✅ Sistema de mensajes en ticket funciona
-- ✅ Notificaciones de nuevas respuestas
+- ✅ Usuarios pueden crear tickets con categoría, prioridad y descripción
+- ✅ Admin ve y gestiona todos los tickets
+- ✅ Sistema de mensajes en ticket funciona bidireccional
+- ✅ Admin puede asignar tickets a sí mismo
+- ✅ Admin puede cambiar estado y prioridad
+- ✅ Estadísticas de tickets disponibles para admin
+- ✅ Filtros por estado, prioridad y categoría
 
 ---
 

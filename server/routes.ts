@@ -12,7 +12,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema } from "@shared/schema";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
@@ -3856,6 +3856,307 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get active insurance companies error', error);
       res.status(500).json({ message: "Failed to get insurance companies" });
+    }
+  });
+
+  // ==================== TICKETS (Module 2.7) ====================
+
+  // Create ticket (authenticated users: clients and drivers)
+  app.post("/api/tickets", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const validationResult = insertTicketSchema.safeParse({
+      ...req.body,
+      usuarioId: req.user!.id,
+    });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de ticket inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      const ticket = await storage.createTicket(validationResult.data);
+      logSystem.info('Ticket created', { ticketId: ticket.id, userId: req.user!.id, categoria: ticket.categoria });
+      res.json(ticket);
+    } catch (error: any) {
+      logSystem.error('Create ticket error', error);
+      res.status(500).json({ message: "Error al crear ticket" });
+    }
+  });
+
+  // Get my tickets (authenticated users)
+  app.get("/api/tickets", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const tickets = await storage.getTicketsByUsuarioId(req.user!.id);
+      res.json(tickets);
+    } catch (error: any) {
+      logSystem.error('Get my tickets error', error);
+      res.status(500).json({ message: "Error al obtener tickets" });
+    }
+  });
+
+  // Get ticket by ID (authenticated users - owner or admin)
+  app.get("/api/tickets/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (ticket.usuarioId !== req.user!.id && req.user!.userType !== 'admin') {
+        return res.status(403).json({ message: "No autorizado para ver este ticket" });
+      }
+
+      res.json(ticket);
+    } catch (error: any) {
+      logSystem.error('Get ticket error', error);
+      res.status(500).json({ message: "Error al obtener ticket" });
+    }
+  });
+
+  // Add message to ticket (owner or admin)
+  app.post("/api/tickets/:id/mensaje", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const ticket = await storage.getTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket no encontrado" });
+    }
+
+    const isAdmin = req.user!.userType === 'admin';
+    if (ticket.usuarioId !== req.user!.id && !isAdmin) {
+      return res.status(403).json({ message: "No autorizado para responder este ticket" });
+    }
+
+    const validationResult = insertMensajeTicketSchema.safeParse({
+      ...req.body,
+      ticketId: req.params.id,
+      usuarioId: req.user!.id,
+      esStaff: isAdmin,
+    });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de mensaje inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      const mensaje = await storage.createMensajeTicket(validationResult.data);
+
+      if (isAdmin && ticket.estado === 'abierto') {
+        await storage.cambiarEstadoTicket(req.params.id, 'en_proceso');
+      }
+
+      logSystem.info('Ticket message sent', { ticketId: req.params.id, messageId: mensaje.id, isStaff: isAdmin });
+      res.json(mensaje);
+    } catch (error: any) {
+      logSystem.error('Create ticket message error', error);
+      res.status(500).json({ message: "Error al enviar mensaje" });
+    }
+  });
+
+  // Get ticket messages (owner or admin)
+  app.get("/api/tickets/:id/mensajes", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const ticket = await storage.getTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket no encontrado" });
+    }
+
+    if (ticket.usuarioId !== req.user!.id && req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "No autorizado para ver este ticket" });
+    }
+
+    try {
+      const mensajes = await storage.getMensajesByTicketId(req.params.id);
+      await storage.marcarMensajesTicketComoLeidos(req.params.id, req.user!.id);
+      res.json(mensajes);
+    } catch (error: any) {
+      logSystem.error('Get ticket messages error', error);
+      res.status(500).json({ message: "Error al obtener mensajes" });
+    }
+  });
+
+  // Close ticket (owner)
+  app.put("/api/tickets/:id/cerrar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const ticket = await storage.getTicketById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket no encontrado" });
+    }
+
+    if (ticket.usuarioId !== req.user!.id && req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "No autorizado para cerrar este ticket" });
+    }
+
+    try {
+      const updated = await storage.cerrarTicket(req.params.id);
+      logSystem.info('Ticket closed', { ticketId: req.params.id, closedBy: req.user!.id });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Close ticket error', error);
+      res.status(500).json({ message: "Error al cerrar ticket" });
+    }
+  });
+
+  // ==================== ADMIN TICKETS ====================
+
+  // Get all tickets (admin only)
+  app.get("/api/admin/tickets", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { estado, prioridad, categoria } = req.query;
+      
+      let tickets;
+      if (estado && typeof estado === 'string') {
+        tickets = await storage.getTicketsByEstado(estado as any);
+      } else {
+        tickets = await storage.getAllTickets();
+      }
+
+      if (prioridad && typeof prioridad === 'string') {
+        tickets = tickets.filter(t => t.prioridad === prioridad);
+      }
+      if (categoria && typeof categoria === 'string') {
+        tickets = tickets.filter(t => t.categoria === categoria);
+      }
+
+      res.json(tickets);
+    } catch (error: any) {
+      logSystem.error('Get all tickets error', error);
+      res.status(500).json({ message: "Error al obtener tickets" });
+    }
+  });
+
+  // Get ticket stats (admin only)
+  app.get("/api/admin/tickets/stats", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const stats = await storage.getTicketsStats();
+      res.json(stats);
+    } catch (error: any) {
+      logSystem.error('Get ticket stats error', error);
+      res.status(500).json({ message: "Error al obtener estadísticas" });
+    }
+  });
+
+  // Assign ticket (admin only)
+  app.put("/api/admin/tickets/:id/asignar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      const adminId = req.body.adminId || req.user!.id;
+      const updated = await storage.asignarTicket(req.params.id, adminId);
+      logSystem.info('Ticket assigned', { ticketId: req.params.id, assignedTo: adminId, assignedBy: req.user!.id });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Assign ticket error', error);
+      res.status(500).json({ message: "Error al asignar ticket" });
+    }
+  });
+
+  // Change ticket status (admin only)
+  app.put("/api/admin/tickets/:id/estado", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const { estado } = req.body;
+    if (!estado || !['abierto', 'en_proceso', 'resuelto', 'cerrado'].includes(estado)) {
+      return res.status(400).json({ message: "Estado inválido" });
+    }
+
+    try {
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      const updated = await storage.cambiarEstadoTicket(req.params.id, estado);
+      logSystem.info('Ticket status changed', { ticketId: req.params.id, newStatus: estado, changedBy: req.user!.id });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Change ticket status error', error);
+      res.status(500).json({ message: "Error al cambiar estado del ticket" });
+    }
+  });
+
+  // Update ticket priority (admin only)
+  app.put("/api/admin/tickets/:id/prioridad", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const { prioridad } = req.body;
+    if (!prioridad || !['baja', 'media', 'alta', 'urgente'].includes(prioridad)) {
+      return res.status(400).json({ message: "Prioridad inválida" });
+    }
+
+    try {
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      const updated = await storage.updateTicket(req.params.id, { prioridad });
+      logSystem.info('Ticket priority changed', { ticketId: req.params.id, newPriority: prioridad, changedBy: req.user!.id });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Change ticket priority error', error);
+      res.status(500).json({ message: "Error al cambiar prioridad del ticket" });
+    }
+  });
+
+  // Get tickets assigned to current admin
+  app.get("/api/admin/tickets/mis-asignados", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const tickets = await storage.getTicketsAsignadosA(req.user!.id);
+      res.json(tickets);
+    } catch (error: any) {
+      logSystem.error('Get assigned tickets error', error);
+      res.status(500).json({ message: "Error al obtener tickets asignados" });
     }
   });
 

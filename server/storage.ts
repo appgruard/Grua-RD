@@ -16,6 +16,8 @@ import {
   serviciosAseguradora,
   documentoRecordatorios,
   systemJobs,
+  tickets,
+  mensajesTicket,
   type User,
   type InsertUser,
   type Conductor,
@@ -52,6 +54,12 @@ import {
   type ComisionWithDetails,
   type AseguradoraWithDetails,
   type ServicioAseguradoraWithDetails,
+  type Ticket,
+  type InsertTicket,
+  type MensajeTicket,
+  type InsertMensajeTicket,
+  type TicketWithDetails,
+  type MensajeTicketWithUsuario,
 } from '@shared/schema';
 import {
   conductorStripeAccounts,
@@ -264,6 +272,32 @@ export interface IStorage {
   getSystemJob(jobName: string): Promise<SystemJob | undefined>;
   createOrUpdateSystemJob(jobName: string, data: Partial<SystemJob>): Promise<SystemJob>;
   setJobRunning(jobName: string, isRunning: boolean): Promise<void>;
+
+  // Tickets (Module 2.7)
+  createTicket(ticket: InsertTicket): Promise<Ticket>;
+  getTicketById(id: string): Promise<TicketWithDetails | undefined>;
+  getTicketsByUsuarioId(usuarioId: string): Promise<TicketWithDetails[]>;
+  getAllTickets(): Promise<TicketWithDetails[]>;
+  getTicketsByEstado(estado: 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'): Promise<TicketWithDetails[]>;
+  getTicketsAsignadosA(adminId: string): Promise<TicketWithDetails[]>;
+  updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket>;
+  asignarTicket(id: string, adminId: string): Promise<Ticket>;
+  cambiarEstadoTicket(id: string, estado: 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'): Promise<Ticket>;
+  cerrarTicket(id: string): Promise<Ticket>;
+  
+  // Mensajes de Tickets
+  createMensajeTicket(mensaje: InsertMensajeTicket): Promise<MensajeTicket>;
+  getMensajesByTicketId(ticketId: string): Promise<MensajeTicketWithUsuario[]>;
+  marcarMensajesTicketComoLeidos(ticketId: string, usuarioId: string): Promise<void>;
+  getTicketsStats(): Promise<{
+    totalTickets: number;
+    abiertos: number;
+    enProceso: number;
+    resueltos: number;
+    cerrados: number;
+    urgentes: number;
+    sinAsignar: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1898,6 +1932,241 @@ export class DatabaseStorage implements IStorage {
 
   async setJobRunning(jobName: string, isRunning: boolean): Promise<void> {
     await this.createOrUpdateSystemJob(jobName, { isRunning });
+  }
+
+  // ==================== TICKETS (Module 2.7) ====================
+
+  async createTicket(insertTicket: InsertTicket): Promise<Ticket> {
+    const [ticket] = await db.insert(tickets).values(insertTicket).returning();
+    return ticket;
+  }
+
+  async getTicketById(id: string): Promise<TicketWithDetails | undefined> {
+    const result = await db.query.tickets.findFirst({
+      where: eq(tickets.id, id),
+      with: {
+        usuario: true,
+        servicioRelacionado: true,
+        asignadoAUsuario: true,
+        mensajes: {
+          with: {
+            usuario: true,
+          },
+          orderBy: (mensajesTicket, { asc }) => [asc(mensajesTicket.createdAt)],
+        },
+      },
+    });
+    
+    if (!result) return undefined;
+    
+    return {
+      ...result,
+      mensajeCount: result.mensajes?.length || 0,
+      ultimoMensaje: result.mensajes?.[result.mensajes.length - 1],
+    } as TicketWithDetails;
+  }
+
+  async getTicketsByUsuarioId(usuarioId: string): Promise<TicketWithDetails[]> {
+    const results = await db.query.tickets.findMany({
+      where: eq(tickets.usuarioId, usuarioId),
+      with: {
+        usuario: true,
+        servicioRelacionado: true,
+        asignadoAUsuario: true,
+        mensajes: {
+          with: {
+            usuario: true,
+          },
+          orderBy: (mensajesTicket, { desc }) => [desc(mensajesTicket.createdAt)],
+          limit: 1,
+        },
+      },
+      orderBy: desc(tickets.createdAt),
+    });
+    
+    return results.map(result => ({
+      ...result,
+      mensajeCount: result.mensajes?.length || 0,
+      ultimoMensaje: result.mensajes?.[0],
+    })) as TicketWithDetails[];
+  }
+
+  async getAllTickets(): Promise<TicketWithDetails[]> {
+    const results = await db.query.tickets.findMany({
+      with: {
+        usuario: true,
+        servicioRelacionado: true,
+        asignadoAUsuario: true,
+        mensajes: {
+          with: {
+            usuario: true,
+          },
+          orderBy: (mensajesTicket, { desc }) => [desc(mensajesTicket.createdAt)],
+          limit: 1,
+        },
+      },
+      orderBy: desc(tickets.createdAt),
+    });
+    
+    return results.map(result => ({
+      ...result,
+      mensajeCount: result.mensajes?.length || 0,
+      ultimoMensaje: result.mensajes?.[0],
+    })) as TicketWithDetails[];
+  }
+
+  async getTicketsByEstado(estado: 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'): Promise<TicketWithDetails[]> {
+    const results = await db.query.tickets.findMany({
+      where: eq(tickets.estado, estado),
+      with: {
+        usuario: true,
+        servicioRelacionado: true,
+        asignadoAUsuario: true,
+        mensajes: {
+          with: {
+            usuario: true,
+          },
+          orderBy: (mensajesTicket, { desc }) => [desc(mensajesTicket.createdAt)],
+          limit: 1,
+        },
+      },
+      orderBy: desc(tickets.createdAt),
+    });
+    
+    return results.map(result => ({
+      ...result,
+      mensajeCount: result.mensajes?.length || 0,
+      ultimoMensaje: result.mensajes?.[0],
+    })) as TicketWithDetails[];
+  }
+
+  async getTicketsAsignadosA(adminId: string): Promise<TicketWithDetails[]> {
+    const results = await db.query.tickets.findMany({
+      where: eq(tickets.asignadoA, adminId),
+      with: {
+        usuario: true,
+        servicioRelacionado: true,
+        asignadoAUsuario: true,
+        mensajes: {
+          with: {
+            usuario: true,
+          },
+          orderBy: (mensajesTicket, { desc }) => [desc(mensajesTicket.createdAt)],
+          limit: 1,
+        },
+      },
+      orderBy: desc(tickets.createdAt),
+    });
+    
+    return results.map(result => ({
+      ...result,
+      mensajeCount: result.mensajes?.length || 0,
+      ultimoMensaje: result.mensajes?.[0],
+    })) as TicketWithDetails[];
+  }
+
+  async updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket> {
+    const [ticket] = await db
+      .update(tickets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tickets.id, id))
+      .returning();
+    return ticket;
+  }
+
+  async asignarTicket(id: string, adminId: string): Promise<Ticket> {
+    const [ticket] = await db
+      .update(tickets)
+      .set({ 
+        asignadoA: adminId, 
+        estado: 'en_proceso',
+        updatedAt: new Date(),
+      })
+      .where(eq(tickets.id, id))
+      .returning();
+    return ticket;
+  }
+
+  async cambiarEstadoTicket(id: string, estado: 'abierto' | 'en_proceso' | 'resuelto' | 'cerrado'): Promise<Ticket> {
+    const updates: Partial<Ticket> = {
+      estado,
+      updatedAt: new Date(),
+    };
+    
+    if (estado === 'resuelto') {
+      updates.resueltoAt = new Date();
+    } else if (estado === 'cerrado') {
+      updates.cerradoAt = new Date();
+    }
+    
+    const [ticket] = await db
+      .update(tickets)
+      .set(updates)
+      .where(eq(tickets.id, id))
+      .returning();
+    return ticket;
+  }
+
+  async cerrarTicket(id: string): Promise<Ticket> {
+    return this.cambiarEstadoTicket(id, 'cerrado');
+  }
+
+  async createMensajeTicket(insertMensaje: InsertMensajeTicket): Promise<MensajeTicket> {
+    const [mensaje] = await db.insert(mensajesTicket).values(insertMensaje).returning();
+    
+    await db
+      .update(tickets)
+      .set({ updatedAt: new Date() })
+      .where(eq(tickets.id, insertMensaje.ticketId));
+    
+    return mensaje;
+  }
+
+  async getMensajesByTicketId(ticketId: string): Promise<MensajeTicketWithUsuario[]> {
+    const results = await db.query.mensajesTicket.findMany({
+      where: eq(mensajesTicket.ticketId, ticketId),
+      with: {
+        usuario: true,
+      },
+      orderBy: (mensajesTicket, { asc }) => [asc(mensajesTicket.createdAt)],
+    });
+    return results as MensajeTicketWithUsuario[];
+  }
+
+  async marcarMensajesTicketComoLeidos(ticketId: string, usuarioId: string): Promise<void> {
+    await db
+      .update(mensajesTicket)
+      .set({ leido: true })
+      .where(
+        and(
+          eq(mensajesTicket.ticketId, ticketId),
+          sql`${mensajesTicket.usuarioId} != ${usuarioId}`
+        )
+      );
+  }
+
+  async getTicketsStats(): Promise<{
+    totalTickets: number;
+    abiertos: number;
+    enProceso: number;
+    resueltos: number;
+    cerrados: number;
+    urgentes: number;
+    sinAsignar: number;
+  }> {
+    const [stats] = await db
+      .select({
+        totalTickets: sql<number>`count(*)::int`,
+        abiertos: sql<number>`count(*) filter (where ${tickets.estado} = 'abierto')::int`,
+        enProceso: sql<number>`count(*) filter (where ${tickets.estado} = 'en_proceso')::int`,
+        resueltos: sql<number>`count(*) filter (where ${tickets.estado} = 'resuelto')::int`,
+        cerrados: sql<number>`count(*) filter (where ${tickets.estado} = 'cerrado')::int`,
+        urgentes: sql<number>`count(*) filter (where ${tickets.prioridad} = 'urgente' and ${tickets.estado} != 'cerrado')::int`,
+        sinAsignar: sql<number>`count(*) filter (where ${tickets.asignadoA} is null and ${tickets.estado} != 'cerrado')::int`,
+      })
+      .from(tickets);
+    
+    return stats;
   }
 }
 

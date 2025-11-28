@@ -34,6 +34,9 @@ const AdminVerifications = lazy(() => import('@/pages/admin/verifications'));
 const AdminDocuments = lazy(() => import('@/pages/admin/documents'));
 const AdminInsurance = lazy(() => import('@/pages/admin/insurance'));
 const AdminAseguradoras = lazy(() => import('@/pages/admin/aseguradoras'));
+const AdminTickets = lazy(() => import('@/pages/admin/tickets'));
+
+const SupportPage = lazy(() => import('@/pages/support'));
 
 const AseguradoraDashboard = lazy(() => import('@/pages/aseguradora/AseguradoraDashboard'));
 const AseguradoraPendientes = lazy(() => import('@/pages/aseguradora/AseguradoraPendientes'));
@@ -120,12 +123,7 @@ function Router() {
       <Route path="/client/support">
         <ProtectedRoute allowedTypes={['cliente']}>
           <MobileLayout userType="cliente">
-            <div className="p-4">
-              <h1 className="text-2xl font-bold mb-4">Soporte</h1>
-              <p className="text-muted-foreground">
-                Para asistencia, contacta al +1 (809) 555-0100
-              </p>
-            </div>
+            <SupportPage />
           </MobileLayout>
         </ProtectedRoute>
       </Route>
@@ -156,6 +154,13 @@ function Router() {
         <ProtectedRoute allowedTypes={['conductor']}>
           <MobileLayout userType="conductor">
             <DriverProfile />
+          </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support">
+        <ProtectedRoute allowedTypes={['conductor']}>
+          <MobileLayout userType="conductor">
+            <SupportPage />
           </MobileLayout>
         </ProtectedRoute>
       </Route>
@@ -235,6 +240,13 @@ function Router() {
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
             <AdminAseguradoras />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/tickets">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminTickets />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
