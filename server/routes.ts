@@ -119,119 +119,99 @@ passport.deserializeUser(async (id: string, done) => {
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Azul Payment Webhook Handler
   app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (!stripeSecretKey || !webhookSecret) {
-      return res.status(503).json({ message: "Payment service not configured" });
-    }
-
     try {
-      const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(stripeSecretKey, {
-        apiVersion: '2024-11-20.acacia' as any,
-      });
-
-      const sig = req.headers['stripe-signature'];
+      const data = JSON.parse(req.body.toString());
       
-      if (!sig) {
-        return res.status(400).json({ message: "No signature" });
+      if (!data.TransactionId || !data.ResponseCode) {
+        return res.status(400).json({ message: "Invalid webhook data" });
       }
 
-      const event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      logSystem.info('Azul webhook received', { transactionId: data.TransactionId, responseCode: data.ResponseCode });
 
-      if (event.type === 'payment_intent.succeeded') {
-        const paymentIntent = event.data.object;
-        const servicioId = paymentIntent.metadata.servicioId;
+      // If it's a successful transaction
+      if (data.ResponseCode === '00') {
+        const orderNumber = data.OrderNumber;
+        const transactionId = data.TransactionId;
+        
+        const servicio = await storage.getServicioById(orderNumber);
+        if (!servicio) {
+          logSystem.warn('Webhook: Service not found', { servicioId: orderNumber });
+          return res.json({ received: true });
+        }
 
-        if (servicioId) {
-          const servicio = await storage.getServicioById(servicioId);
-          
-          if (!servicio) {
-            logSystem.error('Webhook: Service not found', null, { servicioId, paymentIntentId: paymentIntent.id });
-            return res.json({ received: true });
-          }
+        if (servicio.azulTransactionId === transactionId) {
+          logSystem.info('Webhook: Payment already processed (idempotent)', { transactionId, servicioId: orderNumber });
+          return res.json({ received: true });
+        }
 
-          if (servicio.stripePaymentId === paymentIntent.id) {
-            logSystem.info('Webhook: Payment already processed (idempotent)', { paymentIntentId: paymentIntent.id, servicioId });
-            return res.json({ received: true });
-          }
+        const existingComision = await storage.getComisionByServicioId(orderNumber);
+        if (existingComision) {
+          logSystem.warn('Webhook: Commission already exists', { servicioId: orderNumber });
+          return res.json({ received: true });
+        }
 
-          const existingComision = await storage.getComisionByServicioId(servicioId);
-          if (existingComision) {
-            logSystem.warn('Webhook: Commission already exists', { servicioId, comisionId: existingComision.id });
-            return res.json({ received: true });
-          }
+        // Update servicio with Azul transaction ID
+        await storage.updateServicio(orderNumber, {
+          azulTransactionId: transactionId,
+        });
 
-          await storage.updateServicio(servicioId, {
-            stripePaymentId: paymentIntent.id,
-          });
+        // Create commission (70/30 split)
+        const montoTotal = parseFloat(servicio.costoTotal);
+        const montoOperador = montoTotal * 0.7;
+        const montoEmpresa = montoTotal * 0.3;
 
-          const montoTotal = parseFloat(servicio.costoTotal);
-          const montoOperador = montoTotal * 0.7;
-          const montoEmpresa = montoTotal * 0.3;
+        const comision = await storage.createComision({
+          servicioId: orderNumber,
+          montoTotal: servicio.costoTotal,
+          montoOperador: montoOperador.toFixed(2),
+          montoEmpresa: montoEmpresa.toFixed(2),
+        });
 
-          const comision = await storage.createComision({
-            servicioId,
-            montoTotal: servicio.costoTotal,
-            montoOperador: montoOperador.toFixed(2),
-            montoEmpresa: montoEmpresa.toFixed(2),
-          });
+        logTransaction.paymentSuccess(orderNumber, parseFloat(servicio.costoTotal), transactionId);
+        logTransaction.commissionCreated(comision.id, orderNumber, montoOperador, montoEmpresa);
 
-          logTransaction.paymentSuccess(servicioId, parseFloat(servicio.costoTotal), paymentIntent.id);
-          logTransaction.commissionCreated(comision.id, servicioId, montoOperador, montoEmpresa);
+        // Try to process Azul payout for conductor (70%)
+        if (servicio.conductorId) {
+          try {
+            const { azulPaymentService } = await import('./services/azul-payment');
+            const conductor = await storage.getConductorByUserId(servicio.conductorId);
+            
+            if (conductor?.azulCardToken && azulPaymentService.isConfigured()) {
+              // Process immediate payout to conductor using stored token
+              const payoutResult = await azulPaymentService.processPayment({
+                amount: montoOperador,
+                servicioId: orderNumber,
+                email: conductor.user?.email || '',
+                description: `GruaRD Payout - Service ${orderNumber}`,
+                token: conductor.azulCardToken,
+                useToken: true,
+              });
 
-          if (servicio.conductorId) {
-            try {
-              const { stripeConnectService } = await import('./services/stripe-connect');
-              const conductor = await storage.getConductorById(servicio.conductorId);
-              
-              if (conductor && stripeConnectService.isConfigured()) {
-                const stripeTransferId = await stripeConnectService.createTransfer(
-                  montoOperador,
-                  conductor.id,
-                  servicioId
-                );
-
-                await storage.marcarComisionPagada(comision.id, 'operador', stripeTransferId);
-                logSystem.info('Stripe Connect transfer created and commission marked as paid', {
-                  transferId: stripeTransferId,
-                  servicioId,
+              if (payoutResult.approved) {
+                await storage.marcarComisionPagada(comision.id, 'operador', payoutResult.transactionId);
+                logSystem.info('Azul payout processed successfully', {
+                  transactionId: payoutResult.transactionId,
                   conductorId: conductor.id,
                   amount: montoOperador,
-                  comisionId: comision.id,
-                });
-              } else if (!stripeConnectService.isConfigured()) {
-                logSystem.warn('Stripe Connect not configured - cannot create transfer', {
-                  servicioId,
-                  conductorId: conductor?.id,
                 });
               }
-            } catch (error: any) {
-              logSystem.error('Error creating Stripe Connect transfer', error, { servicioId, conductorId: servicio.conductorId });
+            } else if (!azulPaymentService.isConfigured()) {
+              logSystem.warn('Azul Payment Service not configured - conductor payout pending', {
+                servicioId: orderNumber,
+                conductorId: conductor?.id,
+              });
             }
+          } catch (error: any) {
+            logSystem.error('Error processing Azul payout', error, { servicioId: orderNumber, conductorId: servicio.conductorId });
           }
         }
-      } else if (event.type === 'account.updated') {
-        try {
-          const { stripeConnectService } = await import('./services/stripe-connect');
-          await stripeConnectService.handleAccountUpdated(event);
-          logSystem.info('Stripe Connect account updated webhook processed', {
-            accountId: (event.data.object as any).id,
-          });
-        } catch (error: any) {
-          logSystem.error('Error processing account.updated webhook', error);
-        }
-      } else if (event.type === 'payout.paid') {
-        logSystem.info('Payout paid webhook received', {
-          payoutId: (event.data.object as any).id,
-        });
       }
 
       res.json({ received: true });
     } catch (error: any) {
-      logSystem.error('Webhook error', error);
+      logSystem.error('Azul Webhook error', error);
       res.status(400).json({ message: `Webhook Error: ${error.message}` });
     }
   });
@@ -2908,37 +2888,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Service is not in pending state" });
       }
 
-      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      const { azulPaymentService } = await import('./services/azul-payment');
       
-      if (!stripeSecretKey) {
+      if (!azulPaymentService.isConfigured()) {
         return res.status(503).json({ 
           message: "Payment service not configured. Please contact administrator.",
           configured: false 
         });
       }
 
-      const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(stripeSecretKey, {
-        apiVersion: '2024-11-20.acacia' as any,
+      const user = await storage.getUserById(req.user!.id);
+      
+      // Hold funds first (HOLD transaction)
+      const holdResult = await azulPaymentService.holdFunds({
+        amount: parseFloat(servicio.costoTotal),
+        servicioId,
+        email: user?.email || 'cliente@gruard.do',
+        description: `GruaRD Service - ${servicio.origenDireccion} to ${servicio.destinoDireccion}`,
       });
 
-      const amount = Math.round(parseFloat(servicio.costoTotal) * 100);
-
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount,
-        currency: 'dop',
-        metadata: {
-          servicioId,
-          userId: req.user!.id,
-        },
-      });
+      if (!holdResult.approved) {
+        logTransaction.paymentFailed(servicioId, parseFloat(servicio.costoTotal), holdResult.responseMessage);
+        return res.status(400).json({ 
+          message: "Payment hold failed",
+          responseCode: holdResult.responseCode,
+          responseMessage: holdResult.responseMessage
+        });
+      }
 
       logTransaction.paymentStarted(servicioId, parseFloat(servicio.costoTotal), 'tarjeta');
 
       res.json({
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
+        transactionId: holdResult.transactionId,
         amount: servicio.costoTotal,
+        authCode: holdResult.authCode,
+        status: 'hold_created',
       });
     } catch (error: any) {
       logTransaction.paymentFailed(req.body.servicioId || 'unknown', 0, error.message);
@@ -2953,32 +2937,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      const { azulPaymentService } = await import('./services/azul-payment');
       
-      if (!stripeSecretKey) {
+      if (!azulPaymentService.isConfigured()) {
         return res.status(503).json({ 
           message: "Payment service not configured. Please contact administrator.",
           configured: false 
         });
       }
 
-      const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(stripeSecretKey, {
-        apiVersion: '2024-11-20.acacia' as any,
-      });
+      // For conductores - setup Azul token storage
+      if (req.user!.userType === 'conductor') {
+        const conductor = await storage.getConductorByUserId(req.user!.id);
+        
+        if (!conductor) {
+          return res.status(404).json({ message: "Conductor profile not found" });
+        }
 
-      const setupIntent = await stripe.setupIntents.create({
-        payment_method_types: ['card'],
-        metadata: {
-          userId: req.user!.id,
-        },
-      });
+        logSystem.info('Setup intent created for conductor', { conductorId: conductor.id, userId: req.user!.id });
 
-      logSystem.info('Setup intent created', { userId: req.user!.id, setupIntentId: setupIntent.id });
-
-      res.json({
-        clientSecret: setupIntent.client_secret,
-      });
+        res.json({
+          setupRequired: true,
+          message: "Conductor needs to setup Azul card token",
+          conductorId: conductor.id,
+        });
+      } else {
+        // For clients - just acknowledge payment capability
+        res.json({
+          setupRequired: false,
+          message: "Client can proceed with Azul payments",
+        });
+      }
     } catch (error: any) {
       logSystem.error('Create setup intent error', error, { userId: req.user!.id });
       res.status(500).json({ message: "Failed to create setup intent" });

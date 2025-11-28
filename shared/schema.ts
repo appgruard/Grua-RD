@@ -92,6 +92,8 @@ export const conductores = pgTable("conductores", {
   ubicacionLat: decimal("ubicacion_lat", { precision: 10, scale: 7 }),
   ubicacionLng: decimal("ubicacion_lng", { precision: 10, scale: 7 }),
   ultimaUbicacionUpdate: timestamp("ultima_ubicacion_update"),
+  azulMerchantId: text("azul_merchant_id"),
+  azulCardToken: text("azul_card_token"),
 });
 
 // Servicios (Services) Table
@@ -110,6 +112,7 @@ export const servicios = pgTable("servicios", {
   estado: estadoServicioEnum("estado").default("pendiente").notNull(),
   metodoPago: metodoPagoEnum("metodo_pago").default("efectivo").notNull(),
   stripePaymentId: text("stripe_payment_id"),
+  azulTransactionId: text("azul_transaction_id"),
   tipoVehiculo: tipoVehiculoEnum("tipo_vehiculo"),
   aseguradoraNombre: text("aseguradora_nombre"),
   aseguradoraPoliza: text("aseguradora_poliza"),
@@ -219,6 +222,7 @@ export const comisiones = pgTable("comisiones", {
   estadoPagoOperador: estadoPagoEnum("estado_pago_operador").default("pendiente").notNull(),
   estadoPagoEmpresa: estadoPagoEnum("estado_pago_empresa").default("pendiente").notNull(),
   stripeTransferId: text("stripe_transfer_id"),
+  azulTransactionId: text("azul_transaction_id"),
   fechaPagoOperador: timestamp("fecha_pago_operador"),
   fechaPagoEmpresa: timestamp("fecha_pago_empresa"),
   notas: text("notas"),
