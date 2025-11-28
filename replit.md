@@ -66,6 +66,27 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 - **Module 2.7**: Support ticket system ✅ Completed - Full implementation with 12 API endpoints, categories, priorities, and admin management
 - **Module 2.8**: Predefined chat messages ✅ Completed - Role-based quick messages for clients and drivers
 
+### Phase 3 - Quality & Optimization (IN PROGRESS)
+- **Module 3.3**: Rating System ✅ Completed
+  - POST /api/services/:id/calificar endpoint with 1-5 star ratings
+  - StarRating reusable component
+  - RatingModal integration in tracking and history pages
+  - Driver rankings with visual stars in admin analytics
+
+- **Module 3.4**: PWA Optimization ✅ Completed
+  - Service Worker v5.0 with Background Sync
+  - InstallPWA component for app installation prompt
+  - UpdateAvailable component for version updates
+  - OfflineIndicator for connection status
+
+- **Module 3.5**: Security Improvements ✅ Completed
+  - Authentication added to /api/maps endpoints
+  - Rate limiting on /api/pricing/calculate (30/15min)
+  - Privacy policy page (/privacy-policy)
+  - Privacy policy links in auth flows
+
+- **Module 3.7**: Documentation ⏳ In Progress
+
 ## Recent Changes (November 28, 2025)
 
 ### Predefined Chat Messages - COMPLETED (Module 2.8)

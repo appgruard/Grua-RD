@@ -204,6 +204,17 @@ export default function Login() {
                 ¿Olvidaste tu contraseña?
               </button>
             </p>
+            <p className="text-xs text-muted-foreground mt-4">
+              Al iniciar sesión, aceptas nuestra{' '}
+              <button
+                type="button"
+                className="text-primary underline-offset-4 hover:underline"
+                onClick={() => setLocation('/privacy-policy')}
+                data-testid="link-privacy-policy"
+              >
+                Política de Privacidad
+              </button>
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -1,4 +1,4 @@
-const VERSION = '4.0';
+const VERSION = '5.0';
 const STATIC_CACHE = `gruard-static-v${VERSION}`;
 const DYNAMIC_CACHE = `gruard-dynamic-v${VERSION}`;
 const RUNTIME_CACHE = `gruard-runtime-v${VERSION}`;
@@ -205,4 +205,97 @@ self.addEventListener('notificationclick', (event) => {
       }
     })
   );
+});
+
+const SYNC_QUEUE_KEY = 'gruard-sync-queue';
+
+async function getQueuedRequests() {
+  try {
+    const cache = await caches.open('gruard-sync');
+    const response = await cache.match(SYNC_QUEUE_KEY);
+    if (response) {
+      return await response.json();
+    }
+  } catch (e) {
+    console.error('[SW] Error getting queued requests:', e);
+  }
+  return [];
+}
+
+async function saveQueuedRequests(requests) {
+  try {
+    const cache = await caches.open('gruard-sync');
+    const response = new Response(JSON.stringify(requests));
+    await cache.put(SYNC_QUEUE_KEY, response);
+  } catch (e) {
+    console.error('[SW] Error saving queued requests:', e);
+  }
+}
+
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-pending-requests') {
+    event.waitUntil(processPendingRequests());
+  }
+});
+
+async function processPendingRequests() {
+  const requests = await getQueuedRequests();
+  const successfulIds = [];
+
+  for (const request of requests) {
+    try {
+      const response = await fetch(request.url, {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+        credentials: 'include'
+      });
+
+      if (response.ok || response.status === 400) {
+        successfulIds.push(request.id);
+      }
+    } catch (e) {
+      console.log('[SW] Request still failing, will retry:', request.url);
+    }
+  }
+
+  if (successfulIds.length > 0) {
+    const remaining = requests.filter(r => !successfulIds.includes(r.id));
+    await saveQueuedRequests(remaining);
+  }
+}
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+
+  if (event.data && event.data.type === 'QUEUE_REQUEST') {
+    event.waitUntil(
+      (async () => {
+        const requests = await getQueuedRequests();
+        requests.push({
+          id: Date.now().toString(),
+          url: event.data.request.url,
+          method: event.data.request.method,
+          headers: event.data.request.headers,
+          body: event.data.request.body,
+          timestamp: Date.now()
+        });
+        await saveQueuedRequests(requests);
+
+        if ('sync' in self.registration) {
+          try {
+            await self.registration.sync.register('sync-pending-requests');
+          } catch (e) {
+            console.log('[SW] Background sync not available');
+          }
+        }
+      })()
+    );
+  }
+
+  if (event.data && event.data.type === 'GET_VERSION') {
+    event.ports[0].postMessage({ version: VERSION });
+  }
 });

@@ -306,6 +306,63 @@ Completa un servicio en progreso (solo conductores).
 
 ---
 
+### POST /api/services/:id/calificar
+
+Califica un servicio completado (solo clientes).
+
+**Requiere:** Autenticación (cliente, propietario del servicio)
+
+**Request Body:**
+```json
+{
+  "puntuacion": 5,
+  "comentario": "Excelente servicio, muy profesional"
+}
+```
+
+**Campos:**
+- `puntuacion` (integer, required): Calificación de 1 a 5
+- `comentario` (string, optional): Comentario sobre el servicio
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "servicioId": "uuid",
+  "clienteId": "uuid",
+  "puntuacion": 5,
+  "comentario": "Excelente servicio, muy profesional",
+  "createdAt": "2025-01-01T00:30:00.000Z"
+}
+```
+
+**Errors:**
+- `400` - Servicio no completado o ya calificado
+- `403` - No autorizado (no es el cliente del servicio)
+- `404` - Servicio no encontrado
+
+---
+
+### GET /api/services/:id/calificacion
+
+Obtiene la calificación de un servicio.
+
+**Requiere:** Autenticación (cliente o conductor del servicio)
+
+**Response (200):**
+```json
+{
+  "id": "uuid",
+  "puntuacion": 5,
+  "comentario": "Excelente servicio",
+  "createdAt": "2025-01-01T00:30:00.000Z"
+}
+```
+
+**Nota:** Devuelve `null` si el servicio no ha sido calificado.
+
+---
+
 ## Conductores
 
 ### GET /api/drivers/me
@@ -908,7 +965,10 @@ Notifica de un cambio en el estado del servicio.
 - Las contraseñas se hashean con `bcrypt` (10 rounds)
 
 ### Rate Limiting
-No implementado actualmente. Se recomienda agregar para producción.
+Los siguientes endpoints tienen rate limiting:
+- `/api/identity/verify-cedula`: 3 intentos por hora
+- `/api/identity/send-phone-otp`: 5 intentos por 15 minutos
+- `/api/pricing/calculate`: 30 peticiones por 15 minutos
 
 ### CORS
 Configurar según el dominio de producción.
@@ -922,5 +982,5 @@ Configurar según el dominio de producción.
 
 ---
 
-**Versión de la API:** 1.0  
-**Última actualización:** 17 de noviembre de 2025
+**Versión de la API:** 1.1  
+**Última actualización:** 28 de noviembre de 2025

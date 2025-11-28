@@ -730,6 +730,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rate limiter for pricing calculation endpoint
+  const pricingLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 30, // max 30 requests per 15 minutes per IP
+    message: "Demasiados intentos de cálculo de precio. Intenta nuevamente en 15 minutos.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logSystem.warn('Rate limit exceeded for pricing calculation', { 
+        ip: req.ip, 
+        userId: req.user?.id 
+      });
+      res.status(429).json({ 
+        message: "Demasiados intentos de cálculo de precio. Intenta nuevamente en 15 minutos." 
+      });
+    }
+  });
+
   // Identity Verification Endpoints (Workstream A - Phase 4)
   app.post("/api/identity/verify-cedula", verifyCedulaLimiter, async (req: Request, res: Response) => {
     try {
@@ -1823,7 +1841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/pricing/calculate", async (req: Request, res: Response) => {
+  app.post("/api/pricing/calculate", pricingLimiter, async (req: Request, res: Response) => {
     try {
       const { distanceKm } = req.body;
       const tarifa = await storage.getActiveTarifa();
@@ -2954,6 +2972,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/maps/calculate-route", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
     try {
       const { origin, destination } = req.body;
 
@@ -2980,6 +3002,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/maps/geocode", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
     try {
       const { address } = req.body;
 

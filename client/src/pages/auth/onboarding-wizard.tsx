@@ -585,6 +585,18 @@ export default function OnboardingWizard() {
         )}
       </div>
 
+      <p className="text-xs text-muted-foreground text-center">
+        Al continuar, aceptas nuestra{' '}
+        <button
+          type="button"
+          className="text-primary underline-offset-4 hover:underline"
+          onClick={() => setLocation('/privacy-policy')}
+          data-testid="link-privacy-policy-onboarding"
+        >
+          Política de Privacidad
+        </button>
+      </p>
+
       <Button
         type="button"
         className="w-full"

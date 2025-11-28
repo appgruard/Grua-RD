@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
+import { InstallPWA, UpdateAvailable, OfflineIndicator } from '@/components/InstallPWA';
 
 const Login = lazy(() => import('@/pages/auth/login'));
 const OnboardingWizard = lazy(() => import('@/pages/auth/onboarding-wizard'));
@@ -50,6 +51,7 @@ const AseguradoraReportes = lazy(() => import('@/pages/aseguradora/AseguradoraRe
 const AseguradoraPerfil = lazy(() => import('@/pages/aseguradora/AseguradoraPerfil'));
 
 const NotFound = lazy(() => import('@/pages/not-found'));
+const PrivacyPolicy = lazy(() => import('@/pages/privacy-policy'));
 
 function LoadingFallback() {
   return (
@@ -100,6 +102,7 @@ function Router() {
         <Route path="/onboarding" component={OnboardingWizard} />
         <Route path="/verify-otp" component={VerifyOTP} />
         <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
       
       {/* Client Routes - Most specific first */}
       <Route path="/client/tracking/:id">
@@ -343,8 +346,11 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
+          <OfflineIndicator />
           <Toaster />
           <Router />
+          <InstallPWA />
+          <UpdateAvailable />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

@@ -42,13 +42,13 @@
 - ✅ Centro de soporte con tickets (Módulo 2.7)
 - ✅ Mensajes predefinidos en chat (Módulo 2.8) - Mensajes diferenciados por rol cliente/conductor
 
-### ❌ FASE 3 - CALIDAD, TESTING Y OPTIMIZACIÓN (PENDIENTE)
-- Testing E2E completo con Playwright
-- Optimización de performance (Lighthouse ≥90)
-- Sistema de calificaciones
-- PWA optimización final
-- Seguridad y compliance
-- Documentación completa
+### ⏳ FASE 3 - CALIDAD, TESTING Y OPTIMIZACIÓN (EN PROGRESO)
+- ⏳ Testing E2E completo con Playwright
+- ⏳ Optimización de performance (Lighthouse ≥90)
+- ✅ Sistema de calificaciones (Módulo 3.3) - POST /api/services/:id/calificar, StarRating, RatingModal, ranking visual
+- ✅ PWA optimización final (Módulo 3.4) - SW v5.0 Background Sync, InstallPWA, UpdateAvailable, OfflineIndicator
+- ✅ Seguridad y compliance (Módulo 3.5) - Auth en /api/maps, rate limiting pricing, política de privacidad
+- ✅ Documentación completa (Módulo 3.7) - API.md y replit.md actualizados
 
 ---
 
