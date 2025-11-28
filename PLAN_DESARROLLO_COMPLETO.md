@@ -13,7 +13,7 @@
 - ✅ Validación de cédula dominicana (11 dígitos, algoritmo Luhn)
 - ✅ Verificación OTP por SMS (Twilio con fallback mock)
 - ✅ Sistema de gestión de documentos (Replit Object Storage)
-- ✅ Integración Stripe Connect (pagos y comisiones 70/30)
+- ✅ Integración Azul Payment Gateway (pagos y comisiones 70/30)
 - ✅ PWA configurado con manifest y service worker
 - ✅ Sistema de sesiones con cookies
 - ✅ Rutas protegidas por rol
@@ -36,7 +36,7 @@
 - ✅ Integración APIs de aseguradoras dominicanas (Módulo 2.1)
 - ✅ Portal web para aseguradoras con nuevo rol (Módulo 2.2)
 - ✅ Analítica avanzada con gráficas y KPIs (Módulo 2.3)
-- 📋 Sistema de comisiones automático mejorado (Módulo 2.4)
+- 🔄 Migración de Stripe a Azul Payment Gateway (Módulo 2.4) - EN PROGRESO
 - 📋 Portal de socios/inversores (Módulo 2.5)
 - ✅ Sistema de validaciones anuales de documentos (Módulo 2.6)
 - ✅ Centro de soporte con tickets (Módulo 2.7)
@@ -202,24 +202,29 @@
 
 ---
 
-## 0.4 Integración de Pagos (Stripe)
+## 0.4 Integración de Pagos (Azul Payment Gateway)
 
 ### Tareas:
-1. **Configurar Stripe para República Dominicana**
-   - Verificar disponibilidad de Stripe en RD
-   - Configurar cuenta Stripe
-   - Obtener API keys (test y production)
-   - Configurar webhooks
+1. **Configurar Azul Payment Gateway para República Dominicana** ✅ COMPLETADO
+   - Verificar disponibilidad de Azul en RD
+   - Configurar cuenta Azul
+   - Obtener credenciales (MerchantID, AuthKey)
+   - Configurar webhooks para confirmación de pagos
    - Moneda: DOP (Peso Dominicano)
 
-2. **Implementar PaymentIntent para pagos con tarjeta**
-   - Endpoint `POST /api/payments/create-intent`
-   - Frontend: Stripe Elements para captura de tarjeta
-   - Confirmación de pago
-   - Webhook para estado del pago
+2. **Implementar HOLD/POST flow para pagos con tarjeta** ✅ COMPLETADO
+   - Endpoint `POST /api/payments/create-intent` → Crea HOLD
+   - Endpoint `POST /api/payments/webhook` → Recibe confirmación y procesa POST
+   - Servicio `server/services/azul-payment.ts` con métodos:
+     - `holdFunds()` - Reserva de fondos
+     - `captureHold()` - Captura del HOLD
+     - `processPayment()` - Pago SALE directo
+     - `refundTransaction()` - Devoluciones
+     - `voidTransaction()` - Anulación de transacciones
+     - `createDataVaultToken()` - Tokenización para conductores
 
-3. **Sistema de comisiones (preparación)**
-   - Tabla nueva:
+3. **Sistema de comisiones automático** ✅ COMPLETADO
+   - Tabla actualizada con campos Azul:
    ```typescript
    export const comisiones = pgTable("comisiones", {
      id: varchar("id").primaryKey(),
@@ -227,22 +232,47 @@
      montoTotal: decimal("monto_total"),
      montoOperador: decimal("monto_operador"), // 70%
      montoEmpresa: decimal("monto_empresa"), // 30%
-     estadoPagoOperador: estadoPagoEnum("estado_pago_operador"), // pendiente, pagado
+     porcentajeOperador: decimal("porcentaje_operador").default("70.00"),
+     porcentajeEmpresa: decimal("porcentaje_empresa").default("30.00"),
+     estadoPagoOperador: estadoPagoEnum("estado_pago_operador"),
      estadoPagoEmpresa: estadoPagoEnum("estado_pago_empresa"),
-     fechaPago: timestamp("fecha_pago"),
+     azulTransactionId: text("azul_transaction_id"),
+     fechaPagoOperador: timestamp("fecha_pago_operador"),
+     fechaPagoEmpresa: timestamp("fecha_pago_empresa"),
      createdAt: timestamp("created_at").defaultNow(),
    });
    ```
+   - Webhook automáticamente:
+     - Crea comisión 70/30
+     - Intenta pago automático a conductor si tiene token Azul
 
-4. **Recibos digitales**
+4. **DataVault para conductores** ✅ COMPLETADO
+   - Tabla conductores actualizada:
+   ```typescript
+   azulMerchantId: text("azul_merchant_id"),
+   azulCardToken: text("azul_card_token"),
+   ```
+   - Endpoint `POST /api/payments/create-setup-intent` para registrar tarjeta
+   - Tokenización segura con DataVault de Azul
+
+5. **Recibos digitales**
    - Generar PDF con datos del servicio
    - Información fiscal básica
    - Endpoint `GET /api/servicios/:id/recibo`
 
+### Variables de Entorno Requeridas:
+```
+AZUL_MERCHANT_ID=tu_merchant_id
+AZUL_AUTH_KEY=tu_auth_key
+AZUL_API_URL=https://api.azul.com.do/webservices/API_Operation/processTransaction
+```
+
 ### Criterios de aceptación:
-- ✅ Stripe configurado para RD con DOP
-- ✅ Cliente puede pagar con tarjeta
-- ✅ Sistema registra comisiones 70/30
+- ✅ Azul configurado para RD con DOP
+- ✅ Cliente puede pagar con tarjeta (HOLD creado)
+- ✅ Webhook recibe confirmación y procesa POST
+- ✅ Sistema registra comisiones 70/30 automáticamente
+- ✅ Conductor recibe payout automático si tiene token
 - ✅ Recibo digital generado automáticamente
 
 ---
