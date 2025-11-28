@@ -4,7 +4,7 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { logger } from "./logger";
-import { pool } from "./db";
+import { pool, initializeTicketTables } from "./db";
 import { checkStorageHealth } from "./services/object-storage";
 
 const app = express();
@@ -221,6 +221,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize ticket tables if they don't exist (non-blocking)
+  initializeTicketTables().catch(err => {
+    logger.warn("Ticket tables initialization failed (will retry on first use):", err.message);
+  });
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

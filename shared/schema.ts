@@ -671,6 +671,139 @@ export type ServicioAseguradoraWithDetails = ServicioAseguradora & {
   rechazadoPorUsuario?: User;
 };
 
+// ==================== TICKET SYSTEM ====================
+
+// Ticket Enums
+export const ticketCategoriaEnum = pgEnum("ticket_categoria", [
+  "problema_tecnico",
+  "consulta_servicio",
+  "queja",
+  "sugerencia",
+  "problema_pago",
+  "otro"
+]);
+
+export const ticketPrioridadEnum = pgEnum("ticket_prioridad", [
+  "baja",
+  "media",
+  "alta",
+  "urgente"
+]);
+
+export const ticketEstadoEnum = pgEnum("ticket_estado", [
+  "abierto",
+  "en_proceso",
+  "resuelto",
+  "cerrado"
+]);
+
+// Tickets Table
+export const tickets = pgTable("tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  usuarioId: varchar("usuario_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  categoria: ticketCategoriaEnum("categoria").notNull(),
+  prioridad: ticketPrioridadEnum("prioridad").default("media").notNull(),
+  estado: ticketEstadoEnum("estado").default("abierto").notNull(),
+  titulo: text("titulo").notNull(),
+  descripcion: text("descripcion").notNull(),
+  servicioRelacionadoId: varchar("servicio_relacionado_id").references(() => servicios.id, { onDelete: "set null" }),
+  asignadoA: varchar("asignado_a").references(() => users.id, { onDelete: "set null" }),
+  resueltoAt: timestamp("resuelto_at"),
+  cerradoAt: timestamp("cerrado_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Ticket Messages Table
+export const mensajesTicket = pgTable("mensajes_ticket", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => tickets.id, { onDelete: "cascade" }),
+  usuarioId: varchar("usuario_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  mensaje: text("mensaje").notNull(),
+  esStaff: boolean("es_staff").default(false).notNull(),
+  leido: boolean("leido").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Ticket Relations
+export const ticketsRelations = relations(tickets, ({ one, many }) => ({
+  usuario: one(users, {
+    fields: [tickets.usuarioId],
+    references: [users.id],
+  }),
+  servicioRelacionado: one(servicios, {
+    fields: [tickets.servicioRelacionadoId],
+    references: [servicios.id],
+  }),
+  asignadoAUsuario: one(users, {
+    fields: [tickets.asignadoA],
+    references: [users.id],
+  }),
+  mensajes: many(mensajesTicket),
+}));
+
+export const mensajesTicketRelations = relations(mensajesTicket, ({ one }) => ({
+  ticket: one(tickets, {
+    fields: [mensajesTicket.ticketId],
+    references: [tickets.id],
+  }),
+  usuario: one(users, {
+    fields: [mensajesTicket.usuarioId],
+    references: [users.id],
+  }),
+}));
+
+// Ticket Insert Schemas
+export const insertTicketSchema = createInsertSchema(tickets, {
+  titulo: z.string().min(5, "El título debe tener al menos 5 caracteres").max(200, "El título no puede exceder 200 caracteres"),
+  descripcion: z.string().min(10, "La descripción debe tener al menos 10 caracteres").max(2000, "La descripción no puede exceder 2000 caracteres"),
+  categoria: z.enum(["problema_tecnico", "consulta_servicio", "queja", "sugerencia", "problema_pago", "otro"]),
+  prioridad: z.enum(["baja", "media", "alta", "urgente"]).optional(),
+}).omit({
+  id: true,
+  estado: true,
+  asignadoA: true,
+  resueltoAt: true,
+  cerradoAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMensajeTicketSchema = createInsertSchema(mensajesTicket, {
+  mensaje: z.string().min(1, "El mensaje no puede estar vacío").max(2000, "El mensaje no puede exceder 2000 caracteres"),
+}).omit({
+  id: true,
+  createdAt: true,
+  leido: true,
+});
+
+// Ticket Select Schemas
+export const selectTicketSchema = createSelectSchema(tickets);
+export const selectMensajeTicketSchema = createSelectSchema(mensajesTicket);
+
+// Ticket Types
+export type InsertTicket = z.infer<typeof insertTicketSchema>;
+export type Ticket = typeof tickets.$inferSelect;
+
+export type InsertMensajeTicket = z.infer<typeof insertMensajeTicketSchema>;
+export type MensajeTicket = typeof mensajesTicket.$inferSelect;
+
+// Ticket Helper Types
+export type TicketWithDetails = Ticket & {
+  usuario?: User;
+  servicioRelacionado?: Servicio;
+  asignadoAUsuario?: User;
+  mensajes?: MensajeTicketWithUsuario[];
+  mensajeCount?: number;
+  ultimoMensaje?: MensajeTicket;
+};
+
+export type MensajeTicketWithUsuario = MensajeTicket & {
+  usuario?: User;
+};
+
+// ==================== END TICKET SYSTEM ====================
+
 // Document Reminder Types
 export const insertDocumentoRecordatorioSchema = createInsertSchema(documentoRecordatorios).omit({
   id: true,
