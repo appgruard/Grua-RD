@@ -2974,6 +2974,347 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Conductor saves Azul card token (DataVault)
+  app.post("/api/drivers/azul-card-token", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can save payment cards" });
+    }
+
+    try {
+      const { cardNumber, cardExpiry, cardCVV } = req.body;
+
+      if (!cardNumber || !cardExpiry || !cardCVV) {
+        return res.status(400).json({ message: "Card details (cardNumber, cardExpiry, cardCVV) are required" });
+      }
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const { azulPaymentService } = await import('./services/azul-payment');
+      
+      if (!azulPaymentService.isConfigured()) {
+        return res.status(503).json({ 
+          message: "Payment service not configured. Please contact administrator.",
+          configured: false 
+        });
+      }
+
+      const token = await azulPaymentService.createDataVaultToken(
+        cardNumber,
+        cardExpiry,
+        cardCVV,
+        conductor.id
+      );
+
+      await storage.updateConductor(conductor.id, {
+        azulCardToken: token,
+        azulMerchantId: process.env.AZUL_MERCHANT_ID || null,
+      });
+
+      logTransaction.info('Conductor Azul card token saved', { 
+        conductorId: conductor.id,
+        tokenLength: token.length 
+      });
+
+      res.json({
+        success: true,
+        message: "Card token saved successfully",
+        hasToken: true,
+      });
+    } catch (error: any) {
+      logSystem.error('Save Azul card token error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Failed to save card token" });
+    }
+  });
+
+  // Get conductor's Azul token status
+  app.get("/api/drivers/azul-card-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can access this endpoint" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      res.json({
+        hasToken: !!conductor.azulCardToken,
+        hasMerchantId: !!conductor.azulMerchantId,
+      });
+    } catch (error: any) {
+      logSystem.error('Get Azul card status error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get card status" });
+    }
+  });
+
+  // Delete conductor's Azul token
+  app.delete("/api/drivers/azul-card-token", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can delete payment cards" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      await storage.updateConductor(conductor.id, {
+        azulCardToken: null,
+      });
+
+      logSystem.info('Conductor Azul card token deleted', { conductorId: conductor.id });
+
+      res.json({
+        success: true,
+        message: "Card token deleted successfully",
+      });
+    } catch (error: any) {
+      logSystem.error('Delete Azul card token error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to delete card token" });
+    }
+  });
+
+  // Payment status polling for clients
+  app.get("/api/payments/:servicioId/status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const servicio = await storage.getServicioById(req.params.servicioId);
+
+      if (!servicio) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (req.user!.userType !== 'admin' && 
+          servicio.clienteId !== req.user!.id && 
+          servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to view payment status" });
+      }
+
+      const comision = await storage.getComisionByServicioId(servicio.id);
+
+      let paymentStatus = 'unknown';
+      if (servicio.metodoPago === 'efectivo') {
+        paymentStatus = servicio.estado === 'completado' ? 'paid_cash' : 'pending_cash';
+      } else if (servicio.azulTransactionId) {
+        paymentStatus = comision ? 'paid_card' : 'processing';
+      } else if (servicio.metodoPago === 'tarjeta') {
+        paymentStatus = 'awaiting_payment';
+      } else if (servicio.metodoPago === 'aseguradora') {
+        paymentStatus = servicio.aseguradoraEstado === 'aprobado' ? 'approved_insurance' : 
+                        servicio.aseguradoraEstado === 'rechazado' ? 'rejected_insurance' : 'pending_insurance';
+      }
+
+      res.json({
+        servicioId: servicio.id,
+        metodoPago: servicio.metodoPago,
+        estado: servicio.estado,
+        costoTotal: servicio.costoTotal,
+        paymentStatus,
+        azulTransactionId: servicio.azulTransactionId,
+        comision: comision ? {
+          id: comision.id,
+          montoTotal: comision.montoTotal,
+          montoOperador: comision.montoOperador,
+          montoEmpresa: comision.montoEmpresa,
+          estadoPagoOperador: comision.estadoPagoOperador,
+          estadoPagoEmpresa: comision.estadoPagoEmpresa,
+        } : null,
+      });
+    } catch (error: any) {
+      logSystem.error('Get payment status error', error, { servicioId: req.params.servicioId });
+      res.status(500).json({ message: "Failed to get payment status" });
+    }
+  });
+
+  // Admin: Manual payout to conductor using Azul
+  app.post("/api/admin/comisiones/:id/payout-azul", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    if (req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: admin access required" });
+    }
+
+    try {
+      const comision = await storage.getComisionById(req.params.id);
+      
+      if (!comision) {
+        return res.status(404).json({ message: "Commission not found" });
+      }
+
+      if (comision.estadoPagoOperador === 'pagado') {
+        return res.status(400).json({ message: "Commission already paid to operator" });
+      }
+
+      const servicio = await storage.getServicioById(comision.servicioId);
+      if (!servicio || !servicio.conductorId) {
+        return res.status(404).json({ message: "Service or conductor not found" });
+      }
+
+      const conductor = await storage.getConductorByUserId(servicio.conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      if (!conductor.azulCardToken) {
+        return res.status(400).json({ 
+          message: "Conductor does not have an Azul card token. Manual transfer required.",
+          requiresManualTransfer: true 
+        });
+      }
+
+      const { azulPaymentService } = await import('./services/azul-payment');
+      
+      if (!azulPaymentService.isConfigured()) {
+        return res.status(503).json({ 
+          message: "Payment service not configured",
+          configured: false 
+        });
+      }
+
+      const user = await storage.getUserById(servicio.conductorId);
+      const payoutResult = await azulPaymentService.processPayment({
+        amount: parseFloat(comision.montoOperador),
+        servicioId: comision.servicioId,
+        email: user?.email || 'conductor@gruard.do',
+        description: `GruaRD Payout - Commission ${comision.id}`,
+        token: conductor.azulCardToken,
+        useToken: true,
+      });
+
+      if (!payoutResult.approved) {
+        logTransaction.paymentFailed(comision.servicioId, parseFloat(comision.montoOperador), payoutResult.responseMessage);
+        return res.status(400).json({
+          message: "Payout failed",
+          responseCode: payoutResult.responseCode,
+          responseMessage: payoutResult.responseMessage,
+        });
+      }
+
+      await storage.marcarComisionPagada(comision.id, 'operador', payoutResult.transactionId);
+
+      logTransaction.info('Admin processed Azul payout to conductor', {
+        comisionId: comision.id,
+        conductorId: conductor.id,
+        amount: comision.montoOperador,
+        transactionId: payoutResult.transactionId,
+      });
+
+      res.json({
+        success: true,
+        message: "Payout processed successfully",
+        transactionId: payoutResult.transactionId,
+        amount: comision.montoOperador,
+      });
+    } catch (error: any) {
+      logSystem.error('Admin payout error', error, { comisionId: req.params.id });
+      res.status(500).json({ message: error.message || "Failed to process payout" });
+    }
+  });
+
+  // Admin: Mark commission as paid manually (for cash or bank transfers)
+  app.post("/api/admin/comisiones/:id/mark-paid", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    
+    if (req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "Forbidden: admin access required" });
+    }
+
+    try {
+      const { tipo, notas, referencia } = req.body;
+      
+      if (!tipo || (tipo !== 'operador' && tipo !== 'empresa')) {
+        return res.status(400).json({ message: "Valid tipo (operador/empresa) is required" });
+      }
+
+      const comision = await storage.getComisionById(req.params.id);
+      if (!comision) {
+        return res.status(404).json({ message: "Commission not found" });
+      }
+
+      const updatedComision = await storage.marcarComisionPagada(req.params.id, tipo, referencia);
+      
+      if (notas) {
+        await storage.updateComisionNotas(req.params.id, notas);
+      }
+
+      logTransaction.info('Admin marked commission as paid', {
+        comisionId: req.params.id,
+        tipo,
+        referencia,
+        adminId: req.user!.id,
+      });
+
+      res.json({
+        success: true,
+        comision: updatedComision,
+      });
+    } catch (error: any) {
+      logSystem.error('Mark commission paid error', error, { comisionId: req.params.id });
+      res.status(500).json({ message: "Failed to mark commission as paid" });
+    }
+  });
+
+  // Conductor: Get my pending commissions
+  app.get("/api/drivers/mis-comisiones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can access this endpoint" });
+    }
+
+    try {
+      const comisiones = await storage.getComisionesByConductor(req.user!.id);
+      
+      const resumen = {
+        total: comisiones.length,
+        pendientes: comisiones.filter(c => c.estadoPagoOperador === 'pendiente').length,
+        pagadas: comisiones.filter(c => c.estadoPagoOperador === 'pagado').length,
+        montoTotalPendiente: comisiones
+          .filter(c => c.estadoPagoOperador === 'pendiente')
+          .reduce((sum, c) => sum + parseFloat(c.montoOperador), 0)
+          .toFixed(2),
+        montoTotalPagado: comisiones
+          .filter(c => c.estadoPagoOperador === 'pagado')
+          .reduce((sum, c) => sum + parseFloat(c.montoOperador), 0)
+          .toFixed(2),
+      };
+
+      res.json({
+        resumen,
+        comisiones,
+      });
+    } catch (error: any) {
+      logSystem.error('Get driver commissions error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get commissions" });
+    }
+  });
+
   app.get("/api/comisiones", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });

@@ -60,38 +60,52 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 - **Module 2.1**: Real-time location tracking and GPS updates ✅ Completed
 - **Module 2.2**: Insurance company portal and integration ✅ Completed
 - **Module 2.3**: Admin dashboard with statistics and analytics ✅ Completed
-- **Module 2.4**: Payment system migration from Stripe to Azul 🔄 **IN PROGRESS** - Core service created (`server/services/azul-payment.ts`), schema updated with Azul fields, payment endpoints converted, webhook handler migrated, migration SQL written
+- **Module 2.4**: Azul Payment Gateway Integration ✅ **COMPLETED** - Full implementation with DataVault tokenization, HOLD/POST flow, retry logic, commission management
 - **Module 2.5**: Partner/investor portal (pending)
 - **Module 2.6**: Predefined chat messages (pending)
 - **Module 2.7**: Support ticket system ✅ Completed - Full implementation with 9 API endpoints, categories, priorities, and admin management
 
 ## Recent Changes (November 28, 2025)
 
-### Azul Payment Gateway Integration (Module 2.4)
+### Azul Payment Gateway Integration - COMPLETED (Module 2.4)
+
 **Files Created/Modified:**
-- `server/services/azul-payment.ts`: New Azul Payment Service with processPayment, holdFunds, captureHold, voidTransaction, refundTransaction, createDataVaultToken methods
+- `server/services/azul-payment.ts`: Complete Azul Payment Service with:
+  - processPayment, holdFunds, captureHold, voidTransaction, refundTransaction
+  - createDataVaultToken for storing driver cards
+  - verifyTransaction for checking transaction status
+  - Retry logic with exponential backoff (up to 3 attempts)
+  - Comprehensive error code mapping (AZUL_ERROR_CODES) with Spanish messages
+  - Network error handling
+
 - `shared/schema.ts`: Added azulTransactionId to servicios and comisiones; added azulMerchantId and azulCardToken to conductores
-- `server/routes.ts`: 
-  - Updated webhook handler for Azul (replacing Stripe webhook)
-  - Converted `/api/payments/create-intent` to use Azul HOLD method
-  - Converted `/api/payments/create-setup-intent` for conductor token setup
+
+- `server/routes.ts`: New endpoints:
+  - `POST /api/drivers/azul-card-token`: Driver card tokenization via DataVault
+  - `GET /api/drivers/azul-card-status`: Check if driver has stored card token
+  - `DELETE /api/drivers/azul-card-token`: Remove driver's stored card
+  - `GET /api/payments/:servicioId/status`: Payment status polling for clients
+  - `POST /api/admin/comisiones/:id/payout-azul`: Admin manual payout using Azul
+  - `POST /api/admin/comisiones/:id/mark-paid`: Admin mark commission as paid manually
+  - `GET /api/drivers/mis-comisiones`: Get driver's commissions summary
+
+- `server/storage.ts`: New storage methods:
+  - `getComisionById`: Get commission by ID with details
+  - `getComisionesByConductor`: Get all commissions for a conductor
+  - `updateComisionNotas`: Update commission notes
+  - Updated `marcarComisionPagada` to use azulTransactionId
+
 - `migrations/0004_azul_payment_integration.sql`: Database migration for Azul columns and indexes
 
 **Key Implementation Details:**
 - Azul authentication via MerchantID and AuthKey (SHA256 hash generation)
-- HOLD/POST flow: Client requests payment → HOLD created → Webhook triggers POST to capture → Commission split (70/30) → Automatic payout to conductor using stored DataVault token if available
-- Commission system unchanged: 70% to conductor, 30% to platform
+- HOLD/POST flow: Client requests payment → HOLD created → Webhook triggers POST to capture → Commission split (70/30) → Automatic payout to conductor if DataVault token exists
+- Commission system: 70% to conductor, 30% to platform
 - Manual transfer handling since Azul lacks Stripe Connect equivalent
-- WebSocket integration ready for real-time payment status updates
+- Retry logic for network errors (up to 3 attempts with exponential backoff)
+- User-friendly Spanish error messages for all Azul error codes
 
 **Environment Variables Required:**
 - `AZUL_MERCHANT_ID`: Merchant identifier from Azul
 - `AZUL_AUTH_KEY`: Authentication key from Azul
 - `AZUL_API_URL`: API endpoint (default: https://api.azul.com.do/webservices/API_Operation/processTransaction)
-
-**Next Steps for Module 2.4:**
-1. Add endpoint for conductors to store Azul card tokens (DataVault)
-2. Add endpoint for manual commission payout processing
-3. Implement payment status polling for clients
-4. Add comprehensive error handling and retry logic
-5. End-to-end payment flow testing

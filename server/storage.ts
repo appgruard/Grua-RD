@@ -184,11 +184,14 @@ export interface IStorage {
 
   // Comisiones
   createComision(comision: InsertComision): Promise<Comision>;
+  getComisionById(id: string): Promise<ComisionWithDetails | undefined>;
   getComisionByServicioId(servicioId: string): Promise<ComisionWithDetails | undefined>;
   getComisionesByEstado(estado: string, tipo: 'operador' | 'empresa'): Promise<ComisionWithDetails[]>;
+  getComisionesByConductor(conductorId: string): Promise<ComisionWithDetails[]>;
   getAllComisiones(): Promise<ComisionWithDetails[]>;
   updateComision(id: string, data: Partial<Comision>): Promise<Comision>;
-  marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', stripeTransferId?: string): Promise<Comision>;
+  updateComisionNotas(id: string, notas: string): Promise<Comision>;
+  marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', azulTransactionId?: string): Promise<Comision>;
 
   // Stripe Connect Accounts
   createConductorStripeAccount(data: { conductorId: string; stripeAccountId: string }): Promise<any>;
@@ -1153,12 +1156,12 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', stripeTransferId?: string): Promise<Comision> {
+  async marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', azulTransactionId?: string): Promise<Comision> {
     const updateData: Partial<Comision> = tipo === 'operador' 
       ? {
           estadoPagoOperador: 'pagado',
           fechaPagoOperador: new Date(),
-          stripeTransferId,
+          azulTransactionId,
         }
       : {
           estadoPagoEmpresa: 'pagado',
@@ -1168,6 +1171,47 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db
       .update(comisiones)
       .set(updateData)
+      .where(eq(comisiones.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getComisionById(id: string): Promise<ComisionWithDetails | undefined> {
+    const result = await db.query.comisiones.findFirst({
+      where: eq(comisiones.id, id),
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
+          },
+        },
+      },
+    });
+    return result as ComisionWithDetails | undefined;
+  }
+
+  async getComisionesByConductor(conductorId: string): Promise<ComisionWithDetails[]> {
+    const results = await db.query.comisiones.findMany({
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
+          },
+        },
+      },
+      orderBy: desc(comisiones.createdAt),
+    });
+    
+    const filtered = results.filter(c => c.servicio?.conductorId === conductorId);
+    return filtered as ComisionWithDetails[];
+  }
+
+  async updateComisionNotas(id: string, notas: string): Promise<Comision> {
+    const [updated] = await db
+      .update(comisiones)
+      .set({ notas })
       .where(eq(comisiones.id, id))
       .returning();
     return updated;
