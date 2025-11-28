@@ -14,7 +14,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userTypeEnum = pgEnum("user_type", ["cliente", "conductor", "admin", "aseguradora"]);
+export const userTypeEnum = pgEnum("user_type", ["cliente", "conductor", "admin", "aseguradora", "socio"]);
 export const estadoCuentaEnum = pgEnum("estado_cuenta", [
   "pendiente_verificacion",
   "activo",
@@ -389,6 +389,76 @@ export const serviciosAseguradoraRelations = relations(serviciosAseguradora, ({ 
   }),
 }));
 
+// ==================== SOCIOS (PARTNERS/INVESTORS) SYSTEM ====================
+
+// Enum for distribution status
+export const estadoDistribucionEnum = pgEnum("estado_distribucion", [
+  "calculado",
+  "aprobado",
+  "pagado"
+]);
+
+// Socios (Partners/Investors) Table
+export const socios = pgTable("socios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  porcentajeParticipacion: decimal("porcentaje_participacion", { precision: 5, scale: 2 }).notNull(),
+  montoInversion: decimal("monto_inversion", { precision: 12, scale: 2 }).notNull(),
+  fechaInversion: timestamp("fecha_inversion").notNull(),
+  activo: boolean("activo").default(true).notNull(),
+  cuentaBancaria: text("cuenta_bancaria"),
+  bancoNombre: text("banco_nombre"),
+  tipoCuenta: text("tipo_cuenta"),
+  notas: text("notas"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Distribuciones Socios Table (Partner profit distributions)
+export const distribucionesSocios = pgTable("distribuciones_socios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  socioId: varchar("socio_id").notNull().references(() => socios.id, { onDelete: "cascade" }),
+  periodo: text("periodo").notNull(),
+  ingresosTotales: decimal("ingresos_totales", { precision: 12, scale: 2 }).notNull(),
+  comisionEmpresa: decimal("comision_empresa", { precision: 12, scale: 2 }).notNull(),
+  montoSocio: decimal("monto_socio", { precision: 12, scale: 2 }).notNull(),
+  estado: estadoDistribucionEnum("estado").default("calculado").notNull(),
+  fechaPago: timestamp("fecha_pago"),
+  metodoPago: text("metodo_pago"),
+  referenciaTransaccion: text("referencia_transaccion"),
+  notas: text("notas"),
+  calculadoPor: varchar("calculado_por").references(() => users.id),
+  aprobadoPor: varchar("aprobado_por").references(() => users.id),
+  fechaAprobacion: timestamp("fecha_aprobacion"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Socios Relations
+export const sociosRelations = relations(socios, ({ one, many }) => ({
+  user: one(users, {
+    fields: [socios.userId],
+    references: [users.id],
+  }),
+  distribuciones: many(distribucionesSocios),
+}));
+
+export const distribucionesSociosRelations = relations(distribucionesSocios, ({ one }) => ({
+  socio: one(socios, {
+    fields: [distribucionesSocios.socioId],
+    references: [socios.id],
+  }),
+  calculadoPorUsuario: one(users, {
+    fields: [distribucionesSocios.calculadoPor],
+    references: [users.id],
+  }),
+  aprobadoPorUsuario: one(users, {
+    fields: [distribucionesSocios.aprobadoPor],
+    references: [users.id],
+  }),
+}));
+
+// ==================== END SOCIOS SYSTEM ====================
+
 // Enum for document reminder types
 export const tipoRecordatorioEnum = pgEnum("tipo_recordatorio", [
   "30_dias",
@@ -583,6 +653,30 @@ export const insertServicioAseguradoraSchema = createInsertSchema(serviciosAsegu
   motivoRechazo: true,
 });
 
+export const insertSocioSchema = createInsertSchema(socios, {
+  porcentajeParticipacion: z.string().min(1, "Porcentaje de participación es requerido"),
+  montoInversion: z.string().min(1, "Monto de inversión es requerido"),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  activo: true,
+});
+
+export const insertDistribucionSocioSchema = createInsertSchema(distribucionesSocios, {
+  periodo: z.string().regex(/^\d{4}-\d{2}$/, "Formato de período inválido (YYYY-MM)"),
+  ingresosTotales: z.string().min(1, "Ingresos totales es requerido"),
+  comisionEmpresa: z.string().min(1, "Comisión empresa es requerido"),
+  montoSocio: z.string().min(1, "Monto socio es requerido"),
+}).omit({
+  id: true,
+  createdAt: true,
+  estado: true,
+  fechaPago: true,
+  aprobadoPor: true,
+  fechaAprobacion: true,
+});
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -597,6 +691,8 @@ export const selectDocumentoSchema = createSelectSchema(documentos);
 export const selectComisionSchema = createSelectSchema(comisiones);
 export const selectAseguradoraSchema = createSelectSchema(aseguradoras);
 export const selectServicioAseguradoraSchema = createSelectSchema(serviciosAseguradora);
+export const selectSocioSchema = createSelectSchema(socios);
+export const selectDistribucionSocioSchema = createSelectSchema(distribucionesSocios);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -638,6 +734,12 @@ export type Aseguradora = typeof aseguradoras.$inferSelect;
 export type InsertServicioAseguradora = z.infer<typeof insertServicioAseguradoraSchema>;
 export type ServicioAseguradora = typeof serviciosAseguradora.$inferSelect;
 
+export type InsertSocio = z.infer<typeof insertSocioSchema>;
+export type Socio = typeof socios.$inferSelect;
+
+export type InsertDistribucionSocio = z.infer<typeof insertDistribucionSocioSchema>;
+export type DistribucionSocio = typeof distribucionesSocios.$inferSelect;
+
 // Helper types for API responses
 export type UserWithConductor = User & {
   conductor?: Conductor;
@@ -673,6 +775,17 @@ export type ServicioAseguradoraWithDetails = ServicioAseguradora & {
   aseguradora?: Aseguradora;
   aprobadoPorUsuario?: User;
   rechazadoPorUsuario?: User;
+};
+
+export type SocioWithDetails = Socio & {
+  user?: User;
+  distribuciones?: DistribucionSocio[];
+};
+
+export type DistribucionSocioWithDetails = DistribucionSocio & {
+  socio?: SocioWithDetails;
+  calculadoPorUsuario?: User;
+  aprobadoPorUsuario?: User;
 };
 
 // ==================== TICKET SYSTEM ====================

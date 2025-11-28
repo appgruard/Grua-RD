@@ -1,11 +1,11 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Home, History, User, Phone } from 'lucide-react';
+import { Home, History, User, Phone, TrendingUp, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MobileLayoutProps {
   children: ReactNode;
-  userType: 'cliente' | 'conductor';
+  userType: 'cliente' | 'conductor' | 'socio';
 }
 
 export function MobileLayout({ children, userType }: MobileLayoutProps) {
@@ -24,7 +24,11 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
     { path: '/driver/profile', icon: User, label: 'Perfil', testId: 'tab-profile' },
   ];
 
-  const tabs = userType === 'cliente' ? clientTabs : driverTabs;
+  const socioTabs = [
+    { path: '/socio', icon: TrendingUp, label: 'Dashboard', testId: 'tab-dashboard' },
+  ];
+
+  const tabs = userType === 'cliente' ? clientTabs : userType === 'socio' ? socioTabs : driverTabs;
 
   return (
     <div className="flex flex-col h-screen bg-background">

@@ -663,6 +663,303 @@ export class PDFService {
         { align: "center", width: 500 }
       );
   }
+
+  async generarEstadoFinancieroSocio(data: EstadoFinancieroSocioData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          size: "LETTER",
+          margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        });
+
+        const buffers: Buffer[] = [];
+        const stream = new Writable({
+          write(chunk, encoding, callback) {
+            buffers.push(chunk);
+            callback();
+          },
+        });
+
+        doc.pipe(stream);
+
+        this.addSocioHeader(doc, data);
+        this.addSocioInfo(doc, data);
+        this.addDistribucionPeriodo(doc, data);
+        this.addResumenInversion(doc, data);
+        this.addSocioFooter(doc);
+
+        doc.end();
+
+        stream.on("finish", () => {
+          const pdfBuffer = Buffer.concat(buffers);
+          logger.info("Partner financial statement PDF generated", {
+            socioId: data.socio.id,
+            periodo: data.periodo,
+            size: pdfBuffer.length,
+          });
+          resolve(pdfBuffer);
+        });
+
+        stream.on("error", (error) => {
+          logger.error("Error generating partner financial statement PDF", { error });
+          reject(error);
+        });
+      } catch (error) {
+        logger.error("Error creating partner financial statement PDF document", { error });
+        reject(error);
+      }
+    });
+  }
+
+  private addSocioHeader(doc: PDFKit.PDFDocument, data: EstadoFinancieroSocioData): void {
+    doc
+      .fontSize(28)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Grua RD", 50, 50);
+
+    doc
+      .fontSize(10)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text("Portal de Socios e Inversores", 50, 85);
+
+    doc
+      .fontSize(20)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("ESTADO FINANCIERO", 350, 50, { align: "right" });
+
+    const [year, month] = data.periodo.split("-");
+    const monthNames = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    const periodoDisplay = `${monthNames[parseInt(month) - 1]} ${year}`;
+
+    doc
+      .fontSize(10)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text(`Periodo: ${periodoDisplay}`, 350, 80, { align: "right" });
+
+    doc
+      .fontSize(9)
+      .text(`Generado: ${new Date().toLocaleDateString("es-DO")}`, 350, 95, { align: "right" });
+
+    doc
+      .moveTo(50, 120)
+      .lineTo(550, 120)
+      .strokeColor("#e2e8f0")
+      .stroke();
+  }
+
+  private addSocioInfo(doc: PDFKit.PDFDocument, data: EstadoFinancieroSocioData): void {
+    const startY = 140;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Informacion del Socio", 50, startY);
+
+    doc.fontSize(10).fillColor("#000000").font("Helvetica-Bold");
+    doc.text("Nombre:", 50, startY + 30);
+    doc.text("Email:", 50, startY + 50);
+    doc.text("% Participacion:", 50, startY + 70);
+    doc.text("Fecha Ingreso:", 50, startY + 90);
+
+    doc.font("Helvetica").fillColor(this.SECONDARY_COLOR);
+    doc.text(data.socio.user?.nombre || "N/A", 170, startY + 30);
+    doc.text(data.socio.user?.email || "N/A", 170, startY + 50);
+    doc.text(`${data.socio.porcentajeParticipacion}%`, 170, startY + 70);
+    doc.text(
+      new Date(data.socio.fechaInversion).toLocaleDateString("es-DO"),
+      170,
+      startY + 90
+    );
+
+    doc
+      .moveTo(50, startY + 120)
+      .lineTo(550, startY + 120)
+      .strokeColor("#e2e8f0")
+      .stroke();
+  }
+
+  private addDistribucionPeriodo(doc: PDFKit.PDFDocument, data: EstadoFinancieroSocioData): void {
+    const startY = 280;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Distribucion del Periodo", 50, startY);
+
+    if (!data.distribucion) {
+      doc
+        .fontSize(10)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text("No hay distribucion calculada para este periodo.", 50, startY + 30);
+      return;
+    }
+
+    const rowHeight = 25;
+    let currentY = startY + 35;
+
+    doc
+      .fillColor("#f8fafc")
+      .rect(50, currentY - 5, 500, rowHeight)
+      .fill();
+
+    doc
+      .fontSize(10)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("Concepto", 60, currentY);
+    doc.text("Monto", 450, currentY, { align: "right" });
+
+    currentY += rowHeight;
+
+    const rows = [
+      { label: "Ingresos Totales Periodo", value: `RD$ ${parseFloat(data.distribucion.ingresosTotales).toLocaleString('es-DO', { minimumFractionDigits: 2 })}` },
+      { label: "Comision Empresa (30%)", value: `RD$ ${parseFloat(data.distribucion.comisionEmpresa).toLocaleString('es-DO', { minimumFractionDigits: 2 })}` },
+      { label: `Su Participacion (${data.distribucion.porcentajeAlMomento}%)`, value: `RD$ ${parseFloat(data.distribucion.montoSocio).toLocaleString('es-DO', { minimumFractionDigits: 2 })}` },
+    ];
+
+    rows.forEach((row, index) => {
+      const bgColor = index % 2 === 0 ? "#ffffff" : "#f8fafc";
+      doc.fillColor(bgColor).rect(50, currentY - 5, 500, rowHeight).fill();
+
+      doc
+        .fontSize(10)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(row.label, 60, currentY);
+      doc
+        .fillColor("#000000")
+        .font("Helvetica-Bold")
+        .text(row.value, 450, currentY, { align: "right" });
+
+      currentY += rowHeight;
+    });
+
+    const estadoColor = data.distribucion.estado === 'pagado' ? this.SUCCESS_COLOR : "#f59e0b";
+    const estadoTexto = data.distribucion.estado === 'pagado' ? 'PAGADO' : 
+                        data.distribucion.estado === 'aprobado' ? 'APROBADO - PENDIENTE PAGO' : 'CALCULADO';
+
+    doc
+      .fillColor(estadoColor)
+      .rect(50, currentY - 5, 500, rowHeight + 5)
+      .fill();
+
+    doc
+      .fontSize(12)
+      .fillColor("#ffffff")
+      .font("Helvetica-Bold")
+      .text("ESTADO", 60, currentY + 2);
+    doc.text(estadoTexto, 450, currentY + 2, { align: "right" });
+
+    if (data.distribucion.estado === 'pagado' && data.distribucion.fechaPago) {
+      currentY += rowHeight + 15;
+      doc
+        .fontSize(9)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(
+          `Fecha de pago: ${new Date(data.distribucion.fechaPago).toLocaleDateString("es-DO")} | Metodo: ${data.distribucion.metodoPago || 'N/A'}`,
+          60,
+          currentY
+        );
+    }
+  }
+
+  private addResumenInversion(doc: PDFKit.PDFDocument, data: EstadoFinancieroSocioData): void {
+    const startY = 480;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Resumen de Inversion", 50, startY);
+
+    const kpiY = startY + 30;
+    const kpiWidth = 155;
+    const kpiHeight = 60;
+
+    const roiColor = data.resumen.roi >= 0 ? this.SUCCESS_COLOR : "#ef4444";
+
+    const kpis = [
+      { label: "Inversion Total", value: `RD$ ${data.resumen.montoInversion.toLocaleString('es-DO', { minimumFractionDigits: 2 })}` },
+      { label: "Total Recibido", value: `RD$ ${data.resumen.totalRecibido.toLocaleString('es-DO', { minimumFractionDigits: 2 })}` },
+      { label: "ROI", value: `${data.resumen.roi.toFixed(2)}%`, color: roiColor },
+    ];
+
+    kpis.forEach((kpi, index) => {
+      const x = 50 + (index * (kpiWidth + 10));
+      
+      doc.fillColor("#f8fafc").roundedRect(x, kpiY, kpiWidth, kpiHeight, 5).fill();
+      
+      doc
+        .fontSize(9)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(kpi.label, x + 10, kpiY + 10, { width: kpiWidth - 20 });
+      
+      doc
+        .fontSize(14)
+        .fillColor(kpi.color || "#000000")
+        .font("Helvetica-Bold")
+        .text(kpi.value, x + 10, kpiY + 32, { width: kpiWidth - 20 });
+    });
+
+    doc
+      .fontSize(10)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text(
+        `Total Distribuciones: ${data.resumen.totalDistribuciones} | Pendiente de Pago: RD$ ${data.resumen.pendientePago.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`,
+        50,
+        kpiY + 75
+      );
+  }
+
+  private addSocioFooter(doc: PDFKit.PDFDocument): void {
+    const pageHeight = doc.page.height;
+    const footerY = pageHeight - 80;
+
+    doc
+      .moveTo(50, footerY - 20)
+      .lineTo(550, footerY - 20)
+      .strokeColor("#e2e8f0")
+      .stroke();
+
+    doc
+      .fontSize(9)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text("Grua RD - Portal de Socios", 50, footerY, {
+        align: "center",
+        width: 500,
+      });
+
+    doc.text(
+      "Para consultas sobre distribuciones, contacte: socios@gruard.com | Tel: (809) 555-1234",
+      50,
+      footerY + 15,
+      { align: "center", width: 500 }
+    );
+
+    doc
+      .fontSize(8)
+      .fillColor("#94a3b8")
+      .text(
+        "Este documento es confidencial y contiene informacion financiera privilegiada.",
+        50,
+        footerY + 35,
+        { align: "center", width: 500 }
+      );
+  }
 }
 
 export interface AnalyticsReportData {
@@ -693,6 +990,38 @@ export interface AnalyticsReportData {
     completedServices: number;
     averageRating: number;
   }>;
+}
+
+export interface EstadoFinancieroSocioData {
+  socio: {
+    id: string;
+    porcentajeParticipacion: string;
+    montoInversion: string;
+    fechaInversion: Date;
+    user?: {
+      nombre: string;
+      email: string;
+    } | null;
+  };
+  periodo: string;
+  distribucion: {
+    ingresosTotales: string;
+    comisionEmpresa: string;
+    porcentajeAlMomento: string;
+    montoSocio: string;
+    estado: string;
+    fechaPago?: Date | null;
+    metodoPago?: string | null;
+  } | null;
+  resumen: {
+    porcentajeParticipacion: number;
+    montoInversion: number;
+    fechaInversion: Date;
+    totalDistribuciones: number;
+    totalRecibido: number;
+    pendientePago: number;
+    roi: number;
+  };
 }
 
 export const pdfService = new PDFService();

@@ -18,6 +18,8 @@ import {
   systemJobs,
   tickets,
   mensajesTicket,
+  socios,
+  distribucionesSocios,
   type User,
   type InsertUser,
   type Conductor,
@@ -60,6 +62,12 @@ import {
   type InsertMensajeTicket,
   type TicketWithDetails,
   type MensajeTicketWithUsuario,
+  type Socio,
+  type InsertSocio,
+  type DistribucionSocio,
+  type InsertDistribucionSocio,
+  type SocioWithDetails,
+  type DistribucionSocioWithDetails,
 } from '@shared/schema';
 import {
   conductorStripeAccounts,
@@ -300,6 +308,58 @@ export interface IStorage {
     cerrados: number;
     urgentes: number;
     sinAsignar: number;
+  }>;
+
+  // Socios (Partners/Investors) - Module 2.5
+  createSocio(socio: InsertSocio): Promise<Socio>;
+  getSocioById(id: string): Promise<SocioWithDetails | undefined>;
+  getSocioByUserId(userId: string): Promise<SocioWithDetails | undefined>;
+  getAllSocios(): Promise<SocioWithDetails[]>;
+  getActiveSocios(): Promise<SocioWithDetails[]>;
+  updateSocio(id: string, data: Partial<Socio>): Promise<Socio>;
+  toggleSocioActivo(id: string): Promise<Socio>;
+  deleteSocio(id: string): Promise<void>;
+
+  // Distribuciones de Socios
+  createDistribucionSocio(distribucion: InsertDistribucionSocio): Promise<DistribucionSocio>;
+  getDistribucionById(id: string): Promise<DistribucionSocioWithDetails | undefined>;
+  getDistribucionesBySocioId(socioId: string): Promise<DistribucionSocioWithDetails[]>;
+  getDistribucionesByPeriodo(periodo: string): Promise<DistribucionSocioWithDetails[]>;
+  getAllDistribuciones(): Promise<DistribucionSocioWithDetails[]>;
+  updateDistribucion(id: string, data: Partial<DistribucionSocio>): Promise<DistribucionSocio>;
+  aprobarDistribucion(id: string, adminId: string): Promise<DistribucionSocio>;
+  marcarDistribucionPagada(id: string, metodoPago: string, referencia: string): Promise<DistribucionSocio>;
+
+  // Cálculos de distribución
+  calcularDistribucionPeriodo(periodo: string): Promise<{
+    ingresosTotales: number;
+    comisionEmpresa: number;
+    distribucionesPorSocio: Array<{
+      socioId: string;
+      porcentajeParticipacion: number;
+      montoSocio: number;
+    }>;
+  }>;
+
+  // Resumen para dashboard de socio
+  getResumenSocio(socioId: string): Promise<{
+    porcentajeParticipacion: number;
+    montoInversion: number;
+    fechaInversion: Date;
+    totalDistribuciones: number;
+    totalRecibido: number;
+    pendientePago: number;
+    roi: number;
+    ultimaDistribucion: DistribucionSocio | null;
+  }>;
+
+  // Estadísticas de socios para admin
+  getSociosStats(): Promise<{
+    totalSocios: number;
+    sociosActivos: number;
+    totalInversion: number;
+    totalDistribuido: number;
+    pendientePago: number;
   }>;
 }
 
@@ -2211,6 +2271,311 @@ export class DatabaseStorage implements IStorage {
       .from(tickets);
     
     return stats;
+  }
+
+  // ==================== SOCIOS (PARTNERS/INVESTORS) - Module 2.5 ====================
+
+  async createSocio(insertSocio: InsertSocio): Promise<Socio> {
+    const [socio] = await db.insert(socios).values(insertSocio).returning();
+    return socio;
+  }
+
+  async getSocioById(id: string): Promise<SocioWithDetails | undefined> {
+    const result = await db.query.socios.findFirst({
+      where: eq(socios.id, id),
+      with: {
+        user: true,
+        distribuciones: {
+          orderBy: (distribucionesSocios, { desc }) => [desc(distribucionesSocios.createdAt)],
+        },
+      },
+    });
+    return result as SocioWithDetails | undefined;
+  }
+
+  async getSocioByUserId(userId: string): Promise<SocioWithDetails | undefined> {
+    const result = await db.query.socios.findFirst({
+      where: eq(socios.userId, userId),
+      with: {
+        user: true,
+        distribuciones: {
+          orderBy: (distribucionesSocios, { desc }) => [desc(distribucionesSocios.createdAt)],
+        },
+      },
+    });
+    return result as SocioWithDetails | undefined;
+  }
+
+  async getAllSocios(): Promise<SocioWithDetails[]> {
+    const results = await db.query.socios.findMany({
+      with: {
+        user: true,
+        distribuciones: {
+          orderBy: (distribucionesSocios, { desc }) => [desc(distribucionesSocios.createdAt)],
+        },
+      },
+      orderBy: desc(socios.createdAt),
+    });
+    return results as SocioWithDetails[];
+  }
+
+  async getActiveSocios(): Promise<SocioWithDetails[]> {
+    const results = await db.query.socios.findMany({
+      where: eq(socios.activo, true),
+      with: {
+        user: true,
+        distribuciones: {
+          orderBy: (distribucionesSocios, { desc }) => [desc(distribucionesSocios.createdAt)],
+        },
+      },
+      orderBy: desc(socios.createdAt),
+    });
+    return results as SocioWithDetails[];
+  }
+
+  async updateSocio(id: string, data: Partial<Socio>): Promise<Socio> {
+    const [socio] = await db
+      .update(socios)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(socios.id, id))
+      .returning();
+    return socio;
+  }
+
+  async toggleSocioActivo(id: string): Promise<Socio> {
+    const socio = await this.getSocioById(id);
+    if (!socio) throw new Error('Socio no encontrado');
+    
+    const [updated] = await db
+      .update(socios)
+      .set({ activo: !socio.activo, updatedAt: new Date() })
+      .where(eq(socios.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSocio(id: string): Promise<void> {
+    await db.delete(socios).where(eq(socios.id, id));
+  }
+
+  // Distribuciones de Socios
+  async createDistribucionSocio(insertDistribucion: InsertDistribucionSocio): Promise<DistribucionSocio> {
+    const [distribucion] = await db.insert(distribucionesSocios).values(insertDistribucion).returning();
+    return distribucion;
+  }
+
+  async getDistribucionById(id: string): Promise<DistribucionSocioWithDetails | undefined> {
+    const result = await db.query.distribucionesSocios.findFirst({
+      where: eq(distribucionesSocios.id, id),
+      with: {
+        socio: {
+          with: {
+            user: true,
+          },
+        },
+        calculadoPorUsuario: true,
+        aprobadoPorUsuario: true,
+      },
+    });
+    return result as DistribucionSocioWithDetails | undefined;
+  }
+
+  async getDistribucionesBySocioId(socioId: string): Promise<DistribucionSocioWithDetails[]> {
+    const results = await db.query.distribucionesSocios.findMany({
+      where: eq(distribucionesSocios.socioId, socioId),
+      with: {
+        socio: {
+          with: {
+            user: true,
+          },
+        },
+        calculadoPorUsuario: true,
+        aprobadoPorUsuario: true,
+      },
+      orderBy: desc(distribucionesSocios.createdAt),
+    });
+    return results as DistribucionSocioWithDetails[];
+  }
+
+  async getDistribucionesByPeriodo(periodo: string): Promise<DistribucionSocioWithDetails[]> {
+    const results = await db.query.distribucionesSocios.findMany({
+      where: eq(distribucionesSocios.periodo, periodo),
+      with: {
+        socio: {
+          with: {
+            user: true,
+          },
+        },
+        calculadoPorUsuario: true,
+        aprobadoPorUsuario: true,
+      },
+      orderBy: desc(distribucionesSocios.createdAt),
+    });
+    return results as DistribucionSocioWithDetails[];
+  }
+
+  async getAllDistribuciones(): Promise<DistribucionSocioWithDetails[]> {
+    const results = await db.query.distribucionesSocios.findMany({
+      with: {
+        socio: {
+          with: {
+            user: true,
+          },
+        },
+        calculadoPorUsuario: true,
+        aprobadoPorUsuario: true,
+      },
+      orderBy: desc(distribucionesSocios.createdAt),
+    });
+    return results as DistribucionSocioWithDetails[];
+  }
+
+  async updateDistribucion(id: string, data: Partial<DistribucionSocio>): Promise<DistribucionSocio> {
+    const [distribucion] = await db
+      .update(distribucionesSocios)
+      .set(data)
+      .where(eq(distribucionesSocios.id, id))
+      .returning();
+    return distribucion;
+  }
+
+  async aprobarDistribucion(id: string, adminId: string): Promise<DistribucionSocio> {
+    const [distribucion] = await db
+      .update(distribucionesSocios)
+      .set({
+        estado: 'aprobado',
+        aprobadoPor: adminId,
+        fechaAprobacion: new Date(),
+      })
+      .where(eq(distribucionesSocios.id, id))
+      .returning();
+    return distribucion;
+  }
+
+  async marcarDistribucionPagada(id: string, metodoPago: string, referencia: string): Promise<DistribucionSocio> {
+    const [distribucion] = await db
+      .update(distribucionesSocios)
+      .set({
+        estado: 'pagado',
+        metodoPago,
+        referenciaTransaccion: referencia,
+        fechaPago: new Date(),
+      })
+      .where(eq(distribucionesSocios.id, id))
+      .returning();
+    return distribucion;
+  }
+
+  async calcularDistribucionPeriodo(periodo: string): Promise<{
+    ingresosTotales: number;
+    comisionEmpresa: number;
+    distribucionesPorSocio: Array<{
+      socioId: string;
+      porcentajeParticipacion: number;
+      montoSocio: number;
+    }>;
+  }> {
+    const [year, month] = periodo.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const [ingresos] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(${comisiones.montoEmpresa}::numeric), 0)::float`,
+      })
+      .from(comisiones)
+      .where(
+        and(
+          gte(comisiones.createdAt, startDate),
+          lte(comisiones.createdAt, endDate),
+          eq(comisiones.estadoPagoEmpresa, 'pagado')
+        )
+      );
+
+    const ingresosTotales = ingresos?.total || 0;
+    const comisionEmpresa = ingresosTotales;
+
+    const sociosActivos = await this.getActiveSocios();
+    const distribucionesPorSocio = sociosActivos.map(socio => ({
+      socioId: socio.id,
+      porcentajeParticipacion: parseFloat(socio.porcentajeParticipacion),
+      montoSocio: (parseFloat(socio.porcentajeParticipacion) / 100) * comisionEmpresa,
+    }));
+
+    return {
+      ingresosTotales,
+      comisionEmpresa,
+      distribucionesPorSocio,
+    };
+  }
+
+  async getResumenSocio(socioId: string): Promise<{
+    porcentajeParticipacion: number;
+    montoInversion: number;
+    fechaInversion: Date;
+    totalDistribuciones: number;
+    totalRecibido: number;
+    pendientePago: number;
+    roi: number;
+    ultimaDistribucion: DistribucionSocio | null;
+  }> {
+    const socio = await this.getSocioById(socioId);
+    if (!socio) throw new Error('Socio no encontrado');
+
+    const distribuciones = await this.getDistribucionesBySocioId(socioId);
+    
+    const totalRecibido = distribuciones
+      .filter(d => d.estado === 'pagado')
+      .reduce((sum, d) => sum + parseFloat(d.montoSocio), 0);
+
+    const pendientePago = distribuciones
+      .filter(d => d.estado !== 'pagado')
+      .reduce((sum, d) => sum + parseFloat(d.montoSocio), 0);
+
+    const montoInversion = parseFloat(socio.montoInversion);
+    const roi = montoInversion > 0 ? ((totalRecibido - montoInversion) / montoInversion) * 100 : 0;
+
+    return {
+      porcentajeParticipacion: parseFloat(socio.porcentajeParticipacion),
+      montoInversion,
+      fechaInversion: new Date(socio.fechaInversion),
+      totalDistribuciones: distribuciones.length,
+      totalRecibido,
+      pendientePago,
+      roi,
+      ultimaDistribucion: distribuciones.length > 0 ? distribuciones[0] : null,
+    };
+  }
+
+  async getSociosStats(): Promise<{
+    totalSocios: number;
+    sociosActivos: number;
+    totalInversion: number;
+    totalDistribuido: number;
+    pendientePago: number;
+  }> {
+    const [sociosStats] = await db
+      .select({
+        totalSocios: sql<number>`count(*)::int`,
+        sociosActivos: sql<number>`count(*) filter (where ${socios.activo} = true)::int`,
+        totalInversion: sql<number>`COALESCE(SUM(${socios.montoInversion}::numeric), 0)::float`,
+      })
+      .from(socios);
+
+    const [distribucionesStats] = await db
+      .select({
+        totalDistribuido: sql<number>`COALESCE(SUM(${distribucionesSocios.montoSocio}::numeric) filter (where ${distribucionesSocios.estado} = 'pagado'), 0)::float`,
+        pendientePago: sql<number>`COALESCE(SUM(${distribucionesSocios.montoSocio}::numeric) filter (where ${distribucionesSocios.estado} != 'pagado'), 0)::float`,
+      })
+      .from(distribucionesSocios);
+
+    return {
+      totalSocios: sociosStats.totalSocios,
+      sociosActivos: sociosStats.sociosActivos,
+      totalInversion: sociosStats.totalInversion,
+      totalDistribuido: distribucionesStats?.totalDistribuido || 0,
+      pendientePago: distribucionesStats?.pendientePago || 0,
+    };
   }
 }
 

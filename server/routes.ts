@@ -12,7 +12,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema } from "@shared/schema";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
@@ -65,6 +65,57 @@ const updateAseguradoraAdminSchema = z.object({
   direccion: z.string().min(1, "Dirección es requerida").optional().nullable(),
   emailContacto: z.string().email("Email de contacto inválido").optional().nullable(),
   personaContacto: z.string().min(1, "Persona de contacto es requerida").optional().nullable(),
+});
+
+// Zod validation schemas for socios (Module 2.5)
+const createSocioSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  nombre: z.string().min(1, "Nombre es requerido"),
+  telefono: z.string().optional().nullable(),
+  porcentajeParticipacion: z.union([
+    z.string().refine(
+      (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0 && parseFloat(val) <= 100,
+      "Porcentaje debe ser un número entre 0.01 y 100"
+    ),
+    z.number().positive().max(100, "Porcentaje no puede exceder 100"),
+  ]),
+  montoInversion: z.union([
+    z.string().refine(
+      (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
+      "Monto debe ser un número positivo o cero"
+    ),
+    z.number().min(0, "Monto debe ser positivo o cero"),
+  ]),
+  fechaInversion: z.string().optional(),
+  notas: z.string().optional().nullable(),
+});
+
+const updateSocioSchema = z.object({
+  porcentajeParticipacion: z.union([
+    z.string().refine(
+      (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0 && parseFloat(val) <= 100,
+      "Porcentaje debe ser un número entre 0.01 y 100"
+    ),
+    z.number().positive().max(100, "Porcentaje no puede exceder 100"),
+  ]).optional(),
+  montoInversion: z.union([
+    z.string().refine(
+      (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
+      "Monto debe ser un número positivo o cero"
+    ),
+    z.number().min(0, "Monto debe ser positivo o cero"),
+  ]).optional(),
+  notas: z.string().optional().nullable(),
+});
+
+const calcularDistribucionSchema = z.object({
+  periodo: z.string().regex(/^\d{4}-\d{2}$/, "Período debe tener formato YYYY-MM"),
+});
+
+const marcarPagadaSchema = z.object({
+  metodoPago: z.string().min(1, "Método de pago es requerido"),
+  referenciaTransaccion: z.string().min(1, "Referencia de transacción es requerida"),
 });
 
 const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -4487,6 +4538,497 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get assigned tickets error', error);
       res.status(500).json({ message: "Error al obtener tickets asignados" });
+    }
+  });
+
+  // ==================== SOCIOS/PARTNERS PORTAL (Module 2.5) ====================
+
+  // Get current partner's profile and dashboard data
+  app.get("/api/socio/dashboard", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'socio') {
+      return res.status(401).json({ message: "No autorizado. Solo socios pueden acceder." });
+    }
+
+    try {
+      const socio = await storage.getSocioByUserId(req.user!.id);
+      if (!socio) {
+        return res.status(404).json({ message: "Perfil de socio no encontrado" });
+      }
+
+      const resumen = await storage.getResumenSocio(socio.id);
+      const distribuciones = await storage.getDistribucionesBySocioId(socio.id);
+
+      res.json({
+        socio,
+        resumen,
+        distribuciones,
+      });
+    } catch (error: any) {
+      logSystem.error('Get partner dashboard error', error);
+      res.status(500).json({ message: "Error al obtener dashboard de socio" });
+    }
+  });
+
+  // Get partner's distributions history
+  app.get("/api/socio/distribuciones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'socio') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const socio = await storage.getSocioByUserId(req.user!.id);
+      if (!socio) {
+        return res.status(404).json({ message: "Perfil de socio no encontrado" });
+      }
+
+      const distribuciones = await storage.getDistribucionesBySocioId(socio.id);
+      res.json(distribuciones);
+    } catch (error: any) {
+      logSystem.error('Get partner distributions error', error);
+      res.status(500).json({ message: "Error al obtener distribuciones" });
+    }
+  });
+
+  // Get partner's investment summary
+  app.get("/api/socio/resumen", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'socio') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const socio = await storage.getSocioByUserId(req.user!.id);
+      if (!socio) {
+        return res.status(404).json({ message: "Perfil de socio no encontrado" });
+      }
+
+      const resumen = await storage.getResumenSocio(socio.id);
+      res.json(resumen);
+    } catch (error: any) {
+      logSystem.error('Get partner summary error', error);
+      res.status(500).json({ message: "Error al obtener resumen" });
+    }
+  });
+
+  // Generate financial statement PDF for partner
+  app.get("/api/socio/estado-financiero/:periodo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'socio') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const { periodo } = req.params;
+    if (!/^\d{4}-\d{2}$/.test(periodo)) {
+      return res.status(400).json({ message: "Período inválido. Use formato YYYY-MM" });
+    }
+
+    try {
+      const socio = await storage.getSocioByUserId(req.user!.id);
+      if (!socio) {
+        return res.status(404).json({ message: "Perfil de socio no encontrado" });
+      }
+
+      const distribuciones = await storage.getDistribucionesByPeriodo(periodo);
+      const distribucionSocio = distribuciones.find(d => d.socioId === socio.id);
+      const resumen = await storage.getResumenSocio(socio.id);
+
+      // Generate PDF using pdfService
+      const pdfBuffer = await pdfService.generarEstadoFinancieroSocio({
+        socio,
+        periodo,
+        distribucion: distribucionSocio || null,
+        resumen,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=estado-financiero-${periodo}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      logSystem.error('Generate partner financial statement error', error);
+      res.status(500).json({ message: "Error al generar estado financiero" });
+    }
+  });
+
+  // ==================== ADMIN SOCIOS ====================
+
+  // Get all partners (admin only)
+  app.get("/api/admin/socios", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const socios = await storage.getAllSocios();
+      res.json(socios);
+    } catch (error: any) {
+      logSystem.error('Get all partners error', error);
+      res.status(500).json({ message: "Error al obtener socios" });
+    }
+  });
+
+  // Get partner statistics (admin only)
+  app.get("/api/admin/socios/stats", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const stats = await storage.getSociosStats();
+      res.json(stats);
+    } catch (error: any) {
+      logSystem.error('Get partner stats error', error);
+      res.status(500).json({ message: "Error al obtener estadísticas de socios" });
+    }
+  });
+
+  // Get specific partner details (admin only)
+  app.get("/api/admin/socios/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const socio = await storage.getSocioById(req.params.id);
+      if (!socio) {
+        return res.status(404).json({ message: "Socio no encontrado" });
+      }
+
+      const resumen = await storage.getResumenSocio(req.params.id);
+      res.json({ socio, resumen });
+    } catch (error: any) {
+      logSystem.error('Get partner details error', error);
+      res.status(500).json({ message: "Error al obtener detalles del socio" });
+    }
+  });
+
+  // Create new partner (admin only)
+  app.post("/api/admin/socios", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const parsed = createSocioSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        message: "Datos inválidos",
+        errors: parsed.error.errors 
+      });
+    }
+
+    const { email, password, nombre, telefono, porcentajeParticipacion, montoInversion, fechaInversion, notas } = parsed.data;
+
+    try {
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ message: "El email ya está registrado" });
+      }
+
+      // Validate total participation doesn't exceed 100%
+      const currentSocios = await storage.getActiveSocios();
+      const currentTotal = currentSocios.reduce((sum, s) => sum + parseFloat(s.porcentajeParticipacion), 0);
+      const newPercentage = parseFloat(String(porcentajeParticipacion));
+      
+      if (currentTotal + newPercentage > 100) {
+        return res.status(400).json({ 
+          message: `La participación total no puede exceder 100%. Disponible: ${(100 - currentTotal).toFixed(2)}%` 
+        });
+      }
+
+      // Create user account with 'socio' role
+      const passwordHash = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        nombre,
+        telefono: telefono || null,
+        userType: 'socio',
+        verificado: true,
+      });
+
+      // Create partner profile
+      const socio = await storage.createSocio({
+        userId: user.id,
+        porcentajeParticipacion: String(porcentajeParticipacion),
+        montoInversion: String(montoInversion),
+        fechaInversion: fechaInversion ? new Date(fechaInversion) : new Date(),
+        notas: notas || null,
+      });
+
+      logSystem.info('Partner created', { socioId: socio.id, createdBy: req.user!.id });
+      res.status(201).json(socio);
+    } catch (error: any) {
+      logSystem.error('Create partner error', error);
+      res.status(500).json({ message: "Error al crear socio" });
+    }
+  });
+
+  // Update partner (admin only)
+  app.put("/api/admin/socios/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const parsed = updateSocioSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        message: "Datos inválidos",
+        errors: parsed.error.errors 
+      });
+    }
+
+    try {
+      const existingSocio = await storage.getSocioById(req.params.id);
+      if (!existingSocio) {
+        return res.status(404).json({ message: "Socio no encontrado" });
+      }
+
+      // Validate participation if being updated
+      if (parsed.data.porcentajeParticipacion) {
+        const currentSocios = await storage.getActiveSocios();
+        const currentTotal = currentSocios
+          .filter(s => s.id !== req.params.id)
+          .reduce((sum, s) => sum + parseFloat(s.porcentajeParticipacion), 0);
+        const newPercentage = parseFloat(String(parsed.data.porcentajeParticipacion));
+        
+        if (currentTotal + newPercentage > 100) {
+          return res.status(400).json({ 
+            message: `La participación total no puede exceder 100%. Disponible: ${(100 - currentTotal).toFixed(2)}%` 
+          });
+        }
+      }
+
+      const updates: any = {};
+      if (parsed.data.porcentajeParticipacion) {
+        updates.porcentajeParticipacion = String(parsed.data.porcentajeParticipacion);
+      }
+      if (parsed.data.montoInversion !== undefined) {
+        updates.montoInversion = String(parsed.data.montoInversion);
+      }
+      if (parsed.data.notas !== undefined) {
+        updates.notas = parsed.data.notas;
+      }
+
+      const socio = await storage.updateSocio(req.params.id, updates);
+      logSystem.info('Partner updated', { socioId: socio.id, updatedBy: req.user!.id });
+      res.json(socio);
+    } catch (error: any) {
+      logSystem.error('Update partner error', error);
+      res.status(500).json({ message: "Error al actualizar socio" });
+    }
+  });
+
+  // Toggle partner active status (admin only)
+  app.put("/api/admin/socios/:id/toggle-activo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const socio = await storage.toggleSocioActivo(req.params.id);
+      logSystem.info('Partner status toggled', { socioId: socio.id, activo: socio.activo, toggledBy: req.user!.id });
+      res.json(socio);
+    } catch (error: any) {
+      logSystem.error('Toggle partner status error', error);
+      res.status(500).json({ message: "Error al cambiar estado del socio" });
+    }
+  });
+
+  // ==================== DISTRIBUCIONES (PROFIT DISTRIBUTION) ====================
+
+  // Get all distributions (admin only)
+  app.get("/api/admin/distribuciones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const { periodo } = req.query;
+
+    try {
+      let distribuciones;
+      if (periodo && typeof periodo === 'string') {
+        distribuciones = await storage.getDistribucionesByPeriodo(periodo);
+      } else {
+        distribuciones = await storage.getAllDistribuciones();
+      }
+      res.json(distribuciones);
+    } catch (error: any) {
+      logSystem.error('Get distributions error', error);
+      res.status(500).json({ message: "Error al obtener distribuciones" });
+    }
+  });
+
+  // Calculate distribution for a period (admin only)
+  app.post("/api/admin/distribuciones/calcular", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const parsed = calcularDistribucionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        message: "Datos inválidos",
+        errors: parsed.error.errors 
+      });
+    }
+
+    const { periodo } = parsed.data;
+
+    try {
+      // Check if distributions already exist for this period
+      const existingDistribuciones = await storage.getDistribucionesByPeriodo(periodo);
+      if (existingDistribuciones.length > 0) {
+        return res.status(409).json({ 
+          message: "Ya existen distribuciones calculadas para este período",
+          distribuciones: existingDistribuciones 
+        });
+      }
+
+      // Calculate distribution
+      const calculo = await storage.calcularDistribucionPeriodo(periodo);
+      
+      // Create distribution records for each active partner
+      const distribuciones = [];
+      for (const dist of calculo.distribucionesPorSocio) {
+        const distribucion = await storage.createDistribucionSocio({
+          socioId: dist.socioId,
+          periodo,
+          ingresosTotales: String(calculo.ingresosTotales),
+          comisionEmpresa: String(calculo.comisionEmpresa),
+          porcentajeAlMomento: String(dist.porcentajeParticipacion),
+          montoSocio: String(dist.montoSocio),
+          calculadoPor: req.user!.id,
+        });
+        distribuciones.push(distribucion);
+      }
+
+      logSystem.info('Distributions calculated', { 
+        periodo, 
+        totalIngresos: calculo.ingresosTotales,
+        distribucionesCreadas: distribuciones.length,
+        calculadoPor: req.user!.id 
+      });
+
+      res.status(201).json({
+        calculo,
+        distribuciones,
+      });
+    } catch (error: any) {
+      logSystem.error('Calculate distributions error', error);
+      res.status(500).json({ message: "Error al calcular distribuciones" });
+    }
+  });
+
+  // Preview distribution calculation (without creating records)
+  app.get("/api/admin/distribuciones/preview/:periodo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const { periodo } = req.params;
+    if (!/^\d{4}-\d{2}$/.test(periodo)) {
+      return res.status(400).json({ message: "Período inválido. Use formato YYYY-MM" });
+    }
+
+    try {
+      const calculo = await storage.calcularDistribucionPeriodo(periodo);
+      const sociosActivos = await storage.getActiveSocios();
+
+      res.json({
+        periodo,
+        ...calculo,
+        sociosActivos: sociosActivos.map(s => ({
+          id: s.id,
+          nombre: s.user?.nombre,
+          porcentaje: parseFloat(s.porcentajeParticipacion),
+        })),
+      });
+    } catch (error: any) {
+      logSystem.error('Preview distributions error', error);
+      res.status(500).json({ message: "Error al previsualizar distribuciones" });
+    }
+  });
+
+  // Approve distribution (admin only)
+  app.put("/api/admin/distribuciones/:id/aprobar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const distribucion = await storage.getDistribucionById(req.params.id);
+      if (!distribucion) {
+        return res.status(404).json({ message: "Distribución no encontrada" });
+      }
+
+      if (distribucion.estado === 'pagado') {
+        return res.status(400).json({ message: "La distribución ya fue pagada" });
+      }
+
+      const updated = await storage.aprobarDistribucion(req.params.id, req.user!.id);
+      logSystem.info('Distribution approved', { distribucionId: req.params.id, aprobadoPor: req.user!.id });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Approve distribution error', error);
+      res.status(500).json({ message: "Error al aprobar distribución" });
+    }
+  });
+
+  // Mark distribution as paid (admin only)
+  app.put("/api/admin/distribuciones/:id/pagar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const parsed = marcarPagadaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        message: "Datos inválidos",
+        errors: parsed.error.errors 
+      });
+    }
+
+    try {
+      const distribucion = await storage.getDistribucionById(req.params.id);
+      if (!distribucion) {
+        return res.status(404).json({ message: "Distribución no encontrada" });
+      }
+
+      if (distribucion.estado === 'pagado') {
+        return res.status(400).json({ message: "La distribución ya fue pagada" });
+      }
+
+      const updated = await storage.marcarDistribucionPagada(
+        req.params.id,
+        parsed.data.metodoPago,
+        parsed.data.referenciaTransaccion
+      );
+      
+      logSystem.info('Distribution paid', { 
+        distribucionId: req.params.id, 
+        metodoPago: parsed.data.metodoPago,
+        referencia: parsed.data.referenciaTransaccion 
+      });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Pay distribution error', error);
+      res.status(500).json({ message: "Error al marcar distribución como pagada" });
+    }
+  });
+
+  // Get distribution details (admin only)
+  app.get("/api/admin/distribuciones/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const distribucion = await storage.getDistribucionById(req.params.id);
+      if (!distribucion) {
+        return res.status(404).json({ message: "Distribución no encontrada" });
+      }
+      res.json(distribucion);
+    } catch (error: any) {
+      logSystem.error('Get distribution error', error);
+      res.status(500).json({ message: "Error al obtener distribución" });
     }
   });
 

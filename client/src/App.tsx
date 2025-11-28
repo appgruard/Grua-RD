@@ -35,6 +35,9 @@ const AdminDocuments = lazy(() => import('@/pages/admin/documents'));
 const AdminInsurance = lazy(() => import('@/pages/admin/insurance'));
 const AdminAseguradoras = lazy(() => import('@/pages/admin/aseguradoras'));
 const AdminTickets = lazy(() => import('@/pages/admin/tickets'));
+const AdminSocios = lazy(() => import('@/pages/admin/socios'));
+
+const SocioDashboard = lazy(() => import('@/pages/socio/dashboard'));
 
 const SupportPage = lazy(() => import('@/pages/support'));
 
@@ -250,11 +253,27 @@ function Router() {
           </AdminLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/admin/socios">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminSocios />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/admin">
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
             <AdminDashboard />
           </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Socio/Partner Routes */}
+      <Route path="/socio">
+        <ProtectedRoute allowedTypes={['socio']}>
+          <MobileLayout userType="socio">
+            <SocioDashboard />
+          </MobileLayout>
         </ProtectedRoute>
       </Route>
 
@@ -303,6 +322,8 @@ function Router() {
             <Redirect to="/driver" />
           ) : user.userType === 'aseguradora' ? (
             <Redirect to="/aseguradora" />
+          ) : user.userType === 'socio' ? (
+            <Redirect to="/socio" />
           ) : (
             <Redirect to="/client" />
           )

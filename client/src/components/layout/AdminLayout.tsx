@@ -14,6 +14,7 @@ import {
   Shield,
   Building2,
   MessageCircle,
+  Handshake,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,7 @@ const menuItems = [
   { path: '/admin/insurance', icon: Shield, label: 'Validación Seguros', testId: 'nav-insurance' },
   { path: '/admin/aseguradoras', icon: Building2, label: 'Gestión Aseguradoras', testId: 'nav-aseguradoras' },
   { path: '/admin/tickets', icon: MessageCircle, label: 'Tickets Soporte', testId: 'nav-tickets' },
+  { path: '/admin/socios', icon: Handshake, label: 'Socios e Inversores', testId: 'nav-socios' },
 ];
 
 function AppSidebar() {
