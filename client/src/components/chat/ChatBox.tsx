@@ -21,6 +21,31 @@ interface ChatBoxProps {
   currentUserNombre: string;
   currentUserApellido: string;
   otherUserName?: string;
+  userType: 'cliente' | 'conductor';
+}
+
+const QUICK_MESSAGES_CLIENTE = [
+  "¿Cuánto falta para que llegues?",
+  "¿Dónde estás?",
+  "Necesito más tiempo",
+  "Gracias"
+];
+
+const QUICK_MESSAGES_CONDUCTOR = [
+  "Voy en camino, llego en 5 minutos",
+  "Estoy cerca",
+  "He llegado al punto",
+  "Necesito que salgas del vehículo",
+  "Todo listo, nos vamos"
+];
+
+function sanitizeTestId(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[¿?¡!,]/g, '')
+    .replace(/\s+/g, '-');
 }
 
 export function ChatBox({ 
@@ -28,7 +53,8 @@ export function ChatBox({
   currentUserId, 
   currentUserNombre, 
   currentUserApellido,
-  otherUserName = 'Conductor'
+  otherUserName = 'Conductor',
+  userType
 }: ChatBoxProps) {
   const [mensaje, setMensaje] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -162,14 +188,14 @@ export function ChatBox({
       </CardContent>
       <CardFooter className="pt-3 flex flex-col gap-2">
         <div className="flex flex-wrap gap-2 w-full">
-          {['¿Cuánto falta?', 'Ya llegué', 'Gracias', 'En camino'].map((quickMsg) => (
+          {(userType === 'conductor' ? QUICK_MESSAGES_CONDUCTOR : QUICK_MESSAGES_CLIENTE).map((quickMsg) => (
             <Button
               key={quickMsg}
               variant="outline"
               size="sm"
               onClick={() => setMensaje(quickMsg)}
               disabled={sendMutation.isPending}
-              data-testid={`button-quick-${quickMsg.toLowerCase().replace(/[¿?]/g, '').replace(/\s+/g, '-')}`}
+              data-testid={`button-quick-${sanitizeTestId(quickMsg)}`}
             >
               {quickMsg}
             </Button>

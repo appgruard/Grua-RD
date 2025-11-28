@@ -546,6 +546,7 @@ export default function DriverDashboard() {
                 currentUserNombre={user.nombre}
                 currentUserApellido={user.apellido}
                 otherUserName={activeService.cliente ? `${activeService.cliente.nombre} ${activeService.cliente.apellido}` : 'Cliente'}
+                userType="conductor"
               />
             )}
           </div>

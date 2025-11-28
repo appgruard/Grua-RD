@@ -157,6 +157,7 @@ export default function ClientTracking() {
                 currentUserNombre={user.nombre}
                 currentUserApellido={user.apellido}
                 otherUserName={service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Conductor'}
+                userType="cliente"
               />
             )}
           </div>

@@ -56,16 +56,42 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 
 ## Module Development Progress
 
-### Phase 2 - Advanced Features
+### Phase 2 - Advanced Features ✅ COMPLETED
 - **Module 2.1**: Real-time location tracking and GPS updates ✅ Completed
 - **Module 2.2**: Insurance company portal and integration ✅ Completed
 - **Module 2.3**: Admin dashboard with statistics and analytics ✅ Completed
-- **Module 2.4**: Azul Payment Gateway Integration ✅ **COMPLETED** - Full implementation with DataVault tokenization, HOLD/POST flow, retry logic, commission management
-- **Module 2.5**: Partner/investor portal (pending)
-- **Module 2.6**: Predefined chat messages (pending)
-- **Module 2.7**: Support ticket system ✅ Completed - Full implementation with 9 API endpoints, categories, priorities, and admin management
+- **Module 2.4**: Azul Payment Gateway Integration ✅ Completed - Full implementation with DataVault tokenization, HOLD/POST flow, retry logic, commission management
+- **Module 2.5**: Partner/investor portal ✅ Completed - Full dashboard with ROI, distributions, PDF financial statements, admin management
+- **Module 2.6**: Annual document validation system ✅ Completed - Automatic reminders, suspension on expiry, renewal portal
+- **Module 2.7**: Support ticket system ✅ Completed - Full implementation with 12 API endpoints, categories, priorities, and admin management
+- **Module 2.8**: Predefined chat messages ✅ Completed - Role-based quick messages for clients and drivers
 
 ## Recent Changes (November 28, 2025)
+
+### Predefined Chat Messages - COMPLETED (Module 2.8)
+
+**Files Modified:**
+- `client/src/components/chat/ChatBox.tsx`: Added role-based quick messages with:
+  - `QUICK_MESSAGES_CLIENTE`: 4 predefined messages for clients ("¿Cuánto falta para que llegues?", "¿Dónde estás?", "Necesito más tiempo", "Gracias")
+  - `QUICK_MESSAGES_CONDUCTOR`: 5 predefined messages for drivers ("Voy en camino, llego en 5 minutos", "Estoy cerca", "He llegado al punto", "Necesito que salgas del vehículo", "Todo listo, nos vamos")
+  - Required `userType` prop ('cliente' | 'conductor') to differentiate message templates
+  - `sanitizeTestId()` function for stable data-testid generation (removes accents and special characters)
+
+- `client/src/pages/client/tracking.tsx`: Updated ChatBox with `userType="cliente"`
+- `client/src/pages/driver/dashboard.tsx`: Updated ChatBox with `userType="conductor"`
+
+### Partner/Investor Portal - COMPLETED (Module 2.5)
+
+**Files Created/Modified:**
+- `migrations/0005_socios_portal.sql`: Database migration for socios and distribuciones_socios tables
+- `shared/schema.ts`: Added socios and distribucionesSocios tables with relations
+- `server/storage.ts`: Added storage methods for partner management (createSocio, getSocioById, getAllSocios, updateSocio, getDistribucionesBySocioId, getResumenSocio, getSociosStats)
+- `server/routes.ts`: 12 new endpoints for partner portal:
+  - Partner endpoints: `/api/socio/dashboard`, `/api/socio/distribuciones`, `/api/socio/resumen`, `/api/socio/estado-financiero/:periodo`
+  - Admin endpoints: `/api/admin/socios` (CRUD), `/api/admin/socios/stats`, `/api/admin/distribuciones/calcular`, `/api/admin/distribuciones/:id/aprobar`, `/api/admin/distribuciones/:id/pagar`
+- `client/src/pages/socio/dashboard.tsx`: Full partner dashboard with KPIs (participation %, investment, total received, ROI), distribution history, charts, PDF download
+- `client/src/pages/admin/socios.tsx`: Admin panel for partner management with creation, toggle status, distribution calculation, approval, and payment workflows
+- `client/src/App.tsx`: Added routes for `/socio` and `/admin/socios`
 
 ### Azul Payment Gateway Integration - COMPLETED (Module 2.4)
 
