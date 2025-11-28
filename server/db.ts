@@ -17,29 +17,18 @@ if (!process.env.DATABASE_URL) {
 // Merge core schema with server-side extensions
 const fullSchema = { ...schema, ...schemaExtensions };
 
-// Check if connecting to Neon cloud (has neon.tech in URL) or direct PostgreSQL
-const isNeonCloud = process.env.DATABASE_URL.includes('neon.tech');
+// Check if connecting to Neon serverless (includes @neon in host) or direct connection (pooler)
+// Neon serverless URLs typically have @db.xxxx.us-east-1 patterns
+// Neon pooler URLs have @xxxx-pooler.us-east-1 patterns
+const isNeonServerless = process.env.DATABASE_URL.includes('@db.') && process.env.DATABASE_URL.includes('neon.tech');
 
-// For direct PostgreSQL connections, parse DATABASE_URL and set SSL config
-// The sslmode parameter in URL overrides the ssl config object, so we remove it
-function getPoolConfig() {
-  const url = new URL(process.env.DATABASE_URL!);
-  // Remove sslmode from URL so our ssl config takes precedence
-  url.searchParams.delete('sslmode');
-  url.searchParams.delete('ssl');
-  return {
-    connectionString: url.toString(),
-    ssl: { rejectUnauthorized: false }
-  };
-}
-
-// For direct PostgreSQL connections (like Replit's internal DB), use pg driver
-// For Neon cloud, use the serverless driver with WebSocket
-export const pool = isNeonCloud
+// For direct PostgreSQL connections, use pg driver
+// For Neon serverless, use the serverless driver with WebSocket
+export const pool = isNeonServerless
   ? new NeonPool({ connectionString: process.env.DATABASE_URL })
-  : new PgPool(getPoolConfig());
+  : new PgPool({ connectionString: process.env.DATABASE_URL });
 
-export const db = isNeonCloud
+export const db = isNeonServerless
   ? drizzleNeon({ client: pool as NeonPool, schema: fullSchema })
   : drizzlePg({ client: pool as PgPool, schema: fullSchema });
 
