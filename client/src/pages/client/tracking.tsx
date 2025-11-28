@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
-import { Phone, MessageCircle, Loader2 } from 'lucide-react';
+import { Phone, MessageCircle, Loader2, Star } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from '@/lib/auth';
 import { ChatBox } from '@/components/chat/ChatBox';
-import type { ServicioWithDetails } from '@shared/schema';
+import { RatingModal, StarRating } from '@/components/RatingModal';
+import type { ServicioWithDetails, Calificacion } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
 
 export default function ClientTracking() {
@@ -19,11 +20,18 @@ export default function ClientTracking() {
   const serviceId = params?.id;
   const [driverLocation, setDriverLocation] = useState<Coordinates | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [hasShownRatingModal, setHasShownRatingModal] = useState(false);
   const { user } = useAuth();
 
   const { data: service, isLoading } = useQuery<ServicioWithDetails>({
     queryKey: ['/api/services', serviceId],
     enabled: !!serviceId,
+  });
+
+  const { data: existingRating, isLoading: isLoadingRating, isFetched: isRatingFetched } = useQuery<Calificacion | null>({
+    queryKey: ['/api/services', serviceId, 'calificacion'],
+    enabled: !!serviceId && service?.estado === 'completado',
   });
 
   const { send } = useWebSocket((message) => {
@@ -33,6 +41,12 @@ export default function ClientTracking() {
         lng: parseFloat(message.payload.lng),
       });
     }
+    if (message.type === 'service_status_change' && message.payload.id === serviceId) {
+      if (message.payload.estado === 'completado' && !hasShownRatingModal && isRatingFetched && existingRating === null) {
+        setHasShownRatingModal(true);
+        setRatingModalOpen(true);
+      }
+    }
   });
 
   useEffect(() => {
@@ -40,6 +54,13 @@ export default function ClientTracking() {
       send({ type: 'join_service', payload: { serviceId, role: 'client' } });
     }
   }, [serviceId, send]);
+
+  useEffect(() => {
+    if (service?.estado === 'completado' && !hasShownRatingModal && isRatingFetched && existingRating === null) {
+      setHasShownRatingModal(true);
+      setTimeout(() => setRatingModalOpen(true), 500);
+    }
+  }, [service?.estado, hasShownRatingModal, existingRating, isRatingFetched]);
 
   if (isLoading || !service) {
     return (
@@ -72,11 +93,13 @@ export default function ClientTracking() {
     pendiente: 'Buscando conductor...',
     aceptado: 'Conductor en camino',
     conductor_en_sitio: 'Conductor en el punto',
-    cargando: 'Cargando vehículo',
+    cargando: 'Cargando vehiculo',
     en_progreso: 'En ruta al destino',
     completado: 'Servicio completado',
     cancelado: 'Servicio cancelado',
   };
+
+  const driverName = service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Conductor';
 
   return (
     <div className="relative h-full">
@@ -88,14 +111,14 @@ export default function ClientTracking() {
 
       <div className="absolute top-4 left-4 right-4">
         <Card className="p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div>
               <h3 className="font-semibold mb-1">Estado del Servicio</h3>
               <Badge variant={statusColors[service.estado]} data-testid="badge-status">
                 {statusLabels[service.estado]}
               </Badge>
             </div>
-            {service.conductor && (
+            {service.conductor && service.estado !== 'completado' && service.estado !== 'cancelado' && (
               <div className="flex gap-2">
                 <Button size="icon" variant="outline" data-testid="button-call">
                   <Phone className="w-4 h-4" />
@@ -109,6 +132,16 @@ export default function ClientTracking() {
                   <MessageCircle className="w-4 h-4" />
                 </Button>
               </div>
+            )}
+            {service.estado === 'completado' && !existingRating && (
+              <Button
+                variant="default"
+                onClick={() => setRatingModalOpen(true)}
+                data-testid="button-rate-service"
+              >
+                <Star className="w-4 h-4 mr-2" />
+                Calificar
+              </Button>
             )}
           </div>
         </Card>
@@ -128,8 +161,10 @@ export default function ClientTracking() {
                   {service.conductor.nombre} {service.conductor.apellido}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {service.conductor.calificacionPromedio && (
-                    <>⭐ {parseFloat(service.conductor.calificacionPromedio as string).toFixed(1)}</>
+                  {service.conductor.calificacionPromedio ? (
+                    <StarRating rating={parseFloat(service.conductor.calificacionPromedio as string)} size="sm" showValue />
+                  ) : (
+                    'Sin calificaciones'
                   )}
                 </p>
               </div>
@@ -140,6 +175,17 @@ export default function ClientTracking() {
                 </p>
               </div>
             </div>
+            {existingRating && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-1">Tu calificacion:</p>
+                <div className="flex items-center gap-2">
+                  <StarRating rating={existingRating.puntuacion} size="md" />
+                  {existingRating.comentario && (
+                    <span className="text-sm text-muted-foreground">- {existingRating.comentario}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -156,13 +202,22 @@ export default function ClientTracking() {
                 currentUserId={user.id}
                 currentUserNombre={user.nombre}
                 currentUserApellido={user.apellido}
-                otherUserName={service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Conductor'}
+                otherUserName={driverName}
                 userType="cliente"
               />
             )}
           </div>
         </DrawerContent>
       </Drawer>
+
+      {service.conductor && (
+        <RatingModal
+          isOpen={ratingModalOpen}
+          onClose={() => setRatingModalOpen(false)}
+          serviceId={serviceId!}
+          driverName={driverName}
+        />
+      )}
     </div>
   );
 }

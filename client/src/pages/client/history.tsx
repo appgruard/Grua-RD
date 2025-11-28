@@ -1,20 +1,29 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Navigation, Calendar, DollarSign, ClipboardList, Download } from 'lucide-react';
-import type { ServicioWithDetails } from '@shared/schema';
+import { MapPin, Navigation, Calendar, DollarSign, ClipboardList, Download, Star } from 'lucide-react';
+import type { ServicioWithDetails, Calificacion } from '@shared/schema';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ServiceCardSkeletonList } from '@/components/skeletons/ServiceCardSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { useToast } from '@/hooks/use-toast';
+import { RatingModal, StarRating } from '@/components/RatingModal';
+
+interface ServiceWithRating extends ServicioWithDetails {
+  calificacion?: Calificacion | null;
+}
 
 export default function ClientHistory() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { data: services, isLoading } = useQuery<ServicioWithDetails[]>({
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<ServiceWithRating | null>(null);
+
+  const { data: services, isLoading } = useQuery<ServiceWithRating[]>({
     queryKey: ['/api/services/my-services'],
   });
 
@@ -47,6 +56,11 @@ export default function ClientHistory() {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleRateService = (service: ServiceWithRating) => {
+    setSelectedService(service);
+    setRatingModalOpen(true);
   };
 
   if (isLoading) {
@@ -86,7 +100,7 @@ export default function ClientHistory() {
         <EmptyState
           icon={ClipboardList}
           title="No hay servicios"
-          description="Aún no has solicitado ningún servicio de grúa. Solicita tu primer servicio desde la pantalla principal."
+          description="Aun no has solicitado ningun servicio de grua. Solicita tu primer servicio desde la pantalla principal."
           action={{
             label: "Solicitar Servicio",
             onClick: () => setLocation('/client')
@@ -96,7 +110,7 @@ export default function ClientHistory() {
         <div className="space-y-3">
           {services.map((service) => (
             <Card key={service.id} className="p-4" data-testid={`service-card-${service.id}`}>
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
@@ -152,7 +166,28 @@ export default function ClientHistory() {
               )}
 
               {service.estado === 'completado' && (
-                <div className="mt-3">
+                <div className="mt-3 space-y-2">
+                  {service.calificacion ? (
+                    <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                      <StarRating rating={service.calificacion.puntuacion} size="sm" />
+                      {service.calificacion.comentario && (
+                        <span className="text-sm text-muted-foreground truncate">
+                          - {service.calificacion.comentario}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="w-full"
+                      onClick={() => handleRateService(service)}
+                      data-testid={`button-rate-service-${service.id}`}
+                    >
+                      <Star className="w-4 h-4 mr-2" />
+                      Calificar Servicio
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -168,6 +203,18 @@ export default function ClientHistory() {
             </Card>
           ))}
         </div>
+      )}
+
+      {selectedService && selectedService.conductor && (
+        <RatingModal
+          isOpen={ratingModalOpen}
+          onClose={() => {
+            setRatingModalOpen(false);
+            setSelectedService(null);
+          }}
+          serviceId={selectedService.id}
+          driverName={`${selectedService.conductor.nombre} ${selectedService.conductor.apellido}`}
+        />
       )}
     </div>
   );

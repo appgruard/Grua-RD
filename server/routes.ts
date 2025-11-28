@@ -12,7 +12,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema } from "@shared/schema";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema, insertCalificacionSchema } from "@shared/schema";
 import type { User, Servicio } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
@@ -1086,7 +1086,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         services = [];
       }
 
-      res.json(services);
+      const servicesWithRatings = await Promise.all(
+        services.map(async (service) => {
+          if (service.estado === 'completado') {
+            const calificaciones = await storage.getCalificacionesByServicioId(service.id);
+            return { ...service, calificacion: calificaciones[0] || null };
+          }
+          return { ...service, calificacion: null };
+        })
+      );
+
+      res.json(servicesWithRatings);
     } catch (error: any) {
       logSystem.error('Get my services error', error);
       res.status(500).json({ message: "Failed to get services" });
@@ -1360,6 +1370,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Complete service error', error, { servicioId: req.params.id });
       res.status(500).json({ message: "Failed to complete service" });
+    }
+  });
+
+  // Rating endpoints (Module 3.3)
+  app.post("/api/services/:id/calificar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.clienteId !== req.user!.id) {
+        return res.status(403).json({ message: "Solo el cliente puede calificar el servicio" });
+      }
+
+      if (servicio.estado !== 'completado') {
+        return res.status(400).json({ message: "Solo se pueden calificar servicios completados" });
+      }
+
+      const existingRating = await storage.getCalificacionesByServicioId(servicioId);
+      if (existingRating.length > 0) {
+        return res.status(400).json({ message: "Este servicio ya ha sido calificado" });
+      }
+
+      const validatedData = insertCalificacionSchema.parse({
+        servicioId,
+        puntuacion: parseInt(req.body.puntuacion),
+        comentario: req.body.comentario || null,
+      });
+
+      const calificacion = await storage.createCalificacion(validatedData);
+
+      logSystem.info('Service rated', { 
+        servicioId, 
+        puntuacion: validatedData.puntuacion, 
+        clienteId: req.user!.id,
+        conductorId: servicio.conductorId 
+      });
+
+      res.json(calificacion);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0]?.message || "Puntuación debe ser entre 1 y 5" });
+      }
+      logSystem.error('Rate service error', error, { servicioId: req.params.id });
+      res.status(500).json({ message: "Error al calificar el servicio" });
+    }
+  });
+
+  app.get("/api/services/:id/calificacion", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+      const servicio = await storage.getServicioById(servicioId);
+      
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.clienteId !== req.user!.id && servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      const calificaciones = await storage.getCalificacionesByServicioId(servicioId);
+      res.json(calificaciones[0] || null);
+    } catch (error: any) {
+      logSystem.error('Get rating error', error, { servicioId: req.params.id });
+      res.status(500).json({ message: "Error al obtener la calificación" });
     }
   });
 

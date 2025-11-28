@@ -40,6 +40,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { loadGoogleMapsScript } from '@/lib/maps';
+import { StarRating } from '@/components/RatingModal';
 
 type Period = 'day' | 'week' | 'month';
 
@@ -780,9 +781,14 @@ export default function Analytics() {
                           <TableCell>{driver.driverName}</TableCell>
                           <TableCell className="text-right">{driver.completedServices}</TableCell>
                           <TableCell className="text-right">
-                            {driver.averageRating > 0
-                              ? `${driver.averageRating.toFixed(2)}`
-                              : 'Sin calificaciones'}
+                            {driver.averageRating > 0 ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <StarRating rating={driver.averageRating} size="sm" />
+                                <span className="text-muted-foreground">({driver.averageRating.toFixed(1)})</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Sin calificaciones</span>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
