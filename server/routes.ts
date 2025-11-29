@@ -3185,7 +3185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client Insurance Document Management
-  // Upload client insurance document
+  // Upload client insurance document (supports multiple insurances for multiple vehicles)
   app.post("/api/client/insurance", upload.single('document'), async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -3200,19 +3200,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { aseguradoraNombre, numeroPoliza, fechaVencimiento } = req.body;
+      const { aseguradoraNombre, numeroPoliza, fechaVencimiento, vehiculoDescripcion } = req.body;
       
       if (!aseguradoraNombre || !numeroPoliza) {
         return res.status(400).json({ message: "Nombre de aseguradora y número de póliza son requeridos" });
-      }
-
-      // Check if client already has an insurance document
-      const existingInsurance = await storage.getClientInsuranceDocument(req.user!.id);
-      if (existingInsurance) {
-        // Delete existing document first
-        const { deleteDocument } = await import('./services/object-storage');
-        await deleteDocument(existingInsurance.url);
-        await storage.deleteDocumento(existingInsurance.id);
       }
 
       // Upload to object storage
@@ -3238,12 +3229,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Build document name with vehicle description if provided
+      let nombreArchivo = `${aseguradoraNombre} - ${numeroPoliza}`;
+      if (vehiculoDescripcion) {
+        nombreArchivo = `${vehiculoDescripcion} - ${aseguradoraNombre} - ${numeroPoliza}`;
+      }
+
       // Save document metadata to database
       const documento = await storage.createDocumento({
         usuarioId: req.user!.id,
         tipo: 'seguro_cliente',
         url: uploadResult.key,
-        nombreArchivo: `${aseguradoraNombre} - ${numeroPoliza}`,
+        nombreArchivo,
         tamanoArchivo: uploadResult.fileSize,
         mimeType: uploadResult.mimeType,
         estado: 'pendiente',
@@ -3258,7 +3255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get client insurance document
+  // Get all client insurance documents
   app.get("/api/client/insurance", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -3269,11 +3266,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const documento = await storage.getClientInsuranceDocument(req.user!.id);
-      res.json(documento || null);
+      const documentos = await storage.getAllClientInsuranceDocuments(req.user!.id);
+      res.json(documentos);
     } catch (error: any) {
       logSystem.error('Get client insurance error', error);
-      res.status(500).json({ message: "Error al obtener documento de seguro" });
+      res.status(500).json({ message: "Error al obtener documentos de seguro" });
     }
   });
 
@@ -3289,12 +3286,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const hasApprovedInsurance = await storage.hasApprovedClientInsurance(req.user!.id);
-      const insuranceDoc = await storage.getClientInsuranceDocument(req.user!.id);
+      const insuranceDocs = await storage.getAllClientInsuranceDocuments(req.user!.id);
       
       res.json({
         hasApprovedInsurance,
-        insuranceStatus: insuranceDoc?.estado || null,
-        insuranceDocument: insuranceDoc || null,
+        insuranceDocuments: insuranceDocs,
+        totalDocuments: insuranceDocs.length,
+        approvedCount: insuranceDocs.filter(d => d.estado === 'aprobado').length,
+        pendingCount: insuranceDocs.filter(d => d.estado === 'pendiente').length,
+        rejectedCount: insuranceDocs.filter(d => d.estado === 'rechazado').length,
       });
     } catch (error: any) {
       logSystem.error('Check client insurance status error', error);
@@ -3302,8 +3302,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete client insurance document
-  app.delete("/api/client/insurance", async (req: Request, res: Response) => {
+  // Delete specific client insurance document by ID
+  app.delete("/api/client/insurance/:documentId", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -3313,10 +3313,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const documento = await storage.getClientInsuranceDocument(req.user!.id);
+      const { documentId } = req.params;
+      const documento = await storage.getDocumentoById(documentId);
       
       if (!documento) {
         return res.status(404).json({ message: "No se encontró documento de seguro" });
+      }
+
+      // Verify the document belongs to this user
+      if (documento.usuarioId !== req.user!.id) {
+        return res.status(403).json({ message: "No tienes permiso para eliminar este documento" });
+      }
+
+      // Verify it's a client insurance document
+      if (documento.tipo !== 'seguro_cliente') {
+        return res.status(400).json({ message: "Este documento no es un seguro de cliente" });
       }
 
       // Delete from object storage
