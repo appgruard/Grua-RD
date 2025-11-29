@@ -21,36 +21,27 @@ interface CedulaValidationResult {
  * Example: 001-1234567-8
  */
 export function validateCedulaFormat(cedula: string): CedulaValidationResult {
-  // Remove any whitespace
-  const cleaned = cedula.replace(/\s/g, '');
+  // Remove any whitespace and dashes
+  const cleaned = cedula.replace(/[\s-]/g, '');
   
-  // Check if already formatted with dashes
-  const withDashes = /^\d{3}-\d{7}-\d{1}$/;
-  const withoutDashes = /^\d{11}$/;
-  
-  let digits: string;
-  
-  if (withDashes.test(cleaned)) {
-    digits = cleaned.replace(/-/g, '');
-  } else if (withoutDashes.test(cleaned)) {
-    digits = cleaned;
-  } else {
+  // Check if it's 11 digits
+  if (!/^\d{11}$/.test(cleaned)) {
     return {
       valid: false,
       error: "Formato de cédula inválido. Debe contener 11 dígitos."
     };
   }
   
-  // Validate checksum using Luhn algorithm (modulo 10)
-  if (!validateCedulaChecksum(digits)) {
+  // Validate checksum using Dominican Republic algorithm
+  if (!validateCedulaChecksum(cleaned)) {
     return {
       valid: false,
-      error: "Número de cédula inválido (checksum failed)."
+      error: "Número de cédula inválido (verificación de dígito fallida)."
     };
   }
   
-  // Format with dashes
-  const formatted = `${digits.slice(0, 3)}-${digits.slice(3, 10)}-${digits.slice(10)}`;
+  // Format with dashes: XXX-XXXXXXX-X
+  const formatted = `${cleaned.slice(0, 3)}-${cleaned.slice(3, 10)}-${cleaned.slice(10)}`;
   
   return {
     valid: true,
@@ -59,34 +50,37 @@ export function validateCedulaFormat(cedula: string): CedulaValidationResult {
 }
 
 /**
- * Validates cédula checksum using Luhn algorithm (modulo 10)
- * This is a common algorithm used for ID verification
+ * Validates cédula checksum using Dominican Republic algorithm
+ * The check digit is at position 10 (0-indexed)
+ * Algorithm: sum of (digit * weight) mod 11, then 11 - remainder
  */
 function validateCedulaChecksum(digits: string): boolean {
   if (digits.length !== 11) return false;
   
-  let sum = 0;
-  let alternate = false;
+  // Dominican cédula weights for first 10 digits
+  const weights = [1, 2, 1, 2, 1, 2, 1, 2, 1, 2];
   
-  // Process digits from right to left
-  for (let i = digits.length - 2; i >= 0; i--) {
+  let sum = 0;
+  
+  // Process first 10 digits
+  for (let i = 0; i < 10; i++) {
     let digit = parseInt(digits[i], 10);
+    let product = digit * weights[i];
     
-    if (alternate) {
-      digit *= 2;
-      if (digit > 9) {
-        digit -= 9;
-      }
+    // If product is > 9, subtract 9
+    if (product > 9) {
+      product -= 9;
     }
     
-    sum += digit;
-    alternate = !alternate;
+    sum += product;
   }
   
-  const checkDigit = parseInt(digits[10], 10);
-  const calculatedCheck = (10 - (sum % 10)) % 10;
+  // Calculate check digit
+  const remainder = sum % 11;
+  const checkDigitCalculated = remainder === 0 ? 0 : 11 - remainder;
+  const checkDigitProvided = parseInt(digits[10], 10);
   
-  return checkDigit === calculatedCheck;
+  return checkDigitCalculated === checkDigitProvided;
 }
 
 /**
