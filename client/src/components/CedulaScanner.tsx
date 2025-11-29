@@ -164,6 +164,9 @@ export function CedulaScanner({
 
   const startCamera = async () => {
     try {
+      setShowCamera(true);
+      setError(null);
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
@@ -172,12 +175,29 @@ export function CedulaScanner({
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        
+        await new Promise<void>((resolve, reject) => {
+          if (!videoRef.current) {
+            reject(new Error('Video element not available'));
+            return;
+          }
+          
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play()
+              .then(() => resolve())
+              .catch(reject);
+          };
+          
+          videoRef.current.onerror = () => {
+            reject(new Error('Error loading video'));
+          };
+          
+          setTimeout(() => reject(new Error('Camera timeout')), 10000);
+        });
       }
-      
-      setShowCamera(true);
-      setError(null);
     } catch (err) {
+      setShowCamera(false);
+      stopCamera();
       setError('No se pudo acceder a la cámara. Intenta subir una imagen.');
       toast({
         title: 'Error de cámara',
@@ -398,7 +418,6 @@ export function CedulaScanner({
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={handleFileSelect}
               className="hidden"
               data-testid="input-file-cedula"
