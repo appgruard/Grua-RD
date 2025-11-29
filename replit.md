@@ -36,7 +36,7 @@ Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js 
 - **Payment Integration**: Azul Payment Gateway (Dominican provider) for card payments, cash option, automatic 70/30 commission split, DataVault tokenization, HOLD/POST/REFUND/VOID transactions, PDF receipt generation.
 - **Robust UX**: Skeleton loaders, empty states, confirmation dialogs, toast notifications, form validations, responsive design.
 - **Monitoring & Logging**: Structured logging with Winston.
-- **Identity & Compliance**: Multi-step onboarding, Dominican ID validation, phone OTP/SMS verification, admin verification panel.
+- **Identity & Compliance**: Multi-step onboarding, Dominican ID (cédula) validation with Verifik OCR API, phone OTP/SMS verification, admin verification panel. Cédula scanning is mandatory for drivers during registration and optional for clients (required before adding payment methods).
 - **Document Management**: Upload system with Replit Object Storage, admin review, status tracking, automated notifications, availability validation.
 - **Production Readiness**: Environment variables, pre-deployment validation, deployment guide, Capacitor configuration for Android APK, Lighthouse optimization.
 - **Insurance Integration**: Adapter pattern for multiple insurance company APIs, policy validation, towing authorization, claim submission.
@@ -54,3 +54,4 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Web Push API**: For sending push notifications.
 - **Replit Object Storage**: For document storage.
 - **Twilio**: SMS service for OTP delivery.
+- **Verifik**: OCR scanning (`/v2/ocr/scan-prompt`) and Dominican government database verification (`/v2/do/cedula`) for cédula validation.
