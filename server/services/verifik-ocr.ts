@@ -207,7 +207,18 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       };
     }
 
-    const data: VerifikOCRResponse = await response.json();
+    const rawResponse = await response.json();
+    
+    // Log the raw response structure to understand the API format
+    logger.info("Verifik OCR raw response structure", { 
+      topLevelKeys: Object.keys(rawResponse),
+      hasDataWrapper: !!rawResponse.data,
+      hasOCRExtraction: !!rawResponse.OCRExtraction,
+      hasDataOCRExtraction: !!rawResponse.data?.OCRExtraction
+    });
+    
+    // Handle both wrapped and unwrapped response formats
+    const data: VerifikOCRResponse = rawResponse.data || rawResponse;
     
     const ocrData = data.OCRExtraction;
     const confidenceScore = ocrData?.confidenceScore ?? 0;
