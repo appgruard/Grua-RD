@@ -230,7 +230,7 @@ export function MapboxMap({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative ${className}`} style={{ minHeight: '300px' }}>
       <Map
         ref={mapRef}
         {...viewState}
@@ -243,7 +243,7 @@ export function MapboxMap({
           setLoading(false);
         }}
         mapboxAccessToken={MAPBOX_TOKEN}
-        style={{ width: '100%', height: '100%', borderRadius: '0.5rem' }}
+        style={{ width: '100%', height: '100%', minHeight: '300px' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         attributionControl={false}
       >

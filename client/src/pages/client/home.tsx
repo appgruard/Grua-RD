@@ -256,19 +256,23 @@ export default function ClientHome() {
   const showMap = step === 'origin' || step === 'destination';
 
   return (
-    <div className="relative h-full">
-      {showMap && (
-        <MapboxMap
-          center={currentLocation}
-          markers={markers}
-          onMapClick={handleMapClick}
-          onAddressChange={handleAddressChange}
-          className="absolute inset-0"
-        />
+    <div className="flex flex-col h-full">
+      {showMap ? (
+        <div className="flex-1 relative min-h-0">
+          <MapboxMap
+            center={currentLocation}
+            markers={markers}
+            onMapClick={handleMapClick}
+            onAddressChange={handleAddressChange}
+            className="absolute inset-0"
+          />
+        </div>
+      ) : (
+        <div className="flex-1" />
       )}
 
-      <div className="absolute bottom-4 left-4 right-4 max-h-[80vh] overflow-y-auto">
-        <Card className="p-6">
+      <div className={`${showMap ? 'absolute bottom-0 left-0 right-0' : 'flex-1 flex items-center justify-center'} p-4`}>
+        <Card className={`p-4 sm:p-6 w-full ${showMap ? 'max-h-[60vh] overflow-y-auto' : 'max-w-md'}`}>
           {step === 'vehicleType' && (
             <div className="space-y-4">
               <div className="text-center mb-4">
@@ -491,3 +495,4 @@ export default function ClientHome() {
     </div>
   );
 }
+
