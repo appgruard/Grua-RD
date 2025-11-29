@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Home, History, User, Phone, TrendingUp, DollarSign } from 'lucide-react';
+import { Home, History, User, Phone, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -32,11 +33,18 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <main className="flex-1 overflow-hidden">
+      <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-bold text-primary">GrúaRD</span>
+        </div>
+        <ThemeToggle />
+      </header>
+      
+      <main className="flex-1 overflow-y-auto">
         {children}
       </main>
       
-      <nav className="h-16 border-t border-border bg-card flex items-center justify-around px-2 safe-area-inset-bottom">
+      <nav className="flex-shrink-0 h-16 border-t border-border bg-card/95 backdrop-blur-sm flex items-center justify-around px-2 safe-area-inset-bottom">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = location === tab.path || location.startsWith(tab.path + '/');
@@ -46,12 +54,14 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
               <button
                 data-testid={tab.testId}
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-full gap-1 transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground"
+                  "flex flex-col items-center justify-center px-4 py-2 gap-1 rounded-xl transition-all duration-200",
+                  isActive 
+                    ? "text-primary bg-primary/10" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
               >
-                <Icon className="w-6 h-6" />
-                <span className="text-xs font-medium">{tab.label}</span>
+                <Icon className={cn("w-5 h-5 transition-transform", isActive && "scale-110")} />
+                <span className={cn("text-xs font-medium", isActive && "font-semibold")}>{tab.label}</span>
               </button>
             </Link>
           );
