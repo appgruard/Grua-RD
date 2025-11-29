@@ -1371,17 +1371,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = req.user!.id;
 
-      // Upload to object storage
-      const uploadResult = await uploadDocument({
-        buffer: req.file.buffer,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        userId,
-        documentType: 'foto_perfil',
-      });
+      // Convert image to base64 data URL and store in database
+      const base64Image = req.file.buffer.toString('base64');
+      const dataUrl = `data:${req.file.mimetype};base64,${base64Image}`;
 
-      // Update user's photo URL
-      await storage.updateUser(userId, { fotoUrl: uploadResult.url });
+      // Update user's photo URL with base64 data
+      await storage.updateUser(userId, { fotoUrl: dataUrl });
 
       // If driver, also create/update the foto_perfil document
       if (req.user!.userType === 'conductor') {
@@ -1394,7 +1389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (existingPhoto) {
             // Update existing document
             await storage.updateDocumento(existingPhoto.id, {
-              url: uploadResult.url,
+              url: dataUrl,
               nombreArchivo: req.file.originalname,
               tamanoArchivo: req.file.size,
               mimeType: req.file.mimetype,
@@ -1405,7 +1400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createDocumento({
               tipo: 'foto_perfil',
               conductorId: conductor.id,
-              url: uploadResult.url,
+              url: dataUrl,
               nombreArchivo: req.file.originalname,
               tamanoArchivo: req.file.size,
               mimeType: req.file.mimetype,
@@ -1419,7 +1414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ 
         message: "Foto de perfil actualizada",
-        url: uploadResult.url,
+        url: dataUrl,
       });
     } catch (error: any) {
       logSystem.error('Profile photo upload error', error, { userId: req.user?.id });
