@@ -498,38 +498,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       logAuth.registerSuccess(user.id, user.email, user.userType);
 
+      // Cedula verification for conductors is now done via the OCR scan endpoint
+      // which validates confidenceScore >= 0.6 and name matching
+      // The conductor should use /api/identity/scan-cedula with their name during registration
       if (userData.cedula && userType === 'conductor') {
-        try {
-          const { verifyCedulaWithAPI, isVerifikConfigured } = await import("./services/verifik-ocr");
-          
-          if (isVerifikConfigured()) {
-            const apiResult = await verifyCedulaWithAPI(userData.cedula);
-            
-            if (apiResult.success && apiResult.verified) {
-              const { verifyCedula } = await import("./services/identity");
-              const verifyResult = await verifyCedula(
-                user.id,
-                userData.cedula,
-                req.ip,
-                req.headers['user-agent']
-              );
-              
-              if (verifyResult.success) {
-                logAuth.cedulaVerified(user.id, userData.cedula);
-              }
-            } else {
-              logSystem.info("Cedula verification via Verifik API failed or not verified", { 
-                userId: user.id, 
-                verified: apiResult.verified,
-                error: apiResult.error 
-              });
-            }
-          } else {
-            logSystem.warn("Verifik API not configured, skipping cedula verification");
-          }
-        } catch (verifyError) {
-          logSystem.warn("Post-registration cedula verification failed", verifyError);
-        }
+        logSystem.info("Conductor registered with cedula - verification pending via OCR scan", { 
+          userId: user.id,
+          hasCedula: !!userData.cedula
+        });
       }
 
       const updatedUser = await storage.getUserById(user.id);
@@ -1099,7 +1075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
       }
 
-      const { scanAndVerifyCedula, isVerifikConfigured, compareNames } = await import("./services/verifik-ocr");
+      const { scanAndVerifyCedula, isVerifikConfigured } = await import("./services/verifik-ocr");
       
       if (!isVerifikConfigured()) {
         return res.status(503).json({ 
@@ -1107,7 +1083,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const result = await scanAndVerifyCedula(image);
+      // Get user name for comparison (from authenticated user or request body for registration)
+      let userNombre: string | undefined;
+      let userApellido: string | undefined;
+      
+      if (req.isAuthenticated()) {
+        userNombre = req.user!.nombre;
+        userApellido = req.user!.apellido;
+      } else if (req.body.nombre && req.body.apellido) {
+        // For registration flow - name provided in request body
+        userNombre = req.body.nombre;
+        userApellido = req.body.apellido;
+      }
+
+      const result = await scanAndVerifyCedula(image, userNombre, userApellido);
 
       if (!result.success) {
         logSystem.warn('OCR scan failed', { 
@@ -1119,66 +1108,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      if (req.isAuthenticated()) {
-        const user = req.user!;
-        
-        if (!result.nombre || !result.apellido) {
-          logSystem.warn('Could not verify name match - insufficient data from OCR', {
-            userId: user.id,
-            hasNombre: !!result.nombre,
-            hasApellido: !!result.apellido,
-            confidenceScore: result.confidenceScore
-          });
-          
-          return res.status(400).json({
-            success: false,
-            verified: false,
-            nameMatch: false,
-            confidenceScore: result.confidenceScore,
-            message: "No se pudo extraer el nombre completo de la cédula. Por favor, asegúrate de que la imagen sea clara y legible."
-          });
-        }
-        
-        const nameComparison = compareNames(
-          user.nombre,
-          user.apellido,
-          result.nombre,
-          result.apellido
-        );
-
-        logSystem.info('Name comparison result', {
-          userId: user.id,
-          registeredName: `${user.nombre} ${user.apellido}`,
-          documentName: `${result.nombre} ${result.apellido}`,
-          similarity: nameComparison.similarity,
-          match: nameComparison.match,
+      // Check if name extraction failed
+      if (userNombre && userApellido && (!result.nombre || !result.apellido)) {
+        logSystem.warn('Could not verify name match - insufficient data from OCR', {
+          userId: req.user?.id,
+          hasNombre: !!result.nombre,
+          hasApellido: !!result.apellido,
           confidenceScore: result.confidenceScore
         });
-
-        if (!nameComparison.match) {
-          logSystem.warn('Name mismatch during cedula verification', {
-            userId: user.id,
-            registeredName: `${user.nombre} ${user.apellido}`,
-            documentName: `${result.nombre} ${result.apellido}`,
-            similarity: nameComparison.similarity
-          });
-          
-          return res.status(400).json({
-            success: false,
-            verified: false,
-            nameMatch: false,
-            confidenceScore: result.confidenceScore,
-            similarity: nameComparison.similarity,
-            message: `La cédula no coincide con sus datos de registro. El nombre en la cédula "${result.nombre} ${result.apellido}" no corresponde con el nombre registrado "${user.nombre} ${user.apellido}".`
-          });
-        }
-
-        logSystem.info('Name verification passed', {
-          userId: user.id,
-          similarity: nameComparison.similarity
+        
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          nameMatch: false,
+          confidenceScore: result.confidenceScore,
+          message: "No se pudo extraer el nombre completo de la cédula. Por favor, asegúrate de que la imagen sea clara y legible."
         });
       }
 
+      // Check name match result
+      if (!result.nameMatch) {
+        logSystem.warn('Name mismatch during cedula verification', {
+          userId: req.user?.id,
+          registeredName: `${userNombre} ${userApellido}`,
+          documentName: `${result.nombre} ${result.apellido}`,
+          similarity: result.nameSimilarity
+        });
+        
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          nameMatch: false,
+          confidenceScore: result.confidenceScore,
+          similarity: result.nameSimilarity,
+          message: result.error || `La cédula no coincide con sus datos de registro.`
+        });
+      }
+
+      // Update user's cedula verification status if authenticated and verified
       if (req.isAuthenticated() && !skipVerification && result.cedula && result.verified) {
         const { verifyCedula } = await import("./services/identity");
         const verifyResult = await verifyCedula(
@@ -1197,6 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cedula: result.cedula?.slice(0, 5) + '***', 
         verified: result.verified,
         confidenceScore: result.confidenceScore,
+        nameMatch: result.nameMatch,
         userId: userId || req.user?.id 
       });
 
@@ -1206,7 +1174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombre: result.nombre,
         apellido: result.apellido,
         verified: result.verified,
-        nameMatch: true,
+        nameMatch: result.nameMatch,
         confidenceScore: result.confidenceScore,
         message: result.verified 
           ? "Cédula escaneada y verificada exitosamente"

@@ -393,13 +393,15 @@ export async function verifyCedulaWithAPI(cedulaNumber: string): Promise<CedulaV
   }
 }
 
-export async function scanAndVerifyCedula(imageBase64: string): Promise<{
+export async function scanAndVerifyCedula(imageBase64: string, userNombre?: string, userApellido?: string): Promise<{
   success: boolean;
   cedula?: string;
   nombre?: string;
   apellido?: string;
   verified: boolean;
   confidenceScore?: number;
+  nameMatch?: boolean;
+  nameSimilarity?: number;
   error?: string;
 }> {
   const scanResult = await scanCedulaOCR(imageBase64);
@@ -413,27 +415,39 @@ export async function scanAndVerifyCedula(imageBase64: string): Promise<{
     };
   }
 
-  const verifyResult = await verifyCedulaWithAPI(scanResult.cedula);
-  
-  if (!verifyResult.success) {
-    return {
-      success: true,
-      cedula: scanResult.cedula,
-      nombre: scanResult.nombre,
-      apellido: scanResult.apellido,
-      verified: false,
-      confidenceScore: scanResult.confidenceScore,
-      error: verifyResult.error
-    };
+  // Verification is based on confidenceScore >= 0.6 (already validated in scanCedulaOCR)
+  // and name matching if user name is provided
+  let nameMatch = true;
+  let nameSimilarity = 1;
+  let nameError: string | undefined;
+
+  if (userNombre && userApellido && scanResult.nombre && scanResult.apellido) {
+    const nameComparison = compareNames(
+      userNombre,
+      userApellido,
+      scanResult.nombre,
+      scanResult.apellido
+    );
+    
+    nameMatch = nameComparison.match;
+    nameSimilarity = nameComparison.similarity;
+    
+    if (!nameMatch) {
+      nameError = `El nombre en la cédula "${scanResult.nombre} ${scanResult.apellido}" no coincide con el nombre registrado "${userNombre} ${userApellido}"`;
+    }
   }
+
+  const isVerified = (scanResult.confidenceScore ?? 0) >= 0.6 && nameMatch;
 
   return {
     success: true,
     cedula: scanResult.cedula,
-    nombre: verifyResult.nombre || scanResult.nombre,
-    apellido: verifyResult.apellido || scanResult.apellido,
-    verified: verifyResult.verified,
+    nombre: scanResult.nombre,
+    apellido: scanResult.apellido,
+    verified: isVerified,
     confidenceScore: scanResult.confidenceScore,
-    error: verifyResult.verified ? undefined : "La cédula no pudo ser verificada en los registros oficiales"
+    nameMatch: nameMatch,
+    nameSimilarity: nameSimilarity,
+    error: isVerified ? undefined : nameError
   };
 }
