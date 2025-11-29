@@ -27,6 +27,8 @@ interface MapboxMapProps {
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
+console.log('[MapboxMap] Token available:', !!MAPBOX_TOKEN, 'Length:', MAPBOX_TOKEN?.length || 0);
+
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
     const response = await fetch(
