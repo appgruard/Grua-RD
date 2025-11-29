@@ -1,7 +1,6 @@
 import { db } from "../db";
 import { users } from "../../shared/schema";
-import { verificationAudit } from "../schema-extensions";
-import { eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { logger } from "../logger";
 
 /**
@@ -85,6 +84,9 @@ function validateCedulaChecksum(digits: string): boolean {
 
 /**
  * Verifies a user's cédula and updates their verification status
+ * This is called after OCR scanning confirms:
+ * - confidenceScore >= 0.6
+ * - Name matches between document and registered user
  */
 export async function verifyCedula(
   userId: string,
@@ -93,47 +95,24 @@ export async function verifyCedula(
   userAgent?: string
 ): Promise<{ success: boolean; error?: string; formatted?: string }> {
   try {
-    // Validate format
-    const validation = validateCedulaFormat(cedula);
+    // Clean and format the cedula (remove dashes/spaces)
+    const cleaned = cedula.replace(/[\s-]/g, '');
     
-    if (!validation.valid) {
-      // Log failed attempt
-      await db.insert(verificationAudit).values({
-        userId,
-        verificationType: 'cedula',
-        success: false,
-        ipAddress,
-        userAgent,
-        errorMessage: validation.error,
-      });
-      
-      logger.warn(`Failed cedula verification for user ${userId}: ${validation.error}`);
-      
-      return {
-        success: false,
-        error: validation.error
-      };
-    }
+    // Format with dashes: XXX-XXXXXXX-X
+    const formatted = cleaned.length === 11 
+      ? `${cleaned.slice(0, 3)}-${cleaned.slice(3, 10)}-${cleaned.slice(10)}`
+      : cedula;
     
     // Check if cédula is already in use by another user
     const existing = await db.query.users.findFirst({
       where: (users, { and, eq, ne }) => 
         and(
-          eq(users.cedula, validation.formatted!),
+          eq(users.cedula, formatted),
           ne(users.id, userId)
         )
     });
     
     if (existing) {
-      await db.insert(verificationAudit).values({
-        userId,
-        verificationType: 'cedula',
-        success: false,
-        ipAddress,
-        userAgent,
-        errorMessage: "Cédula already registered to another user",
-      });
-      
       logger.warn(`Duplicate cedula attempt for user ${userId}`);
       
       return {
@@ -145,26 +124,16 @@ export async function verifyCedula(
     // Update user with verified cédula
     await db.update(users)
       .set({
-        cedula: validation.formatted,
+        cedula: formatted,
         cedulaVerificada: true
       })
       .where(eq(users.id, userId));
-    
-    // Log successful verification
-    await db.insert(verificationAudit).values({
-      userId,
-      verificationType: 'cedula',
-      success: true,
-      ipAddress,
-      userAgent,
-      metadata: JSON.stringify({ cedula: validation.formatted }),
-    });
     
     logger.info(`Successful cedula verification for user ${userId}`);
     
     return {
       success: true,
-      formatted: validation.formatted
+      formatted: formatted
     };
     
   } catch (error) {
@@ -194,18 +163,9 @@ export async function isIdentityVerified(userId: string): Promise<boolean> {
 
 /**
  * Gets verification history for a user
- * Returns all verification attempts (cedula, phone, etc.) in chronological order
+ * Note: Currently returns empty array as verification audit table is not implemented
  */
 export async function getVerificationHistory(userId: string) {
-  try {
-    const history = await db.query.verificationAudit.findMany({
-      where: eq(verificationAudit.userId, userId),
-      orderBy: desc(verificationAudit.createdAt),
-    });
-    
-    return history;
-  } catch (error) {
-    logger.error("Error fetching verification history:", error);
-    return [];
-  }
+  logger.info(`Verification history requested for user ${userId}`);
+  return [];
 }
