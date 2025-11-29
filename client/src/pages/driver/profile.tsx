@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FileUpload } from '@/components/FileUpload';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { DocumentExpirationAlerts } from '@/components/DocumentExpirationAlerts';
+import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import type { Conductor, Documento } from '@shared/schema';
 
 const REQUIRED_DOCUMENTS = [
@@ -673,6 +674,8 @@ export default function DriverProfile() {
           </Card>
         </>
       )}
+
+      <ThemeSettingsCard />
 
       <Button
         variant="destructive"

@@ -13,6 +13,7 @@ import AzulPaymentMethodsManager from '@/components/AzulPaymentMethodsManager';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { CedulaScanner } from '@/components/CedulaScanner';
+import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import {
   Dialog,
   DialogContent,
@@ -295,6 +296,8 @@ export default function ClientProfile() {
         <div className="space-y-4">
           <AzulPaymentMethodsManager />
         </div>
+
+        <ThemeSettingsCard />
 
         <Button
           variant="outline"
