@@ -89,22 +89,26 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <img 
-              src={logoUrl} 
-              alt="Grúa RD Logo" 
-              className="w-32 h-32 object-contain"
-            />
+    <div className="min-h-screen flex flex-col bg-background">
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <img 
+                  src={logoUrl} 
+                  alt="Grúa RD Logo" 
+                  className="w-24 h-24 object-contain"
+                />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">Bienvenido de vuelta</h1>
+            <p className="text-muted-foreground mt-2">
+              Ingresa tus credenciales para continuar
+            </p>
           </div>
-          <CardTitle className="text-2xl font-bold">Grúa RD</CardTitle>
-          <CardDescription>
-            Inicia sesión para acceder a tu cuenta
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          
+          <div className="space-y-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {errors.general && (
               <Alert variant="destructive">
@@ -167,7 +171,7 @@ export default function Login() {
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full h-12 text-base font-semibold"
               disabled={loading}
               data-testid="button-login"
             >
@@ -177,47 +181,57 @@ export default function Login() {
                   Iniciando sesión...
                 </>
               ) : (
-                'Iniciar Sesión'
+                'Continuar'
               )}
             </Button>
           </form>
 
-          <div className="mt-6 text-center space-y-2">
-            <p className="text-sm text-muted-foreground">
-              ¿No tienes cuenta?{' '}
-              <button
-                type="button"
-                className="text-primary underline-offset-4 hover:underline"
-                onClick={() => setLocation('/onboarding')}
-                data-testid="link-register"
-              >
-                Regístrate aquí
-              </button>
-            </p>
-            <p className="text-sm text-muted-foreground">
-              <button
-                type="button"
-                className="text-primary underline-offset-4 hover:underline"
-                onClick={() => setLocation('/forgot-password')}
-                data-testid="link-forgot-password"
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
-            </p>
-            <p className="text-xs text-muted-foreground mt-4">
-              Al iniciar sesión, aceptas nuestra{' '}
-              <button
-                type="button"
-                className="text-primary underline-offset-4 hover:underline"
-                onClick={() => setLocation('/privacy-policy')}
-                data-testid="link-privacy-policy"
-              >
-                Política de Privacidad
-              </button>
-            </p>
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">o</span>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="space-y-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-12"
+              onClick={() => setLocation('/onboarding')}
+              data-testid="link-register"
+            >
+              Crear cuenta nueva
+            </Button>
+            
+            <button
+              type="button"
+              className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setLocation('/forgot-password')}
+              data-testid="link-forgot-password"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+          </div>
+        </div>
+      </div>
+      
+      <footer className="py-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          Al continuar, aceptas nuestra{' '}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+            onClick={() => setLocation('/privacy-policy')}
+            data-testid="link-privacy-policy"
+          >
+            Política de Privacidad
+          </button>
+        </p>
+      </footer>
     </div>
   );
 }

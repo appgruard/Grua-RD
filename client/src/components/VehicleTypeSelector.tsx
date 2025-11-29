@@ -38,34 +38,47 @@ const vehicleTypes = [
 
 export function VehicleTypeSelector({ value, onChange }: VehicleTypeSelectorProps) {
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {vehicleTypes.map(({ id, label, Icon }) => (
-        <Card
-          key={id}
-          data-testid={`vehicle-type-${id}`}
-          onClick={() => onChange(id)}
-          className={`p-6 cursor-pointer hover-elevate active-elevate-2 transition-all ${
-            value === id
-              ? 'border-2 border-primary bg-primary/5'
-              : 'border-2 border-transparent'
-          }`}
-        >
-          <div className="flex flex-col items-center gap-3">
-            <Icon
-              className={`w-12 h-12 ${
-                value === id ? 'text-primary' : 'text-muted-foreground'
-              }`}
-            />
+    <div className="grid grid-cols-2 gap-3">
+      {vehicleTypes.map(({ id, label, Icon }) => {
+        const isSelected = value === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            data-testid={`vehicle-type-${id}`}
+            onClick={() => onChange(id)}
+            className={`relative flex flex-col items-center justify-center gap-3 p-5 rounded-xl border-2 transition-all duration-200 ${
+              isSelected
+                ? 'border-primary bg-primary/5 shadow-md'
+                : 'border-border bg-card hover:border-primary/30 hover:bg-muted/50'
+            }`}
+          >
+            {isSelected && (
+              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            )}
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
+              isSelected ? 'bg-primary/10' : 'bg-muted'
+            }`}>
+              <Icon
+                className={`w-8 h-8 transition-colors ${
+                  isSelected ? 'text-primary' : 'text-muted-foreground'
+                }`}
+              />
+            </div>
             <span
-              className={`text-sm font-semibold ${
-                value === id ? 'text-primary' : 'text-foreground'
+              className={`text-sm font-semibold transition-colors ${
+                isSelected ? 'text-primary' : 'text-foreground'
               }`}
             >
               {label}
             </span>
-          </div>
-        </Card>
-      ))}
+          </button>
+        );
+      })}
     </div>
   );
 }

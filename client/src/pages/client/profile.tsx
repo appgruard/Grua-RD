@@ -2,7 +2,7 @@ import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { User, Mail, Phone, Star, LogOut } from 'lucide-react';
+import { User, Mail, Phone, Star, LogOut, ChevronRight, Shield, CreditCard } from 'lucide-react';
 import { useLocation } from 'wouter';
 import PaymentMethodsManager from '@/components/PaymentMethodsManager';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
@@ -19,77 +19,88 @@ export default function ClientProfile() {
   };
 
   return (
-    <div className="p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6">Mi Perfil</h1>
-
-      <Card className="p-6 mb-4">
-        <div className="flex items-center gap-4 mb-6">
-          <Avatar className="w-20 h-20">
-            <AvatarFallback className="text-2xl">
+    <div className="min-h-full pb-8">
+      <div className="bg-gradient-to-b from-primary/5 to-background px-4 pt-6 pb-8">
+        <div className="flex flex-col items-center text-center">
+          <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
+            <AvatarFallback className="text-2xl bg-primary text-primary-foreground font-semibold">
               {user.nombre[0]}{user.apellido[0]}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold" data-testid="text-username">
-              {user.nombre} {user.apellido}
-            </h2>
-            {user.calificacionPromedio && (
-              <div className="flex items-center gap-1 mt-1">
-                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-medium">
-                  {parseFloat(user.calificacionPromedio as string).toFixed(1)}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Mail className="w-5 h-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">Correo</p>
-              <p className="font-medium" data-testid="text-email">{user.email}</p>
-            </div>
-          </div>
-
-          {user.phone && (
-            <div className="flex items-center gap-3">
-              <Phone className="w-5 h-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Teléfono</p>
-                <p className="font-medium" data-testid="text-phone">{user.phone}</p>
-              </div>
+          <h2 className="text-xl font-bold mt-4" data-testid="text-username">
+            {user.nombre} {user.apellido}
+          </h2>
+          {user.calificacionPromedio && (
+            <div className="flex items-center gap-1.5 mt-2 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+              <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+              <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400">
+                {parseFloat(user.calificacionPromedio as string).toFixed(1)}
+              </span>
             </div>
           )}
+        </div>
+      </div>
 
-          <div className="flex items-center gap-3">
-            <User className="w-5 h-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">Tipo de usuario</p>
-              <p className="font-medium capitalize">{user.userType}</p>
+      <div className="px-4 -mt-4 space-y-4">
+        <Card className="overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Información Personal
+            </h3>
+          </div>
+          <div className="divide-y divide-border">
+            <div className="flex items-center gap-4 p-4">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <Mail className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Correo electrónico</p>
+                <p className="font-medium truncate" data-testid="text-email">{user.email}</p>
+              </div>
+            </div>
+
+            {user.phone && (
+              <div className="flex items-center gap-4 p-4">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Teléfono</p>
+                  <p className="font-medium" data-testid="text-phone">{user.phone}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4 p-4">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <User className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Tipo de cuenta</p>
+                <p className="font-medium capitalize">{user.userType === 'cliente' ? 'Cliente' : user.userType}</p>
+              </div>
             </div>
           </div>
+        </Card>
+
+        <div className="space-y-4">
+          <ClientInsuranceManager />
         </div>
-      </Card>
 
-      <div className="mb-4">
-        <ClientInsuranceManager />
+        <div className="space-y-4">
+          <PaymentMethodsManager />
+        </div>
+
+        <Button
+          variant="outline"
+          className="w-full h-12 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+          onClick={handleLogout}
+          data-testid="button-logout"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Cerrar Sesión
+        </Button>
       </div>
-
-      <div className="mb-4">
-        <PaymentMethodsManager />
-      </div>
-
-      <Button
-        variant="destructive"
-        className="w-full"
-        onClick={handleLogout}
-        data-testid="button-logout"
-      >
-        <LogOut className="w-4 h-4 mr-2" />
-        Cerrar Sesión
-      </Button>
     </div>
   );
 }

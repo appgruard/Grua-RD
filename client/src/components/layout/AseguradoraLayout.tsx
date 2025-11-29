@@ -25,6 +25,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 interface AseguradoraLayoutProps {
@@ -115,10 +116,10 @@ export function AseguradoraLayout({ children }: AseguradoraLayoutProps) {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1">
-          <header className="flex items-center justify-between p-4 border-b border-border">
+          <header className="flex items-center justify-between p-4 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-40">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <h1 className="text-xl font-semibold">Portal de Aseguradora</h1>
-            <div className="w-10" />
+            <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto p-6">
             {children}
