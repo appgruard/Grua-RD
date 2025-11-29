@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Users, Truck, FileText, DollarSign } from 'lucide-react';
+import { Users, Truck, FileText, DollarSign, ChevronDown, ChevronUp } from 'lucide-react';
 import { MapboxMap } from '@/components/maps/MapboxMap';
 import { useWebSocket } from '@/lib/websocket';
+import { cn } from '@/lib/utils';
 import type { Conductor, User, ServicioWithDetails } from '@shared/schema';
 
 interface DashboardStats {
@@ -23,6 +24,8 @@ interface ActiveService extends ServicioWithDetails {
 }
 
 export default function AdminDashboard() {
+  const [showLegend, setShowLegend] = useState(false);
+  
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/admin/dashboard'],
   });
@@ -77,12 +80,12 @@ export default function AdminDashboard() {
 
   if (statsLoading || !stats) {
     return (
-      <div>
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="p-4 md:p-6">
+        <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="p-6 animate-pulse">
-              <div className="h-20 bg-muted rounded" />
+            <Card key={i} className="p-4 md:p-6 animate-pulse">
+              <div className="h-16 md:h-20 bg-muted rounded" />
             </Card>
           ))}
         </div>
@@ -92,11 +95,11 @@ export default function AdminDashboard() {
 
   const statCards = [
     {
-      title: 'Usuarios Totales',
+      title: 'Usuarios',
       value: stats.totalUsers,
       icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
       testId: 'stat-users',
     },
     {
@@ -104,8 +107,8 @@ export default function AdminDashboard() {
       value: stats.totalDrivers,
       description: `${activeDrivers?.length || 0} en línea`,
       icon: Truck,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-100 dark:bg-green-900/30',
       testId: 'stat-drivers',
     },
     {
@@ -113,39 +116,39 @@ export default function AdminDashboard() {
       value: stats.totalServices,
       description: `${activeServices.length} activos`,
       icon: FileText,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      color: 'text-purple-600 dark:text-purple-400',
+      bgColor: 'bg-purple-100 dark:bg-purple-900/30',
       testId: 'stat-services',
     },
     {
-      title: 'Ingresos Totales',
-      value: `RD$ ${stats.totalRevenue.toFixed(2)}`,
+      title: 'Ingresos',
+      value: `RD$ ${stats.totalRevenue.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       icon: DollarSign,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
+      color: 'text-yellow-600 dark:text-yellow-400',
+      bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
       testId: 'stat-revenue',
     },
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+    <div className="h-full flex flex-col p-4 md:p-6">
+      <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="p-6" data-testid={stat.testId}>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground mb-1">{stat.title}</p>
-                  <p className="text-2xl font-bold mb-1">{stat.value}</p>
+            <Card key={stat.title} className="p-3 md:p-4" data-testid={stat.testId}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm text-muted-foreground mb-0.5 md:mb-1 truncate">{stat.title}</p>
+                  <p className="text-lg md:text-2xl font-bold truncate">{stat.value}</p>
                   {stat.description && (
-                    <p className="text-xs text-muted-foreground">{stat.description}</p>
+                    <p className="text-xs text-muted-foreground truncate">{stat.description}</p>
                   )}
                 </div>
-                <div className={`${stat.bgColor} p-3 rounded-lg`}>
-                  <Icon className={`w-6 h-6 ${stat.color}`} />
+                <div className={`${stat.bgColor} p-2 md:p-3 rounded-lg flex-shrink-0`}>
+                  <Icon className={`w-4 h-4 md:w-6 md:h-6 ${stat.color}`} />
                 </div>
               </div>
             </Card>
@@ -153,30 +156,48 @@ export default function AdminDashboard() {
         })}
       </div>
 
-      <Card className="flex-1 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Mapa en Tiempo Real</h2>
-          <div className="flex gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full" />
-              <span className="text-muted-foreground">Disponible</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full" />
-              <span className="text-muted-foreground">En servicio</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full" />
-              <span className="text-muted-foreground">Solicitud activa</span>
+      <Card className="flex-1 flex flex-col min-h-0">
+        <div className="p-3 md:p-4 border-b border-border flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <h2 className="text-base md:text-lg font-semibold">Mapa en Tiempo Real</h2>
+            
+            <button 
+              className="sm:hidden flex items-center justify-between text-sm text-muted-foreground"
+              onClick={() => setShowLegend(!showLegend)}
+              data-testid="button-toggle-legend"
+            >
+              <span>Leyenda</span>
+              {showLegend ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+
+            <div className={cn(
+              "flex flex-col sm:flex-row gap-2 sm:gap-4 text-sm",
+              "sm:flex",
+              showLegend ? "flex" : "hidden"
+            )}>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full" />
+                <span className="text-muted-foreground text-xs md:text-sm">Disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full" />
+                <span className="text-muted-foreground text-xs md:text-sm">En servicio</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full" />
+                <span className="text-muted-foreground text-xs md:text-sm">Solicitud</span>
+              </div>
             </div>
           </div>
         </div>
-        <MapboxMap
-          center={center}
-          zoom={12}
-          markers={markers}
-          className="w-full h-full min-h-[500px]"
-        />
+        <div className="flex-1 relative min-h-[300px] md:min-h-[400px]">
+          <MapboxMap
+            center={center}
+            zoom={12}
+            markers={markers}
+            className="absolute inset-0"
+          />
+        </div>
       </Card>
     </div>
   );
