@@ -1099,7 +1099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
       }
 
-      const { scanAndVerifyCedula, isVerifikConfigured } = await import("./services/verifik-ocr");
+      const { scanAndVerifyCedula, isVerifikConfigured, compareNames } = await import("./services/verifik-ocr");
       
       if (!isVerifikConfigured()) {
         return res.status(503).json({ 
@@ -1116,6 +1116,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         return res.status(400).json({ 
           message: result.error || "No se pudo escanear la cédula"
+        });
+      }
+
+      if (req.isAuthenticated() && result.nombre && result.apellido) {
+        const user = req.user!;
+        const nameComparison = compareNames(
+          user.nombre,
+          user.apellido,
+          result.nombre,
+          result.apellido
+        );
+
+        if (!nameComparison.match) {
+          logSystem.warn('Name mismatch during cedula verification', {
+            userId: user.id,
+            registeredName: `${user.nombre} ${user.apellido}`,
+            documentName: `${result.nombre} ${result.apellido}`,
+            similarity: nameComparison.similarity
+          });
+          
+          return res.status(400).json({
+            success: false,
+            verified: false,
+            nameMatch: false,
+            message: `La cédula no coincide con sus datos de registro. El nombre en la cédula "${result.nombre} ${result.apellido}" no corresponde con el nombre registrado "${user.nombre} ${user.apellido}".`
+          });
+        }
+
+        logSystem.info('Name verification passed', {
+          userId: user.id,
+          similarity: nameComparison.similarity
         });
       }
 
@@ -1145,6 +1176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombre: result.nombre,
         apellido: result.apellido,
         verified: result.verified,
+        nameMatch: true,
         message: result.verified 
           ? "Cédula escaneada y verificada exitosamente"
           : "Cédula escaneada. Verificación pendiente."

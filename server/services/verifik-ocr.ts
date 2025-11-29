@@ -3,6 +3,71 @@ import { logger } from "../logger";
 const VERIFIK_API_KEY = process.env.VERIFIK_API_KEY;
 const VERIFIK_BASE_URL = "https://api.verifik.co/v2";
 
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getNameTokens(text: string): string[] {
+  return normalizeText(text).split(" ").filter(t => t.length > 0);
+}
+
+export function compareNames(
+  registeredNombre: string,
+  registeredApellido: string,
+  documentNombre: string,
+  documentApellido: string
+): { match: boolean; similarity: number; details: string } {
+  const regFirstTokens = getNameTokens(registeredNombre);
+  const regLastTokens = getNameTokens(registeredApellido);
+  const docFirstTokens = getNameTokens(documentNombre);
+  const docLastTokens = getNameTokens(documentApellido);
+  
+  const regFullTokens = [...regFirstTokens, ...regLastTokens];
+  const docFullTokens = [...docFirstTokens, ...docLastTokens];
+  
+  if (regFullTokens.length === 0 || docFullTokens.length === 0) {
+    return { match: false, similarity: 0, details: "No se pudieron extraer nombres para comparar" };
+  }
+  
+  let matchedTokens = 0;
+  const totalTokens = Math.max(regFullTokens.length, docFullTokens.length);
+  
+  for (const regToken of regFullTokens) {
+    if (docFullTokens.some(docToken => 
+      docToken === regToken || 
+      docToken.includes(regToken) || 
+      regToken.includes(docToken)
+    )) {
+      matchedTokens++;
+    }
+  }
+  
+  const similarity = matchedTokens / totalTokens;
+  
+  const firstNameMatch = regFirstTokens.some(rt => 
+    docFirstTokens.some(dt => dt === rt || dt.includes(rt) || rt.includes(dt))
+  );
+  
+  const lastNameMatch = regLastTokens.some(rt => 
+    docLastTokens.some(dt => dt === rt || dt.includes(rt) || rt.includes(dt))
+  );
+  
+  const match = similarity >= 0.5 && (firstNameMatch || lastNameMatch);
+  
+  let details = "";
+  if (!match) {
+    details = `El nombre registrado "${registeredNombre} ${registeredApellido}" no coincide con el nombre en la cédula "${documentNombre} ${documentApellido}"`;
+  }
+  
+  return { match, similarity, details };
+}
+
 interface VerifikOCRResponse {
   data?: {
     documentType?: string;
