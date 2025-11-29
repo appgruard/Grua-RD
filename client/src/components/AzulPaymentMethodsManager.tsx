@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, CreditCard, Trash2, CheckCircle2, Plus, AlertCircle } from 'lucide-react';
+import { Loader2, CreditCard, Trash2, CheckCircle2, Plus, AlertCircle, IdCard, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { useAuth } from '@/lib/auth';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -220,6 +222,9 @@ export default function AzulPaymentMethodsManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteMethodId, setDeleteMethodId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  const isCedulaVerified = user?.cedulaVerificada;
 
   const { data: serviceStatus, isLoading: isLoadingStatus } = useQuery<ServiceStatus>({
     queryKey: ['/api/client/payment-service-status'],
@@ -358,28 +363,39 @@ export default function AzulPaymentMethodsManager() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
           <CardTitle>Métodos de Pago</CardTitle>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                data-testid="button-add-payment-method"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Agregar Tarjeta
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Agregar Método de Pago</DialogTitle>
-                <DialogDescription>
-                  Agrega una tarjeta de crédito o débito para futuros pagos
-                </DialogDescription>
-              </DialogHeader>
-              <AddCardForm onSuccess={handleCloseDialog} />
-            </DialogContent>
-          </Dialog>
+          {isCedulaVerified ? (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  data-testid="button-add-payment-method"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar Tarjeta
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Agregar Método de Pago</DialogTitle>
+                  <DialogDescription>
+                    Agrega una tarjeta de crédito o débito para futuros pagos
+                  </DialogDescription>
+                </DialogHeader>
+                <AddCardForm onSuccess={handleCloseDialog} />
+              </DialogContent>
+            </Dialog>
+          ) : null}
         </CardHeader>
         <CardContent>
+          {!isCedulaVerified && (
+            <Alert className="mb-4">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription>
+                Debes verificar tu cédula para poder agregar métodos de pago.
+                Ve a la sección de "Verificación de Identidad" arriba.
+              </AlertDescription>
+            </Alert>
+          )}
           {!methods || methods.length === 0 ? (
             <div className="text-center py-8">
               <CreditCard className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
@@ -387,7 +403,9 @@ export default function AzulPaymentMethodsManager() {
                 No tienes métodos de pago guardados
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Agrega una tarjeta para realizar pagos más rápido
+                {isCedulaVerified 
+                  ? 'Agrega una tarjeta para realizar pagos más rápido'
+                  : 'Verifica tu cédula para agregar tarjetas'}
               </p>
             </div>
           ) : (

@@ -2,8 +2,9 @@ import { useState, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2, IdCard, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
@@ -11,12 +12,23 @@ import { useToast } from '@/hooks/use-toast';
 import AzulPaymentMethodsManager from '@/components/AzulPaymentMethodsManager';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
 import { EditProfileModal } from '@/components/EditProfileModal';
+import { CedulaScanner } from '@/components/CedulaScanner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function ClientProfile() {
   const { user, logout, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [cedulaDialogOpen, setCedulaDialogOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const uploadPhotoMutation = useMutation({
@@ -78,12 +90,33 @@ export default function ClientProfile() {
     }
   };
 
+  const handleCedulaScanComplete = async (result: { success: boolean; cedula?: string; verified: boolean }) => {
+    if (result.success) {
+      await refreshUser();
+      setCedulaDialogOpen(false);
+      
+      if (result.verified) {
+        toast({
+          title: 'Cédula verificada',
+          description: 'Tu identidad ha sido verificada exitosamente',
+        });
+      } else {
+        toast({
+          title: 'Cédula escaneada',
+          description: 'La cédula fue registrada. La verificación puede tardar unos minutos.',
+        });
+      }
+    }
+  };
+
   if (!user) return null;
 
   const handleLogout = async () => {
     await logout();
     setLocation('/login');
   };
+
+  const isCedulaVerified = user.cedulaVerificada;
 
   return (
     <div className="min-h-full pb-8">
@@ -186,6 +219,72 @@ export default function ClientProfile() {
                 <p className="font-medium capitalize">{user.userType === 'cliente' ? 'Cliente' : user.userType}</p>
               </div>
             </div>
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Verificación de Identidad
+            </h3>
+            {isCedulaVerified ? (
+              <Badge variant="default" className="bg-green-600 hover:bg-green-700">
+                <CheckCircle2 className="w-3 h-3 mr-1" />
+                Verificada
+              </Badge>
+            ) : (
+              <Badge variant="secondary">
+                Pendiente
+              </Badge>
+            )}
+          </div>
+          <div className="p-4">
+            {isCedulaVerified ? (
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <IdCard className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Cédula</p>
+                  <p className="font-medium" data-testid="text-cedula">
+                    {user.cedula || 'Verificada'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Verifica tu cédula para poder agregar métodos de pago y disfrutar de una experiencia completa.
+                  </AlertDescription>
+                </Alert>
+                
+                <Dialog open={cedulaDialogOpen} onOpenChange={setCedulaDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="w-full" data-testid="button-verify-cedula">
+                      <IdCard className="w-4 h-4 mr-2" />
+                      Verificar Cédula
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Verificar Cédula</DialogTitle>
+                      <DialogDescription>
+                        Escanea tu cédula de identidad para verificar tu identidad
+                      </DialogDescription>
+                    </DialogHeader>
+                    <CedulaScanner
+                      title=""
+                      description=""
+                      required={false}
+                      showSkip={false}
+                      onScanComplete={handleCedulaScanComplete}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
           </div>
         </Card>
 

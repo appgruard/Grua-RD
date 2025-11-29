@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard, Truck, CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CedulaScanner } from '@/components/CedulaScanner';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 type FormErrors = {
@@ -32,6 +33,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [userType, setUserType] = useState<'cliente' | 'conductor'>('cliente');
   const [errors, setErrors] = useState<FormErrors>({});
+  const [registrationStep, setRegistrationStep] = useState<'form' | 'cedula-scan'>('form');
+  const [cedulaVerified, setCedulaVerified] = useState(false);
 
   useEffect(() => {
     if (user && !isLoading) {
@@ -83,10 +86,6 @@ export default function Register() {
       newErrors.phone = 'Ingresa un número de teléfono válido (10 dígitos)';
     }
 
-    if (formData.cedula && !/^\d{11}$/.test(formData.cedula.replace(/\D/g, ''))) {
-      newErrors.cedula = 'La cédula debe tener 11 dígitos';
-    }
-
     if (!formData.password) {
       newErrors.password = 'La contraseña es requerida';
     } else if (formData.password.length < 6) {
@@ -112,10 +111,7 @@ export default function Register() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-
+  const handleContinueToScan = () => {
     if (!validateForm()) {
       toast({
         title: 'Errores en el formulario',
@@ -124,7 +120,24 @@ export default function Register() {
       });
       return;
     }
+    setRegistrationStep('cedula-scan');
+  };
 
+  const handleCedulaScanComplete = (result: { success: boolean; cedula?: string; nombre?: string; apellido?: string; verified: boolean }) => {
+    if (result.success && result.cedula) {
+      setFormData(prev => ({
+        ...prev,
+        cedula: result.cedula || '',
+        nombre: result.nombre || prev.nombre,
+        apellido: result.apellido || prev.apellido,
+      }));
+      setCedulaVerified(result.verified);
+      
+      handleSubmitRegistration(result.cedula, result.verified);
+    }
+  };
+
+  const handleSubmitRegistration = async (cedulaOverride?: string, cedulaVerifiedStatus?: boolean) => {
     setLoading(true);
 
     try {
@@ -134,7 +147,8 @@ export default function Register() {
         nombre: formData.nombre,
         apellido: formData.apellido,
         phone: formData.phone,
-        cedula: formData.cedula || null,
+        cedula: cedulaOverride || formData.cedula || null,
+        cedulaVerificada: cedulaVerifiedStatus || false,
         userType,
       };
 
@@ -168,6 +182,69 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+
+    if (!validateForm()) {
+      toast({
+        title: 'Errores en el formulario',
+        description: 'Por favor corrige los campos marcados',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (userType === 'conductor') {
+      setRegistrationStep('cedula-scan');
+      return;
+    }
+
+    await handleSubmitRegistration();
+  };
+
+  if (registrationStep === 'cedula-scan') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 py-8">
+        <div className="w-full max-w-md space-y-4">
+          <Button 
+            variant="ghost" 
+            onClick={() => setRegistrationStep('form')}
+            className="mb-2"
+            data-testid="button-back-to-form"
+          >
+            <ChevronLeft className="w-4 h-4 mr-2" />
+            Volver al formulario
+          </Button>
+          
+          <CedulaScanner
+            title="Verificación de Identidad"
+            description="Como conductor, debes verificar tu identidad escaneando tu cédula"
+            required={true}
+            showSkip={false}
+            onScanComplete={handleCedulaScanComplete}
+          />
+
+          {cedulaVerified && (
+            <Alert>
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription>
+                Tu cédula ha sido verificada. Tu cuenta será creada automáticamente.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {loading && (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              <span>Creando tu cuenta...</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 py-8">
@@ -284,56 +361,30 @@ export default function Register() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="809-555-1234"
-                    className={`pl-10 ${errors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                    value={formData.phone}
-                    onChange={(e) => {
-                      setFormData({ ...formData, phone: e.target.value });
-                      setErrors({ ...errors, phone: undefined });
-                    }}
-                    disabled={loading}
-                    data-testid="input-phone"
-                  />
-                </div>
-                {errors.phone && (
-                  <p className="text-xs text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {errors.phone}
-                  </p>
-                )}
+            <div className="space-y-2">
+              <Label htmlFor="phone">Teléfono</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="809-555-1234"
+                  className={`pl-10 ${errors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  value={formData.phone}
+                  onChange={(e) => {
+                    setFormData({ ...formData, phone: e.target.value });
+                    setErrors({ ...errors, phone: undefined });
+                  }}
+                  disabled={loading}
+                  data-testid="input-phone"
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="cedula">Cédula (opcional)</Label>
-                <div className="relative">
-                  <IdCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="cedula"
-                    placeholder="00000000000"
-                    className={`pl-10 ${errors.cedula ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                    value={formData.cedula}
-                    onChange={(e) => {
-                      setFormData({ ...formData, cedula: e.target.value });
-                      setErrors({ ...errors, cedula: undefined });
-                    }}
-                    disabled={loading}
-                    data-testid="input-cedula"
-                  />
-                </div>
-                {errors.cedula && (
-                  <p className="text-xs text-destructive flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {errors.cedula}
-                  </p>
-                )}
-              </div>
+              {errors.phone && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.phone}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -467,6 +518,13 @@ export default function Register() {
                     </div>
                   </div>
                 </div>
+
+                <Alert>
+                  <IdCard className="h-4 w-4" />
+                  <AlertDescription>
+                    Como conductor, deberás escanear tu cédula para verificar tu identidad en el siguiente paso.
+                  </AlertDescription>
+                </Alert>
               </>
             )}
 
@@ -480,6 +538,11 @@ export default function Register() {
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Creando cuenta...
+                </>
+              ) : userType === 'conductor' ? (
+                <>
+                  Continuar con verificación
+                  <ChevronRight className="w-4 h-4 ml-2" />
                 </>
               ) : (
                 'Crear Cuenta'

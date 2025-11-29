@@ -444,7 +444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
-      const { password, userType, conductorData, ...userData } = req.body;
+      const { password, userType, conductorData, cedulaVerificada: _ignored, ...userData } = req.body;
 
       if (!password || password.length < 6) {
         return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
@@ -454,6 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...userData,
         passwordHash: password,
         userType: userType || 'cliente',
+        cedulaVerificada: false,
       });
 
       if (!validationResult.success) {
@@ -497,12 +498,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       logAuth.registerSuccess(user.id, user.email, user.userType);
 
-      req.login(user, (err) => {
+      if (userData.cedula && userType === 'conductor') {
+        try {
+          const { verifyCedulaWithAPI, isVerifikConfigured } = await import("./services/verifik-ocr");
+          
+          if (isVerifikConfigured()) {
+            const apiResult = await verifyCedulaWithAPI(userData.cedula);
+            
+            if (apiResult.success && apiResult.verified) {
+              const { verifyCedula } = await import("./services/identity");
+              const verifyResult = await verifyCedula(
+                user.id,
+                userData.cedula,
+                req.ip,
+                req.headers['user-agent']
+              );
+              
+              if (verifyResult.success) {
+                logAuth.cedulaVerified(user.id, userData.cedula);
+              }
+            } else {
+              logSystem.info("Cedula verification via Verifik API failed or not verified", { 
+                userId: user.id, 
+                verified: apiResult.verified,
+                error: apiResult.error 
+              });
+            }
+          } else {
+            logSystem.warn("Verifik API not configured, skipping cedula verification");
+          }
+        } catch (verifyError) {
+          logSystem.warn("Post-registration cedula verification failed", verifyError);
+        }
+      }
+
+      const updatedUser = await storage.getUserById(user.id);
+
+      req.login(updatedUser || user, (err) => {
         if (err) {
           logSystem.error("Login failed after registration", err, { userId: user.id });
           return res.status(500).json({ message: "Login failed after registration" });
         }
-        res.json({ user });
+        res.json({ user: updatedUser || user });
       });
     } catch (error: any) {
       logSystem.error('Registration error', error);
@@ -1030,6 +1067,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Verify cedula error', error, { userId: req.user?.id });
       res.status(500).json({ message: "Error al verificar cédula" });
+    }
+  });
+
+  const ocrScanLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    message: "Demasiados intentos de escaneo. Intenta nuevamente en 1 hora.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logSystem.warn('Rate limit exceeded for OCR scan', { 
+        ip: req.ip, 
+        userId: req.user?.id 
+      });
+      res.status(429).json({ 
+        message: "Demasiados intentos de escaneo. Intenta nuevamente en 1 hora." 
+      });
+    }
+  });
+
+  app.post("/api/identity/scan-cedula", ocrScanLimiter, async (req: Request, res: Response) => {
+    try {
+      const { image, userId, skipVerification } = req.body;
+
+      if (!image) {
+        return res.status(400).json({ message: "Imagen de la cédula es requerida" });
+      }
+
+      if (image.length > 10 * 1024 * 1024) {
+        return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
+      }
+
+      const { scanAndVerifyCedula, isVerifikConfigured } = await import("./services/verifik-ocr");
+      
+      if (!isVerifikConfigured()) {
+        return res.status(503).json({ 
+          message: "El servicio de verificación OCR no está configurado" 
+        });
+      }
+
+      const result = await scanAndVerifyCedula(image);
+
+      if (!result.success) {
+        logSystem.warn('OCR scan failed', { 
+          error: result.error, 
+          userId: userId || req.user?.id 
+        });
+        return res.status(400).json({ 
+          message: result.error || "No se pudo escanear la cédula"
+        });
+      }
+
+      if (req.isAuthenticated() && !skipVerification && result.cedula && result.verified) {
+        const { verifyCedula } = await import("./services/identity");
+        const verifyResult = await verifyCedula(
+          req.user!.id,
+          result.cedula,
+          req.ip,
+          req.headers['user-agent']
+        );
+
+        if (verifyResult.success) {
+          logAuth.cedulaVerified(req.user!.id, result.cedula);
+        }
+      }
+
+      logSystem.info('OCR scan successful', { 
+        cedula: result.cedula?.slice(0, 5) + '***', 
+        verified: result.verified,
+        userId: userId || req.user?.id 
+      });
+
+      res.json({
+        success: true,
+        cedula: result.cedula,
+        nombre: result.nombre,
+        apellido: result.apellido,
+        verified: result.verified,
+        message: result.verified 
+          ? "Cédula escaneada y verificada exitosamente"
+          : "Cédula escaneada. Verificación pendiente."
+      });
+    } catch (error: any) {
+      logSystem.error('Scan cedula error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al escanear cédula" });
+    }
+  });
+
+  app.get("/api/identity/verifik-status", async (req: Request, res: Response) => {
+    try {
+      const { isVerifikConfigured } = await import("./services/verifik-ocr");
+      res.json({ 
+        configured: isVerifikConfigured(),
+        service: "Verifik OCR"
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Error checking Verifik status" });
     }
   });
 
