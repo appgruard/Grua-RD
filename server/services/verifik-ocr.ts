@@ -76,6 +76,12 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
     };
   }
 
+  const apiKey = VERIFIK_API_KEY.trim();
+  logger.info("Verifik OCR scan started", { 
+    apiKeyLength: apiKey.length,
+    apiKeyPrefix: apiKey.substring(0, 20) + "..."
+  });
+
   try {
     const imageData = imageBase64.startsWith('data:') 
       ? imageBase64 
@@ -86,7 +92,7 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${VERIFIK_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         image: imageData,
@@ -167,6 +173,7 @@ export async function verifyCedulaWithAPI(cedulaNumber: string): Promise<CedulaV
     };
   }
 
+  const apiKey = VERIFIK_API_KEY.trim();
   const cleanCedula = cedulaNumber.replace(/[\s-]/g, '');
   
   if (!/^\d{11}$/.test(cleanCedula)) {
@@ -182,7 +189,7 @@ export async function verifyCedulaWithAPI(cedulaNumber: string): Promise<CedulaV
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${VERIFIK_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       }
     });
 
