@@ -9,21 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { FileUpload } from '@/components/ui/file-upload';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
-  Loader2, 
-  Mail, 
-  Lock, 
-  User, 
-  Phone, 
-  AlertCircle, 
-  FileText, 
-  Car, 
-  IdCard,
-  CheckCircle2,
-  ArrowRight,
-  Clock
+  Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard,
+  CheckCircle2, ArrowRight, Clock, Upload
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
@@ -47,6 +38,7 @@ interface OnboardingData {
 type StepErrors = Record<string, string>;
 
 const WIZARD_STORAGE_KEY = 'gruard_onboarding_wizard_state';
+const TOTAL_STEPS = 6;
 
 export default function OnboardingWizard() {
   const [location, setLocation] = useLocation();
@@ -55,23 +47,17 @@ export default function OnboardingWizard() {
   
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<OnboardingData>({
-    email: '',
-    password: '',
-    userType: 'cliente',
-    cedula: '',
-    phone: '',
-    otpCode: '',
-    nombre: '',
-    apellido: '',
-    licencia: '',
-    placaGrua: '',
-    marcaGrua: '',
-    modeloGrua: '',
+    email: '', password: '', userType: 'cliente', cedula: '', phone: '',
+    otpCode: '', nombre: '', apellido: '', licencia: '',
+    placaGrua: '', marcaGrua: '', modeloGrua: '',
   });
   const [errors, setErrors] = useState<StepErrors>({});
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [otpTimer, setOtpTimer] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -107,11 +93,9 @@ export default function OnboardingWizard() {
 
   useEffect(() => {
     if (!isInitialized) return;
-
     try {
       const stateToSave = {
-        currentStep,
-        formData,
+        currentStep, formData,
         completedSteps: Array.from(completedSteps),
       };
       sessionStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(stateToSave));
@@ -128,677 +112,288 @@ export default function OnboardingWizard() {
   const registerMutation = useMutation({
     mutationFn: async () => {
       const data: any = {
-        email: formData.email,
-        password: formData.password,
-        userType: formData.userType,
-        nombre: formData.nombre,
-        apellido: formData.apellido,
-        phone: formData.phone,
+        email: formData.email, password: formData.password,
+        userType: formData.userType, nombre: formData.nombre,
+        apellido: formData.apellido, phone: formData.phone,
       };
       return await register(data);
     },
     onSuccess: () => {
-      toast({
-        title: '¡Cuenta creada!',
-        description: 'Ahora verificaremos tu identidad',
-      });
+      toast({ title: '¡Cuenta creada!', description: 'Ahora verificaremos tu identidad' });
       setCompletedSteps(prev => new Set(prev).add(1));
       setCurrentStep(2);
     },
     onError: (error: any) => {
-      const message = error?.message || 'Error al crear la cuenta';
-      setErrors({ general: message });
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      });
+      setErrors({ general: error?.message || 'Error al crear la cuenta' });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
 
   const verifyCedulaMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/identity/verify-cedula', {
-        cedula: formData.cedula,
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Error al verificar cédula');
-      }
+      const res = await apiRequest('POST', '/api/identity/verify-cedula', { cedula: formData.cedula });
+      if (!res.ok) throw new Error((await res.json()).message || 'Error al verificar cédula');
       return res.json();
     },
     onSuccess: () => {
-      toast({
-        title: '¡Cédula verificada!',
-        description: 'Tu cédula ha sido validada correctamente',
-      });
+      toast({ title: '¡Cédula verificada!', description: 'Tu cédula ha sido validada correctamente' });
       setCompletedSteps(prev => new Set(prev).add(2));
       setCurrentStep(3);
     },
     onError: (error: any) => {
-      const message = error?.message || 'Error al verificar cédula';
-      setErrors({ cedula: message });
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      });
+      setErrors({ cedula: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
 
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/identity/send-phone-otp', {
-        phone: formData.phone,
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Error al enviar código');
-      }
+      const res = await apiRequest('POST', '/api/identity/send-phone-otp', { phone: formData.phone });
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: (data) => {
       setOtpTimer(data.expiresIn || 600);
-      toast({
-        title: 'Código enviado',
-        description: 'Revisa tu teléfono para el código de verificación',
-      });
+      toast({ title: 'Código enviado', description: 'Revisa tu teléfono para el código' });
     },
     onError: (error: any) => {
-      const message = error?.message || 'Error al enviar código';
-      setErrors({ phone: message });
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      });
+      setErrors({ phone: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
 
   const verifyOtpMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/identity/verify-phone-otp', {
-        phone: formData.phone,
-        code: formData.otpCode,
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Error al verificar código');
-      }
+      const res = await apiRequest('POST', '/api/identity/verify-phone-otp',
+        { phone: formData.phone, code: formData.otpCode });
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
-      toast({
-        title: '¡Teléfono verificado!',
-        description: 'Tu número ha sido verificado correctamente',
-      });
+      toast({ title: '¡Teléfono verificado!', description: 'Tu número ha sido verificado' });
       setCompletedSteps(prev => new Set(prev).add(3));
       setCurrentStep(4);
     },
     onError: (error: any) => {
-      const message = error?.message || 'Código incorrecto';
-      setErrors({ otpCode: message });
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      });
+      setErrors({ otpCode: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
+    },
+  });
+
+  const uploadDocsMutation = useMutation({
+    mutationFn: async () => {
+      if (!licenseFile && !insuranceFile) {
+        throw new Error('Debe cargar al menos un documento');
+      }
+
+      const filesUploaded = [];
+      if (licenseFile) {
+        const formDataLicense = new FormData();
+        formDataLicense.append('document', licenseFile);
+        formDataLicense.append('tipoDocumento', formData.userType === 'conductor' ? 'licencia_conducir' : 'seguro_cliente');
+        const licRes = await fetch('/api/documents/upload', {
+          method: 'POST',
+          body: formDataLicense,
+        });
+        if (!licRes.ok) throw new Error('Error al subir licencia');
+        filesUploaded.push(licRes.json());
+      }
+
+      if (insuranceFile) {
+        const formDataIns = new FormData();
+        formDataIns.append('document', insuranceFile);
+        formDataIns.append('tipoDocumento', formData.userType === 'conductor' ? 'seguro_grua' : 'seguro_cliente');
+        const insRes = await fetch('/api/documents/upload', {
+          method: 'POST',
+          body: formDataIns,
+        });
+        if (!insRes.ok) throw new Error('Error al subir documento de seguro');
+        filesUploaded.push(insRes.json());
+      }
+
+      return Promise.all(filesUploaded);
+    },
+    onSuccess: () => {
+      toast({ title: '¡Documentos subidos!', description: 'Tus documentos han sido guardados' });
+      setCompletedSteps(prev => new Set(prev).add(4));
+      setCurrentStep(formData.userType === 'conductor' ? 5 : 6);
+    },
+    onError: (error: any) => {
+      setErrors({ documents: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
 
   const finalizeProfileMutation = useMutation({
     mutationFn: async () => {
-      const updateData: any = {
-        nombre: formData.nombre,
-        apellido: formData.apellido,
-      };
-
+      const updateData: any = { nombre: formData.nombre, apellido: formData.apellido };
       if (formData.userType === 'conductor') {
         updateData.conductorData = {
-          licencia: formData.licencia,
-          placaGrua: formData.placaGrua,
-          marcaGrua: formData.marcaGrua,
-          modeloGrua: formData.modeloGrua,
+          licencia: formData.licencia, placaGrua: formData.placaGrua,
+          marcaGrua: formData.marcaGrua, modeloGrua: formData.modeloGrua,
         };
       }
-
       const res = await apiRequest('PATCH', '/api/users/me', updateData);
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Error al actualizar perfil');
-      }
+      if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: async () => {
       const statusRes = await apiRequest('GET', '/api/identity/status');
       if (!statusRes.ok) {
-        toast({
-          title: 'Error',
-          description: 'No se pudo verificar el estado de identidad',
-          variant: 'destructive',
-        });
+        toast({ title: 'Error', description: 'No se pudo verificar identidad', variant: 'destructive' });
         return;
       }
-
       const status = await statusRes.json();
-      
       if (!status.cedulaVerificada || !status.telefonoVerificado) {
-        toast({
-          title: 'Verificación incompleta',
-          description: 'Asegúrate de completar todas las verificaciones',
-          variant: 'destructive',
-        });
+        toast({ title: 'Verificación incompleta', description: 'Completa todas las verificaciones', variant: 'destructive' });
         return;
       }
-
       queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
-
       sessionStorage.removeItem(WIZARD_STORAGE_KEY);
-
-      toast({
-        title: '¡Registro completado!',
-        description: 'Bienvenido a Grúa RD',
-      });
-      
+      toast({ title: '¡Registro completado!', description: 'Bienvenido a Grúa RD' });
       const redirectPath = formData.userType === 'conductor' ? '/driver' : '/client';
       setTimeout(() => setLocation(redirectPath), 1500);
     },
     onError: (error: any) => {
-      const message = error?.message || 'Error al completar registro';
-      setErrors({ general: message });
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      });
+      setErrors({ general: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
 
   const validateStep1 = (): boolean => {
     const newErrors: StepErrors = {};
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'El correo electrónico es requerido';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Ingresa un correo electrónico válido';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'La contraseña es requerida';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
-    }
-
-    if (!formData.nombre.trim()) {
-      newErrors.nombre = 'El nombre es requerido';
-    } else if (formData.nombre.trim().length < 2) {
-      newErrors.nombre = 'El nombre debe tener al menos 2 caracteres';
-    }
-
-    if (!formData.apellido.trim()) {
-      newErrors.apellido = 'El apellido es requerido';
-    } else if (formData.apellido.trim().length < 2) {
-      newErrors.apellido = 'El apellido debe tener al menos 2 caracteres';
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'El teléfono es requerido';
-    } else if (!/^\+?1?8\d{9}$/.test(formData.phone.replace(/[\s-]/g, ''))) {
-      newErrors.phone = 'Formato de teléfono inválido (use +1809XXXXXXX)';
-    }
-
+    if (!formData.email.trim()) newErrors.email = 'Correo requerido';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Correo inválido';
+    if (!formData.password) newErrors.password = 'Contraseña requerida';
+    else if (formData.password.length < 6) newErrors.password = 'Mínimo 6 caracteres';
+    if (!formData.nombre.trim()) newErrors.nombre = 'Nombre requerido';
+    if (!formData.apellido.trim()) newErrors.apellido = 'Apellido requerido';
+    if (!formData.phone.trim()) newErrors.phone = 'Teléfono requerido';
+    else if (!/^\+?1?8\d{9}$/.test(formData.phone.replace(/[\s-]/g, ''))) newErrors.phone = 'Teléfono inválido';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const validateStep2 = (): boolean => {
-    const newErrors: StepErrors = {};
-
     if (!formData.cedula.trim()) {
-      newErrors.cedula = 'La cédula es requerida';
-    } else if (!/^\d{11}$/.test(formData.cedula.replace(/\D/g, ''))) {
-      newErrors.cedula = 'La cédula debe tener 11 dígitos';
+      setErrors({ cedula: 'Cédula requerida' });
+      return false;
     }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const validateStep3 = (): boolean => {
-    const newErrors: StepErrors = {};
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'El teléfono es requerido';
-    } else if (!/^\+?1?8\d{9}$/.test(formData.phone.replace(/[\s-]/g, ''))) {
-      newErrors.phone = 'Formato de teléfono inválido (use +1809XXXXXXX)';
+    if (!/^\d{11}$/.test(formData.cedula.replace(/\D/g, ''))) {
+      setErrors({ cedula: 'La cédula debe tener 11 dígitos' });
+      return false;
     }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors({});
+    return true;
   };
 
   const validateStep4 = (): boolean => {
-    const newErrors: StepErrors = {};
-
-    if (formData.userType === 'conductor') {
-      if (!formData.licencia.trim()) {
-        newErrors.licencia = 'El número de licencia es requerido';
-      }
-      if (!formData.placaGrua.trim()) {
-        newErrors.placaGrua = 'La placa de la grúa es requerida';
-      }
-      if (!formData.marcaGrua.trim()) {
-        newErrors.marcaGrua = 'La marca de la grúa es requerida';
-      }
-      if (!formData.modeloGrua.trim()) {
-        newErrors.modeloGrua = 'El modelo de la grúa es requerido';
-      }
+    if (formData.userType === 'conductor' && !licenseFile) {
+      setErrors({ licenseFile: 'La licencia es obligatoria' });
+      return false;
     }
+    setErrors({});
+    return true;
+  };
 
+  const validateStep5 = (): boolean => {
+    const newErrors: StepErrors = {};
+    if (!formData.licencia.trim()) newErrors.licencia = 'Número de licencia requerido';
+    if (!formData.placaGrua.trim()) newErrors.placaGrua = 'Placa de la grúa requerida';
+    if (!formData.marcaGrua.trim()) newErrors.marcaGrua = 'Marca de la grúa requerida';
+    if (!formData.modeloGrua.trim()) newErrors.modeloGrua = 'Modelo de la grúa requerido';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleStep1Submit = async () => {
-    if (!validateStep1()) return;
-    registerMutation.mutate();
-  };
-
-  const handleStep2Submit = async () => {
-    if (!validateStep2()) return;
-    verifyCedulaMutation.mutate();
-  };
-
-  const handleSendOtp = async () => {
-    if (!formData.phone.trim()) {
-      setErrors({ phone: 'El teléfono es requerido' });
-      toast({
-        title: 'Error',
-        description: 'Debes ingresar un número de teléfono',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (!validateStep3()) return;
-    sendOtpMutation.mutate();
-  };
-
-  const handleStep3Submit = async () => {
-    if (!formData.otpCode.trim()) {
-      setErrors({ otpCode: 'El código es requerido' });
-      return;
-    }
-    verifyOtpMutation.mutate();
-  };
-
-  const handleStep4Submit = async () => {
-    if (!validateStep4()) return;
-    finalizeProfileMutation.mutate();
-  };
-
-  const getProgressValue = () => {
-    return (currentStep / 4) * 100;
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const getProgressValue = () => (currentStep / TOTAL_STEPS) * 100;
+  const formatTime = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
 
   const renderStep1 = () => (
     <div className="space-y-4">
-      {errors.general && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{errors.general}</AlertDescription>
-        </Alert>
-      )}
-
+      {errors.general && (<Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errors.general}</AlertDescription></Alert>)}
       <div className="space-y-2">
         <Label htmlFor="userType">Tipo de Usuario</Label>
-        <Select
-          value={formData.userType}
-          onValueChange={(value) => updateField('userType', value)}
-          disabled={registerMutation.isPending}
-        >
-          <SelectTrigger id="userType" data-testid="select-user-type">
-            <SelectValue />
-          </SelectTrigger>
+        <Select value={formData.userType} onValueChange={(value) => updateField('userType', value)} disabled={registerMutation.isPending}>
+          <SelectTrigger id="userType" data-testid="select-user-type"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="cliente">Cliente</SelectItem>
             <SelectItem value="conductor">Conductor de Grúa</SelectItem>
           </SelectContent>
         </Select>
       </div>
-
       <div className="space-y-2">
         <Label htmlFor="nombre">Nombre</Label>
-        <div className="relative">
-          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="nombre"
-            placeholder="Tu nombre"
-            className={`pl-9 ${errors.nombre ? 'border-destructive' : ''}`}
-            value={formData.nombre}
-            onChange={(e) => updateField('nombre', e.target.value)}
-            disabled={registerMutation.isPending}
-            data-testid="input-nombre-step1"
-          />
-        </div>
-        {errors.nombre && (
-          <p className="text-sm text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {errors.nombre}
-          </p>
-        )}
+        <Input id="nombre" placeholder="Tu nombre" value={formData.nombre} onChange={(e) => updateField('nombre', e.target.value)} disabled={registerMutation.isPending} data-testid="input-nombre-step1" />
+        {errors.nombre && <p className="text-sm text-destructive">{errors.nombre}</p>}
       </div>
-
       <div className="space-y-2">
         <Label htmlFor="apellido">Apellido</Label>
-        <div className="relative">
-          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="apellido"
-            placeholder="Tu apellido"
-            className={`pl-9 ${errors.apellido ? 'border-destructive' : ''}`}
-            value={formData.apellido}
-            onChange={(e) => updateField('apellido', e.target.value)}
-            disabled={registerMutation.isPending}
-            data-testid="input-apellido-step1"
-          />
-        </div>
-        {errors.apellido && (
-          <p className="text-sm text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {errors.apellido}
-          </p>
-        )}
+        <Input id="apellido" placeholder="Tu apellido" value={formData.apellido} onChange={(e) => updateField('apellido', e.target.value)} disabled={registerMutation.isPending} data-testid="input-apellido-step1" />
+        {errors.apellido && <p className="text-sm text-destructive">{errors.apellido}</p>}
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="phone">Número de Teléfono</Label>
-        <div className="relative">
-          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="phone"
-            type="tel"
-            placeholder="+1 809 555 0100"
-            className={`pl-9 ${errors.phone ? 'border-destructive' : ''}`}
-            value={formData.phone}
-            onChange={(e) => updateField('phone', e.target.value)}
-            disabled={registerMutation.isPending}
-            data-testid="input-phone-step1"
-          />
-        </div>
-        {errors.phone && (
-          <p className="text-sm text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {errors.phone}
-          </p>
-        )}
-      </div>
-
       <div className="space-y-2">
         <Label htmlFor="email">Correo Electrónico</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            placeholder="tu@email.com"
-            className={`pl-9 ${errors.email ? 'border-destructive' : ''}`}
-            value={formData.email}
-            onChange={(e) => updateField('email', e.target.value)}
-            disabled={registerMutation.isPending}
-            data-testid="input-email"
-          />
-        </div>
-        {errors.email && (
-          <p className="text-sm text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {errors.email}
-          </p>
-        )}
+        <Input id="email" type="email" placeholder="tu@email.com" value={formData.email} onChange={(e) => updateField('email', e.target.value)} disabled={registerMutation.isPending} data-testid="input-email" />
+        {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
       </div>
-
       <div className="space-y-2">
         <Label htmlFor="password">Contraseña</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="password"
-            type="password"
-            placeholder="Mínimo 6 caracteres"
-            className={`pl-9 ${errors.password ? 'border-destructive' : ''}`}
-            value={formData.password}
-            onChange={(e) => updateField('password', e.target.value)}
-            disabled={registerMutation.isPending}
-            data-testid="input-password"
-          />
-        </div>
-        {errors.password && (
-          <p className="text-sm text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {errors.password}
-          </p>
-        )}
+        <Input id="password" type="password" placeholder="Mínimo 6 caracteres" value={formData.password} onChange={(e) => updateField('password', e.target.value)} disabled={registerMutation.isPending} data-testid="input-password" />
+        {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
       </div>
-
-      <p className="text-xs text-muted-foreground text-center">
-        Al continuar, aceptas nuestra{' '}
-        <button
-          type="button"
-          className="text-primary underline-offset-4 hover:underline"
-          onClick={() => setLocation('/privacy-policy')}
-          data-testid="link-privacy-policy-onboarding"
-        >
-          Política de Privacidad
-        </button>
-      </p>
-
-      <Button
-        type="button"
-        className="w-full"
-        onClick={handleStep1Submit}
-        disabled={registerMutation.isPending}
-        data-testid="button-continue-step1"
-      >
-        {registerMutation.isPending ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Creando cuenta...
-          </>
-        ) : (
-          <>
-            Continuar
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </>
-        )}
+      <div className="space-y-2">
+        <Label htmlFor="phone">Teléfono</Label>
+        <Input id="phone" type="tel" placeholder="+1 809 555 0100" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} disabled={registerMutation.isPending} data-testid="input-phone-step1" />
+        {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
+      </div>
+      <Button type="button" className="w-full" onClick={() => validateStep1() && registerMutation.mutate()} disabled={registerMutation.isPending} data-testid="button-continue-step1">
+        {registerMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>) : (<>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>)}
       </Button>
     </div>
   );
 
   const renderStep2 = () => (
     <div className="space-y-4">
-      {errors.general && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{errors.general}</AlertDescription>
-        </Alert>
-      )}
-
       <div className="space-y-2">
         <Label htmlFor="cedula">Cédula de Identidad</Label>
-        <div className="relative">
-          <IdCard className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="cedula"
-            placeholder="000-0000000-0"
-            maxLength={13}
-            className={`pl-9 ${errors.cedula ? 'border-destructive' : ''}`}
-            value={formData.cedula}
-            onChange={(e) => {
-              const value = e.target.value.replace(/\D/g, '');
-              updateField('cedula', value);
-            }}
-            disabled={verifyCedulaMutation.isPending}
-            data-testid="input-cedula"
-          />
-        </div>
-        {errors.cedula && (
-          <p className="text-sm text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {errors.cedula}
-          </p>
-        )}
-        <p className="text-sm text-muted-foreground">
-          Ingresa tu cédula dominicana (11 dígitos)
-        </p>
+        <Input id="cedula" placeholder="000-0000000-0" maxLength={13} value={formData.cedula} onChange={(e) => updateField('cedula', e.target.value.replace(/\D/g, ''))} disabled={verifyCedulaMutation.isPending} data-testid="input-cedula" />
+        {errors.cedula && <p className="text-sm text-destructive">{errors.cedula}</p>}
+        <p className="text-sm text-muted-foreground">Cédula dominicana (11 dígitos)</p>
       </div>
-
-      <Button
-        type="button"
-        className="w-full"
-        onClick={handleStep2Submit}
-        disabled={verifyCedulaMutation.isPending}
-        data-testid="button-verify-cedula"
-      >
-        {verifyCedulaMutation.isPending ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Verificando...
-          </>
-        ) : (
-          <>
-            Verificar Cédula
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </>
-        )}
+      <Button type="button" className="w-full" onClick={() => validateStep2() && verifyCedulaMutation.mutate()} disabled={verifyCedulaMutation.isPending} data-testid="button-verify-cedula">
+        {verifyCedulaMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar Cédula<ArrowRight className="w-4 h-4 ml-2" /></>)}
       </Button>
     </div>
   );
 
   const renderStep3 = () => (
     <div className="space-y-4">
-      {errors.general && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{errors.general}</AlertDescription>
-        </Alert>
-      )}
-
       <div className="space-y-2">
         <Label htmlFor="phone">Número de Teléfono</Label>
-        <div className="relative">
-          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="phone"
-            type="tel"
-            placeholder="+1 809 555 0100"
-            className={`pl-9 ${errors.phone ? 'border-destructive' : ''}`}
-            value={formData.phone}
-            onChange={(e) => updateField('phone', e.target.value)}
-            disabled={sendOtpMutation.isPending}
-            data-testid="input-phone"
-          />
-        </div>
-        {errors.phone && (
-          <p className="text-sm text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            {errors.phone}
-          </p>
-        )}
+        <Input id="phone" type="tel" placeholder="+1 809 555 0100" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} disabled={sendOtpMutation.isPending} data-testid="input-phone" />
+        {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
       </div>
-
       {otpTimer === 0 ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={handleSendOtp}
-          disabled={sendOtpMutation.isPending}
-          data-testid="button-send-otp"
-        >
-          {sendOtpMutation.isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Enviando código...
-            </>
-          ) : (
-            'Enviar Código de Verificación'
-          )}
+        <Button type="button" variant="outline" className="w-full" onClick={sendOtpMutation.mutate} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
+          {sendOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>) : 'Enviar Código'}
         </Button>
       ) : (
         <>
           <div className="space-y-2">
             <Label htmlFor="otpCode">Código de Verificación</Label>
-            <Input
-              id="otpCode"
-              placeholder="000000"
-              maxLength={6}
-              className={`text-center text-2xl tracking-widest ${
-                errors.otpCode ? 'border-destructive' : ''
-              }`}
-              value={formData.otpCode}
-              onChange={(e) => updateField('otpCode', e.target.value.replace(/\D/g, ''))}
-              disabled={verifyOtpMutation.isPending}
-              data-testid="input-otp-code"
-            />
-            {errors.otpCode && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.otpCode}
-              </p>
-            )}
+            <Input id="otpCode" placeholder="000000" maxLength={6} className="text-center text-2xl tracking-widest" value={formData.otpCode} onChange={(e) => updateField('otpCode', e.target.value.replace(/\D/g, ''))} disabled={verifyOtpMutation.isPending} data-testid="input-otp-code" />
+            {errors.otpCode && <p className="text-sm text-destructive">{errors.otpCode}</p>}
           </div>
-
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
-            <span>Código expira en: {formatTime(otpTimer)}</span>
+            <span>Expira en: {formatTime(otpTimer)}</span>
           </div>
-
-          <Button
-            type="button"
-            className="w-full"
-            onClick={handleStep3Submit}
-            disabled={verifyOtpMutation.isPending || !formData.otpCode}
-            data-testid="button-verify-otp"
-          >
-            {verifyOtpMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Verificando...
-              </>
-            ) : (
-              <>
-                Verificar Código
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </>
-            )}
+          <Button type="button" className="w-full" onClick={verifyOtpMutation.mutate} disabled={verifyOtpMutation.isPending || !formData.otpCode} data-testid="button-verify-otp">
+            {verifyOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar<ArrowRight className="w-4 h-4 ml-2" /></>)}
           </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full"
-            onClick={handleSendOtp}
-            disabled={sendOtpMutation.isPending || otpTimer > 60}
-            data-testid="button-resend-otp"
-          >
-            {sendOtpMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Enviando código...
-              </>
-            ) : otpTimer > 60 ? (
-              <>
-                <Clock className="w-4 h-4 mr-2" />
-                Reenviar disponible en {formatTime(otpTimer - 60)}
-              </>
-            ) : (
-              'Reenviar Código'
-            )}
+          <Button type="button" variant="ghost" className="w-full" onClick={sendOtpMutation.mutate} disabled={sendOtpMutation.isPending || otpTimer > 60} data-testid="button-resend-otp">
+            {otpTimer > 60 ? (<><Clock className="w-4 h-4 mr-2" />Reenviar en {formatTime(otpTimer - 60)}</>) : 'Reenviar Código'}
           </Button>
         </>
       )}
@@ -807,173 +402,83 @@ export default function OnboardingWizard() {
 
   const renderStep4 = () => (
     <div className="space-y-4">
-      {errors.general && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{errors.general}</AlertDescription>
-        </Alert>
+      {errors.documents && (<Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errors.documents}</AlertDescription></Alert>)}
+      {formData.userType === 'conductor' && (
+        <FileUpload label="Licencia de Conducir" required onFileSelect={setLicenseFile} fileName={licenseFile?.name} error={errors.licenseFile} testId="input-license-file" />
       )}
+      <FileUpload label={formData.userType === 'conductor' ? 'Documento de Seguro de Grúa' : 'Documento de Seguro'} onFileSelect={setInsuranceFile} fileName={insuranceFile?.name} required={formData.userType === 'conductor'} testId="input-insurance-file" />
+      <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
+        {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Subir Documentos<Upload className="w-4 h-4 ml-2" /></>)}
+      </Button>
+    </div>
+  );
 
-      {formData.userType === 'conductor' ? (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="licencia">Número de Licencia</Label>
-            <div className="relative">
-              <FileText className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="licencia"
-                placeholder="Número de licencia de conducir"
-                className={`pl-9 ${errors.licencia ? 'border-destructive' : ''}`}
-                value={formData.licencia}
-                onChange={(e) => updateField('licencia', e.target.value)}
-                disabled={finalizeProfileMutation.isPending}
-                data-testid="input-licencia"
-              />
-            </div>
-            {errors.licencia && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.licencia}
-              </p>
-            )}
-          </div>
+  const renderStep5 = () => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="licencia">Número de Licencia</Label>
+        <Input id="licencia" placeholder="Licencia de conducir" value={formData.licencia} onChange={(e) => updateField('licencia', e.target.value)} disabled={finalizeProfileMutation.isPending} data-testid="input-licencia" />
+        {errors.licencia && <p className="text-sm text-destructive">{errors.licencia}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="placaGrua">Placa de la Grúa</Label>
+        <Input id="placaGrua" placeholder="A123456" value={formData.placaGrua} onChange={(e) => updateField('placaGrua', e.target.value.toUpperCase())} disabled={finalizeProfileMutation.isPending} data-testid="input-placa-grua" />
+        {errors.placaGrua && <p className="text-sm text-destructive">{errors.placaGrua}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="marcaGrua">Marca de la Grúa</Label>
+        <Input id="marcaGrua" placeholder="Ej: Ford" value={formData.marcaGrua} onChange={(e) => updateField('marcaGrua', e.target.value)} disabled={finalizeProfileMutation.isPending} data-testid="input-marca-grua" />
+        {errors.marcaGrua && <p className="text-sm text-destructive">{errors.marcaGrua}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="modeloGrua">Modelo de la Grúa</Label>
+        <Input id="modeloGrua" placeholder="Ej: F-450" value={formData.modeloGrua} onChange={(e) => updateField('modeloGrua', e.target.value)} disabled={finalizeProfileMutation.isPending} data-testid="input-modelo-grua" />
+        {errors.modeloGrua && <p className="text-sm text-destructive">{errors.modeloGrua}</p>}
+      </div>
+      <Button type="button" className="w-full" onClick={() => validateStep5() && (formData.userType === 'conductor' ? finalizeProfileMutation.mutate() : setCurrentStep(6))} disabled={finalizeProfileMutation.isPending} data-testid="button-continue-step5">
+        {formData.userType === 'conductor' ? 'Completar' : 'Continuar'}
+      </Button>
+    </div>
+  );
 
-          <div className="space-y-2">
-            <Label htmlFor="placaGrua">Placa de la Grúa</Label>
-            <div className="relative">
-              <Car className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="placaGrua"
-                placeholder="A123456"
-                className={`pl-9 ${errors.placaGrua ? 'border-destructive' : ''}`}
-                value={formData.placaGrua}
-                onChange={(e) => updateField('placaGrua', e.target.value.toUpperCase())}
-                disabled={finalizeProfileMutation.isPending}
-                data-testid="input-placa-grua"
-              />
-            </div>
-            {errors.placaGrua && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.placaGrua}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="marcaGrua">Marca de la Grúa</Label>
-            <Input
-              id="marcaGrua"
-              placeholder="Ej: Ford, Chevrolet, etc."
-              className={errors.marcaGrua ? 'border-destructive' : ''}
-              value={formData.marcaGrua}
-              onChange={(e) => updateField('marcaGrua', e.target.value)}
-              disabled={finalizeProfileMutation.isPending}
-              data-testid="input-marca-grua"
-            />
-            {errors.marcaGrua && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.marcaGrua}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="modeloGrua">Modelo de la Grúa</Label>
-            <Input
-              id="modeloGrua"
-              placeholder="Ej: F-450, Silverado 3500, etc."
-              className={errors.modeloGrua ? 'border-destructive' : ''}
-              value={formData.modeloGrua}
-              onChange={(e) => updateField('modeloGrua', e.target.value)}
-              disabled={finalizeProfileMutation.isPending}
-              data-testid="input-modelo-grua"
-            />
-            {errors.modeloGrua && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.modeloGrua}
-              </p>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="text-center py-8">
-          <CheckCircle2 className="w-16 h-16 mx-auto text-primary mb-4" />
-          <h3 className="text-lg font-semibold mb-2">¡Todo listo!</h3>
-          <p className="text-sm text-muted-foreground mb-6">
-            Haz clic en el botón para completar tu registro
-          </p>
-        </div>
-      )}
-
-      <Button
-        type="button"
-        className="w-full"
-        onClick={handleStep4Submit}
-        disabled={finalizeProfileMutation.isPending}
-        data-testid="button-complete-registration"
-      >
-        {finalizeProfileMutation.isPending ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Completando registro...
-          </>
-        ) : (
-          <>
-            <CheckCircle2 className="w-4 h-4 mr-2" />
-            Completar Registro
-          </>
-        )}
+  const renderStep6 = () => (
+    <div className="space-y-4">
+      <div className="text-center py-8">
+        <CheckCircle2 className="w-16 h-16 mx-auto text-primary mb-4" />
+        <h3 className="text-lg font-semibold mb-2">¡Listo para finalizar!</h3>
+        <p className="text-sm text-muted-foreground mb-6">Haz clic para completar tu registro</p>
+      </div>
+      <Button type="button" className="w-full" onClick={() => finalizeProfileMutation.mutate()} disabled={finalizeProfileMutation.isPending} data-testid="button-complete-registration">
+        {finalizeProfileMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Completando...</>) : (<><CheckCircle2 className="w-4 h-4 mr-2" />Completar Registro</>)}
       </Button>
     </div>
   );
 
   const getStepTitle = () => {
-    switch (currentStep) {
-      case 1:
-        return 'Crea tu Cuenta';
-      case 2:
-        return 'Verificación de Cédula';
-      case 3:
-        return 'Verificación de Teléfono';
-      case 4:
-        return formData.userType === 'conductor'
-          ? 'Datos de la Grúa'
-          : 'Confirmación';
-      default:
-        return '';
-    }
+    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Teléfono', 'Subir Documentos', 'Datos de la Grúa', 'Confirmación'];
+    return titles[currentStep - 1] || '';
   };
 
   const getStepDescription = () => {
-    switch (currentStep) {
-      case 1:
-        return 'Ingresa tus datos personales y crea tu cuenta';
-      case 2:
-        return 'Valida tu identidad con tu cédula dominicana';
-      case 3:
-        return 'Verifica tu número de teléfono con un código SMS';
-      case 4:
-        return formData.userType === 'conductor' 
-          ? 'Completa los datos de tu grúa'
-          : 'Finaliza tu registro';
-      default:
-        return '';
-    }
+    const descs = [
+      'Ingresa tus datos personales',
+      'Valida tu identidad con cédula',
+      'Verifica tu número de teléfono',
+      'Sube tus documentos requeridos',
+      'Completa los datos de tu grúa',
+      'Finaliza tu registro',
+    ];
+    return descs[currentStep - 1] || '';
   };
+
+  if (!isInitialized) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img 
-              src={logoUrl} 
-              alt="Grúa RD Logo" 
-              className="w-32 h-32 object-contain"
-            />
+            <img src={logoUrl} alt="Grúa RD Logo" className="w-32 h-32 object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold">{getStepTitle()}</CardTitle>
           <CardDescription>{getStepDescription()}</CardDescription>
@@ -981,24 +486,20 @@ export default function OnboardingWizard() {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Paso {currentStep} de 4</span>
+              <span>Paso {currentStep} de {TOTAL_STEPS}</span>
               <span>{Math.round(getProgressValue())}%</span>
             </div>
             <Progress value={getProgressValue()} data-testid="progress-wizard" />
           </div>
-
           {currentStep === 1 && renderStep1()}
           {currentStep === 2 && renderStep2()}
           {currentStep === 3 && renderStep3()}
           {currentStep === 4 && renderStep4()}
-
+          {currentStep === 5 && renderStep5()}
+          {currentStep === 6 && renderStep6()}
           <div className="text-center text-sm text-muted-foreground">
             ¿Ya tienes cuenta?{' '}
-            <button
-              onClick={() => setLocation('/login')}
-              className="text-primary hover:underline"
-              data-testid="link-login"
-            >
+            <button onClick={() => setLocation('/login')} className="text-primary hover:underline" data-testid="link-login">
               Inicia sesión
             </button>
           </div>
