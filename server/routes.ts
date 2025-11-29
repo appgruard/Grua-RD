@@ -3288,8 +3288,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hasApprovedInsurance = await storage.hasApprovedClientInsurance(req.user!.id);
       const insuranceDocs = await storage.getAllClientInsuranceDocuments(req.user!.id);
       
+      // Calculate overall status for backward compatibility
+      // Priority: aprobado > pendiente > rechazado > null
+      let insuranceStatus: 'pendiente' | 'aprobado' | 'rechazado' | null = null;
+      if (insuranceDocs.length > 0) {
+        if (insuranceDocs.some(d => d.estado === 'aprobado')) {
+          insuranceStatus = 'aprobado';
+        } else if (insuranceDocs.some(d => d.estado === 'pendiente')) {
+          insuranceStatus = 'pendiente';
+        } else if (insuranceDocs.some(d => d.estado === 'rechazado')) {
+          insuranceStatus = 'rechazado';
+        }
+      }
+
       res.json({
         hasApprovedInsurance,
+        // Backward compatibility fields
+        insuranceStatus,
+        insuranceDocument: insuranceDocs.length > 0 ? insuranceDocs[0] : null,
+        // New array-based fields
         insuranceDocuments: insuranceDocs,
         totalDocuments: insuranceDocs.length,
         approvedCount: insuranceDocs.filter(d => d.estado === 'aprobado').length,

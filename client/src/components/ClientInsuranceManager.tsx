@@ -44,7 +44,8 @@ import {
   Trash2,
   Plus,
   FileText,
-  Building2
+  Building2,
+  Car
 } from 'lucide-react';
 
 interface InsuranceDocument {
@@ -59,8 +60,11 @@ interface InsuranceDocument {
 
 interface InsuranceStatus {
   hasApprovedInsurance: boolean;
-  insuranceStatus: 'pendiente' | 'aprobado' | 'rechazado' | null;
-  insuranceDocument: InsuranceDocument | null;
+  insuranceDocuments: InsuranceDocument[];
+  totalDocuments: number;
+  approvedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
 }
 
 const insuranceCompanies = [
@@ -82,6 +86,8 @@ export default function ClientInsuranceManager() {
   const [aseguradoraNombre, setAseguradoraNombre] = useState('');
   const [numeroPoliza, setNumeroPoliza] = useState('');
   const [fechaVencimiento, setFechaVencimiento] = useState('');
+  const [vehiculoDescripcion, setVehiculoDescripcion] = useState('');
+  const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
 
   const { data: insuranceStatus, isLoading } = useQuery<InsuranceStatus>({
     queryKey: ['/api/client/insurance/status'],
@@ -106,7 +112,7 @@ export default function ClientInsuranceManager() {
       resetForm();
       toast({
         title: 'Documento subido',
-        description: 'Tu documento de seguro ha sido enviado para revisión.',
+        description: 'Tu documento de seguro ha sido enviado para revision.',
       });
     },
     onError: (error: Error) => {
@@ -119,8 +125,8 @@ export default function ClientInsuranceManager() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('DELETE', '/api/client/insurance');
+    mutationFn: async (documentId: string) => {
+      const res = await apiRequest('DELETE', `/api/client/insurance/${documentId}`);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || 'Error al eliminar documento');
@@ -129,6 +135,7 @@ export default function ClientInsuranceManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/client/insurance/status'] });
+      setDocumentToDelete(null);
       toast({
         title: 'Documento eliminado',
         description: 'Tu documento de seguro ha sido eliminado.',
@@ -148,6 +155,7 @@ export default function ClientInsuranceManager() {
     setAseguradoraNombre('');
     setNumeroPoliza('');
     setFechaVencimiento('');
+    setVehiculoDescripcion('');
   };
 
   const handleSubmit = () => {
@@ -167,6 +175,9 @@ export default function ClientInsuranceManager() {
     if (fechaVencimiento) {
       formData.append('fechaVencimiento', fechaVencimiento);
     }
+    if (vehiculoDescripcion) {
+      formData.append('vehiculoDescripcion', vehiculoDescripcion);
+    }
 
     uploadMutation.mutate(formData);
   };
@@ -184,7 +195,7 @@ export default function ClientInsuranceManager() {
         return (
           <Badge variant="secondary">
             <Clock className="w-3 h-3 mr-1" />
-            En revisión
+            En revision
           </Badge>
         );
       case 'rechazado':
@@ -211,28 +222,47 @@ export default function ClientInsuranceManager() {
     );
   }
 
-  const hasInsurance = insuranceStatus?.insuranceDocument !== null;
-  const insuranceDoc = insuranceStatus?.insuranceDocument;
+  const documents = insuranceStatus?.insuranceDocuments || [];
+  const hasDocuments = documents.length > 0;
 
   return (
     <>
       <Card className="p-6" data-testid="card-client-insurance">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
           <div className="flex items-center gap-3">
             <Shield className="w-6 h-6 text-primary" />
-            <h3 className="text-lg font-semibold">Mi Seguro</h3>
+            <h3 className="text-lg font-semibold">Mis Seguros</h3>
           </div>
-          {hasInsurance && getStatusBadge(insuranceDoc?.estado || null)}
+          {hasDocuments && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {insuranceStatus && insuranceStatus.approvedCount > 0 && (
+                <Badge variant="default" className="bg-green-500">
+                  {insuranceStatus.approvedCount} aprobado{insuranceStatus.approvedCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+              {insuranceStatus && insuranceStatus.pendingCount > 0 && (
+                <Badge variant="secondary">
+                  {insuranceStatus.pendingCount} en revision
+                </Badge>
+              )}
+              {insuranceStatus && insuranceStatus.rejectedCount > 0 && (
+                <Badge variant="destructive">
+                  {insuranceStatus.rejectedCount} rechazado{insuranceStatus.rejectedCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
-        {!hasInsurance ? (
+        {!hasDocuments ? (
           <div className="text-center py-6">
             <Building2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground mb-4">
-              No tienes un documento de seguro registrado.
+              No tienes documentos de seguro registrados.
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              Sube tu póliza de seguro con cobertura de asistencia vial para poder usar "Aseguradora" como método de pago.
+              Sube tu poliza de seguro con cobertura de asistencia vial para poder usar "Aseguradora" como metodo de pago.
+              Puedes agregar multiples seguros si tienes varios vehiculos.
             </p>
             <Button onClick={() => setIsUploadDialogOpen(true)} data-testid="button-add-insurance">
               <Plus className="w-4 h-4 mr-2" />
@@ -241,82 +271,104 @@ export default function ClientInsuranceManager() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg">
-              <FileText className="w-10 h-10 text-primary flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate" data-testid="text-insurance-name">
-                  {insuranceDoc?.nombreArchivo}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Subido el {new Date(insuranceDoc?.createdAt || '').toLocaleDateString('es-DO')}
-                </p>
-                {insuranceDoc?.validoHasta && (
-                  <p className="text-sm text-muted-foreground">
-                    Válido hasta: {new Date(insuranceDoc.validoHasta).toLocaleDateString('es-DO')}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {insuranceDoc?.estado === 'rechazado' && insuranceDoc?.motivoRechazo && (
-              <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-                <p className="text-sm font-medium text-destructive mb-1">Motivo del rechazo:</p>
-                <p className="text-sm text-muted-foreground">{insuranceDoc.motivoRechazo}</p>
-              </div>
-            )}
-
-            {insuranceDoc?.estado === 'aprobado' && (
-              <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-                <p className="text-sm text-green-700 dark:text-green-400">
-                  Tu seguro está aprobado. Puedes usar "Aseguradora" como método de pago al solicitar una grúa.
-                </p>
-              </div>
-            )}
-
-            {insuranceDoc?.estado === 'pendiente' && (
-              <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                  Tu documento está siendo revisado. Te notificaremos cuando sea aprobado.
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                onClick={() => setIsUploadDialogOpen(true)}
-                data-testid="button-update-insurance"
+            {documents.map((doc) => (
+              <div 
+                key={doc.id}
+                className="flex items-start gap-4 p-4 bg-muted/50 rounded-lg"
+                data-testid={`card-insurance-${doc.id}`}
               >
-                <Upload className="w-4 h-4 mr-2" />
-                {insuranceDoc?.estado === 'rechazado' ? 'Subir nuevo documento' : 'Actualizar'}
-              </Button>
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 flex-shrink-0">
+                  <Car className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div>
+                      <p className="font-medium" data-testid={`text-insurance-name-${doc.id}`}>
+                        {doc.nombreArchivo}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Subido el {new Date(doc.createdAt).toLocaleDateString('es-DO')}
+                      </p>
+                      {doc.validoHasta && (
+                        <p className="text-sm text-muted-foreground">
+                          Valido hasta: {new Date(doc.validoHasta).toLocaleDateString('es-DO')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(doc.estado)}
+                    </div>
+                  </div>
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" className="text-destructive" data-testid="button-delete-insurance">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Eliminar
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Eliminar documento de seguro?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta acción no se puede deshacer. Si eliminas tu seguro, no podrás usar "Aseguradora" como método de pago.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteMutation.mutate()}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      data-testid="button-confirm-delete-insurance"
-                    >
-                      Eliminar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                  {doc.estado === 'rechazado' && doc.motivoRechazo && (
+                    <div className="p-3 bg-destructive/10 rounded-md border border-destructive/20">
+                      <p className="text-sm font-medium text-destructive mb-1">Motivo del rechazo:</p>
+                      <p className="text-sm text-muted-foreground">{doc.motivoRechazo}</p>
+                    </div>
+                  )}
+
+                  {doc.estado === 'aprobado' && (
+                    <div className="p-3 bg-green-500/10 rounded-md border border-green-500/20">
+                      <p className="text-sm text-green-700 dark:text-green-400">
+                        Este seguro esta aprobado y puedes usarlo como metodo de pago.
+                      </p>
+                    </div>
+                  )}
+
+                  {doc.estado === 'pendiente' && (
+                    <div className="p-3 bg-yellow-500/10 rounded-md border border-yellow-500/20">
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                        Este documento esta siendo revisado. Te notificaremos cuando sea aprobado.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <AlertDialog open={documentToDelete === doc.id} onOpenChange={(open) => !open && setDocumentToDelete(null)}>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-destructive" 
+                          onClick={() => setDocumentToDelete(doc.id)}
+                          data-testid={`button-delete-insurance-${doc.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Eliminar
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Eliminar documento de seguro?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta accion no se puede deshacer. El documento "{doc.nombreArchivo}" sera eliminado permanentemente.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMutation.mutate(doc.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            data-testid={`button-confirm-delete-insurance-${doc.id}`}
+                          >
+                            {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="pt-4 border-t">
+              <Button onClick={() => setIsUploadDialogOpen(true)} data-testid="button-add-more-insurance">
+                <Plus className="w-4 h-4 mr-2" />
+                Agregar Otro Seguro
+              </Button>
+              <p className="text-sm text-muted-foreground mt-2">
+                Puedes agregar seguros adicionales para otros vehiculos.
+              </p>
             </div>
           </div>
         )}
@@ -327,11 +379,25 @@ export default function ClientInsuranceManager() {
           <DialogHeader>
             <DialogTitle>Subir Documento de Seguro</DialogTitle>
             <DialogDescription>
-              Sube tu póliza de seguro con cobertura de asistencia vial/remolque.
+              Sube tu poliza de seguro con cobertura de asistencia vial/remolque.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="vehiculo">Descripcion del Vehiculo (opcional)</Label>
+              <Input
+                id="vehiculo"
+                value={vehiculoDescripcion}
+                onChange={(e) => setVehiculoDescripcion(e.target.value)}
+                placeholder="Ej: Toyota Corolla 2020, Honda Civic Azul"
+                data-testid="input-vehicle-description"
+              />
+              <p className="text-xs text-muted-foreground">
+                Ayuda a identificar a que vehiculo corresponde este seguro.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="aseguradora">Aseguradora *</Label>
               <Select value={aseguradoraNombre} onValueChange={setAseguradoraNombre}>
@@ -349,7 +415,7 @@ export default function ClientInsuranceManager() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="poliza">Número de Póliza *</Label>
+              <Label htmlFor="poliza">Numero de Poliza *</Label>
               <Input
                 id="poliza"
                 value={numeroPoliza}
@@ -372,8 +438,8 @@ export default function ClientInsuranceManager() {
             </div>
 
             <FileUpload
-              label="Documento de Póliza *"
-              helperText="Sube tu documento de póliza (imagen o PDF)"
+              label="Documento de Poliza *"
+              helperText="Sube tu documento de poliza (imagen o PDF)"
               onFileSelect={setSelectedFile}
               onFileRemove={() => setSelectedFile(null)}
               maxSizeMB={5}
