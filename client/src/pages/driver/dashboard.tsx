@@ -13,11 +13,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/lib/websocket';
 import { ChatBox } from '@/components/chat/ChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
+import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car } from 'lucide-react';
 import { SiWaze } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
 import { getNavigationUrl } from '@/lib/maps';
+import { cn } from '@/lib/utils';
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -25,6 +26,7 @@ export default function DriverDashboard() {
   const { toast } = useToast();
   const [currentLocation, setCurrentLocation] = useState<Coordinates>({ lat: 18.4861, lng: -69.9312 });
   const [chatOpen, setChatOpen] = useState(false);
+  const [showExpandedCard, setShowExpandedCard] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     action: 'complete' | 'start' | null;
@@ -292,8 +294,30 @@ export default function DriverDashboard() {
     }
   }, [driverData?.disponible]);
 
+  const getStatusBadgeVariant = (estado: string) => {
+    switch (estado) {
+      case 'aceptado': return 'default';
+      case 'conductor_en_sitio': return 'secondary';
+      case 'cargando': return 'default';
+      case 'en_progreso': return 'default';
+      case 'completado': return 'default';
+      default: return 'secondary';
+    }
+  };
+
+  const getStatusText = (estado: string) => {
+    switch (estado) {
+      case 'aceptado': return 'Aceptado';
+      case 'conductor_en_sitio': return 'En sitio';
+      case 'cargando': return 'Cargando';
+      case 'en_progreso': return 'En ruta';
+      case 'completado': return 'Completado';
+      default: return estado;
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative overflow-hidden">
       <div className="flex-1 relative min-h-0">
         <MapboxMap
           center={currentLocation}
@@ -309,29 +333,32 @@ export default function DriverDashboard() {
         />
       </div>
 
-      <div className="absolute top-4 left-4 right-4 z-10">
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <Label htmlFor="availability" className="text-lg font-semibold">
-                Estado
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                {driverData?.disponible ? 'Disponible para servicios' : 'No disponible'}
-              </p>
+      <div className="absolute top-3 left-3 right-3 z-10">
+        <Card className="p-3 bg-background/95 backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "w-2 h-2 rounded-full flex-shrink-0",
+                  driverData?.disponible ? "bg-green-500" : "bg-muted-foreground"
+                )} />
+                <Label htmlFor="availability" className="text-base font-semibold truncate">
+                  {driverData?.disponible ? 'Disponible' : 'No disponible'}
+                </Label>
+              </div>
               {driverDocuments && (() => {
                 const { complete, missing } = checkDocumentsComplete();
                 return (
-                  <div className="mt-2">
+                  <div className="mt-1">
                     {complete ? (
-                      <Badge variant="secondary" className="gap-1" data-testid="badge-documents-complete">
+                      <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-documents-complete">
                         <CheckCircle2 className="w-3 h-3" />
-                        Documentos completos
+                        Documentos OK
                       </Badge>
                     ) : (
-                      <Badge variant="destructive" className="gap-1" data-testid="badge-documents-pending">
+                      <Badge variant="destructive" className="gap-1 text-xs" data-testid="badge-documents-pending">
                         <AlertCircle className="w-3 h-3" />
-                        {missing} documento{missing !== 1 ? 's' : ''} pendiente{missing !== 1 ? 's' : ''}
+                        {missing} pendiente{missing !== 1 ? 's' : ''}
                       </Badge>
                     )}
                   </div>
@@ -342,32 +369,43 @@ export default function DriverDashboard() {
               id="availability"
               checked={driverData?.disponible || false}
               onCheckedChange={(checked) => toggleAvailability.mutate(checked)}
+              disabled={toggleAvailability.isPending}
               data-testid="switch-availability"
             />
           </div>
         </Card>
       </div>
 
-      {activeService ? (
-        <div className="absolute bottom-4 left-4 right-4 z-10 max-h-[60vh] overflow-y-auto">
-          <Card className="p-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Servicio Activo</h3>
-                <Badge variant="default">
-                  {activeService.estado === 'aceptado' && 'Aceptado'}
-                  {activeService.estado === 'conductor_en_sitio' && 'En sitio'}
-                  {activeService.estado === 'cargando' && 'Cargando'}
-                  {activeService.estado === 'en_progreso' && 'En ruta'}
-                  {activeService.estado === 'completado' && 'Completado'}
-                </Badge>
-              </div>
+      {activeService && (
+        <div 
+          className={cn(
+            "bg-background border-t border-border transition-all duration-300 safe-area-inset-bottom",
+            showExpandedCard ? "max-h-[65vh]" : "max-h-14"
+          )}
+        >
+          <button 
+            className="w-full flex items-center justify-center py-2 text-muted-foreground"
+            onClick={() => setShowExpandedCard(!showExpandedCard)}
+            data-testid="button-toggle-active-service"
+          >
+            <div className="flex items-center gap-2">
+              <Badge variant={getStatusBadgeVariant(activeService.estado)} className="text-xs">
+                {getStatusText(activeService.estado)}
+              </Badge>
+              {showExpandedCard ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            </div>
+          </button>
 
+          <div className={cn(
+            "overflow-y-auto transition-all duration-300 px-4 pb-4",
+            showExpandedCard ? "max-h-[calc(65vh-56px)]" : "max-h-0 overflow-hidden"
+          )}>
+            <div className="space-y-4">
               {activeService.cliente && (
-                <div className="flex items-center justify-between pb-2 border-b">
-                  <div>
-                    <p className="text-sm font-medium">Cliente</p>
-                    <p className="text-sm text-muted-foreground">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Cliente</p>
+                    <p className="font-semibold truncate">
                       {activeService.cliente.nombre} {activeService.cliente.apellido}
                     </p>
                   </div>
@@ -382,50 +420,46 @@ export default function DriverDashboard() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-green-600 mt-1" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">Origen</p>
-                    <p className="text-sm truncate">{activeService.origenDireccion}</p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                    <div className="w-0.5 h-8 bg-border" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
                   </div>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Origen</p>
+                      <p className="text-sm font-medium">{activeService.origenDireccion}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Destino</p>
+                      <p className="text-sm font-medium">{activeService.destinoDireccion}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
                   {(activeService.estado === 'aceptado' || activeService.estado === 'conductor_en_sitio') && (() => {
                     const navUrl = getNavigationUrl(activeService.origenLat, activeService.origenLng);
                     if (!navUrl) return null;
                     return (
-                      <a
-                        href={navUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-shrink-0"
-                      >
-                        <Button size="sm" variant="outline" className="gap-1" data-testid="button-waze-origin">
+                      <a href={navUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
+                        <Button variant="outline" className="w-full gap-2" data-testid="button-waze-origin">
                           <SiWaze className="w-4 h-4 text-[#33CCFF]" />
-                          Navegar
+                          Ir al origen
                         </Button>
                       </a>
                     );
                   })()}
-                </div>
-                <div className="flex items-start gap-2">
-                  <Navigation className="w-4 h-4 text-destructive mt-1" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">Destino</p>
-                    <p className="text-sm truncate">{activeService.destinoDireccion}</p>
-                  </div>
                   {(activeService.estado === 'cargando' || activeService.estado === 'en_progreso') && (() => {
                     const navUrl = getNavigationUrl(activeService.destinoLat, activeService.destinoLng);
                     if (!navUrl) return null;
                     return (
-                      <a
-                        href={navUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-shrink-0"
-                      >
-                        <Button size="sm" variant="outline" className="gap-1" data-testid="button-waze-destination">
+                      <a href={navUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
+                        <Button variant="outline" className="w-full gap-2" data-testid="button-waze-destination">
                           <SiWaze className="w-4 h-4 text-[#33CCFF]" />
-                          Navegar
+                          Ir al destino
                         </Button>
                       </a>
                     );
@@ -433,21 +467,24 @@ export default function DriverDashboard() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-bold">
-                    RD$ {parseFloat(activeService.costoTotal as string).toFixed(2)}
-                  </span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Distancia</p>
+                  <p className="text-lg font-bold">
+                    {parseFloat(activeService.distanciaKm as string).toFixed(1)} km
+                  </p>
                 </div>
-                <Badge variant="secondary">
-                  {parseFloat(activeService.distanciaKm as string).toFixed(1)} km
-                </Badge>
+                <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-xs text-muted-foreground mb-1">Ganancia</p>
+                  <p className="text-lg font-bold text-primary">
+                    RD$ {parseFloat(activeService.costoTotal as string).toFixed(2)}
+                  </p>
+                </div>
               </div>
 
               {activeService.estado === 'aceptado' && (
                 <Button 
-                  className="w-full" 
+                  className="w-full h-12" 
                   onClick={() => arrivedService.mutate(activeService.id)}
                   disabled={arrivedService.isPending}
                   data-testid="button-arrived"
@@ -463,9 +500,9 @@ export default function DriverDashboard() {
 
               {activeService.estado === 'conductor_en_sitio' && (
                 <Button 
-                  className="w-full" 
+                  className="w-full h-12" 
                   onClick={() => loadingService.mutate(activeService.id)}
-                  disabled={loadingService.isPending || arrivedService.isPending}
+                  disabled={loadingService.isPending}
                   data-testid="button-loading"
                 >
                   {loadingService.isPending ? (
@@ -479,9 +516,9 @@ export default function DriverDashboard() {
 
               {activeService.estado === 'cargando' && (
                 <Button 
-                  className="w-full" 
+                  className="w-full h-12" 
                   onClick={() => startService.mutate(activeService.id)}
-                  disabled={startService.isPending || loadingService.isPending || arrivedService.isPending}
+                  disabled={startService.isPending}
                   data-testid="button-start-service"
                 >
                   {startService.isPending ? (
@@ -495,7 +532,7 @@ export default function DriverDashboard() {
 
               {activeService.estado === 'en_progreso' && (
                 <Button 
-                  className="w-full" 
+                  className="w-full h-12" 
                   onClick={() => setConfirmDialog({ open: true, action: 'complete', serviceId: activeService.id })}
                   data-testid="button-complete-service"
                 >
@@ -504,73 +541,89 @@ export default function DriverDashboard() {
                 </Button>
               )}
             </div>
-          </Card>
+          </div>
         </div>
-      ) : driverData?.disponible && nearbyRequests && nearbyRequests.length > 0 ? (
-        <div className="absolute bottom-4 left-4 right-4 z-10 max-h-[50vh] overflow-y-auto space-y-3">
-          <h3 className="text-sm font-semibold text-white bg-black/50 backdrop-blur-sm p-2 rounded-lg">
-            Solicitudes Cercanas ({nearbyRequests.length})
-          </h3>
-          {nearbyRequests.map((request) => (
-            <Card key={request.id} className="p-4" data-testid={`request-${request.id}`}>
-              <div className="space-y-3">
-                <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-green-600 mt-1" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Recoger en</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {request.origenDireccion}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Navigation className="w-4 h-4 text-destructive mt-1" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Llevar a</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {request.destinoDireccion}
-                    </p>
-                  </div>
-                </div>
+      )}
 
-                <div className="flex items-center justify-between pt-3 border-t border-border">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-bold">
-                      RD$ {parseFloat(request.costoTotal as string).toFixed(2)}
-                    </span>
-                  </div>
-                  <Badge variant="secondary">
-                    {parseFloat(request.distanciaKm as string).toFixed(1)} km
-                  </Badge>
-                </div>
+      {!activeService && driverData?.disponible && nearbyRequests && nearbyRequests.length > 0 && (
+        <div 
+          className={cn(
+            "bg-background border-t border-border transition-all duration-300 safe-area-inset-bottom",
+            showExpandedCard ? "max-h-[60vh]" : "max-h-14"
+          )}
+        >
+          <button 
+            className="w-full flex items-center justify-between px-4 py-2 text-muted-foreground"
+            onClick={() => setShowExpandedCard(!showExpandedCard)}
+            data-testid="button-toggle-requests"
+          >
+            <span className="text-sm font-semibold">
+              {nearbyRequests.length} solicitud{nearbyRequests.length !== 1 ? 'es' : ''} cercana{nearbyRequests.length !== 1 ? 's' : ''}
+            </span>
+            {showExpandedCard ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid={`button-reject-${request.id}`}
-                  >
-                    Rechazar
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => acceptService.mutate(request.id)}
-                    disabled={acceptService.isPending}
-                    data-testid={`button-accept-${request.id}`}
-                  >
-                    {acceptService.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Aceptar'
-                    )}
-                  </Button>
+          <div className={cn(
+            "overflow-y-auto transition-all duration-300 px-4 pb-4 space-y-3",
+            showExpandedCard ? "max-h-[calc(60vh-56px)]" : "max-h-0 overflow-hidden"
+          )}>
+            {nearbyRequests.map((request) => (
+              <Card key={request.id} className="p-4" data-testid={`request-${request.id}`}>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                      <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                      <div className="w-0.5 h-8 bg-border" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="text-sm font-medium truncate">{request.origenDireccion}</p>
+                      <p className="text-sm text-muted-foreground truncate">{request.destinoDireccion}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between py-2 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-primary" />
+                      <span className="font-bold text-primary">
+                        RD$ {parseFloat(request.costoTotal as string).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Car className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {parseFloat(request.distanciaKm as string).toFixed(1)} km
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1 h-10"
+                      data-testid={`button-reject-${request.id}`}
+                    >
+                      Rechazar
+                    </Button>
+                    <Button
+                      className="flex-1 h-10"
+                      onClick={() => acceptService.mutate(request.id)}
+                      disabled={acceptService.isPending}
+                      data-testid={`button-accept-${request.id}`}
+                    >
+                      {acceptService.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        'Aceptar'
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
         </div>
-      ) : null}
+      )}
 
       <Drawer open={chatOpen} onOpenChange={setChatOpen}>
         <DrawerContent className="h-[80vh]">
@@ -594,16 +647,12 @@ export default function DriverDashboard() {
 
       <ConfirmDialog
         open={confirmDialog.open}
-        onOpenChange={(open) => setConfirmDialog({ open, action: null, serviceId: null })}
-        title={confirmDialog.action === 'complete' ? '¿Completar servicio?' : '¿Iniciar servicio?'}
-        description={
-          confirmDialog.action === 'complete'
-            ? 'Confirma que has llegado al destino y completado el servicio. Esta acción no se puede deshacer.'
-            : 'Confirma que estás listo para comenzar el servicio y dirigirte al destino.'
-        }
-        confirmLabel={confirmDialog.action === 'complete' ? 'Completar' : 'Iniciar'}
+        onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}
+        title="Completar Servicio"
+        description="¿Estás seguro de que deseas marcar este servicio como completado? Esta acción no se puede deshacer."
+        confirmText="Completar"
         onConfirm={handleConfirmAction}
-        loading={completeService.isPending || startService.isPending}
+        isLoading={completeService.isPending}
       />
     </div>
   );
