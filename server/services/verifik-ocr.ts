@@ -92,7 +92,7 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': apiKey
       },
       body: JSON.stringify({
         image: imageData,
@@ -189,7 +189,7 @@ export async function verifyCedulaWithAPI(cedulaNumber: string): Promise<CedulaV
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': apiKey
       }
     });
 
