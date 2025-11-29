@@ -3,6 +3,7 @@ import Map, { Marker, NavigationControl, GeolocateControl } from 'react-map-gl/m
 import type { MapRef, MapMouseEvent } from 'react-map-gl/mapbox';
 import { Loader2, MapPin } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import watermarkLogo from '@assets/20251129_191904_0001_1764458415723.png';
 
 export interface Coordinates {
   lat: number;
@@ -267,6 +268,15 @@ export function MapboxMap({
           </Marker>
         ))}
       </Map>
+
+      {/* Watermark logo */}
+      <div className="absolute bottom-4 left-4 z-10 pointer-events-none">
+        <img 
+          src={watermarkLogo} 
+          alt="GrúaRD" 
+          className="w-12 h-12 opacity-60"
+        />
+      </div>
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">

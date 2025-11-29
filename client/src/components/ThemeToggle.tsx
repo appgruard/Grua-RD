@@ -75,8 +75,12 @@ export function ThemeToggle() {
 }
 
 export function ThemeSettingsCard() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const isDark = theme === 'dark';
+
+  const handleThemeChange = (checked: boolean) => {
+    setTheme(checked ? 'dark' : 'light');
+  };
 
   return (
     <Card className="overflow-hidden">
@@ -102,7 +106,7 @@ export function ThemeSettingsCard() {
           </div>
           <Switch
             checked={isDark}
-            onCheckedChange={toggleTheme}
+            onCheckedChange={handleThemeChange}
             data-testid="switch-theme-toggle"
           />
         </div>
