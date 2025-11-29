@@ -2094,15 +2094,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { distanceKm } = req.body;
       const tarifa = await storage.getActiveTarifa();
 
-      if (!tarifa) {
-        return res.status(404).json({ message: "No active pricing found" });
-      }
+      const DEFAULT_PRECIO_BASE = 150;
+      const DEFAULT_TARIFA_POR_KM = 20;
 
-      const precioBase = parseFloat(tarifa.precioBase as string);
-      const tarifaPorKm = parseFloat(tarifa.tarifaPorKm as string);
+      const precioBase = tarifa ? parseFloat(tarifa.precioBase as string) : DEFAULT_PRECIO_BASE;
+      const tarifaPorKm = tarifa ? parseFloat(tarifa.tarifaPorKm as string) : DEFAULT_TARIFA_POR_KM;
       const total = precioBase + (distanceKm * tarifaPorKm);
 
-      res.json({ total, precioBase, tarifaPorKm, distanceKm });
+      res.json({ 
+        total, 
+        precioBase, 
+        tarifaPorKm, 
+        distanceKm,
+        isDefaultPricing: !tarifa 
+      });
     } catch (error: any) {
       logSystem.error('Calculate pricing error', error);
       res.status(500).json({ message: "Failed to calculate pricing" });
@@ -3274,6 +3279,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Geocode error', error);
       res.status(500).json({ message: "Failed to geocode address" });
+    }
+  });
+
+  app.get("/api/maps/autocomplete", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { query, proximity } = req.query;
+
+      if (!query || typeof query !== 'string' || query.length < 2) {
+        return res.json({ suggestions: [] });
+      }
+
+      let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=DO&limit=5&types=address,poi,place,locality,neighborhood`;
+      
+      if (proximity && typeof proximity === 'string') {
+        const [lng, lat] = proximity.split(',');
+        if (lng && lat) {
+          url += `&proximity=${lng},${lat}`;
+        }
+      }
+      
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const suggestions = (data.features || []).map((feature: any) => ({
+        id: feature.id,
+        placeName: feature.place_name,
+        text: feature.text,
+        coordinates: {
+          lat: feature.center[1],
+          lng: feature.center[0],
+        },
+      }));
+
+      res.json({ suggestions });
+    } catch (error: any) {
+      logSystem.error('Autocomplete error', error);
+      res.status(500).json({ message: "Failed to get autocomplete suggestions" });
     }
   });
 
