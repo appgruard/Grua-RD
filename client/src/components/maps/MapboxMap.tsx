@@ -270,11 +270,11 @@ export function MapboxMap({
       </Map>
 
       {/* Watermark logo */}
-      <div className="absolute bottom-4 left-4 z-10 pointer-events-none">
+      <div className="absolute bottom-2 right-2 z-10 pointer-events-none">
         <img 
           src={watermarkLogo} 
           alt="GrúaRD" 
-          className="w-12 h-12 opacity-60"
+          className="w-10 h-10 opacity-70"
         />
       </div>
 
