@@ -102,14 +102,16 @@ export default function ClientTracking() {
   const driverName = service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Conductor';
 
   return (
-    <div className="relative h-full">
-      <MapboxMap
-        center={driverLocation || origin}
-        markers={markers}
-        className="absolute inset-0"
-      />
+    <div className="flex flex-col h-full">
+      <div className="flex-1 relative min-h-0">
+        <MapboxMap
+          center={driverLocation || origin}
+          markers={markers}
+          className="absolute inset-0"
+        />
+      </div>
 
-      <div className="absolute top-4 left-4 right-4">
+      <div className="absolute top-4 left-4 right-4 z-10">
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -148,7 +150,7 @@ export default function ClientTracking() {
       </div>
 
       {service.conductor && (
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="absolute bottom-4 left-4 right-4 z-10">
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <Avatar className="w-12 h-12">

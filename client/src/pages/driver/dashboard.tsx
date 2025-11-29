@@ -293,21 +293,23 @@ export default function DriverDashboard() {
   }, [driverData?.disponible]);
 
   return (
-    <div className="relative h-full">
-      <MapboxMap
-        center={currentLocation}
-        markers={nearbyRequests?.map(req => ({
-          position: {
-            lat: parseFloat(req.origenLat as string),
-            lng: parseFloat(req.origenLng as string),
-          },
-          title: 'Solicitud',
-          color: '#F5A623',
-        })) || []}
-        className="absolute inset-0"
-      />
+    <div className="flex flex-col h-full">
+      <div className="flex-1 relative min-h-0">
+        <MapboxMap
+          center={currentLocation}
+          markers={nearbyRequests?.map(req => ({
+            position: {
+              lat: parseFloat(req.origenLat as string),
+              lng: parseFloat(req.origenLng as string),
+            },
+            title: 'Solicitud',
+            color: '#F5A623',
+          })) || []}
+          className="absolute inset-0"
+        />
+      </div>
 
-      <div className="absolute top-4 left-4 right-4">
+      <div className="absolute top-4 left-4 right-4 z-10">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -347,7 +349,7 @@ export default function DriverDashboard() {
       </div>
 
       {activeService ? (
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="absolute bottom-4 left-4 right-4 z-10 max-h-[60vh] overflow-y-auto">
           <Card className="p-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -505,7 +507,7 @@ export default function DriverDashboard() {
           </Card>
         </div>
       ) : driverData?.disponible && nearbyRequests && nearbyRequests.length > 0 ? (
-        <div className="absolute bottom-4 left-4 right-4 max-h-80 overflow-y-auto space-y-3">
+        <div className="absolute bottom-4 left-4 right-4 z-10 max-h-[50vh] overflow-y-auto space-y-3">
           <h3 className="text-sm font-semibold text-white bg-black/50 backdrop-blur-sm p-2 rounded-lg">
             Solicitudes Cercanas ({nearbyRequests.length})
           </h3>
