@@ -2,7 +2,6 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Home, History, User, Phone, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -33,13 +32,6 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-primary">GrúaRD</span>
-        </div>
-        <ThemeToggle />
-      </header>
-      
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 
 type Theme = 'light' | 'dark';
 
@@ -18,7 +20,7 @@ function getStoredTheme(): Theme | null {
   return null;
 }
 
-export function ThemeToggle() {
+export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = getStoredTheme();
     return stored || getSystemTheme();
@@ -49,6 +51,12 @@ export function ThemeToggle() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  return { theme, setTheme, toggleTheme };
+}
+
+export function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <Button
       variant="ghost"
@@ -63,5 +71,42 @@ export function ThemeToggle() {
         <Sun className="w-5 h-5" />
       )}
     </Button>
+  );
+}
+
+export function ThemeSettingsCard() {
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="p-4 border-b border-border">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Configuración
+        </h3>
+      </div>
+      <div className="divide-y divide-border">
+        <div className="flex items-center gap-4 p-4">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+            {isDark ? (
+              <Moon className="w-5 h-5 text-muted-foreground" />
+            ) : (
+              <Sun className="w-5 h-5 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium">Tema oscuro</p>
+            <p className="text-xs text-muted-foreground">
+              {isDark ? 'Activado' : 'Desactivado'}
+            </p>
+          </div>
+          <Switch
+            checked={isDark}
+            onCheckedChange={toggleTheme}
+            data-testid="switch-theme-toggle"
+          />
+        </div>
+      </div>
+    </Card>
   );
 }
