@@ -22,7 +22,7 @@ Prioritize performance and scalability in new implementations.
 The design system uses Inter font with Grúa RD brand colors: navy blue (`#0F2947`) as primary and orange (`#F5A623`) as accent, leveraging `shadcn/ui` and Tailwind CSS for a mobile-first, responsive PWA. It supports a light mode with dark mode preparation. Client and Driver interfaces utilize a `MobileLayout` with bottom navigation, while the Admin interface uses an `AdminLayout` with a sidebar. The PWA is configured for standalone installation with the Grúa RD logo integrated across all interfaces.
 
 ### Technical Implementations
-Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js) backend. PostgreSQL (Neon) with Drizzle ORM manages the database. Authentication uses Passport.js with local strategy and bcrypt. Real-time features, including GPS tracking and chat, are powered by WebSockets (`ws` library). Google Maps JavaScript API handles mapping, distance, and geocoding. State management is done with TanStack Query (React Query v5). The project maintains a modular structure.
+Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js) backend. PostgreSQL (Neon) with Drizzle ORM manages the database. Authentication uses Passport.js with local strategy and bcrypt. Real-time features, including GPS tracking and chat, are powered by WebSockets (`ws` library). Mapbox GL JS handles mapping, routing, and geocoding with react-map-gl as the React wrapper. State management is done with TanStack Query (React Query v5). The project maintains a modular structure.
 
 ### Feature Specifications
 **Core Features:**
@@ -48,7 +48,8 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
 
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
-- **Google Maps Platform**: Maps JavaScript API, Distance Matrix API, Geocoding API, Visualization library.
+- **Mapbox**: Maps (Mapbox GL JS via react-map-gl), Directions API for routing, Geocoding API for address lookup.
+- **Waze**: Deep links for driver navigation to service locations.
 - **Azul Payment Gateway**: Dominican payment provider for card transactions, tokenization (DataVault), HOLD/POST/REFUND operations.
 - **Web Push API**: For sending push notifications.
 - **Replit Object Storage**: For document storage.
@@ -102,6 +103,36 @@ The system uses PostgreSQL with Drizzle ORM for type-safe data access. WebSocket
   - scripts/pre-deploy-check.ts - Deployment validation
 
 ## Recent Changes (November 29, 2025)
+
+### Mapbox Migration - COMPLETED
+
+**Key Changes:**
+- Migrated from Google Maps API to Mapbox GL JS for all mapping functionality
+- Created new `MapboxMap` component (`client/src/components/maps/MapboxMap.tsx`) with:
+  - Interactive markers with click callbacks
+  - Route line rendering between two points
+  - Click-to-select location with reverse geocoding
+  - Fit bounds for multiple markers
+  - Heatmap visualization component for admin analytics
+- Updated `client/src/lib/maps.ts` utility functions:
+  - `getWazeNavigationUrl(lat, lng)`: Generate Waze deep links for driver navigation
+  - `reverseGeocode(lat, lng)`: Fetch address from coordinates using Mapbox Geocoding API
+- Updated backend API routes in `server/routes.ts`:
+  - `POST /api/maps/calculate-route`: Uses Mapbox Directions API for distance/duration
+  - `POST /api/maps/geocode`: Uses Mapbox Geocoding API for address lookup
+- Added Waze navigation buttons in driver dashboard for quick navigation to service locations
+- Updated all pages using maps: client home, driver dashboard, admin analytics
+
+**Environment Variables Required:**
+- `MAPBOX_ACCESS_TOKEN`: Backend access token for Mapbox APIs
+- `VITE_MAPBOX_ACCESS_TOKEN`: Frontend access token for Mapbox GL JS
+
+**Libraries Added:**
+- `mapbox-gl`: Core Mapbox GL JS library
+- `react-map-gl`: React wrapper for Mapbox GL JS
+- `@types/mapbox-gl`: TypeScript definitions
+
+---
 
 ### Module 3.6: Monitoring & Logging - COMPLETED
 

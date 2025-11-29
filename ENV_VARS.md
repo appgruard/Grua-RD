@@ -126,26 +126,36 @@ Las siguientes variables son configuradas automáticamente por Replit Database:
 
 ---
 
-### 🗺️ Google Maps
+### 🗺️ Mapbox
 
-#### `VITE_GOOGLE_MAPS_API_KEY`
+#### `MAPBOX_ACCESS_TOKEN`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: Token de acceso de Mapbox para el servidor
+- **Obtención**: https://account.mapbox.com/access-tokens/
+- **APIs utilizadas**:
+  - Directions API (cálculo de rutas y distancias)
+  - Geocoding API (conversión de direcciones a coordenadas)
+- **Uso**:
+  - Backend: `server/routes.ts` - Cálculo de distancias y geocoding
+- **Formato**: `pk.eyJ1Ijo...`
+- **Nota**: Tier gratuito incluye 100,000 peticiones/mes de direcciones
+
+#### `VITE_MAPBOX_ACCESS_TOKEN`
 - **Tipo**: Environment Variable (Semi-público)
 - **Ambiente**: Shared
 - **Requerido**: ✅ Sí
-- **Descripción**: API Key de Google Maps Platform
-- **Obtención**: https://console.cloud.google.com/google/maps-apis
-- **APIs habilitadas requeridas**:
-  - Maps JavaScript API
-  - Geocoding API
-  - Distance Matrix API
-  - Places API
+- **Descripción**: Token de acceso de Mapbox para el frontend
+- **Obtención**: https://account.mapbox.com/access-tokens/
+- **APIs utilizadas**:
+  - Mapbox GL JS (renderizado de mapas)
+  - Geocoding API (reverse geocoding en clicks del mapa)
 - **Uso**:
-  - Frontend: `client/src/lib/maps.ts` - Carga del SDK
-  - Backend: `server/routes.ts` - Cálculo de distancias y geocoding
-- **Restricciones recomendadas**:
-  - HTTP referrers para frontend
-  - IP addresses para backend
-- **Nota**: Prefijo `VITE_` permite uso tanto en frontend como backend
+  - Frontend: `client/src/components/maps/MapboxMap.tsx` - Renderizado de mapas
+  - Frontend: `client/src/pages/admin/analytics.tsx` - Mapa de calor
+- **Formato**: `pk.eyJ1Ijo...`
+- **Nota**: Prefijo `VITE_` es necesario para acceso desde frontend. Tier gratuito incluye 50,000 cargas de mapa/mes
 
 ---
 
@@ -258,8 +268,9 @@ DATABASE_URL=postgresql://...
 # Sesión (usar default SOLO en dev)
 SESSION_SECRET=dev-secret-change-in-production
 
-# Google Maps (requerida)
-VITE_GOOGLE_MAPS_API_KEY=AIza...
+# Mapbox (requerida)
+MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
+VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 
 # Stripe (usar claves de test)
 STRIPE_SECRET_KEY=sk_test_...
@@ -298,8 +309,9 @@ NODE_ENV=production
 PORT=5000
 ALLOWED_ORIGINS=https://gruard.com,https://www.gruard.com
 
-# Google Maps
-VITE_GOOGLE_MAPS_API_KEY=AIza... (con restricciones)
+# Mapbox (requerida)
+MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
+VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 
 # Stripe (usar claves LIVE)
 STRIPE_SECRET_KEY=sk_live_...
@@ -349,7 +361,7 @@ LOG_LEVEL=info
 - [ ] Stripe keys son claves LIVE (`sk_live_`, `pk_live_`)
 - [ ] `STRIPE_WEBHOOK_SECRET` configurado y endpoint verificado
 - [ ] Twilio configurado con número verificado y créditos
-- [ ] `VITE_GOOGLE_MAPS_API_KEY` con restricciones de IP/referrer
+- [ ] `MAPBOX_ACCESS_TOKEN` y `VITE_MAPBOX_ACCESS_TOKEN` configurados
 - [ ] VAPID keys generadas y guardadas de forma segura
 - [ ] `ALLOWED_ORIGINS` incluye todos los dominios de producción
 - [ ] `NODE_ENV=production`
@@ -407,5 +419,5 @@ Si tienes dudas sobre la configuración de variables de entorno:
 
 ---
 
-**Última actualización**: Noviembre 24, 2025  
-**Versión**: 1.0.0 - Workstream D
+**Última actualización**: Noviembre 29, 2025  
+**Versión**: 1.1.0 - Migración a Mapbox

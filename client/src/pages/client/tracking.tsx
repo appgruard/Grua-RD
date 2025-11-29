@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRoute } from 'wouter';
-import { GoogleMap } from '@/components/maps/GoogleMap';
+import { MapboxMap } from '@/components/maps/MapboxMap';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,9 +74,9 @@ export default function ClientTracking() {
   const destination = { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) };
 
   const markers = [
-    { position: origin, title: 'Origen', icon: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' },
-    { position: destination, title: 'Destino', icon: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png' },
-    driverLocation && { position: driverLocation, title: 'Conductor' },
+    { position: origin, title: 'Origen', color: '#22c55e' },
+    { position: destination, title: 'Destino', color: '#ef4444' },
+    driverLocation && { position: driverLocation, title: 'Conductor', color: '#3b82f6' },
   ].filter(Boolean) as any[];
 
   const statusColors = {
@@ -103,7 +103,7 @@ export default function ClientTracking() {
 
   return (
     <div className="relative h-full">
-      <GoogleMap
+      <MapboxMap
         center={driverLocation || origin}
         markers={markers}
         className="absolute inset-0"

@@ -43,25 +43,27 @@ export async function geocodeAddress(address: string): Promise<Coordinates> {
   return response.json();
 }
 
-export function loadGoogleMapsScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.google?.maps) {
-      resolve();
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Google Maps'));
-    document.head.appendChild(script);
-  });
+export function generateWazeNavigationUrl(lat: number | null | undefined, lng: number | null | undefined): string | null {
+  if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+    return null;
+  }
+  return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
 }
 
-declare global {
-  interface Window {
-    google: any;
+export function generateGoogleMapsNavigationUrl(lat: number | null | undefined, lng: number | null | undefined): string | null {
+  if (lat == null || lng == null || isNaN(lat) || isNaN(lng)) {
+    return null;
   }
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+}
+
+export function getNavigationUrl(lat: number | string | null | undefined, lng: number | string | null | undefined): string | null {
+  const parsedLat = typeof lat === 'string' ? parseFloat(lat) : lat;
+  const parsedLng = typeof lng === 'string' ? parseFloat(lng) : lng;
+  
+  const wazeUrl = generateWazeNavigationUrl(parsedLat, parsedLng);
+  if (wazeUrl) return wazeUrl;
+  
+  const googleUrl = generateGoogleMapsNavigationUrl(parsedLat, parsedLng);
+  return googleUrl;
 }

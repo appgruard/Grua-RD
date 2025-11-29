@@ -118,7 +118,7 @@ const marcarPagadaSchema = z.object({
   referenciaTransaccion: z.string().min(1, "Referencia de transacción es requerida"),
 });
 
-const GOOGLE_MAPS_API_KEY = process.env.VITE_GOOGLE_MAPS_API_KEY;
+const MAPBOX_ACCESS_TOKEN = process.env.MAPBOX_ACCESS_TOKEN;
 
 declare global {
   namespace Express {
@@ -3227,18 +3227,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { origin, destination } = req.body;
 
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${destination.lat},${destination.lng}&key=${GOOGLE_MAPS_API_KEY}`;
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?access_token=${MAPBOX_ACCESS_TOKEN}`;
       
       const response = await fetch(url);
       const data = await response.json();
 
-      if (data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
-        const element = data.rows[0].elements[0];
+      if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const distanceKm = route.distance / 1000;
+        const durationMinutes = route.duration / 60;
+        
         res.json({
-          distanceKm: element.distance.value / 1000,
-          durationMinutes: element.duration.value / 60,
-          distanceText: element.distance.text,
-          durationText: element.duration.text,
+          distanceKm: distanceKm,
+          durationMinutes: durationMinutes,
+          distanceText: `${distanceKm.toFixed(1)} km`,
+          durationText: `${Math.round(durationMinutes)} min`,
         });
       } else {
         res.status(400).json({ message: "Failed to calculate route" });
@@ -3257,14 +3260,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { address } = req.body;
 
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_API_KEY}`;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&country=DO&limit=1`;
       
       const response = await fetch(url);
       const data = await response.json();
 
-      if (data.status === 'OK' && data.results.length > 0) {
-        const location = data.results[0].geometry.location;
-        res.json({ lat: location.lat, lng: location.lng });
+      if (data.features && data.features.length > 0) {
+        const [lng, lat] = data.features[0].center;
+        res.json({ lat, lng });
       } else {
         res.status(400).json({ message: "Failed to geocode address" });
       }

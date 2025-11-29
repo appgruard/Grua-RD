@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { GoogleMap } from '@/components/maps/GoogleMap';
+import { MapboxMap } from '@/components/maps/MapboxMap';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -249,8 +249,8 @@ export default function ClientHome() {
   };
 
   const markers = [
-    origin && { position: origin, title: 'Origen', icon: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' },
-    destination && { position: destination, title: 'Destino', icon: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png' },
+    origin && { position: origin, title: 'Origen', color: '#22c55e' },
+    destination && { position: destination, title: 'Destino', color: '#ef4444' },
   ].filter(Boolean) as any[];
 
   const showMap = step === 'origin' || step === 'destination';
@@ -258,7 +258,7 @@ export default function ClientHome() {
   return (
     <div className="relative h-full">
       {showMap && (
-        <GoogleMap
+        <MapboxMap
           center={currentLocation}
           markers={markers}
           onMapClick={handleMapClick}

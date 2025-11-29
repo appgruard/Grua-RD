@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
-import { GoogleMap } from '@/components/maps/GoogleMap';
+import { MapboxMap } from '@/components/maps/MapboxMap';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -13,9 +13,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/lib/websocket';
 import { ChatBox } from '@/components/chat/ChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
+import { SiWaze } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
+import { getNavigationUrl } from '@/lib/maps';
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -292,7 +294,7 @@ export default function DriverDashboard() {
 
   return (
     <div className="relative h-full">
-      <GoogleMap
+      <MapboxMap
         center={currentLocation}
         markers={nearbyRequests?.map(req => ({
           position: {
@@ -300,6 +302,7 @@ export default function DriverDashboard() {
             lng: parseFloat(req.origenLng as string),
           },
           title: 'Solicitud',
+          color: '#F5A623',
         })) || []}
         className="absolute inset-0"
       />
@@ -384,6 +387,23 @@ export default function DriverDashboard() {
                     <p className="text-xs text-muted-foreground">Origen</p>
                     <p className="text-sm truncate">{activeService.origenDireccion}</p>
                   </div>
+                  {(activeService.estado === 'aceptado' || activeService.estado === 'conductor_en_sitio') && (() => {
+                    const navUrl = getNavigationUrl(activeService.origenLat, activeService.origenLng);
+                    if (!navUrl) return null;
+                    return (
+                      <a
+                        href={navUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0"
+                      >
+                        <Button size="sm" variant="outline" className="gap-1" data-testid="button-waze-origin">
+                          <SiWaze className="w-4 h-4 text-[#33CCFF]" />
+                          Navegar
+                        </Button>
+                      </a>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-start gap-2">
                   <Navigation className="w-4 h-4 text-destructive mt-1" />
@@ -391,6 +411,23 @@ export default function DriverDashboard() {
                     <p className="text-xs text-muted-foreground">Destino</p>
                     <p className="text-sm truncate">{activeService.destinoDireccion}</p>
                   </div>
+                  {(activeService.estado === 'cargando' || activeService.estado === 'en_progreso') && (() => {
+                    const navUrl = getNavigationUrl(activeService.destinoLat, activeService.destinoLng);
+                    if (!navUrl) return null;
+                    return (
+                      <a
+                        href={navUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0"
+                      >
+                        <Button size="sm" variant="outline" className="gap-1" data-testid="button-waze-destination">
+                          <SiWaze className="w-4 h-4 text-[#33CCFF]" />
+                          Navegar
+                        </Button>
+                      </a>
+                    );
+                  })()}
                 </div>
               </div>
 

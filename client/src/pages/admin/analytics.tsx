@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { Calendar, Download, TrendingUp, Clock, CheckCircle, XCircle, DollarSign, Car, FileText, MapPin } from 'lucide-react';
+import { Calendar, Download, Clock, CheckCircle, XCircle, DollarSign, Car, FileText } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -39,7 +39,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { loadGoogleMapsScript } from '@/lib/maps';
+import { HeatmapComponent } from '@/components/maps/MapboxMap';
 import { StarRating } from '@/components/RatingModal';
 
 type Period = 'day' | 'week' | 'month';
@@ -114,124 +114,6 @@ const vehicleLabels: Record<string, string> = {
   camion: 'Camion',
   no_especificado: 'No Especificado',
 };
-
-function HeatmapComponent({ data, startDate, endDate }: { data: HeatmapPoint[]; startDate: string; endDate: string }) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [heatmap, setHeatmap] = useState<google.maps.visualization.HeatmapLayer | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadGoogleMapsScript()
-      .then(() => {
-        if (mapRef.current && !map) {
-          const center = data.length > 0 
-            ? { lat: data[0].lat, lng: data[0].lng }
-            : { lat: 18.4861, lng: -69.9312 };
-
-          const newMap = new window.google.maps.Map(mapRef.current, {
-            center,
-            zoom: 10,
-            disableDefaultUI: false,
-            zoomControl: true,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: true,
-          });
-
-          setMap(newMap);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load Google Maps:', err);
-        setError('No se pudo cargar el mapa. Verifique la configuracion de Google Maps API.');
-        setLoading(false);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (!map || !window.google?.maps?.visualization) return;
-
-    if (heatmap) {
-      heatmap.setMap(null);
-    }
-
-    if (data.length === 0) {
-      setHeatmap(null);
-      return;
-    }
-
-    const heatmapData = data.map(point => ({
-      location: new window.google.maps.LatLng(point.lat, point.lng),
-      weight: point.weight * 10,
-    }));
-
-    const newHeatmap = new window.google.maps.visualization.HeatmapLayer({
-      data: heatmapData,
-      map,
-      radius: 50,
-      opacity: 0.7,
-      gradient: [
-        'rgba(0, 255, 255, 0)',
-        'rgba(0, 255, 255, 1)',
-        'rgba(0, 191, 255, 1)',
-        'rgba(0, 127, 255, 1)',
-        'rgba(0, 63, 255, 1)',
-        'rgba(0, 0, 255, 1)',
-        'rgba(0, 0, 223, 1)',
-        'rgba(0, 0, 191, 1)',
-        'rgba(0, 0, 159, 1)',
-        'rgba(0, 0, 127, 1)',
-        'rgba(63, 0, 91, 1)',
-        'rgba(127, 0, 63, 1)',
-        'rgba(191, 0, 31, 1)',
-        'rgba(255, 0, 0, 1)',
-      ],
-    });
-
-    setHeatmap(newHeatmap);
-
-    if (data.length > 0) {
-      const bounds = new window.google.maps.LatLngBounds();
-      data.forEach(point => {
-        bounds.extend({ lat: point.lat, lng: point.lng });
-      });
-      map.fitBounds(bounds);
-    }
-  }, [map, data]);
-
-  if (error) {
-    return (
-      <div className="h-80 flex items-center justify-center bg-muted rounded-lg">
-        <div className="text-center p-4">
-          <MapPin className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-          <p className="text-muted-foreground">{error}</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Configure VITE_GOOGLE_MAPS_API_KEY para habilitar el mapa de calor.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative h-80 rounded-lg overflow-hidden">
-      <div ref={mapRef} className="w-full h-full" />
-      {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
-      )}
-      {!loading && data.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-          <p className="text-muted-foreground">No hay datos de ubicacion para el periodo seleccionado</p>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({

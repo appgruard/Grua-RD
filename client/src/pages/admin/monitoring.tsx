@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { GoogleMap } from '@/components/maps/GoogleMap';
+import { MapboxMap } from '@/components/maps/MapboxMap';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Conductor, User } from '@shared/schema';
@@ -31,7 +31,7 @@ export default function AdminMonitoring() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
           <Card className="p-4 h-[600px]">
-            <GoogleMap
+            <MapboxMap
               center={center}
               zoom={12}
               markers={markers}
