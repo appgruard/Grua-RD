@@ -1148,6 +1148,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId: user.id,
           similarity: nameComparison.similarity
         });
+      } else if (req.isAuthenticated() && (!result.nombre || !result.apellido)) {
+        logSystem.warn('Could not verify name match - insufficient data from OCR', {
+          userId: req.user?.id,
+          hasNombre: !!result.nombre,
+          hasApellido: !!result.apellido
+        });
       }
 
       if (req.isAuthenticated() && !skipVerification && result.cedula && result.verified) {

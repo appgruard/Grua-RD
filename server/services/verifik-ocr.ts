@@ -186,7 +186,11 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
     
     logger.info("Verifik OCR response received", { 
       hasData: !!data.data,
-      documentType: data.data?.documentType 
+      documentType: data.data?.documentType,
+      fullName: data.data?.fullName,
+      firstName: data.data?.firstName,
+      lastName: data.data?.lastName,
+      documentNumber: data.data?.documentNumber
     });
 
     if (!data.data) {
@@ -227,8 +231,8 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
     return {
       success: true,
       cedula: cedula,
-      nombre: nombre || 'No disponible',
-      apellido: apellido || 'No disponible',
+      nombre: nombre,
+      apellido: apellido,
       fechaNacimiento: data.data.dateOfBirth,
       rawData: data
     };
