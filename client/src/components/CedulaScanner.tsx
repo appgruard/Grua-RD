@@ -54,7 +54,7 @@ export function CedulaScanner({
     });
   };
 
-  const resizeImage = (base64: string, maxWidth: number = 1200): Promise<string> => {
+  const resizeImage = (base64: string, maxWidth: number = 1000, maxHeight: number = 800): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -66,12 +66,17 @@ export function CedulaScanner({
           height = (height * maxWidth) / width;
           width = maxWidth;
         }
+        
+        if (height > maxHeight) {
+          width = (width * maxHeight) / height;
+          height = maxHeight;
+        }
 
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
       };
       img.src = base64;
     });
