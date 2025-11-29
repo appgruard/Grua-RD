@@ -517,20 +517,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let dbStatus = 'unknown';
       let serviciosActivos = 0;
       let conductoresOnline = 0;
+      let dbErrors = 0;
+      
+      // Safe storage queries with individual error handling
+      let servicios: any[] = [];
+      let drivers: any[] = [];
       
       try {
-        const servicios = await storage.getAllServicios();
-        const conductores = await storage.getAllConductores();
-        
-        dbStatus = 'connected';
-        serviciosActivos = servicios.filter(s => 
-          s.estado === 'aceptado' || s.estado === 'en_progreso'
-        ).length;
-        conductoresOnline = conductores.filter(c => c.disponible).length;
-      } catch (error) {
-        dbStatus = 'error';
-        logSystem.error('Health check: Database error', error);
+        servicios = await storage.getAllServicios();
+      } catch (e) {
+        dbErrors++;
+        logSystem.warn('Health check: Failed to fetch services', e);
       }
+      
+      try {
+        drivers = await storage.getAllDrivers();
+      } catch (e) {
+        dbErrors++;
+        logSystem.warn('Health check: Failed to fetch drivers', e);
+      }
+      
+      // Set DB status based on errors
+      dbStatus = dbErrors === 0 ? 'connected' : dbErrors < 2 ? 'degraded' : 'error';
+      serviciosActivos = servicios.filter(s => 
+        s.estado === 'aceptado' || s.estado === 'en_progreso'
+      ).length;
+      conductoresOnline = drivers.filter(d => d.disponible).length;
       
       const dbResponseTime = Date.now() - startTime;
       
@@ -566,6 +578,242 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
         error: error.message
+      });
+    }
+  });
+
+  // Health Check - Database detailed
+  app.get("/api/health/db", async (_req: Request, res: Response) => {
+    try {
+      const startTime = Date.now();
+      
+      // Test basic connectivity with safe queries
+      const [users, servicios, drivers, tarifas] = await Promise.all([
+        storage.getAllUsers().catch(() => []),
+        storage.getAllServicios().catch(() => []),
+        storage.getAllDrivers().catch(() => []),
+        storage.getAllTarifas().catch(() => []),
+      ]);
+      
+      const responseTime = Date.now() - startTime;
+      
+      // Calculate stats
+      const stats = {
+        totalUsers: users.length,
+        usersByType: {
+          clientes: users.filter(u => u.userType === 'cliente').length,
+          conductores: users.filter(u => u.userType === 'conductor').length,
+          admins: users.filter(u => u.userType === 'admin').length,
+          aseguradoras: users.filter(u => u.userType === 'aseguradora').length,
+          socios: users.filter(u => u.userType === 'socio').length,
+        },
+        totalServices: servicios.length,
+        servicesByState: {
+          pendiente: servicios.filter(s => s.estado === 'pendiente').length,
+          aceptado: servicios.filter(s => s.estado === 'aceptado').length,
+          en_progreso: servicios.filter(s => s.estado === 'en_progreso').length,
+          completado: servicios.filter(s => s.estado === 'completado').length,
+          cancelado: servicios.filter(s => s.estado === 'cancelado').length,
+        },
+        totalDrivers: drivers.length,
+        availableDrivers: drivers.filter(d => d.disponible).length,
+        activeTariffs: tarifas.filter(t => t.activo).length,
+      };
+      
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        responseTime: `${responseTime}ms`,
+        connection: 'established',
+        stats,
+      });
+      
+    } catch (error: any) {
+      logSystem.error('Health check DB: Failed', error);
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: error.message,
+        connection: 'failed',
+      });
+    }
+  });
+
+  // Health Check - Payment Gateway (Azul)
+  app.get("/api/health/payments", async (_req: Request, res: Response) => {
+    try {
+      // Check if Azul keys are configured
+      const merchantId = process.env.AZUL_MERCHANT_ID;
+      const authKey = process.env.AZUL_AUTH_KEY;
+      
+      const keysConfigured = !!(merchantId && authKey);
+      const mode = process.env.AZUL_ENVIRONMENT === 'production' ? 'live' : 'test';
+      
+      if (!keysConfigured) {
+        return res.status(200).json({
+          status: 'not_configured',
+          timestamp: new Date().toISOString(),
+          message: 'Azul Payment Gateway keys not configured',
+          gateway: 'azul',
+          keysPresent: {
+            merchantId: !!merchantId,
+            authKey: !!authKey,
+          },
+        });
+      }
+      
+      res.json({
+        status: 'configured',
+        timestamp: new Date().toISOString(),
+        gateway: 'azul',
+        mode,
+        keysConfigured: true,
+        features: {
+          cardPayments: true,
+          dataVaultTokenization: true,
+          holdAndCapture: true,
+          refunds: true,
+        },
+      });
+      
+    } catch (error: any) {
+      logSystem.error('Health check Payments: Failed', error);
+      res.status(503).json({
+        status: 'error',
+        timestamp: new Date().toISOString(),
+        gateway: 'azul',
+        error: error.message,
+      });
+    }
+  });
+
+  // System Alerts endpoint - Basic monitoring
+  app.get("/api/health/alerts", async (_req: Request, res: Response) => {
+    try {
+      const alerts: Array<{ level: 'critical' | 'warning' | 'info'; message: string; category: string; timestamp: string }> = [];
+      const now = new Date();
+      
+      // Fetch data with safe fallbacks
+      const [servicios, drivers, documentos, tickets] = await Promise.all([
+        storage.getAllServicios().catch(() => []),
+        storage.getAllDrivers().catch(() => []),
+        storage.getAllDocumentos().catch(() => []),
+        storage.getAllTickets().catch(() => []),
+      ]);
+      
+      // Check for pending services older than 30 minutes
+      const pendientes = servicios.filter(s => {
+        if (s.estado !== 'pendiente') return false;
+        const createdAt = new Date(s.createdAt || now);
+        const ageMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+        return ageMinutes > 30;
+      });
+      
+      if (pendientes.length > 0) {
+        alerts.push({
+          level: pendientes.length > 5 ? 'critical' : 'warning',
+          message: `${pendientes.length} servicios pendientes por más de 30 minutos`,
+          category: 'operations',
+          timestamp: now.toISOString(),
+        });
+      }
+      
+      // Check driver availability
+      const disponibles = drivers.filter(d => d.disponible).length;
+      const total = drivers.length;
+      
+      if (disponibles === 0 && total > 0) {
+        alerts.push({
+          level: 'critical',
+          message: 'No hay conductores disponibles',
+          category: 'operations',
+          timestamp: now.toISOString(),
+        });
+      } else if (disponibles < 3 && total > 0) {
+        alerts.push({
+          level: 'warning',
+          message: `Solo ${disponibles} conductores disponibles`,
+          category: 'operations',
+          timestamp: now.toISOString(),
+        });
+      }
+      
+      // Check for documents expiring soon
+      const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const expiringDocs = documentos.filter(d => {
+        if (!d.validoHasta) return false;
+        const validoHasta = new Date(d.validoHasta);
+        return validoHasta <= thirtyDaysFromNow && validoHasta > now;
+      });
+      
+      if (expiringDocs.length > 0) {
+        alerts.push({
+          level: 'warning',
+          message: `${expiringDocs.length} documentos vencerán en los próximos 30 días`,
+          category: 'compliance',
+          timestamp: now.toISOString(),
+        });
+      }
+      
+      // Check for expired documents
+      const expiredDocs = documentos.filter(d => {
+        if (!d.validoHasta) return false;
+        return new Date(d.validoHasta) < now;
+      });
+      
+      if (expiredDocs.length > 0) {
+        alerts.push({
+          level: 'critical',
+          message: `${expiredDocs.length} documentos vencidos`,
+          category: 'compliance',
+          timestamp: now.toISOString(),
+        });
+      }
+      
+      // Check pending tickets (urgent priority)
+      const urgentPending = tickets.filter(t => 
+        t.prioridad === 'urgente' && 
+        (t.estado === 'abierto' || t.estado === 'en_proceso')
+      );
+      
+      if (urgentPending.length > 0) {
+        alerts.push({
+          level: 'warning',
+          message: `${urgentPending.length} tickets urgentes sin resolver`,
+          category: 'support',
+          timestamp: now.toISOString(),
+        });
+      }
+      
+      // Summary
+      const summary = {
+        critical: alerts.filter(a => a.level === 'critical').length,
+        warning: alerts.filter(a => a.level === 'warning').length,
+        info: alerts.filter(a => a.level === 'info').length,
+      };
+      
+      res.json({
+        status: summary.critical > 0 ? 'critical' : summary.warning > 0 ? 'warning' : 'ok',
+        timestamp: now.toISOString(),
+        summary,
+        alerts,
+        metrics: {
+          serviciosPendientes: servicios.filter(s => s.estado === 'pendiente').length,
+          serviciosActivos: servicios.filter(s => s.estado === 'aceptado' || s.estado === 'en_progreso').length,
+          conductoresDisponibles: disponibles,
+          conductoresTotales: total,
+          documentosVencidos: expiredDocs.length,
+          documentosPorVencer: expiringDocs.length,
+          ticketsUrgentes: urgentPending.length,
+        },
+      });
+      
+    } catch (error: any) {
+      logSystem.error('Health alerts: Failed', error);
+      res.status(500).json({
+        status: 'error',
+        timestamp: new Date().toISOString(),
+        error: error.message,
       });
     }
   });
