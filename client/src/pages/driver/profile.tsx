@@ -1,26 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Mail, Phone, Star, Truck, LogOut, FileText, Upload, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { User, Mail, Phone, Star, Truck, LogOut, FileText, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar, Pencil, Camera, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileUpload } from '@/components/FileUpload';
+import { EditProfileModal } from '@/components/EditProfileModal';
+import { DocumentExpirationAlerts } from '@/components/DocumentExpirationAlerts';
 import type { Conductor, Documento } from '@shared/schema';
 
 const REQUIRED_DOCUMENTS = [
-  { tipo: 'licencia', label: 'Licencia de Conducir', requiereVencimiento: true },
-  { tipo: 'matricula', label: 'Matrícula del Vehículo', requiereVencimiento: true },
-  { tipo: 'seguro_grua', label: 'Seguro de la Grúa', requiereVencimiento: true },
-  { tipo: 'foto_vehiculo', label: 'Foto del Vehículo', requiereVencimiento: false },
-  { tipo: 'cedula_frontal', label: 'Cédula (Frente)', requiereVencimiento: false },
-  { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false },
+  { tipo: 'foto_perfil', label: 'Foto de Perfil', requiereVencimiento: false, obligatorio: true, descripcion: 'Debe mostrar claramente tu rostro' },
+  { tipo: 'licencia', label: 'Licencia de Conducir', requiereVencimiento: true, obligatorio: true },
+  { tipo: 'matricula', label: 'Matrícula del Vehículo', requiereVencimiento: true, obligatorio: true },
+  { tipo: 'seguro_grua', label: 'Seguro de la Grúa', requiereVencimiento: true, obligatorio: true },
+  { tipo: 'foto_vehiculo', label: 'Foto del Vehículo', requiereVencimiento: false, obligatorio: true },
+  { tipo: 'cedula_frontal', label: 'Cédula (Frente)', requiereVencimiento: false, obligatorio: true },
+  { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false, obligatorio: true },
 ];
 
 const DOCUMENTOS_CON_VENCIMIENTO = ['seguro_grua', 'licencia', 'matricula'];
@@ -35,12 +39,15 @@ interface StripeAccountStatus {
 }
 
 export default function DriverProfile() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [fechasVencimiento, setFechasVencimiento] = useState<Record<string, string>>({});
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File>>({});
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const documentsRef = useRef<HTMLDivElement>(null);
 
   const { data: driverData } = useQuery<Conductor>({
     queryKey: ['/api/drivers/me'],
@@ -108,6 +115,41 @@ export default function DriverProfile() {
     },
   });
 
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      const response = await fetch('/api/users/profile-photo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al subir la foto');
+      }
+
+      return response.json();
+    },
+    onSuccess: async () => {
+      await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ['/api/documents/my-documents'] });
+      toast({
+        title: 'Foto actualizada',
+        description: 'Tu foto de perfil ha sido actualizada y está pendiente de revisión',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error al subir foto',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const getDocumentStatus = (tipo: string) => {
     const doc = documentos.find(d => d.tipo === tipo);
     return doc;
@@ -128,7 +170,6 @@ export default function DriverProfile() {
     
     if (!file) return;
     
-    // Validate that all documents with expiration require a date
     if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo) && !fechaVencimiento) {
       toast({
         title: 'Fecha requerida',
@@ -138,7 +179,6 @@ export default function DriverProfile() {
       return;
     }
     
-    // Validate that expiration date is in the future for all documents with expiration
     if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo) && fechaVencimiento) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -155,6 +195,31 @@ export default function DriverProfile() {
     
     setUploadingDoc(tipo);
     uploadMutation.mutate({ file, tipo, fechaVencimiento });
+  };
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Formato inválido',
+          description: 'Solo se permiten imágenes (JPG, PNG)',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'Archivo muy grande',
+          description: 'El tamaño máximo es 5MB',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      uploadPhotoMutation.mutate(file);
+    }
   };
 
   const isDocumentExpiringSoon = (documento: Documento): boolean => {
@@ -188,10 +253,8 @@ export default function DriverProfile() {
 
   const stripeOnboardingMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('/api/drivers/stripe-onboarding', {
-        method: 'POST',
-      });
-      return response as { accountId: string; onboardingUrl: string };
+      const response = await apiRequest('POST', '/api/drivers/stripe-onboarding', {});
+      return response.json() as Promise<{ accountId: string; onboardingUrl: string }>;
     },
     onSuccess: (data) => {
       window.location.href = data.onboardingUrl;
@@ -234,17 +297,74 @@ export default function DriverProfile() {
     setLocation('/login');
   };
 
+  const scrollToDocuments = () => {
+    documentsRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const profilePhotoDoc = documentos.find(d => d.tipo === 'foto_perfil');
+  const hasProfilePhoto = !!user.fotoUrl || !!profilePhotoDoc;
+
   return (
     <div className="p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6">Mi Perfil</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Mi Perfil</h1>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => setEditModalOpen(true)}
+          data-testid="button-edit-profile"
+        >
+          <Pencil className="w-4 h-4 mr-2" />
+          Editar
+        </Button>
+      </div>
+
+      <DocumentExpirationAlerts onNavigateToDocuments={scrollToDocuments} />
+
+      {!hasProfilePhoto && (
+        <Alert variant="destructive" className="mb-4" data-testid="alert-missing-photo">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Foto de perfil requerida:</strong> Como conductor, es obligatorio que subas una foto de perfil donde se vea tu rostro claramente para poder ser aprobado.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card className="p-6 mb-4">
         <div className="flex items-center gap-4 mb-6">
-          <Avatar className="w-20 h-20">
-            <AvatarFallback className="text-2xl">
-              {user.nombre[0]}{user.apellido[0]}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="w-20 h-20 border-4 border-background shadow-lg">
+              {user.fotoUrl ? (
+                <AvatarImage src={user.fotoUrl} alt="Foto de perfil" />
+              ) : null}
+              <AvatarFallback className="text-2xl bg-primary text-primary-foreground font-semibold">
+                {user.nombre[0]}{user.apellido[0]}
+              </AvatarFallback>
+            </Avatar>
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="absolute bottom-0 right-0 rounded-full shadow-md h-8 w-8"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploadPhotoMutation.isPending}
+              data-testid="button-change-photo"
+            >
+              {uploadPhotoMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Camera className="w-4 h-4" />
+              )}
+            </Button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/jpg"
+              onChange={handlePhotoSelect}
+              className="hidden"
+              data-testid="input-profile-photo"
+            />
+          </div>
           <div className="flex-1">
             <h2 className="text-xl font-bold" data-testid="text-username">
               {user.nombre} {user.apellido}
@@ -256,6 +376,11 @@ export default function DriverProfile() {
                   {parseFloat(user.calificacionPromedio as string).toFixed(1)}
                 </span>
               </div>
+            )}
+            {!hasProfilePhoto && (
+              <p className="text-xs text-destructive mt-1">
+                Sube una foto de perfil
+              </p>
             )}
           </div>
         </div>
@@ -283,7 +408,7 @@ export default function DriverProfile() {
             <User className="w-5 h-5 text-muted-foreground" />
             <div>
               <p className="text-sm text-muted-foreground">Tipo de usuario</p>
-              <p className="font-medium capitalize">{user.userType}</p>
+              <p className="font-medium capitalize">{user.userType === 'conductor' ? 'Conductor' : user.userType}</p>
             </div>
           </div>
         </div>
@@ -319,14 +444,14 @@ export default function DriverProfile() {
             </div>
           </Card>
 
-          <Card className="p-6 mb-4">
+          <Card className="p-6 mb-4" ref={documentsRef}>
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">Documentos</h3>
             </div>
 
             <div className="space-y-4">
-              {REQUIRED_DOCUMENTS.map((docType) => {
+              {REQUIRED_DOCUMENTS.filter(d => d.tipo !== 'foto_perfil').map((docType) => {
                 const documento = getDocumentStatus(docType.tipo);
                 const isUploading = uploadingDoc === docType.tipo;
                 const hasSelectedFile = !!selectedFiles[docType.tipo];
@@ -339,6 +464,7 @@ export default function DriverProfile() {
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <label className="text-sm font-medium">
                         {docType.label}
+                        {docType.obligatorio && <span className="text-destructive ml-1">*</span>}
                       </label>
                       <div className="flex items-center gap-2 flex-wrap">
                         {documento && expired && (
@@ -557,6 +683,19 @@ export default function DriverProfile() {
         <LogOut className="w-4 h-4 mr-2" />
         Cerrar Sesión
       </Button>
+
+      <EditProfileModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        isDriver={true}
+        currentPhotoUrl={user.fotoUrl}
+        conductorData={driverData ? {
+          licencia: driverData.licencia,
+          placaGrua: driverData.placaGrua,
+          marcaGrua: driverData.marcaGrua,
+          modeloGrua: driverData.modeloGrua,
+        } : undefined}
+      />
     </div>
   );
 }

@@ -1,15 +1,82 @@
+import { useState, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { User, Mail, Phone, Star, LogOut, ChevronRight, Shield, CreditCard } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
+import { useMutation } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import PaymentMethodsManager from '@/components/PaymentMethodsManager';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
+import { EditProfileModal } from '@/components/EditProfileModal';
 
 export default function ClientProfile() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      const response = await fetch('/api/users/profile-photo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al subir la foto');
+      }
+
+      return response.json();
+    },
+    onSuccess: async () => {
+      await refreshUser();
+      toast({
+        title: 'Foto actualizada',
+        description: 'Tu foto de perfil ha sido actualizada',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error al subir foto',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Formato inválido',
+          description: 'Solo se permiten imágenes (JPG, PNG)',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'Archivo muy grande',
+          description: 'El tamaño máximo es 5MB',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      uploadPhotoMutation.mutate(file);
+    }
+  };
 
   if (!user) return null;
 
@@ -21,12 +88,51 @@ export default function ClientProfile() {
   return (
     <div className="min-h-full pb-8">
       <div className="bg-gradient-to-b from-primary/5 to-background px-4 pt-6 pb-8">
+        <div className="flex justify-end mb-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setEditModalOpen(true)}
+            data-testid="button-edit-profile"
+          >
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar
+          </Button>
+        </div>
         <div className="flex flex-col items-center text-center">
-          <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
-            <AvatarFallback className="text-2xl bg-primary text-primary-foreground font-semibold">
-              {user.nombre[0]}{user.apellido[0]}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
+              {user.fotoUrl ? (
+                <AvatarImage src={user.fotoUrl} alt="Foto de perfil" />
+              ) : null}
+              <AvatarFallback className="text-2xl bg-primary text-primary-foreground font-semibold">
+                {user.nombre[0]}{user.apellido[0]}
+              </AvatarFallback>
+            </Avatar>
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="absolute bottom-0 right-0 rounded-full shadow-md h-8 w-8"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploadPhotoMutation.isPending}
+              data-testid="button-change-photo"
+            >
+              {uploadPhotoMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Camera className="w-4 h-4" />
+              )}
+            </Button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/jpg"
+              onChange={handlePhotoSelect}
+              className="hidden"
+              data-testid="input-profile-photo"
+            />
+          </div>
           <h2 className="text-xl font-bold mt-4" data-testid="text-username">
             {user.nombre} {user.apellido}
           </h2>
@@ -101,6 +207,13 @@ export default function ClientProfile() {
           Cerrar Sesión
         </Button>
       </div>
+
+      <EditProfileModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        isDriver={false}
+        currentPhotoUrl={user.fotoUrl}
+      />
     </div>
   );
 }

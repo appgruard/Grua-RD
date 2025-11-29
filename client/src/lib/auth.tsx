@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<UserWithConductor>;
   register: (data: RegisterData) => Promise<UserWithConductor>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -87,8 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await logoutMutation.mutateAsync();
   };
 
+  const refreshUser = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+  };
+
   return (
-    <AuthContext.Provider value={{ user: user || null, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user: user || null, isLoading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

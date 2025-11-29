@@ -1142,12 +1142,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "No autenticado" });
       }
 
-      const { nombre, apellido, conductorData } = req.body;
+      const { nombre, apellido, phone, conductorData } = req.body;
       const userId = req.user!.id;
 
       const updateData: any = {};
       if (nombre !== undefined) updateData.nombre = nombre;
       if (apellido !== undefined) updateData.apellido = apellido;
+      if (phone !== undefined) updateData.phone = phone;
 
       if (Object.keys(updateData).length > 0) {
         await storage.updateUser(userId, updateData);
@@ -1175,6 +1176,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Update user profile error', error, { userId: req.user?.id });
       res.status(500).json({ message: "Error al actualizar perfil" });
+    }
+  });
+
+  // Profile photo upload - needs multer configuration first
+  const profilePhotoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024,
+    },
+    fileFilter: (_req, file, cb) => {
+      if (!file.mimetype.startsWith('image/')) {
+        cb(new Error('Solo se permiten imágenes'));
+        return;
+      }
+      cb(null, true);
+    },
+  });
+
+  app.post("/api/users/profile-photo", profilePhotoUpload.single('photo'), async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No se recibió ninguna imagen" });
+      }
+
+      const userId = req.user!.id;
+
+      // Upload to object storage
+      const uploadResult = await uploadDocument({
+        buffer: req.file.buffer,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        userId,
+        documentType: 'foto_perfil',
+      });
+
+      // Update user's photo URL
+      await storage.updateUser(userId, { fotoUrl: uploadResult.url });
+
+      // If driver, also create/update the foto_perfil document
+      if (req.user!.userType === 'conductor') {
+        const conductor = await storage.getConductorByUserId(userId);
+        if (conductor) {
+          // Check for existing profile photo document
+          const existingDocs = await storage.getDocumentosByConductorId(conductor.id);
+          const existingPhoto = existingDocs.find(d => d.tipo === 'foto_perfil');
+          
+          if (existingPhoto) {
+            // Update existing document
+            await storage.updateDocumento(existingPhoto.id, {
+              url: uploadResult.url,
+              nombreArchivo: req.file.originalname,
+              tamanoArchivo: req.file.size,
+              mimeType: req.file.mimetype,
+              estado: 'pendiente',
+            });
+          } else {
+            // Create new document
+            await storage.createDocumento({
+              tipo: 'foto_perfil',
+              conductorId: conductor.id,
+              url: uploadResult.url,
+              nombreArchivo: req.file.originalname,
+              tamanoArchivo: req.file.size,
+              mimeType: req.file.mimetype,
+              estado: 'pendiente',
+            });
+          }
+        }
+      }
+
+      logSystem.info('Profile photo uploaded', { userId });
+
+      res.json({ 
+        message: "Foto de perfil actualizada",
+        url: uploadResult.url,
+      });
+    } catch (error: any) {
+      logSystem.error('Profile photo upload error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al subir la foto de perfil" });
     }
   });
 
