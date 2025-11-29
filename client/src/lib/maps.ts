@@ -10,6 +10,46 @@ export interface RouteResult {
   durationText: string;
 }
 
+let googleMapsPromise: Promise<void> | null = null;
+
+export function loadGoogleMapsScript(): Promise<void> {
+  if (googleMapsPromise) {
+    return googleMapsPromise;
+  }
+
+  if (typeof window !== 'undefined' && window.google?.maps) {
+    return Promise.resolve();
+  }
+
+  googleMapsPromise = new Promise((resolve, reject) => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    
+    if (!apiKey) {
+      console.warn('Google Maps API key not configured. Map features will be limited.');
+      reject(new Error('Google Maps API key not configured'));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    
+    script.onload = () => {
+      resolve();
+    };
+    
+    script.onerror = () => {
+      googleMapsPromise = null;
+      reject(new Error('Failed to load Google Maps script'));
+    };
+
+    document.head.appendChild(script);
+  });
+
+  return googleMapsPromise;
+}
+
 export async function calculateRoute(
   origin: Coordinates,
   destination: Coordinates

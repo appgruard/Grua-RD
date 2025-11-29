@@ -46,6 +46,7 @@ export default function AdminDashboard() {
 
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const infoWindowsRef = useRef<google.maps.InfoWindow[]>([]);
 
@@ -72,20 +73,25 @@ export default function AdminDashboard() {
 
   // Initialize map
   useEffect(() => {
-    loadGoogleMapsScript().then(() => {
-      if (mapRef.current && !map) {
-        const newMap = new window.google.maps.Map(mapRef.current, {
-          center: { lat: 18.4861, lng: -69.9312 }, // Santo Domingo, RD
-          zoom: 12,
-          disableDefaultUI: false,
-          zoomControl: true,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: true,
-        });
-        setMap(newMap);
-      }
-    });
+    loadGoogleMapsScript()
+      .then(() => {
+        if (mapRef.current && !map) {
+          const newMap = new window.google.maps.Map(mapRef.current, {
+            center: { lat: 18.4861, lng: -69.9312 }, // Santo Domingo, RD
+            zoom: 12,
+            disableDefaultUI: false,
+            zoomControl: true,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+          });
+          setMap(newMap);
+        }
+      })
+      .catch((error) => {
+        console.error('Map error:', error);
+        setMapError('El mapa no está disponible. Configure la API de Google Maps para habilitar esta función.');
+      });
   }, []);
 
   // Update markers when data changes
@@ -323,7 +329,16 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-        <div ref={mapRef} className="w-full h-full min-h-[500px] rounded-lg" data-testid="map-realtime" />
+        {mapError ? (
+          <div className="w-full h-full min-h-[500px] rounded-lg bg-muted flex items-center justify-center" data-testid="map-error">
+            <div className="text-center p-4">
+              <MapPin className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">{mapError}</p>
+            </div>
+          </div>
+        ) : (
+          <div ref={mapRef} className="w-full h-full min-h-[500px] rounded-lg" data-testid="map-realtime" />
+        )}
       </Card>
     </div>
   );
