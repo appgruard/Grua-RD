@@ -205,16 +205,30 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       };
     }
 
-    const fullName = data.data.fullName || '';
-    const nameParts = fullName.split(' ');
-    const firstName = data.data.firstName || nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
-    const lastName = data.data.lastName || nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ');
+    const fullName = (data.data.fullName || '').trim();
+    const firstName = data.data.firstName ? (data.data.firstName).trim() : '';
+    const lastName = data.data.lastName ? (data.data.lastName).trim() : '';
+
+    let nombre = firstName;
+    let apellido = lastName;
+
+    if (!nombre && !apellido && fullName) {
+      const nameParts = fullName.split(' ').filter(p => p.length > 0);
+      if (nameParts.length >= 2) {
+        nombre = nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
+        apellido = nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ');
+      } else if (nameParts.length === 1) {
+        nombre = nameParts[0];
+      }
+    } else if (fullName && !nombre && lastName) {
+      nombre = fullName.replace(lastName, '').trim();
+    }
 
     return {
       success: true,
       cedula: cedula,
-      nombre: firstName,
-      apellido: lastName,
+      nombre: nombre || 'No disponible',
+      apellido: apellido || 'No disponible',
       fechaNacimiento: data.data.dateOfBirth,
       rawData: data
     };
