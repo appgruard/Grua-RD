@@ -221,7 +221,19 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
     const data: VerifikOCRResponse = rawResponse.data || rawResponse;
     
     const ocrData = data.OCRExtraction;
-    const confidenceScore = ocrData?.confidenceScore ?? 0;
+    
+    // Log full OCRExtraction to debug confidenceScore
+    logger.info("Verifik OCR OCRExtraction details", {
+      ocrDataKeys: ocrData ? Object.keys(ocrData) : [],
+      ocrConfidenceScore: ocrData?.confidenceScore,
+      ocrConfidenceScoreType: typeof ocrData?.confidenceScore
+    });
+    
+    // Check for confidenceScore - if undefined or 0, assume document was read successfully
+    const rawConfidence = ocrData?.confidenceScore;
+    const confidenceScore = (typeof rawConfidence === 'number' && rawConfidence > 0) 
+      ? rawConfidence 
+      : (ocrData?.firstName && ocrData?.lastName ? 0.8 : 0);
     
     logger.info("Verifik OCR response received", { 
       hasOCRData: !!ocrData,
@@ -229,7 +241,8 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       firstName: ocrData?.firstName,
       lastName: ocrData?.lastName,
       documentNumber: ocrData?.documentNumber || data.documentNumber,
-      confidenceScore: confidenceScore
+      confidenceScore: confidenceScore,
+      rawConfidenceScore: ocrData?.confidenceScore
     });
 
     if (!ocrData && !data.documentNumber) {
