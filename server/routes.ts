@@ -1119,14 +1119,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      if (req.isAuthenticated() && result.nombre && result.apellido) {
+      if (req.isAuthenticated()) {
         const user = req.user!;
+        
+        if (!result.nombre || !result.apellido) {
+          logSystem.warn('Could not verify name match - insufficient data from OCR', {
+            userId: user.id,
+            hasNombre: !!result.nombre,
+            hasApellido: !!result.apellido,
+            confidenceScore: result.confidenceScore
+          });
+          
+          return res.status(400).json({
+            success: false,
+            verified: false,
+            nameMatch: false,
+            confidenceScore: result.confidenceScore,
+            message: "No se pudo extraer el nombre completo de la cédula. Por favor, asegúrate de que la imagen sea clara y legible."
+          });
+        }
+        
         const nameComparison = compareNames(
           user.nombre,
           user.apellido,
           result.nombre,
           result.apellido
         );
+
+        logSystem.info('Name comparison result', {
+          userId: user.id,
+          registeredName: `${user.nombre} ${user.apellido}`,
+          documentName: `${result.nombre} ${result.apellido}`,
+          similarity: nameComparison.similarity,
+          match: nameComparison.match,
+          confidenceScore: result.confidenceScore
+        });
 
         if (!nameComparison.match) {
           logSystem.warn('Name mismatch during cedula verification', {
@@ -1140,6 +1167,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             success: false,
             verified: false,
             nameMatch: false,
+            confidenceScore: result.confidenceScore,
+            similarity: nameComparison.similarity,
             message: `La cédula no coincide con sus datos de registro. El nombre en la cédula "${result.nombre} ${result.apellido}" no corresponde con el nombre registrado "${user.nombre} ${user.apellido}".`
           });
         }
@@ -1147,12 +1176,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         logSystem.info('Name verification passed', {
           userId: user.id,
           similarity: nameComparison.similarity
-        });
-      } else if (req.isAuthenticated() && (!result.nombre || !result.apellido)) {
-        logSystem.warn('Could not verify name match - insufficient data from OCR', {
-          userId: req.user?.id,
-          hasNombre: !!result.nombre,
-          hasApellido: !!result.apellido
         });
       }
 
@@ -1173,6 +1196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       logSystem.info('OCR scan successful', { 
         cedula: result.cedula?.slice(0, 5) + '***', 
         verified: result.verified,
+        confidenceScore: result.confidenceScore,
         userId: userId || req.user?.id 
       });
 
@@ -1183,6 +1207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apellido: result.apellido,
         verified: result.verified,
         nameMatch: true,
+        confidenceScore: result.confidenceScore,
         message: result.verified 
           ? "Cédula escaneada y verificada exitosamente"
           : "Cédula escaneada. Verificación pendiente."

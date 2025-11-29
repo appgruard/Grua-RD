@@ -68,24 +68,48 @@ export function compareNames(
   return { match, similarity, details };
 }
 
+interface VerifikOCRExtraction {
+  documentType?: string;
+  country?: string;
+  category?: string;
+  confidenceScore?: number;
+  documentNumber?: string;
+  firstName?: string;
+  lastName?: string;
+  placeOfBirth?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  gender?: string;
+  stateCivil?: string;
+  occupation?: string;
+  expirationDate?: string;
+  [key: string]: any;
+}
+
 interface VerifikOCRResponse {
-  data?: {
-    documentType?: string;
-    documentNumber?: string;
-    fullName?: string;
-    firstName?: string;
-    lastName?: string;
-    dateOfBirth?: string;
-    expirationDate?: string;
-    nationality?: string;
-    gender?: string;
-    [key: string]: any;
-  };
-  signature?: {
-    dateTime: string;
-    message: string;
-  };
-  id?: string;
+  _id?: string;
+  country?: string;
+  documentCategory?: string;
+  documentNumber?: string;
+  documentType?: string;
+  firstNameMatchPercentage?: number;
+  fullNameMatchPercentage?: number;
+  lastNameMatchPercentage?: number;
+  namesMatch?: boolean;
+  gender?: string;
+  imageValidated?: boolean;
+  infoValidationSupported?: boolean;
+  inputMethod?: string;
+  nationality?: string;
+  OCRExtraction?: VerifikOCRExtraction;
+  requiresBackSide?: boolean;
+  scoreValidated?: boolean;
+  status?: string;
+  type?: string;
+  url?: string;
+  validationMethod?: string;
+  updatedAt?: string;
+  createdAt?: string;
   error?: string;
   message?: string;
 }
@@ -114,6 +138,7 @@ interface OCRScanResult {
   nombre?: string;
   apellido?: string;
   fechaNacimiento?: string;
+  confidenceScore?: number;
   rawData?: any;
   error?: string;
 }
@@ -184,23 +209,35 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
 
     const data: VerifikOCRResponse = await response.json();
     
+    const ocrData = data.OCRExtraction;
+    const confidenceScore = ocrData?.confidenceScore ?? 0;
+    
     logger.info("Verifik OCR response received", { 
-      hasData: !!data.data,
-      documentType: data.data?.documentType,
-      fullName: data.data?.fullName,
-      firstName: data.data?.firstName,
-      lastName: data.data?.lastName,
-      documentNumber: data.data?.documentNumber
+      hasOCRData: !!ocrData,
+      documentType: ocrData?.documentType || data.documentType,
+      firstName: ocrData?.firstName,
+      lastName: ocrData?.lastName,
+      documentNumber: ocrData?.documentNumber || data.documentNumber,
+      confidenceScore: confidenceScore
     });
 
-    if (!data.data) {
+    if (!ocrData && !data.documentNumber) {
       return {
         success: false,
         error: "No se pudo extraer información del documento"
       };
     }
 
-    const cedula = data.data.documentNumber?.replace(/[\s-]/g, '');
+    if (confidenceScore < 0.6) {
+      logger.warn("Low confidence score in OCR scan", { confidenceScore });
+      return {
+        success: false,
+        error: `La calidad del escaneo es muy baja (${Math.round(confidenceScore * 100)}%). Por favor, toma una foto más clara de tu cédula con buena iluminación.`
+      };
+    }
+
+    const rawCedula = ocrData?.documentNumber || data.documentNumber || '';
+    const cedula = rawCedula.replace(/[\s-]/g, '');
     
     if (!cedula || cedula.length !== 11) {
       return {
@@ -209,31 +246,19 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       };
     }
 
-    const fullName = (data.data.fullName || '').trim();
-    const firstName = data.data.firstName ? (data.data.firstName).trim() : '';
-    const lastName = data.data.lastName ? (data.data.lastName).trim() : '';
+    const firstName = ocrData?.firstName ? ocrData.firstName.trim() : '';
+    const lastName = ocrData?.lastName ? ocrData.lastName.trim() : '';
 
     let nombre = firstName;
     let apellido = lastName;
-
-    if (!nombre && !apellido && fullName) {
-      const nameParts = fullName.split(' ').filter(p => p.length > 0);
-      if (nameParts.length >= 2) {
-        nombre = nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
-        apellido = nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ');
-      } else if (nameParts.length === 1) {
-        nombre = nameParts[0];
-      }
-    } else if (fullName && !nombre && lastName) {
-      nombre = fullName.replace(lastName, '').trim();
-    }
 
     return {
       success: true,
       cedula: cedula,
       nombre: nombre,
       apellido: apellido,
-      fechaNacimiento: data.data.dateOfBirth,
+      fechaNacimiento: ocrData?.dateOfBirth,
+      confidenceScore: confidenceScore,
       rawData: data
     };
 
@@ -350,6 +375,7 @@ export async function scanAndVerifyCedula(imageBase64: string): Promise<{
   nombre?: string;
   apellido?: string;
   verified: boolean;
+  confidenceScore?: number;
   error?: string;
 }> {
   const scanResult = await scanCedulaOCR(imageBase64);
@@ -358,6 +384,7 @@ export async function scanAndVerifyCedula(imageBase64: string): Promise<{
     return {
       success: false,
       verified: false,
+      confidenceScore: scanResult.confidenceScore,
       error: scanResult.error || "No se pudo escanear la cédula"
     };
   }
@@ -371,6 +398,7 @@ export async function scanAndVerifyCedula(imageBase64: string): Promise<{
       nombre: scanResult.nombre,
       apellido: scanResult.apellido,
       verified: false,
+      confidenceScore: scanResult.confidenceScore,
       error: verifyResult.error
     };
   }
@@ -381,6 +409,7 @@ export async function scanAndVerifyCedula(imageBase64: string): Promise<{
     nombre: verifyResult.nombre || scanResult.nombre,
     apellido: verifyResult.apellido || scanResult.apellido,
     verified: verifyResult.verified,
+    confidenceScore: scanResult.confidenceScore,
     error: verifyResult.verified ? undefined : "La cédula no pudo ser verificada en los registros oficiales"
   };
 }
