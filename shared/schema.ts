@@ -494,6 +494,32 @@ export const documentoRecordatoriosRelations = relations(documentoRecordatorios,
   }),
 }));
 
+// ==================== CLIENT PAYMENT METHODS (AZUL) ====================
+
+// Client Payment Methods Table (Azul DataVault tokens for clients)
+export const clientPaymentMethods = pgTable("client_payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  azulToken: text("azul_token").notNull(),
+  cardBrand: text("card_brand").notNull(),
+  last4: text("last4").notNull(),
+  expiryMonth: integer("expiry_month").notNull(),
+  expiryYear: integer("expiry_year").notNull(),
+  cardholderName: text("cardholder_name"),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Client Payment Methods Relations
+export const clientPaymentMethodsRelations = relations(clientPaymentMethods, ({ one }) => ({
+  user: one(users, {
+    fields: [clientPaymentMethods.userId],
+    references: [users.id],
+  }),
+}));
+
+// ==================== END CLIENT PAYMENT METHODS ====================
+
 // Validation functions
 const validarCedulaRD = (cedula: string): boolean => {
   if (!/^\d{11}$/.test(cedula)) return false;
@@ -677,6 +703,19 @@ export const insertDistribucionSocioSchema = createInsertSchema(distribucionesSo
   fechaAprobacion: true,
 });
 
+export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentMethods, {
+  azulToken: z.string().min(1, "Token de Azul es requerido"),
+  cardBrand: z.string().min(1, "Marca de tarjeta es requerida"),
+  last4: z.string().length(4, "Los últimos 4 dígitos son requeridos"),
+  expiryMonth: z.number().min(1).max(12),
+  expiryYear: z.number().min(2024),
+  cardholderName: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  isDefault: true,
+});
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -693,6 +732,7 @@ export const selectAseguradoraSchema = createSelectSchema(aseguradoras);
 export const selectServicioAseguradoraSchema = createSelectSchema(serviciosAseguradora);
 export const selectSocioSchema = createSelectSchema(socios);
 export const selectDistribucionSocioSchema = createSelectSchema(distribucionesSocios);
+export const selectClientPaymentMethodSchema = createSelectSchema(clientPaymentMethods);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -739,6 +779,9 @@ export type Socio = typeof socios.$inferSelect;
 
 export type InsertDistribucionSocio = z.infer<typeof insertDistribucionSocioSchema>;
 export type DistribucionSocio = typeof distribucionesSocios.$inferSelect;
+
+export type InsertClientPaymentMethod = z.infer<typeof insertClientPaymentMethodSchema>;
+export type ClientPaymentMethod = typeof clientPaymentMethods.$inferSelect;
 
 // Helper types for API responses
 export type UserWithConductor = User & {

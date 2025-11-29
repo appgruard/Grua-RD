@@ -20,6 +20,7 @@ import {
   mensajesTicket,
   socios,
   distribucionesSocios,
+  clientPaymentMethods,
   type User,
   type InsertUser,
   type Conductor,
@@ -68,6 +69,8 @@ import {
   type InsertDistribucionSocio,
   type SocioWithDetails,
   type DistribucionSocioWithDetails,
+  type ClientPaymentMethod,
+  type InsertClientPaymentMethod,
 } from '@shared/schema';
 import {
   conductorStripeAccounts,
@@ -361,6 +364,15 @@ export interface IStorage {
     totalDistribuido: number;
     pendientePago: number;
   }>;
+
+  // Client Payment Methods (Azul)
+  createClientPaymentMethod(paymentMethod: InsertClientPaymentMethod): Promise<ClientPaymentMethod>;
+  getClientPaymentMethodById(id: string): Promise<ClientPaymentMethod | undefined>;
+  getClientPaymentMethodsByUserId(userId: string): Promise<ClientPaymentMethod[]>;
+  getDefaultClientPaymentMethod(userId: string): Promise<ClientPaymentMethod | undefined>;
+  updateClientPaymentMethod(id: string, data: Partial<ClientPaymentMethod>): Promise<ClientPaymentMethod>;
+  setDefaultClientPaymentMethod(id: string, userId: string): Promise<ClientPaymentMethod>;
+  deleteClientPaymentMethod(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2576,6 +2588,74 @@ export class DatabaseStorage implements IStorage {
       totalDistribuido: distribucionesStats?.totalDistribuido || 0,
       pendientePago: distribucionesStats?.pendientePago || 0,
     };
+  }
+
+  // Client Payment Methods (Azul)
+  async createClientPaymentMethod(paymentMethod: InsertClientPaymentMethod): Promise<ClientPaymentMethod> {
+    const existingMethods = await this.getClientPaymentMethodsByUserId(paymentMethod.userId);
+    const isFirst = existingMethods.length === 0;
+    
+    const [method] = await db.insert(clientPaymentMethods).values({
+      ...paymentMethod,
+      isDefault: isFirst,
+    }).returning();
+    return method;
+  }
+
+  async getClientPaymentMethodById(id: string): Promise<ClientPaymentMethod | undefined> {
+    const [method] = await db.select().from(clientPaymentMethods).where(eq(clientPaymentMethods.id, id));
+    return method;
+  }
+
+  async getClientPaymentMethodsByUserId(userId: string): Promise<ClientPaymentMethod[]> {
+    return db.select()
+      .from(clientPaymentMethods)
+      .where(eq(clientPaymentMethods.userId, userId))
+      .orderBy(desc(clientPaymentMethods.isDefault), desc(clientPaymentMethods.createdAt));
+  }
+
+  async getDefaultClientPaymentMethod(userId: string): Promise<ClientPaymentMethod | undefined> {
+    const [method] = await db.select()
+      .from(clientPaymentMethods)
+      .where(and(
+        eq(clientPaymentMethods.userId, userId),
+        eq(clientPaymentMethods.isDefault, true)
+      ));
+    return method;
+  }
+
+  async updateClientPaymentMethod(id: string, data: Partial<ClientPaymentMethod>): Promise<ClientPaymentMethod> {
+    const [method] = await db.update(clientPaymentMethods)
+      .set(data)
+      .where(eq(clientPaymentMethods.id, id))
+      .returning();
+    return method;
+  }
+
+  async setDefaultClientPaymentMethod(id: string, userId: string): Promise<ClientPaymentMethod> {
+    await db.update(clientPaymentMethods)
+      .set({ isDefault: false })
+      .where(and(
+        eq(clientPaymentMethods.userId, userId),
+        eq(clientPaymentMethods.isDefault, true)
+      ));
+    
+    const [method] = await db.update(clientPaymentMethods)
+      .set({ isDefault: true })
+      .where(and(
+        eq(clientPaymentMethods.id, id),
+        eq(clientPaymentMethods.userId, userId)
+      ))
+      .returning();
+    
+    if (!method) {
+      throw new Error('Payment method not found or not owned by user');
+    }
+    return method;
+  }
+
+  async deleteClientPaymentMethod(id: string): Promise<void> {
+    await db.delete(clientPaymentMethods).where(eq(clientPaymentMethods.id, id));
   }
 }
 

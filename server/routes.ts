@@ -3636,6 +3636,261 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== CLIENT PAYMENT METHODS (AZUL) ====================
+
+  // Get client's payment methods
+  app.get("/api/client/payment-methods", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const methods = await storage.getClientPaymentMethodsByUserId(req.user!.id);
+      res.json(methods);
+    } catch (error: any) {
+      logSystem.error('Get client payment methods error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get payment methods" });
+    }
+  });
+
+  // Add a new payment method for client
+  app.post("/api/client/payment-methods", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { cardNumber, cardExpiry, cardCVV, cardholderName } = req.body;
+
+      if (!cardNumber || !cardExpiry || !cardCVV) {
+        return res.status(400).json({ 
+          message: "Datos de tarjeta incompletos (cardNumber, cardExpiry, cardCVV son requeridos)" 
+        });
+      }
+
+      const cleanNumber = cardNumber.replace(/\s/g, '');
+      const cleanExpiry = cardExpiry.replace('/', '');
+      
+      if (!/^\d{15,16}$/.test(cleanNumber)) {
+        return res.status(400).json({ 
+          message: "Número de tarjeta inválido. Debe contener 15-16 dígitos." 
+        });
+      }
+      
+      if (!/^\d{4}$/.test(cleanExpiry)) {
+        return res.status(400).json({ 
+          message: "Fecha de vencimiento inválida. Usa formato MMYY." 
+        });
+      }
+      
+      const month = parseInt(cleanExpiry.substring(0, 2), 10);
+      const year = 2000 + parseInt(cleanExpiry.substring(2, 4), 10);
+      if (month < 1 || month > 12) {
+        return res.status(400).json({ 
+          message: "Mes de vencimiento inválido." 
+        });
+      }
+      
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        return res.status(400).json({ 
+          message: "La tarjeta ha expirado." 
+        });
+      }
+      
+      if (!/^\d{3,4}$/.test(cardCVV)) {
+        return res.status(400).json({ 
+          message: "CVV inválido. Debe contener 3-4 dígitos." 
+        });
+      }
+
+      const { azulPaymentService } = await import('./services/azul-payment');
+      
+      if (!azulPaymentService.isConfigured()) {
+        return res.status(503).json({ 
+          message: "El servicio de pagos no está configurado. Por favor, contacta al administrador.",
+          configured: false 
+        });
+      }
+
+      // Create DataVault token with Azul
+      let token: string;
+      try {
+        token = await azulPaymentService.createDataVaultToken(
+          cleanNumber,
+          cleanExpiry,
+          cardCVV,
+          req.user!.id
+        );
+      } catch (azulError: any) {
+        logSystem.error('Azul tokenization failed', azulError, { userId: req.user!.id });
+        return res.status(422).json({ 
+          message: "No se pudo procesar la tarjeta. Verifica los datos e intenta de nuevo.",
+          code: "TOKENIZATION_FAILED"
+        });
+      }
+
+      // Determine card brand from card number (cleanNumber already defined above)
+      let cardBrand = 'unknown';
+      if (cleanNumber.startsWith('4')) {
+        cardBrand = 'visa';
+      } else if (cleanNumber.startsWith('5')) {
+        cardBrand = 'mastercard';
+      } else if (cleanNumber.startsWith('3')) {
+        cardBrand = 'amex';
+      }
+
+      // Parse expiry (cleanExpiry already defined above)
+      let expiryMonth = 0;
+      let expiryYear = 0;
+      if (cleanExpiry.length === 4) {
+        expiryMonth = parseInt(cleanExpiry.substring(0, 2), 10);
+        expiryYear = 2000 + parseInt(cleanExpiry.substring(2, 4), 10);
+      }
+
+      // Get last 4 digits
+      const last4 = cleanNumber.slice(-4);
+
+      // Save payment method
+      const paymentMethod = await storage.createClientPaymentMethod({
+        userId: req.user!.id,
+        azulToken: token,
+        cardBrand,
+        last4,
+        expiryMonth,
+        expiryYear,
+        cardholderName: cardholderName || null,
+      });
+
+      logTransaction.info('Client payment method created', { 
+        userId: req.user!.id,
+        paymentMethodId: paymentMethod.id,
+        cardBrand,
+        last4,
+      });
+
+      res.json({
+        success: true,
+        message: "Tarjeta guardada correctamente",
+        paymentMethod: {
+          id: paymentMethod.id,
+          cardBrand: paymentMethod.cardBrand,
+          last4: paymentMethod.last4,
+          expiryMonth: paymentMethod.expiryMonth,
+          expiryYear: paymentMethod.expiryYear,
+          isDefault: paymentMethod.isDefault,
+        },
+      });
+    } catch (error: any) {
+      logSystem.error('Create client payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Error al guardar la tarjeta" });
+    }
+  });
+
+  // Set default payment method
+  app.put("/api/client/payment-methods/:id/default", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { id } = req.params;
+      
+      // Verify ownership
+      const method = await storage.getClientPaymentMethodById(id);
+      if (!method) {
+        return res.status(404).json({ message: "Método de pago no encontrado" });
+      }
+      
+      if (method.userId !== req.user!.id) {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      const updatedMethod = await storage.setDefaultClientPaymentMethod(id, req.user!.id);
+
+      logSystem.info('Client payment method set as default', { 
+        userId: req.user!.id,
+        paymentMethodId: id,
+      });
+
+      res.json({
+        success: true,
+        message: "Tarjeta predeterminada actualizada",
+        paymentMethod: updatedMethod,
+      });
+    } catch (error: any) {
+      logSystem.error('Set default payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Error al actualizar la tarjeta predeterminada" });
+    }
+  });
+
+  // Delete payment method
+  app.delete("/api/client/payment-methods/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { id } = req.params;
+      
+      // Verify ownership
+      const method = await storage.getClientPaymentMethodById(id);
+      if (!method) {
+        return res.status(404).json({ message: "Método de pago no encontrado" });
+      }
+      
+      if (method.userId !== req.user!.id) {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      await storage.deleteClientPaymentMethod(id);
+
+      // If this was the default, set another one as default
+      if (method.isDefault) {
+        const remainingMethods = await storage.getClientPaymentMethodsByUserId(req.user!.id);
+        if (remainingMethods.length > 0) {
+          await storage.setDefaultClientPaymentMethod(remainingMethods[0].id, req.user!.id);
+        }
+      }
+
+      logSystem.info('Client payment method deleted', { 
+        userId: req.user!.id,
+        paymentMethodId: id,
+      });
+
+      res.json({
+        success: true,
+        message: "Tarjeta eliminada correctamente",
+      });
+    } catch (error: any) {
+      logSystem.error('Delete client payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Error al eliminar la tarjeta" });
+    }
+  });
+
+  // Check Azul payment service status
+  app.get("/api/client/payment-service-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { azulPaymentService } = await import('./services/azul-payment');
+      
+      res.json({
+        configured: azulPaymentService.isConfigured(),
+        gateway: 'azul',
+      });
+    } catch (error: any) {
+      logSystem.error('Get payment service status error', error);
+      res.status(500).json({ message: "Error checking payment service status" });
+    }
+  });
+
+  // ==================== END CLIENT PAYMENT METHODS ====================
+
   // Payment status polling for clients
   app.get("/api/payments/:servicioId/status", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {

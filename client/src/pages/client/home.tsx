@@ -31,6 +31,7 @@ export default function ClientHome() {
   const [step, setStep] = useState<Step>('address');
   const [tipoVehiculo, setTipoVehiculo] = useState<string | null>(null);
   const [metodoPago, setMetodoPago] = useState<string>('efectivo');
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [aseguradoraNombre, setAseguradoraNombre] = useState<string>('');
   const [aseguradoraPoliza, setAseguradoraPoliza] = useState<string>('');
   const [isCalculating, setIsCalculating] = useState(false);
@@ -183,6 +184,14 @@ export default function ClientHome() {
           return;
         }
       }
+      if (metodoPago === 'tarjeta' && !selectedCardId) {
+        toast({
+          title: 'Seleccione una tarjeta',
+          description: 'Debe seleccionar una tarjeta guardada o agregar una nueva en su perfil',
+          variant: 'destructive',
+        });
+        return;
+      }
       setStep('confirm');
     }
   };
@@ -224,6 +233,10 @@ export default function ClientHome() {
       serviceData.aseguradoraPoliza = aseguradoraPoliza;
     }
 
+    if (metodoPago === 'tarjeta' && selectedCardId) {
+      serviceData.paymentMethodId = selectedCardId;
+    }
+
     createServiceMutation.mutate(serviceData);
   };
 
@@ -237,6 +250,7 @@ export default function ClientHome() {
     setCost(null);
     setTipoVehiculo(null);
     setMetodoPago('efectivo');
+    setSelectedCardId(null);
     setAseguradoraNombre('');
     setAseguradoraPoliza('');
     setStep('address');
@@ -435,6 +449,8 @@ export default function ClientHome() {
               <PaymentMethodSelector 
                 value={metodoPago} 
                 onChange={setMetodoPago} 
+                selectedCardId={selectedCardId}
+                onCardSelect={setSelectedCardId}
                 insuranceStatus={insuranceStatus} 
               />
               
