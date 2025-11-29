@@ -290,7 +290,7 @@ export default function ClientHome() {
       <div 
         className={cn(
           "bg-background border-t border-border transition-all duration-300 safe-area-inset-bottom",
-          showExpandedCard ? "max-h-[75vh]" : "max-h-16"
+          showExpandedCard ? "max-h-[85vh] md:max-h-[75vh]" : "max-h-16"
         )}
       >
         <button 
@@ -302,8 +302,8 @@ export default function ClientHome() {
         </button>
 
         <div className={cn(
-          "overflow-y-auto transition-all duration-300 px-4 pb-4",
-          showExpandedCard ? "max-h-[calc(75vh-48px)]" : "max-h-0 overflow-hidden"
+          "transition-all duration-300 px-4 pb-4",
+          showExpandedCard ? "max-h-[calc(85vh-48px)] md:max-h-[calc(75vh-48px)] overflow-y-auto" : "max-h-0 overflow-hidden"
         )}>
           {step === 'address' && (
             <div className="space-y-4">
