@@ -186,6 +186,7 @@ export interface IStorage {
 
   // Seguro del Cliente
   getClientInsuranceDocument(userId: string): Promise<DocumentoWithDetails | undefined>;
+  getAllClientInsuranceDocuments(userId: string): Promise<DocumentoWithDetails[]>;
   hasApprovedClientInsurance(userId: string): Promise<boolean>;
 
   // Servicios con Aseguradora
@@ -1153,6 +1154,23 @@ export class DatabaseStorage implements IStorage {
       orderBy: desc(documentos.createdAt),
     });
     return result;
+  }
+
+  async getAllClientInsuranceDocuments(userId: string): Promise<DocumentoWithDetails[]> {
+    const results = await db.query.documentos.findMany({
+      where: and(
+        eq(documentos.usuarioId, userId),
+        eq(documentos.tipo, 'seguro_cliente')
+      ),
+      with: {
+        usuario: true,
+        conductor: true,
+        servicio: true,
+        revisadoPorUsuario: true,
+      },
+      orderBy: desc(documentos.createdAt),
+    });
+    return results;
   }
 
   async hasApprovedClientInsurance(userId: string): Promise<boolean> {
