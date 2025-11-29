@@ -116,13 +116,20 @@ export default function DriverDashboard() {
       if (errorResponse?.missingDocuments && errorResponse.missingDocuments.length > 0) {
         const documentsList = errorResponse.missingDocuments.join(', ');
         toast({
-          title: 'Documentos pendientes',
-          description: `Debes tener todos tus documentos aprobados. Documentos pendientes: ${documentsList}`,
+          title: 'Documentos incompletos',
+          description: `No puedes activar disponibilidad. Necesitas: ${documentsList}`,
+          variant: 'destructive',
+        });
+      } else if (errorResponse?.expiredDocuments && errorResponse.expiredDocuments.length > 0) {
+        const documentsList = errorResponse.expiredDocuments.join(', ');
+        toast({
+          title: 'Documentos vencidos',
+          description: `Los siguientes documentos han vencido: ${documentsList}. Por favor, renuévalos.`,
           variant: 'destructive',
         });
       } else if (errorResponse?.message) {
         toast({
-          title: 'Error',
+          title: 'No se puede activar disponibilidad',
           description: errorResponse.message,
           variant: 'destructive',
         });
