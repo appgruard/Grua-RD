@@ -44,6 +44,9 @@ export default function ClientHome() {
     queryKey: ['/api/client/insurance/status'],
   });
 
+  const DEFAULT_PRECIO_BASE = 150;
+  const DEFAULT_TARIFA_POR_KM = 20;
+
   const calculatePricingMutation = useMutation({
     mutationFn: async (distanceKm: number) => {
       const res = await apiRequest('POST', '/api/pricing/calculate', { distanceKm });
@@ -51,10 +54,16 @@ export default function ClientHome() {
       return res.json();
     },
     onSuccess: (data) => {
-      setCost(data.total);
+      if (data.total && data.total > 0) {
+        setCost(data.total);
+      } else {
+        const currentDist = distanceRef.current || 0;
+        setCost(DEFAULT_PRECIO_BASE + (currentDist * DEFAULT_TARIFA_POR_KM));
+      }
     },
     onError: () => {
-      setCost(150);
+      const currentDist = distanceRef.current || 0;
+      setCost(DEFAULT_PRECIO_BASE + (currentDist * DEFAULT_TARIFA_POR_KM));
     },
   });
 
@@ -198,14 +207,14 @@ export default function ClientHome() {
     const finalCost = cost || DEFAULT_MIN_COST;
 
     const serviceData: any = {
-      origenLat: origin.lat,
-      origenLng: origin.lng,
+      origenLat: origin.lat.toString(),
+      origenLng: origin.lng.toString(),
       origenDireccion: origenDireccion || `${origin.lat}, ${origin.lng}`,
-      destinoLat: destination.lat,
-      destinoLng: destination.lng,
+      destinoLat: destination.lat.toString(),
+      destinoLng: destination.lng.toString(),
       destinoDireccion: destinoDireccion || `${destination.lat}, ${destination.lng}`,
-      distanciaKm: Number(currentDistance.toFixed(2)),
-      costoTotal: Number(finalCost.toFixed(2)),
+      distanciaKm: currentDistance.toFixed(2),
+      costoTotal: finalCost.toFixed(2),
       metodoPago,
       tipoVehiculo,
     };
