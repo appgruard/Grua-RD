@@ -55,3 +55,16 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Replit Object Storage**: For document storage.
 - **Twilio**: SMS service for OTP delivery.
 - **Verifik**: OCR scanning (`/v2/ocr/scan-prompt`) and Dominican government database verification (`/v2/do/cedula`) for cédula validation.
+
+## Recent Changes
+
+### November 29, 2025 - Multiple Insurance Documents Support
+- **Client Insurance**: Clients can now upload multiple insurance documents for different vehicles
+- **API Changes**: 
+  - `POST /api/client/insurance` now adds documents without deleting existing ones
+  - Added `vehiculoDescripcion` field to identify which vehicle the insurance is for
+  - `GET /api/client/insurance` returns array of all documents
+  - `GET /api/client/insurance/status` returns counts (approved, pending, rejected) plus backward-compatible single status
+  - `DELETE /api/client/insurance/:documentId` deletes specific document with ownership validation
+- **Frontend**: ClientInsuranceManager component updated to display list of insurances with add/delete functionality
+- **Storage**: Added `getAllClientInsuranceDocuments(userId)` function
