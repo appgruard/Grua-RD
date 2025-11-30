@@ -359,7 +359,7 @@ export default function ClientHome() {
     }
   };
 
-  const handleSubtypeChange = (subtype: string) => {
+  const handleSubtypeChange = (subtype: string | null) => {
     setServicioSubtipo(subtype);
     setOrigin(null);
     setDestination(null);
