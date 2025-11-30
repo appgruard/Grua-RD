@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, Mail, Phone, Star, Truck, LogOut, FileText, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar, Pencil, Camera, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Star, Truck, LogOut, FileText, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar, Pencil, Camera, Loader2, Wrench, Shield, ShieldCheck, ShieldX, ShieldAlert, Edit3, Save, X } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -16,7 +16,19 @@ import { FileUpload } from '@/components/FileUpload';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { DocumentExpirationAlerts } from '@/components/DocumentExpirationAlerts';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
+import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
 import type { Conductor, Documento } from '@shared/schema';
+
+interface VerifikValidation {
+  cedulaVerificada: boolean;
+  validationScore?: number;
+  validatedAt?: string;
+  validationDetails?: {
+    faceMatchScore?: number;
+    documentValidity?: boolean;
+    livenessCheck?: boolean;
+  };
+}
 
 const REQUIRED_DOCUMENTS = [
   { tipo: 'foto_perfil', label: 'Foto de Perfil', requiereVencimiento: false, obligatorio: true, descripcion: 'Debe mostrar claramente tu rostro' },
@@ -47,6 +59,8 @@ export default function DriverProfile() {
   const [fechasVencimiento, setFechasVencimiento] = useState<Record<string, string>>({});
   const [selectedFiles, setSelectedFiles] = useState<Record<string, File>>({});
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingServices, setEditingServices] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const documentsRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +77,38 @@ export default function DriverProfile() {
     queryKey: ['/api/drivers/stripe-account-status'],
     enabled: !!driverData,
     retry: 2,
+  });
+
+  const { data: driverServices, isLoading: isLoadingServices } = useQuery<{ categorias: ServiceSelection[] }>({
+    queryKey: ['/api/drivers/me/servicios'],
+    enabled: !!driverData,
+  });
+
+  const { data: verifikStatus } = useQuery<VerifikValidation>({
+    queryKey: ['/api/identity/status'],
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    if (driverServices?.categorias && !editingServices) {
+      setSelectedServices(driverServices.categorias);
+    }
+  }, [driverServices, editingServices]);
+
+  const saveServicesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('PUT', '/api/drivers/me/servicios', { categorias: selectedServices });
+      if (!res.ok) throw new Error((await res.json()).message || 'Error al guardar servicios');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/me/servicios'] });
+      toast({ title: 'Servicios actualizados', description: 'Tus categorías de servicio han sido guardadas' });
+      setEditingServices(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error al guardar servicios', description: error.message, variant: 'destructive' });
+    },
   });
 
   const uploadMutation = useMutation({
@@ -442,6 +488,203 @@ export default function DriverProfile() {
                   <p className="font-medium" data-testid="text-modelo">{driverData.modeloGrua}</p>
                 </div>
               </div>
+            </div>
+          </Card>
+
+          <Card className="p-6 mb-4">
+            <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold">Servicios Ofrecidos</h3>
+              </div>
+              {!editingServices ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingServices(true)}
+                  data-testid="button-edit-services"
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditingServices(false);
+                      setSelectedServices(driverServices?.categorias || []);
+                    }}
+                    disabled={saveServicesMutation.isPending}
+                    data-testid="button-cancel-services"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => saveServicesMutation.mutate()}
+                    disabled={saveServicesMutation.isPending || selectedServices.length === 0}
+                    data-testid="button-save-services"
+                  >
+                    {saveServicesMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    Guardar
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {isLoadingServices ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : editingServices ? (
+              <div className="max-h-[400px] overflow-y-auto">
+                <ServiceCategoryMultiSelect
+                  value={selectedServices}
+                  onChange={setSelectedServices}
+                  disabled={saveServicesMutation.isPending}
+                />
+              </div>
+            ) : driverServices?.categorias && driverServices.categorias.length > 0 ? (
+              <div className="space-y-3">
+                {driverServices.categorias.map((service) => {
+                  const categoryInfo = SERVICE_CATEGORIES.find(c => c.id === service.categoria);
+                  return (
+                    <div key={service.categoria} className="p-3 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="default" data-testid={`badge-service-${service.categoria}`}>
+                          {categoryInfo?.label || service.categoria}
+                        </Badge>
+                      </div>
+                      {service.subtipos.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {service.subtipos.map((subtipo) => (
+                            <Badge key={subtipo} variant="secondary" className="text-xs" data-testid={`badge-subtipo-${subtipo}`}>
+                              {categoryInfo?.subtipos.find(s => s.id === subtipo)?.label || subtipo}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Wrench className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No has seleccionado ningún servicio aún.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setEditingServices(true)}
+                  data-testid="button-add-services"
+                >
+                  Agregar Servicios
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-6 mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Verificación de Identidad</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Estado de Verificación</span>
+                {verifikStatus?.cedulaVerificada ? (
+                  <Badge variant="default" className="gap-1" data-testid="badge-verifik-verified">
+                    <ShieldCheck className="w-3 h-3" />
+                    Verificado
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="gap-1" data-testid="badge-verifik-pending">
+                    <ShieldAlert className="w-3 h-3" />
+                    Pendiente
+                  </Badge>
+                )}
+              </div>
+
+              {verifikStatus?.validationScore !== undefined && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Puntuación de Validación</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${
+                          verifikStatus.validationScore >= 0.6 ? 'bg-green-500' : 
+                          verifikStatus.validationScore >= 0.4 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${Math.min(verifikStatus.validationScore * 100, 100)}%` }}
+                      />
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      verifikStatus.validationScore >= 0.6 ? 'text-green-600 dark:text-green-400' :
+                      verifikStatus.validationScore >= 0.4 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
+                    }`} data-testid="text-verifik-score">
+                      {(verifikStatus.validationScore * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {verifikStatus?.validatedAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Fecha de Verificación</span>
+                  <span className="text-sm font-medium" data-testid="text-verifik-date">
+                    {formatDate(verifikStatus.validatedAt)}
+                  </span>
+                </div>
+              )}
+
+              {verifikStatus?.validationDetails && (
+                <div className="pt-3 border-t">
+                  <p className="text-xs text-muted-foreground mb-2">Detalles de Validación</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {verifikStatus.validationDetails.faceMatchScore !== undefined && (
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Coincidencia Facial:</span>
+                        <span className="ml-1 font-medium">{(verifikStatus.validationDetails.faceMatchScore * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
+                    {verifikStatus.validationDetails.documentValidity !== undefined && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Documento:</span>
+                        {verifikStatus.validationDetails.documentValidity ? (
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                        ) : (
+                          <XCircle className="w-3 h-3 text-red-500" />
+                        )}
+                      </div>
+                    )}
+                    {verifikStatus.validationDetails.livenessCheck !== undefined && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Prueba de Vida:</span>
+                        {verifikStatus.validationDetails.livenessCheck ? (
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                        ) : (
+                          <XCircle className="w-3 h-3 text-red-500" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!verifikStatus?.cedulaVerificada && (
+                <p className="text-xs text-muted-foreground">
+                  Tu identidad será verificada automáticamente durante el proceso de registro.
+                </p>
+              )}
             </div>
           </Card>
 

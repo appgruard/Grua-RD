@@ -12,13 +12,19 @@ import { Progress } from '@/components/ui/progress';
 import { FileUpload } from '@/components/ui/file-upload';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ServiceCategoryMultiSelect } from '@/components/ServiceCategoryMultiSelect';
 import { 
   Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard,
-  CheckCircle2, ArrowRight, Clock, Upload
+  CheckCircle2, ArrowRight, Clock, Upload, Truck
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 type UserType = 'cliente' | 'conductor';
+
+interface ServiceSelection {
+  categoria: string;
+  subtipos: string[];
+}
 
 interface OnboardingData {
   email: string;
@@ -38,7 +44,7 @@ interface OnboardingData {
 type StepErrors = Record<string, string>;
 
 const WIZARD_STORAGE_KEY = 'gruard_onboarding_wizard_state';
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 
 export default function OnboardingWizard() {
   const [location, setLocation] = useLocation();
@@ -58,6 +64,7 @@ export default function OnboardingWizard() {
   const [licenseFile, setLicenseFile] = useState<File | null>(null);
   const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
   const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -83,6 +90,7 @@ export default function OnboardingWizard() {
         setCurrentStep(parsed.currentStep || 1);
         setFormData(parsed.formData || formData);
         setCompletedSteps(new Set(parsed.completedSteps || []));
+        setSelectedServices(parsed.selectedServices || []);
       }
     } catch (error) {
       console.error('Error restoring wizard state:', error);
@@ -97,12 +105,13 @@ export default function OnboardingWizard() {
       const stateToSave = {
         currentStep, formData,
         completedSteps: Array.from(completedSteps),
+        selectedServices,
       };
       sessionStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (error) {
       console.error('Error saving wizard state:', error);
     }
-  }, [currentStep, formData, completedSteps, isInitialized]);
+  }, [currentStep, formData, completedSteps, selectedServices, isInitialized]);
 
   const updateField = (field: keyof OnboardingData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -216,10 +225,27 @@ export default function OnboardingWizard() {
     onSuccess: () => {
       toast({ title: '¡Documentos subidos!', description: 'Tus documentos han sido guardados' });
       setCompletedSteps(prev => new Set(prev).add(4));
-      setCurrentStep(formData.userType === 'conductor' ? 5 : 6);
+      setCurrentStep(formData.userType === 'conductor' ? 5 : 7);
     },
     onError: (error: any) => {
       setErrors({ documents: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
+    },
+  });
+
+  const saveServicesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('PUT', '/api/drivers/me/servicios', { categorias: selectedServices });
+      if (!res.ok) throw new Error((await res.json()).message || 'Error al guardar servicios');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: '¡Servicios guardados!', description: 'Tus categorías de servicio han sido registradas' });
+      setCompletedSteps(prev => new Set(prev).add(5));
+      setCurrentStep(6);
+    },
+    onError: (error: any) => {
+      setErrors({ services: error?.message });
       toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
@@ -297,6 +323,15 @@ export default function OnboardingWizard() {
   };
 
   const validateStep5 = (): boolean => {
+    if (selectedServices.length === 0) {
+      setErrors({ services: 'Debes seleccionar al menos una categoría de servicio' });
+      return false;
+    }
+    setErrors({});
+    return true;
+  };
+
+  const validateStep6 = (): boolean => {
     const newErrors: StepErrors = {};
     if (!formData.licencia.trim()) newErrors.licencia = 'Número de licencia requerido';
     if (!formData.placaGrua.trim()) newErrors.placaGrua = 'Placa de la grúa requerida';
@@ -415,6 +450,43 @@ export default function OnboardingWizard() {
 
   const renderStep5 = () => (
     <div className="space-y-4">
+      {errors.services && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errors.services}</AlertDescription>
+        </Alert>
+      )}
+      <div className="text-center mb-4">
+        <Truck className="w-12 h-12 mx-auto text-primary mb-2" />
+        <p className="text-sm text-muted-foreground">
+          Selecciona las categorías de servicios que puedes ofrecer. Puedes elegir múltiples categorías y subtipos específicos.
+        </p>
+      </div>
+      <div className="max-h-[400px] overflow-y-auto pr-2">
+        <ServiceCategoryMultiSelect
+          value={selectedServices}
+          onChange={setSelectedServices}
+          disabled={saveServicesMutation.isPending}
+        />
+      </div>
+      <Button 
+        type="button" 
+        className="w-full" 
+        onClick={() => validateStep5() && saveServicesMutation.mutate()} 
+        disabled={saveServicesMutation.isPending || selectedServices.length === 0} 
+        data-testid="button-save-services"
+      >
+        {saveServicesMutation.isPending ? (
+          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+        ) : (
+          <>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
+        )}
+      </Button>
+    </div>
+  );
+
+  const renderStep6 = () => (
+    <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="licencia">Número de Licencia</Label>
         <Input id="licencia" placeholder="Licencia de conducir" value={formData.licencia} onChange={(e) => updateField('licencia', e.target.value)} disabled={finalizeProfileMutation.isPending} data-testid="input-licencia" />
@@ -435,13 +507,13 @@ export default function OnboardingWizard() {
         <Input id="modeloGrua" placeholder="Ej: F-450" value={formData.modeloGrua} onChange={(e) => updateField('modeloGrua', e.target.value)} disabled={finalizeProfileMutation.isPending} data-testid="input-modelo-grua" />
         {errors.modeloGrua && <p className="text-sm text-destructive">{errors.modeloGrua}</p>}
       </div>
-      <Button type="button" className="w-full" onClick={() => validateStep5() && (formData.userType === 'conductor' ? finalizeProfileMutation.mutate() : setCurrentStep(6))} disabled={finalizeProfileMutation.isPending} data-testid="button-continue-step5">
-        {formData.userType === 'conductor' ? 'Completar' : 'Continuar'}
+      <Button type="button" className="w-full" onClick={() => validateStep6() && setCurrentStep(7)} disabled={finalizeProfileMutation.isPending} data-testid="button-continue-step6">
+        Continuar
       </Button>
     </div>
   );
 
-  const renderStep6 = () => (
+  const renderStep7 = () => (
     <div className="space-y-4">
       <div className="text-center py-8">
         <CheckCircle2 className="w-16 h-16 mx-auto text-primary mb-4" />
@@ -455,7 +527,7 @@ export default function OnboardingWizard() {
   );
 
   const getStepTitle = () => {
-    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Teléfono', 'Subir Documentos', 'Datos de la Grúa', 'Confirmación'];
+    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Teléfono', 'Subir Documentos', 'Servicios Ofrecidos', 'Datos de la Grúa', 'Confirmación'];
     return titles[currentStep - 1] || '';
   };
 
@@ -465,6 +537,7 @@ export default function OnboardingWizard() {
       'Valida tu identidad con cédula',
       'Verifica tu número de teléfono',
       'Sube tus documentos requeridos',
+      'Selecciona los servicios que ofreces',
       'Completa los datos de tu grúa',
       'Finaliza tu registro',
     ];
@@ -497,6 +570,7 @@ export default function OnboardingWizard() {
           {currentStep === 4 && renderStep4()}
           {currentStep === 5 && renderStep5()}
           {currentStep === 6 && renderStep6()}
+          {currentStep === 7 && renderStep7()}
           <div className="text-center text-sm text-muted-foreground">
             ¿Ya tienes cuenta?{' '}
             <button onClick={() => setLocation('/login')} className="text-primary hover:underline" data-testid="link-login">

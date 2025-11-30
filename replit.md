@@ -58,6 +58,33 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### November 30, 2025 - Driver Service Specialization and Verifik Validation Display
+- **Service Categories**: Drivers can now select multiple service categories and subtypes during registration and edit them post-registration
+- **New Component**: `ServiceCategoryMultiSelect.tsx` with 6 service categories:
+  - Remolque Estándar (Standard Tow)
+  - Auxilio Vial (Roadside Assistance)
+  - Remolque Especializado (Specialized Tow)
+  - Camiones Pesados (Heavy Trucks)
+  - Izaje y Construcción (Lifting & Construction)
+  - Remolque Recreativo (Recreational Towing)
+- **Onboarding Wizard Updates**:
+  - New step 5: "Servicios Ofrecidos" for service selection
+  - TOTAL_STEPS increased from 6 to 7
+  - Services saved via PUT /api/drivers/me/servicios
+- **Driver Profile Updates**:
+  - New "Servicios Ofrecidos" section with view/edit mode
+  - New "Verificación de Identidad" section showing Verifik validation status and score
+  - Visual progress bar for validation score with color coding
+- **Admin Panel Updates**:
+  - New "Servicios" column with expandable service badges
+  - New "Verificación" column with Verifik score display
+  - Tooltips showing service subtypes and validation details
+- **Key Files Modified**:
+  - `client/src/components/ServiceCategoryMultiSelect.tsx`
+  - `client/src/pages/auth/onboarding-wizard.tsx`
+  - `client/src/pages/driver/profile.tsx`
+  - `client/src/pages/admin/drivers.tsx`
+
 ### November 29, 2025 - Multiple Insurance Documents Support
 - **Client Insurance**: Clients can now upload multiple insurance documents for different vehicles
 - **API Changes**: 

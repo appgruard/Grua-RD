@@ -25,11 +25,42 @@ Actualizar la plataforma Grúa RD para soportar especialización de servicios de
    - ✅ Rutas admin en `/api/admin/drivers/:id/servicios` (GET/PUT)
    - ✅ Ruta de validación de documentos en `/api/documents/:id/validate` (POST)
 
+4. **Componente ServiceCategoryMultiSelect**
+   - ✅ Componente creado en `client/src/components/ServiceCategoryMultiSelect.tsx`
+   - ✅ Soporte para 6 categorías de servicio con iconos personalizados
+   - ✅ Subtipos específicos para cada categoría
+   - ✅ Selección múltiple de categorías y subtipos
+   - ✅ Exportación de tipos y constantes (SERVICE_CATEGORIES, ServiceSelection)
+
+5. **Wizard de Onboarding - Paso de Servicios (Tarea 4)**
+   - ✅ Paso 5 agregado al wizard para conductores: "Servicios Ofrecidos"
+   - ✅ TOTAL_STEPS aumentado de 6 a 7
+   - ✅ Estado y persistencia de servicios seleccionados en sessionStorage
+   - ✅ Mutación `saveServicesMutation` para guardar servicios vía PUT /api/drivers/me/servicios
+   - ✅ Validación: mínimo 1 categoría requerida
+   - ✅ Flujo: Documentos (paso 4) → Servicios (paso 5) → Datos Vehículo (paso 6) → Confirmación (paso 7)
+
+6. **Perfil del Conductor - Gestión de Servicios (Tarea 5)**
+   - ✅ Sección "Servicios Ofrecidos" en perfil del conductor
+   - ✅ Vista de servicios actuales con badges de categorías y subtipos
+   - ✅ Modo edición con ServiceCategoryMultiSelect
+   - ✅ Botones Editar/Cancelar/Guardar con estados de carga
+   - ✅ Sección "Verificación de Identidad" con estado Verifik
+   - ✅ Barra de progreso visual para puntuación de validación
+   - ✅ Detalles de validación: coincidencia facial, validez de documento, prueba de vida
+
+7. **Panel Admin - Servicios y Validación (Tarea 6)**
+   - ✅ Columna "Servicios" con badges expandibles por conductor
+   - ✅ Columna "Verificación" con badge de estado Verifik y score
+   - ✅ Tooltips con detalles de subtipos y puntuaciones
+   - ✅ Badge expandir/colapsar para conductores con múltiples servicios
+   - ✅ Colores de score: verde (≥60%), amarillo (40-60%), rojo (<40%)
+
 ---
 
 ## Tareas Pendientes 📋
 
-### Tarea 4: Wizard de Onboarding - Selección de Servicios
+### ~~Tarea 4: Wizard de Onboarding - Selección de Servicios~~ ✅ COMPLETADA
 **Archivo Principal:** `client/src/pages/auth/onboarding-wizard.tsx`
 
 #### Descripción
@@ -77,13 +108,13 @@ Agregar un nuevo paso en el wizard de onboarding donde los conductores seleccion
 
 ---
 
-### Tarea 5: Perfil del Conductor - Gestión de Servicios
+### ~~Tarea 5: Perfil del Conductor - Gestión de Servicios~~ ✅ COMPLETADA
 **Archivo Principal:** `client/src/pages/driver/profile.tsx`
 
-#### Descripción
-Permitir que conductores veen y editen sus categorías de servicios en cualquier momento DESPUÉS del registro, y ver el estado de validación de documentos (score Verifik).
-
-**Requisito Clave:** Los conductores DEBEN poder añadir o modificar sus servicios en el perfil después de haberse registrado (completar onboarding). Esto permite que evolucionen su oferta de servicios conforme su negocio crece.
+#### Estado: COMPLETADO
+- Sección "Servicios Ofrecidos" implementada con vista/edición
+- Sección "Verificación de Identidad" con estado Verifik y puntuación visual
+- Botones de editar/cancelar/guardar con estados de carga correctos
 
 #### Cambios Necesarios
 
@@ -119,11 +150,14 @@ Permitir que conductores veen y editen sus categorías de servicios en cualquier
 
 ---
 
-### Tarea 6: Panel Admin - Servicios y Validación de Conductores
+### ~~Tarea 6: Panel Admin - Servicios y Validación de Conductores~~ ✅ COMPLETADA
 **Archivo Principal:** `client/src/pages/admin/drivers.tsx`
 
-#### Descripción
-Mostrar en el panel de admin los servicios que ofrece cada conductor y los scores de validación de sus documentos.
+#### Estado: COMPLETADO
+- Columna "Servicios" con badges expandibles
+- Columna "Verificación" con score Verifik
+- Tooltips informativos en badges
+- Indicadores de color según puntuación
 
 #### Cambios Necesarios
 
