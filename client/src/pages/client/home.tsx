@@ -483,8 +483,8 @@ export default function ClientHome() {
   };
 
   const markers = [
-    origin && { position: origin, title: isOnsiteService() ? 'Ubicación del servicio' : 'Origen', color: '#22c55e' },
-    destination && requiresTransport() && { position: destination, title: 'Destino', color: '#ef4444' },
+    origin && { position: origin, title: isOnsiteService() ? 'Ubicación del servicio' : 'Origen', color: '#22c55e', type: 'origin' as const },
+    destination && requiresTransport() && { position: destination, title: 'Destino', color: '#ef4444', type: 'destination' as const },
   ].filter(Boolean) as any[];
 
   const mapCenter = origin || currentLocation;

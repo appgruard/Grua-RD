@@ -333,8 +333,9 @@ export default function DriverDashboard() {
               lat: parseFloat(req.origenLat as string),
               lng: parseFloat(req.origenLng as string),
             },
-            title: 'Solicitud',
+            title: 'Solicitud de servicio',
             color: '#F5A623',
+            type: 'service' as const,
           })) || []}
           className="absolute inset-0"
         />

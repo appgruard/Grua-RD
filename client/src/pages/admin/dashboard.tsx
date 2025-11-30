@@ -66,6 +66,7 @@ export default function AdminDashboard() {
         },
         title: driver.user ? `${driver.user.nombre} ${driver.user.apellido}` : 'Conductor',
         color: hasActiveService ? '#eab308' : '#22c55e',
+        type: 'driver' as const,
       };
     }) || []),
     ...(activeServices?.filter(s => s.origenLat && s.origenLng).map((service) => ({
@@ -75,6 +76,7 @@ export default function AdminDashboard() {
       },
       title: `Servicio - ${service.estado}`,
       color: '#ef4444',
+      type: 'service' as const,
     })) || []),
   ];
 

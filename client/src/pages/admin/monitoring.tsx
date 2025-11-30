@@ -22,6 +22,7 @@ export default function AdminMonitoring() {
         lng: parseFloat(driver.ubicacionLng as string),
       },
       title: `${driver.user.nombre} ${driver.user.apellido}`,
+      type: 'driver' as const,
     })) || [];
 
   return (

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Map, { Marker, GeolocateControl, Source, Layer } from 'react-map-gl/mapbox';
 import type { MapRef, MapMouseEvent } from 'react-map-gl/mapbox';
-import { Loader2, MapPin } from 'lucide-react';
+import { Loader2, MapPin, Truck, Car, Flag, Wrench } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import watermarkLogo from '@assets/20251129_191904_0001_1764458415723.png';
 import type { RouteGeometry } from '@/lib/maps';
@@ -11,6 +11,8 @@ export interface Coordinates {
   lng: number;
 }
 
+export type MarkerType = 'origin' | 'destination' | 'driver' | 'service' | 'default';
+
 interface MapboxMapProps {
   center: Coordinates;
   zoom?: number;
@@ -19,6 +21,7 @@ interface MapboxMapProps {
     title?: string;
     icon?: string;
     color?: string;
+    type?: MarkerType;
   }>;
   onMapClick?: (coordinates: Coordinates) => void;
   onAddressChange?: (address: string) => void;
@@ -47,12 +50,70 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
   }
 }
 
-function getMarkerColor(icon?: string, color?: string): string {
+function getMarkerColor(icon?: string, color?: string, type?: MarkerType): string {
   if (color) return color;
-  if (icon?.includes('green')) return '#22c55e';
-  if (icon?.includes('red')) return '#ef4444';
-  if (icon?.includes('blue')) return '#3b82f6';
+  if (type === 'origin' || icon?.includes('green')) return '#22c55e';
+  if (type === 'destination' || icon?.includes('red')) return '#ef4444';
+  if (type === 'driver' || icon?.includes('blue')) return '#3b82f6';
+  if (type === 'service') return '#f59e0b';
   return '#0F2947';
+}
+
+function getMarkerType(title?: string, color?: string, type?: MarkerType): MarkerType {
+  if (type) return type;
+  
+  const lowerTitle = title?.toLowerCase() || '';
+  
+  if (lowerTitle.includes('origen') || 
+      lowerTitle.includes('ubicación') || 
+      lowerTitle.includes('location') ||
+      lowerTitle.includes('pickup') ||
+      lowerTitle.includes('recogida') ||
+      color === '#22c55e') {
+    return 'origin';
+  }
+  
+  if (lowerTitle.includes('destino') || 
+      lowerTitle.includes('destination') ||
+      lowerTitle.includes('final') ||
+      lowerTitle.includes('entrega') ||
+      color === '#ef4444') {
+    return 'destination';
+  }
+  
+  if (lowerTitle.includes('conductor') || 
+      lowerTitle.includes('driver') || 
+      lowerTitle.includes('grúa') ||
+      lowerTitle.includes('grua') ||
+      lowerTitle.includes('operador') ||
+      color === '#3b82f6') {
+    return 'driver';
+  }
+  
+  if (lowerTitle.includes('servicio') || 
+      lowerTitle.includes('service') ||
+      lowerTitle.includes('solicitud')) {
+    return 'service';
+  }
+  
+  return 'default';
+}
+
+function MarkerIcon({ type, className }: { type: MarkerType; className?: string }) {
+  const iconClass = className || "w-3.5 h-3.5 text-white";
+  
+  switch (type) {
+    case 'origin':
+      return <Car className={iconClass} />;
+    case 'destination':
+      return <Flag className={iconClass} />;
+    case 'driver':
+      return <Truck className={iconClass} />;
+    case 'service':
+      return <Wrench className={iconClass} />;
+    default:
+      return <MapPin className={iconClass} />;
+  }
 }
 
 export function MapboxMap({ 
@@ -313,22 +374,34 @@ export function MapboxMap({
           </Source>
         )}
 
-        {markers.map((marker, index) => (
-          <Marker
-            key={`${marker.position.lat}-${marker.position.lng}-${index}`}
-            longitude={marker.position.lng}
-            latitude={marker.position.lat}
-            anchor="bottom"
-          >
-            <div 
-              className="w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center"
-              style={{ backgroundColor: getMarkerColor(marker.icon, marker.color) }}
-              title={marker.title}
+        {markers.map((marker, index) => {
+          const markerType = getMarkerType(marker.title, marker.color, marker.type);
+          const isDriverMarker = markerType === 'driver';
+          
+          return (
+            <Marker
+              key={`${marker.position.lat}-${marker.position.lng}-${index}`}
+              longitude={marker.position.lng}
+              latitude={marker.position.lat}
+              anchor="bottom"
             >
-              <MapPin className="w-3 h-3 text-white" />
-            </div>
-          </Marker>
-        ))}
+              <div 
+                className={`
+                  ${isDriverMarker ? 'w-10 h-10' : 'w-8 h-8'} 
+                  rounded-full border-2 border-white shadow-lg flex items-center justify-center
+                  ${isDriverMarker ? 'animate-pulse' : ''}
+                `}
+                style={{ backgroundColor: getMarkerColor(marker.icon, marker.color, markerType) }}
+                title={marker.title}
+              >
+                <MarkerIcon 
+                  type={markerType} 
+                  className={isDriverMarker ? 'w-5 h-5 text-white' : 'w-4 h-4 text-white'} 
+                />
+              </div>
+            </Marker>
+          );
+        })}
       </Map>
 
       {/* Watermark logo */}

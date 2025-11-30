@@ -89,9 +89,9 @@ export default function ClientTracking() {
   const destination = { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) };
 
   const markers = [
-    { position: origin, title: 'Origen', color: '#22c55e' },
-    { position: destination, title: 'Destino', color: '#ef4444' },
-    driverLocation && { position: driverLocation, title: 'Conductor', color: '#3b82f6' },
+    { position: origin, title: 'Origen', color: '#22c55e', type: 'origin' as const },
+    { position: destination, title: 'Destino', color: '#ef4444', type: 'destination' as const },
+    driverLocation && { position: driverLocation, title: 'Conductor', color: '#3b82f6', type: 'driver' as const },
   ].filter(Boolean) as any[];
 
   const statusColors = {
