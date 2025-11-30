@@ -78,6 +78,23 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### November 30, 2025 - Service Auto-Cancellation and API Optimization
+- **Automatic Service Cancellation**: Services not accepted by operators within 10 minutes are automatically cancelled
+  - Atomic UPDATE...RETURNING pattern to prevent race conditions
+  - Push notifications sent to clients when services are auto-cancelled
+  - WebSocket broadcasts for real-time UI updates
+  - Configurable timeout (SERVICE_TIMEOUT_MINUTES)
+  - File: `server/services/service-auto-cancel.ts`
+- **Driver Profile API Optimization**: Combined endpoint reduces API calls
+  - New endpoint: `GET /api/drivers/me/full` consolidates driver data, documents, services, and identity status
+  - Parallel queries for improved performance
+  - Reduces page load from 4+ API calls to 1
+  - File: `server/routes.ts`
+- **Storage Layer Updates**: 
+  - `cancelExpiredServicios()` now returns cancelled service records for notifications
+  - `getRecentlyCancelledServices()` for querying recently cancelled services
+  - File: `server/storage.ts`
+
 ### November 30, 2025 - Notification Services Integration (Twilio + Resend)
 - **SMS Service**: Updated to use Replit Twilio Connector for OTP delivery
   - Lazy initialization for credentials from Replit Connector API
