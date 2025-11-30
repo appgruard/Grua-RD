@@ -549,7 +549,7 @@ export default function ClientHome() {
         </button>
 
         {showExpandedCard && (
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           {step === 'serviceCategory' && (
             <div className="flex flex-col h-full">
               <div className="text-center px-4 pb-2 flex-shrink-0">
