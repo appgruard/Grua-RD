@@ -1659,6 +1659,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get driver's service categories
+  app.get("/api/drivers/me/servicios", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const servicios = await storage.getConductorServicios(conductor.id);
+      res.json(servicios);
+    } catch (error: any) {
+      logSystem.error('Get driver services error', error);
+      res.status(500).json({ message: "Failed to get driver services" });
+    }
+  });
+
+  // Set/update driver's service categories
+  app.put("/api/drivers/me/servicios", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const { categorias } = req.body;
+      
+      if (!Array.isArray(categorias)) {
+        return res.status(400).json({ message: "Categorias must be an array" });
+      }
+
+      await storage.setConductorServicios(conductor.id, categorias);
+      const servicios = await storage.getConductorServicios(conductor.id);
+      
+      logSystem.info('Driver services updated', { conductorId: conductor.id, count: servicios.length });
+      res.json(servicios);
+    } catch (error: any) {
+      logSystem.error('Update driver services error', error);
+      res.status(500).json({ message: "Failed to update driver services" });
+    }
+  });
+
+  // Validate document with Verifik API (face or license)
+  app.post("/api/documents/:id/validate", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { id } = req.params;
+      const documento = await storage.getDocumentoById(id);
+      
+      if (!documento) {
+        return res.status(404).json({ message: "Documento no encontrado" });
+      }
+
+      // Verify the user owns this document or is admin
+      if (req.user!.userType !== 'admin' && documento.usuarioId !== req.user!.id) {
+        return res.status(403).json({ message: "No autorizado para validar este documento" });
+      }
+
+      const { validateFacePhoto, validateDriverLicense, isVerifikConfigured } = await import('./services/verifik-ocr');
+      
+      if (!isVerifikConfigured()) {
+        return res.status(503).json({ 
+          message: "El servicio de validación no está configurado",
+          configured: false 
+        });
+      }
+
+      // Determine validation type based on document type
+      let validationResult;
+      let validationType: string;
+      
+      if (documento.tipo === 'foto_perfil') {
+        validationType = 'face';
+        // Get base64 from URL or fetch the image
+        const imageResponse = await fetch(documento.url);
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const base64 = Buffer.from(imageBuffer).toString('base64');
+        const mimeType = documento.mimeType || 'image/jpeg';
+        const imageData = `data:${mimeType};base64,${base64}`;
+        
+        validationResult = await validateFacePhoto(imageData);
+      } else if (documento.tipo === 'licencia') {
+        validationType = 'license';
+        // Get base64 from URL or fetch the image
+        const imageResponse = await fetch(documento.url);
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const base64 = Buffer.from(imageBuffer).toString('base64');
+        const mimeType = documento.mimeType || 'image/jpeg';
+        const imageData = `data:${mimeType};base64,${base64}`;
+        
+        validationResult = await validateDriverLicense(imageData);
+      } else {
+        return res.status(400).json({ 
+          message: "Este tipo de documento no requiere validación Verifik" 
+        });
+      }
+
+      // Update document with validation results
+      const MINIMUM_SCORE = 0.6;
+      const isValid = validationResult.success && validationResult.score >= MINIMUM_SCORE;
+      
+      await storage.updateDocumentoVerifikValidation(id, {
+        verifikScanId: validationResult.scanId || null,
+        verifikScore: validationResult.score.toString(),
+        verifikValidado: isValid,
+        verifikTipoValidacion: validationType,
+        verifikRespuesta: JSON.stringify(validationResult.rawResponse || {}),
+        verifikFechaValidacion: new Date(),
+        estado: isValid ? 'aprobado' : 'rechazado',
+      });
+
+      logSystem.info('Document validation completed', { 
+        documentoId: id, 
+        validationType,
+        score: validationResult.score,
+        isValid,
+        userId: req.user!.id 
+      });
+
+      res.json({
+        success: validationResult.success,
+        isValid,
+        score: validationResult.score,
+        validationType,
+        details: validationResult.details || validationResult.error,
+        scanId: validationResult.scanId,
+      });
+    } catch (error: any) {
+      logSystem.error('Document validation error', error);
+      res.status(500).json({ message: "Error al validar el documento" });
+    }
+  });
+
   app.put("/api/drivers/availability", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
       return res.status(401).json({ message: "Not authorized" });
@@ -2206,6 +2349,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get drivers error', error);
       res.status(500).json({ message: "Failed to get drivers" });
+    }
+  });
+
+  // Get driver's service categories (admin)
+  app.get("/api/admin/drivers/:driverId/servicios", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { driverId } = req.params;
+      const servicios = await storage.getConductorServicios(driverId);
+      res.json(servicios);
+    } catch (error: any) {
+      logSystem.error('Get driver services (admin) error', error);
+      res.status(500).json({ message: "Failed to get driver services" });
+    }
+  });
+
+  // Update driver's service categories (admin)
+  app.put("/api/admin/drivers/:driverId/servicios", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { driverId } = req.params;
+      const { categorias } = req.body;
+      
+      if (!Array.isArray(categorias)) {
+        return res.status(400).json({ message: "Categorias must be an array" });
+      }
+
+      await storage.setConductorServicios(driverId, categorias);
+      const servicios = await storage.getConductorServicios(driverId);
+      
+      logSystem.info('Driver services updated by admin', { adminId: req.user!.id, driverId, count: servicios.length });
+      res.json(servicios);
+    } catch (error: any) {
+      logSystem.error('Update driver services (admin) error', error);
+      res.status(500).json({ message: "Failed to update driver services" });
     }
   });
 

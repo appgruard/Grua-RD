@@ -3,6 +3,8 @@ import { eq, and, desc, isNull, sql, gte, lte, between } from 'drizzle-orm';
 import {
   users,
   conductores,
+  conductorServicios,
+  conductorServicioSubtipos,
   servicios,
   tarifas,
   calificaciones,
@@ -25,6 +27,10 @@ import {
   type InsertUser,
   type Conductor,
   type InsertConductor,
+  type ConductorServicio,
+  type InsertConductorServicio,
+  type ConductorServicioSubtipo,
+  type InsertConductorServicioSubtipo,
   type Servicio,
   type InsertServicio,
   type Tarifa,
@@ -95,6 +101,25 @@ export interface IStorage {
   updateDriverLocation(userId: string, lat: number, lng: number): Promise<Conductor>;
   getAvailableDrivers(): Promise<Array<Conductor & { user: User }>>;
   getAllDrivers(): Promise<Array<Conductor & { user: User }>>;
+
+  // Conductor Services (Service Categories and Subtypes)
+  getConductorServicios(conductorId: string): Promise<Array<ConductorServicio & { subtipos: ConductorServicioSubtipo[] }>>;
+  setConductorServicios(conductorId: string, categorias: Array<{ categoria: string; subtipos: string[] }>): Promise<void>;
+  addConductorServicio(conductorId: string, categoriaServicio: string): Promise<ConductorServicio>;
+  removeConductorServicio(conductorId: string, categoriaServicio: string): Promise<void>;
+  addConductorServicioSubtipo(conductorServicioId: string, subtipoServicio: string): Promise<ConductorServicioSubtipo>;
+  removeConductorServicioSubtipo(conductorServicioId: string, subtipoServicio: string): Promise<void>;
+
+  // Document Validation (Verifik)
+  updateDocumentoVerifikValidation(documentoId: string, data: {
+    verifikScanId?: string;
+    verifikScore?: string;
+    verifikValidado?: boolean;
+    verifikTipoValidacion?: string;
+    verifikRespuesta?: string;
+    verifikFechaValidacion?: Date;
+    estado?: string;
+  }): Promise<Documento>;
 
   // Servicios
   createServicio(servicio: InsertServicio): Promise<Servicio>;
@@ -472,6 +497,88 @@ export class DatabaseStorage implements IStorage {
       },
     });
     return results as any;
+  }
+
+  // Conductor Services
+  async getConductorServicios(conductorId: string): Promise<Array<ConductorServicio & { subtipos: ConductorServicioSubtipo[] }>> {
+    const results = await db.query.conductorServicios.findMany({
+      where: eq(conductorServicios.conductorId, conductorId),
+      with: {
+        subtipos: true,
+      },
+    });
+    return results as any;
+  }
+
+  async setConductorServicios(conductorId: string, categorias: Array<{ categoria: string; subtipos: string[] }>): Promise<void> {
+    await db.delete(conductorServicios).where(eq(conductorServicios.conductorId, conductorId));
+    
+    for (const cat of categorias) {
+      const [servicio] = await db.insert(conductorServicios).values({
+        conductorId,
+        categoriaServicio: cat.categoria as any,
+      }).returning();
+      
+      if (cat.subtipos && cat.subtipos.length > 0) {
+        for (const subtipo of cat.subtipos) {
+          await db.insert(conductorServicioSubtipos).values({
+            conductorServicioId: servicio.id,
+            subtipoServicio: subtipo as any,
+          });
+        }
+      }
+    }
+  }
+
+  async addConductorServicio(conductorId: string, categoriaServicio: string): Promise<ConductorServicio> {
+    const [servicio] = await db.insert(conductorServicios).values({
+      conductorId,
+      categoriaServicio: categoriaServicio as any,
+    }).returning();
+    return servicio;
+  }
+
+  async removeConductorServicio(conductorId: string, categoriaServicio: string): Promise<void> {
+    await db.delete(conductorServicios).where(
+      and(
+        eq(conductorServicios.conductorId, conductorId),
+        eq(conductorServicios.categoriaServicio, categoriaServicio as any)
+      )
+    );
+  }
+
+  async addConductorServicioSubtipo(conductorServicioId: string, subtipoServicio: string): Promise<ConductorServicioSubtipo> {
+    const [subtipo] = await db.insert(conductorServicioSubtipos).values({
+      conductorServicioId,
+      subtipoServicio: subtipoServicio as any,
+    }).returning();
+    return subtipo;
+  }
+
+  async removeConductorServicioSubtipo(conductorServicioId: string, subtipoServicio: string): Promise<void> {
+    await db.delete(conductorServicioSubtipos).where(
+      and(
+        eq(conductorServicioSubtipos.conductorServicioId, conductorServicioId),
+        eq(conductorServicioSubtipos.subtipoServicio, subtipoServicio as any)
+      )
+    );
+  }
+
+  // Document Validation (Verifik)
+  async updateDocumentoVerifikValidation(documentoId: string, data: {
+    verifikScanId?: string;
+    verifikScore?: string;
+    verifikValidado?: boolean;
+    verifikTipoValidacion?: string;
+    verifikRespuesta?: string;
+    verifikFechaValidacion?: Date;
+    estado?: string;
+  }): Promise<Documento> {
+    const [documento] = await db.update(documentos).set({
+      ...data,
+      updatedAt: new Date(),
+    } as any).where(eq(documentos.id, documentoId)).returning();
+    return documento;
   }
 
   // Servicios

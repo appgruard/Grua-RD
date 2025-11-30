@@ -451,3 +451,373 @@ export async function scanAndVerifyCedula(imageBase64: string, userNombre?: stri
     error: isVerified ? undefined : nameError
   };
 }
+
+// ==================== FACE VALIDATION (PROFILE PHOTO) ====================
+
+interface FaceValidationResponse {
+  _id?: string;
+  hasFace?: boolean;
+  faceCount?: number;
+  faceScore?: number;
+  confidenceScore?: number;
+  livenessScore?: number;
+  isHuman?: boolean;
+  quality?: {
+    brightness?: number;
+    sharpness?: number;
+    contrast?: number;
+  };
+  faceDetails?: {
+    age?: number;
+    gender?: string;
+    expression?: string;
+  };
+  error?: string;
+  message?: string;
+}
+
+export interface FaceValidationResult {
+  success: boolean;
+  isHumanFace: boolean;
+  score: number;
+  scanId?: string;
+  details?: string;
+  rawResponse?: any;
+  error?: string;
+}
+
+const MINIMUM_VALIDATION_SCORE = 0.6;
+
+export async function validateFacePhoto(imageBase64: string): Promise<FaceValidationResult> {
+  if (!VERIFIK_API_KEY) {
+    logger.warn("Verifik API key not configured for face validation");
+    return {
+      success: false,
+      isHumanFace: false,
+      score: 0,
+      error: "El servicio de verificación no está configurado"
+    };
+  }
+
+  const apiKey = VERIFIK_API_KEY.trim();
+  logger.info("Starting Verifik face validation");
+
+  try {
+    const imageData = imageBase64.startsWith('data:') 
+      ? imageBase64 
+      : `data:image/jpeg;base64,${imageBase64}`;
+
+    // Use the face-check endpoint for human face detection
+    const response = await fetch(`${VERIFIK_BASE_URL}/face/check`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        image: imageData
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error("Verifik face validation API error", { status: response.status, error: errorText });
+      
+      if (response.status === 401) {
+        return {
+          success: false,
+          isHumanFace: false,
+          score: 0,
+          error: "Error de autenticación con el servicio de verificación"
+        };
+      }
+      
+      return {
+        success: false,
+        isHumanFace: false,
+        score: 0,
+        error: "Error al procesar la foto. Intenta de nuevo."
+      };
+    }
+
+    const rawResponse = await response.json();
+    const data: FaceValidationResponse = rawResponse.data || rawResponse;
+
+    logger.info("Verifik face validation response", { 
+      hasFace: data.hasFace,
+      faceCount: data.faceCount,
+      faceScore: data.faceScore,
+      confidenceScore: data.confidenceScore,
+      livenessScore: data.livenessScore,
+      isHuman: data.isHuman
+    });
+
+    // Calculate the overall score from available metrics
+    const faceScore = data.faceScore ?? data.confidenceScore ?? data.livenessScore ?? 0;
+    const hasFace = data.hasFace ?? (data.faceCount !== undefined && data.faceCount > 0);
+    const isHuman = data.isHuman ?? hasFace;
+    
+    // Normalize score to 0-1 range if needed
+    const normalizedScore = faceScore > 1 ? faceScore / 100 : faceScore;
+    
+    const isValidHumanFace = isHuman && normalizedScore >= MINIMUM_VALIDATION_SCORE;
+
+    let details = "";
+    if (!hasFace) {
+      details = "No se detectó un rostro en la imagen";
+    } else if (!isHuman) {
+      details = "La imagen no parece ser de un rostro humano";
+    } else if (normalizedScore < MINIMUM_VALIDATION_SCORE) {
+      details = `La calidad de la imagen es muy baja (${Math.round(normalizedScore * 100)}%). Se requiere al menos 60%.`;
+    }
+
+    return {
+      success: true,
+      isHumanFace: isValidHumanFace,
+      score: normalizedScore,
+      scanId: data._id,
+      details: details || undefined,
+      rawResponse: data,
+      error: isValidHumanFace ? undefined : details
+    };
+
+  } catch (error: any) {
+    logger.error("Error in Verifik face validation", error);
+    return {
+      success: false,
+      isHumanFace: false,
+      score: 0,
+      error: "Error al conectar con el servicio de verificación"
+    };
+  }
+}
+
+// ==================== LICENSE VALIDATION ====================
+
+interface LicenseOCRExtraction {
+  documentType?: string;
+  country?: string;
+  category?: string;
+  licenseNumber?: string;
+  documentNumber?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  dateOfBirth?: string;
+  expirationDate?: string;
+  issueDate?: string;
+  licenseClass?: string;
+  restrictions?: string;
+  confidenceScore?: number;
+  [key: string]: any;
+}
+
+interface LicenseValidationResponse {
+  _id?: string;
+  documentType?: string;
+  documentCategory?: string;
+  documentNumber?: string;
+  imageValidated?: boolean;
+  scoreValidated?: boolean;
+  OCRExtraction?: LicenseOCRExtraction;
+  confidenceScore?: number;
+  status?: string;
+  error?: string;
+  message?: string;
+}
+
+export interface LicenseValidationResult {
+  success: boolean;
+  isValidLicense: boolean;
+  score: number;
+  scanId?: string;
+  licenseNumber?: string;
+  licenseClass?: string;
+  expirationDate?: string;
+  holderName?: string;
+  details?: string;
+  rawResponse?: any;
+  error?: string;
+}
+
+export async function validateDriverLicense(imageBase64: string): Promise<LicenseValidationResult> {
+  if (!VERIFIK_API_KEY) {
+    logger.warn("Verifik API key not configured for license validation");
+    return {
+      success: false,
+      isValidLicense: false,
+      score: 0,
+      error: "El servicio de verificación no está configurado"
+    };
+  }
+
+  const apiKey = VERIFIK_API_KEY.trim();
+  logger.info("Starting Verifik license validation");
+
+  try {
+    const imageData = imageBase64.startsWith('data:') 
+      ? imageBase64 
+      : `data:image/jpeg;base64,${imageBase64}`;
+
+    // Use OCR scan with document type for driver's license
+    const response = await fetch(`${VERIFIK_BASE_URL}/ocr/scan-prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        image: imageData,
+        documentType: "DL" // Driver's License
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error("Verifik license validation API error", { status: response.status, error: errorText });
+      
+      if (response.status === 401) {
+        return {
+          success: false,
+          isValidLicense: false,
+          score: 0,
+          error: "Error de autenticación con el servicio de verificación"
+        };
+      }
+      
+      return {
+        success: false,
+        isValidLicense: false,
+        score: 0,
+        error: "Error al procesar la licencia. Intenta de nuevo."
+      };
+    }
+
+    const rawResponse = await response.json();
+    const data: LicenseValidationResponse = rawResponse.data || rawResponse;
+    const ocrData = data.OCRExtraction;
+
+    logger.info("Verifik license validation response", { 
+      documentType: ocrData?.documentType || data.documentType,
+      documentNumber: ocrData?.documentNumber || ocrData?.licenseNumber || data.documentNumber,
+      confidenceScore: ocrData?.confidenceScore || data.confidenceScore,
+      imageValidated: data.imageValidated,
+      scoreValidated: data.scoreValidated
+    });
+
+    // Calculate confidence score
+    const rawConfidence = ocrData?.confidenceScore ?? data.confidenceScore ?? 0;
+    // If we got license data but no confidence score, assume it was successfully read
+    const confidenceScore = (typeof rawConfidence === 'number' && rawConfidence > 0)
+      ? (rawConfidence > 1 ? rawConfidence / 100 : rawConfidence)
+      : ((ocrData?.licenseNumber || ocrData?.documentNumber || data.documentNumber) ? 0.8 : 0);
+
+    const licenseNumber = ocrData?.licenseNumber || ocrData?.documentNumber || data.documentNumber;
+    const holderName = ocrData?.fullName || (ocrData?.firstName && ocrData?.lastName 
+      ? `${ocrData.firstName} ${ocrData.lastName}`.trim() 
+      : undefined);
+
+    const isValidLicense = confidenceScore >= MINIMUM_VALIDATION_SCORE && !!licenseNumber;
+
+    let details = "";
+    if (!licenseNumber) {
+      details = "No se pudo detectar un número de licencia en la imagen";
+    } else if (confidenceScore < MINIMUM_VALIDATION_SCORE) {
+      details = `La calidad del escaneo es muy baja (${Math.round(confidenceScore * 100)}%). Se requiere al menos 60%.`;
+    }
+
+    return {
+      success: true,
+      isValidLicense: isValidLicense,
+      score: confidenceScore,
+      scanId: data._id,
+      licenseNumber: licenseNumber,
+      licenseClass: ocrData?.licenseClass || ocrData?.category,
+      expirationDate: ocrData?.expirationDate,
+      holderName: holderName,
+      details: details || undefined,
+      rawResponse: data,
+      error: isValidLicense ? undefined : details
+    };
+
+  } catch (error: any) {
+    logger.error("Error in Verifik license validation", error);
+    return {
+      success: false,
+      isValidLicense: false,
+      score: 0,
+      error: "Error al conectar con el servicio de verificación"
+    };
+  }
+}
+
+// ==================== UNIFIED DOCUMENT VALIDATION ====================
+
+export type ValidationType = 'face' | 'license' | 'cedula';
+
+export interface UnifiedValidationResult {
+  success: boolean;
+  isValid: boolean;
+  score: number;
+  validationType: ValidationType;
+  scanId?: string;
+  details?: string;
+  rawResponse?: any;
+  error?: string;
+}
+
+export async function validateDocument(
+  imageBase64: string, 
+  validationType: ValidationType
+): Promise<UnifiedValidationResult> {
+  switch (validationType) {
+    case 'face': {
+      const result = await validateFacePhoto(imageBase64);
+      return {
+        success: result.success,
+        isValid: result.isHumanFace,
+        score: result.score,
+        validationType: 'face',
+        scanId: result.scanId,
+        details: result.details,
+        rawResponse: result.rawResponse,
+        error: result.error
+      };
+    }
+    case 'license': {
+      const result = await validateDriverLicense(imageBase64);
+      return {
+        success: result.success,
+        isValid: result.isValidLicense,
+        score: result.score,
+        validationType: 'license',
+        scanId: result.scanId,
+        details: result.details,
+        rawResponse: result.rawResponse,
+        error: result.error
+      };
+    }
+    case 'cedula': {
+      const result = await scanCedulaOCR(imageBase64);
+      return {
+        success: result.success,
+        isValid: (result.confidenceScore ?? 0) >= MINIMUM_VALIDATION_SCORE,
+        score: result.confidenceScore ?? 0,
+        validationType: 'cedula',
+        details: result.error,
+        rawResponse: result.rawData,
+        error: result.error
+      };
+    }
+    default:
+      return {
+        success: false,
+        isValid: false,
+        score: 0,
+        validationType,
+        error: `Tipo de validación no soportado: ${validationType}`
+      };
+  }
+}

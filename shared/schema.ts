@@ -136,6 +136,22 @@ export const conductores = pgTable("conductores", {
   azulCardToken: text("azul_card_token"),
 });
 
+// Conductor Service Categories Table (driver can offer multiple service categories)
+export const conductorServicios = pgTable("conductor_servicios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
+  categoriaServicio: servicioCategoriaEnum("categoria_servicio").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Conductor Service Subtypes Table (driver can specify subtypes for each category)
+export const conductorServicioSubtipos = pgTable("conductor_servicio_subtipos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorServicioId: varchar("conductor_servicio_id").notNull().references(() => conductorServicios.id, { onDelete: "cascade" }),
+  subtipoServicio: servicioSubtipoEnum("subtipo_servicio").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Servicios (Services) Table
 export const servicios = pgTable("servicios", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -248,6 +264,12 @@ export const documentos = pgTable("documentos", {
   revisadoPor: varchar("revisado_por").references(() => users.id),
   fechaRevision: timestamp("fecha_revision"),
   motivoRechazo: text("motivo_rechazo"),
+  verifikScanId: text("verifik_scan_id"),
+  verifikScore: decimal("verifik_score", { precision: 4, scale: 3 }),
+  verifikValidado: boolean("verifik_validado").default(false),
+  verifikTipoValidacion: text("verifik_tipo_validacion"),
+  verifikRespuesta: text("verifik_respuesta"),
+  verifikFechaValidacion: timestamp("verifik_fecha_validacion"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -324,6 +346,22 @@ export const conductoresRelations = relations(conductores, ({ one, many }) => ({
   }),
   servicios: many(servicios),
   ubicacionesTracking: many(ubicacionesTracking),
+  serviciosOfrecidos: many(conductorServicios),
+}));
+
+export const conductorServiciosRelations = relations(conductorServicios, ({ one, many }) => ({
+  conductor: one(conductores, {
+    fields: [conductorServicios.conductorId],
+    references: [conductores.id],
+  }),
+  subtipos: many(conductorServicioSubtipos),
+}));
+
+export const conductorServicioSubtiposRelations = relations(conductorServicioSubtipos, ({ one }) => ({
+  conductorServicio: one(conductorServicios, {
+    fields: [conductorServicioSubtipos.conductorServicioId],
+    references: [conductorServicios.id],
+  }),
 }));
 
 export const serviciosRelations = relations(servicios, ({ one, many }) => ({
@@ -611,6 +649,55 @@ export const insertConductorSchema = createInsertSchema(conductores, {
   ultimaUbicacionUpdate: true,
 });
 
+export const insertConductorServicioSchema = createInsertSchema(conductorServicios, {
+  categoriaServicio: z.enum([
+    "remolque_estandar",
+    "auxilio_vial",
+    "remolque_especializado",
+    "camiones_pesados",
+    "izaje_construccion",
+    "remolque_recreativo"
+  ]),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertConductorServicioSubtipoSchema = createInsertSchema(conductorServicioSubtipos, {
+  subtipoServicio: z.enum([
+    "cambio_goma",
+    "inflado_neumatico",
+    "paso_corriente",
+    "cerrajero_automotriz",
+    "suministro_combustible",
+    "envio_bateria",
+    "diagnostico_obd",
+    "extraccion_vehiculo",
+    "vehiculo_sin_llanta",
+    "vehiculo_sin_direccion",
+    "vehiculo_chocado",
+    "vehiculo_lujo",
+    "vehiculo_electrico",
+    "camion_liviano",
+    "camion_mediano",
+    "patana_cabezote",
+    "volteo",
+    "transporte_maquinarias",
+    "montacargas",
+    "retroexcavadora",
+    "tractor",
+    "izaje_materiales",
+    "subida_muebles",
+    "transporte_equipos",
+    "remolque_botes",
+    "remolque_jetski",
+    "remolque_cuatrimoto"
+  ]),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertServicioSchema = createInsertSchema(servicios, {
   origenDireccion: z.string().min(1),
   destinoDireccion: z.string().min(1),
@@ -798,6 +885,8 @@ export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentM
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
+export const selectConductorServicioSchema = createSelectSchema(conductorServicios);
+export const selectConductorServicioSubtipoSchema = createSelectSchema(conductorServicioSubtipos);
 export const selectServicioSchema = createSelectSchema(servicios);
 export const selectTarifaSchema = createSelectSchema(tarifas);
 export const selectCalificacionSchema = createSelectSchema(calificaciones);
@@ -819,6 +908,12 @@ export type User = typeof users.$inferSelect;
 
 export type InsertConductor = z.infer<typeof insertConductorSchema>;
 export type Conductor = typeof conductores.$inferSelect;
+
+export type InsertConductorServicio = z.infer<typeof insertConductorServicioSchema>;
+export type ConductorServicio = typeof conductorServicios.$inferSelect;
+
+export type InsertConductorServicioSubtipo = z.infer<typeof insertConductorServicioSubtipoSchema>;
+export type ConductorServicioSubtipo = typeof conductorServicioSubtipos.$inferSelect;
 
 export type InsertServicio = z.infer<typeof insertServicioSchema>;
 export type Servicio = typeof servicios.$inferSelect;
