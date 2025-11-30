@@ -77,20 +77,21 @@ export function MapboxMap({
   });
 
   useEffect(() => {
-    if (focusOnOrigin && markers.length > 0) {
+    if (focusOnOrigin && markers.length > 0 && mapRef.current) {
       const originMarker = markers[0];
-      setViewState(prev => ({
-        ...prev,
-        longitude: originMarker.position.lng,
-        latitude: originMarker.position.lat,
-        zoom: 15
-      }));
-    } else {
-      setViewState(prev => ({
-        ...prev,
-        longitude: center.lng,
-        latitude: center.lat
-      }));
+      mapRef.current.flyTo({
+        center: [originMarker.position.lng, originMarker.position.lat],
+        zoom: 15,
+        duration: 1200,
+        essential: true,
+        easing: (t) => 1 - Math.pow(1 - t, 3)
+      });
+    } else if (!focusOnOrigin && mapRef.current) {
+      mapRef.current.easeTo({
+        center: [center.lng, center.lat],
+        duration: 800,
+        easing: (t) => t * (2 - t)
+      });
     }
   }, [center.lat, center.lng, focusOnOrigin, markers]);
 
@@ -107,7 +108,11 @@ export function MapboxMap({
         
         mapRef.current.fitBounds(
           [[minLng, minLat], [maxLng, maxLat]],
-          { padding: 60, duration: 500 }
+          { 
+            padding: 60, 
+            duration: 1500,
+            easing: (t) => 1 - Math.pow(1 - t, 4)
+          }
         );
       }
     }
