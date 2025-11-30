@@ -1597,23 +1597,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/services/:id", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    try {
-      const servicio = await storage.getServicioById(req.params.id);
-      if (!servicio) {
-        return res.status(404).json({ message: "Service not found" });
-      }
-      res.json(servicio);
-    } catch (error: any) {
-      logSystem.error('Get service error', error);
-      res.status(500).json({ message: "Failed to get service" });
-    }
-  });
-
   app.get("/api/services/my-services", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -1645,6 +1628,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get my services error', error);
       res.status(500).json({ message: "Failed to get services" });
+    }
+  });
+
+  app.get("/api/services/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const servicio = await storage.getServicioById(req.params.id);
+      if (!servicio) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+      res.json(servicio);
+    } catch (error: any) {
+      logSystem.error('Get service error', error);
+      res.status(500).json({ message: "Failed to get service" });
     }
   });
 
