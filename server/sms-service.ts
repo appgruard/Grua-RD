@@ -3,33 +3,122 @@ import { logger } from './logger';
 import { db } from './db';
 import { otpTokens, verificationAudit } from './schema-extensions';
 import { eq, and, gt } from 'drizzle-orm';
+import { users } from '@shared/schema';
 import bcrypt from 'bcryptjs';
 
 export interface SMSService {
   sendSMS(phone: string, message: string): Promise<boolean>;
   sendOTP(phone: string, code: string): Promise<boolean>;
+  isConfigured(): boolean;
 }
 
-/**
- * Twilio SMS Service (production)
- */
-class TwilioSMSService implements SMSService {
-  private client: twilio.Twilio;
-  private fromPhone: string;
+interface TwilioCredentials {
+  accountSid: string;
+  apiKey: string;
+  apiKeySecret: string;
+  phoneNumber: string;
+}
 
-  constructor() {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    this.fromPhone = process.env.TWILIO_PHONE_NUMBER || '';
+let cachedCredentials: TwilioCredentials | null = null;
+let credentialsFetchTime: number = 0;
+const CREDENTIALS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-    if (!accountSid || !authToken || !this.fromPhone) {
-      throw new Error('Twilio credentials not configured');
+async function getTwilioCredentials(): Promise<TwilioCredentials | null> {
+  const now = Date.now();
+  if (cachedCredentials && (now - credentialsFetchTime) < CREDENTIALS_CACHE_TTL) {
+    return cachedCredentials;
+  }
+
+  try {
+    const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+    const xReplitToken = process.env.REPL_IDENTITY 
+      ? 'repl ' + process.env.REPL_IDENTITY 
+      : process.env.WEB_REPL_RENEWAL 
+      ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+      : null;
+
+    if (!hostname || !xReplitToken) {
+      logger.warn('Replit connector environment not available');
+      return null;
     }
 
-    this.client = twilio(accountSid, authToken);
+    const response = await fetch(
+      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=twilio',
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X_REPLIT_TOKEN': xReplitToken
+        }
+      }
+    );
+
+    const data = await response.json();
+    const connectionSettings = data.items?.[0];
+
+    if (!connectionSettings || 
+        !connectionSettings.settings.account_sid || 
+        !connectionSettings.settings.api_key || 
+        !connectionSettings.settings.api_key_secret) {
+      logger.warn('Twilio connector not configured properly');
+      return null;
+    }
+
+    cachedCredentials = {
+      accountSid: connectionSettings.settings.account_sid,
+      apiKey: connectionSettings.settings.api_key,
+      apiKeySecret: connectionSettings.settings.api_key_secret,
+      phoneNumber: connectionSettings.settings.phone_number || ''
+    };
+    credentialsFetchTime = now;
+
+    logger.info('Twilio credentials loaded from Replit connector');
+    return cachedCredentials;
+  } catch (error) {
+    logger.error('Failed to fetch Twilio credentials:', error);
+    return null;
+  }
+}
+
+class ReplitTwilioSMSService implements SMSService {
+  private client: twilio.Twilio | null = null;
+  private fromPhone: string = '';
+  private initialized: boolean = false;
+
+  async ensureInitialized(): Promise<boolean> {
+    if (this.initialized && this.client) {
+      return true;
+    }
+
+    const credentials = await getTwilioCredentials();
+    if (!credentials) {
+      return false;
+    }
+
+    try {
+      this.client = twilio(credentials.apiKey, credentials.apiKeySecret, {
+        accountSid: credentials.accountSid
+      });
+      this.fromPhone = credentials.phoneNumber;
+      this.initialized = true;
+      logger.info('Twilio SMS service initialized via Replit connector');
+      return true;
+    } catch (error) {
+      logger.error('Failed to initialize Twilio client:', error);
+      return false;
+    }
+  }
+
+  isConfigured(): boolean {
+    return this.initialized;
   }
 
   async sendSMS(phone: string, message: string): Promise<boolean> {
+    const ready = await this.ensureInitialized();
+    if (!ready || !this.client) {
+      logger.error('Twilio not initialized, cannot send SMS');
+      return false;
+    }
+
     try {
       await this.client.messages.create({
         body: message,
@@ -50,10 +139,11 @@ class TwilioSMSService implements SMSService {
   }
 }
 
-/**
- * Mock SMS Service (development/testing)
- */
 class MockSMSService implements SMSService {
+  isConfigured(): boolean {
+    return false;
+  }
+
   async sendSMS(phone: string, message: string): Promise<boolean> {
     logger.info(`📱 [MOCK SMS] Enviando a ${phone}: ${message}`);
     return true;
@@ -65,52 +155,34 @@ class MockSMSService implements SMSService {
   }
 }
 
-/**
- * Initialize SMS service based on environment
- */
-function initializeSMSService(): SMSService {
-  const hasTwilioCredentials = 
-    process.env.TWILIO_ACCOUNT_SID && 
-    process.env.TWILIO_AUTH_TOKEN && 
-    process.env.TWILIO_PHONE_NUMBER;
-
-  if (hasTwilioCredentials) {
-    try {
-      logger.info('Initializing Twilio SMS service');
-      return new TwilioSMSService();
-    } catch (error) {
-      logger.warn('Failed to initialize Twilio, falling back to mock service:', error);
-      return new MockSMSService();
-    }
-  } else {
-    logger.info('Twilio credentials not found, using mock SMS service');
-    return new MockSMSService();
+async function initializeSMSService(): Promise<SMSService> {
+  const twilioService = new ReplitTwilioSMSService();
+  const isReady = await twilioService.ensureInitialized();
+  
+  if (isReady) {
+    logger.info('Using Twilio SMS service via Replit connector');
+    return twilioService;
   }
+  
+  logger.info('Twilio not available, using mock SMS service');
+  return new MockSMSService();
 }
 
-export const smsService: SMSService = initializeSMSService();
+let smsServiceInstance: SMSService | null = null;
 
-/**
- * Generates a 6-digit OTP code
- * In development with MockSMSService, returns a fixed code for testing
- */
-export function generateOTP(): string {
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const hasTwilioCredentials = 
-    process.env.TWILIO_ACCOUNT_SID && 
-    process.env.TWILIO_AUTH_TOKEN && 
-    process.env.TWILIO_PHONE_NUMBER;
-  
-  if (isDevelopment && !hasTwilioCredentials) {
-    return '123456';
+export async function getSMSService(): Promise<SMSService> {
+  if (!smsServiceInstance) {
+    smsServiceInstance = await initializeSMSService();
   }
-  
+  return smsServiceInstance;
+}
+
+export const smsService: SMSService = new ReplitTwilioSMSService();
+
+export function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-/**
- * Creates and sends an OTP to a phone number
- */
 export async function createAndSendOTP(
   userId: string,
   phone: string,
@@ -118,13 +190,12 @@ export async function createAndSendOTP(
   userAgent?: string
 ): Promise<{ success: boolean; error?: string; expiresIn?: number }> {
   try {
-    // Check for recent OTP requests (rate limiting)
     const recentOTP = await db.query.otpTokens.findFirst({
       where: (otpTokens, { and, eq, gt }) =>
         and(
           eq(otpTokens.userId, userId),
           eq(otpTokens.phone, phone),
-          gt(otpTokens.createdAt, new Date(Date.now() - 60 * 1000)) // Within last minute
+          gt(otpTokens.createdAt, new Date(Date.now() - 60 * 1000))
         ),
     });
 
@@ -136,12 +207,10 @@ export async function createAndSendOTP(
       };
     }
 
-    // Generate OTP and hash it
     const code = generateOTP();
     const codeHash = await bcrypt.hash(code, 10);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Store OTP in database
     await db.insert(otpTokens).values({
       userId,
       phone,
@@ -151,8 +220,8 @@ export async function createAndSendOTP(
       verified: false,
     });
 
-    // Send OTP via SMS
-    const sent = await smsService.sendOTP(phone, code);
+    const service = await getSMSService();
+    const sent = await service.sendOTP(phone, code);
 
     if (!sent) {
       logger.error(`Failed to send OTP to ${phone}`);
@@ -162,7 +231,6 @@ export async function createAndSendOTP(
       };
     }
 
-    // Log successful OTP generation
     await db.insert(verificationAudit).values({
       userId,
       verificationType: 'phone_otp',
@@ -176,7 +244,7 @@ export async function createAndSendOTP(
 
     return {
       success: true,
-      expiresIn: 10, // minutes
+      expiresIn: 10,
     };
   } catch (error) {
     logger.error('Error creating and sending OTP:', error);
@@ -187,9 +255,6 @@ export async function createAndSendOTP(
   }
 }
 
-/**
- * Verifies an OTP code
- */
 export async function verifyOTP(
   userId: string,
   phone: string,
@@ -198,7 +263,6 @@ export async function verifyOTP(
   userAgent?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Find the most recent unverified OTP for this user and phone
     const otpRecord = await db.query.otpTokens.findFirst({
       where: (otpTokens, { and, eq }) =>
         and(
@@ -225,7 +289,6 @@ export async function verifyOTP(
       };
     }
 
-    // Check if OTP has expired
     if (new Date() > otpRecord.expiresAt) {
       await db.insert(verificationAudit).values({
         userId,
@@ -242,7 +305,6 @@ export async function verifyOTP(
       };
     }
 
-    // Check attempt limit (max 3 attempts)
     if (otpRecord.attempts >= 3) {
       await db.insert(verificationAudit).values({
         userId,
@@ -259,10 +321,8 @@ export async function verifyOTP(
       };
     }
 
-    // Verify the code
     const isValid = await bcrypt.compare(code, otpRecord.codeHash);
 
-    // Increment attempt counter
     await db
       .update(otpTokens)
       .set({ attempts: otpRecord.attempts + 1 })
@@ -285,22 +345,19 @@ export async function verifyOTP(
       };
     }
 
-    // Mark OTP as verified
     await db
       .update(otpTokens)
       .set({ verified: true })
       .where(eq(otpTokens.id, otpRecord.id));
 
-    // Update user's phone verification status
     await db
-      .update(db.query.users)
+      .update(users)
       .set({
         phone,
         telefonoVerificado: true,
       })
-      .where(eq(db.query.users.id, userId));
+      .where(eq(users.id, userId));
 
-    // Log successful verification
     await db.insert(verificationAudit).values({
       userId,
       verificationType: 'phone_otp',
