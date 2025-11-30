@@ -31,12 +31,12 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
   const tabs = userType === 'cliente' ? clientTabs : userType === 'socio' ? socioTabs : driverTabs;
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <main className="flex-1 overflow-y-auto">
+    <div className="flex flex-col min-h-screen bg-background">
+      <main className="flex-1 overflow-y-auto pb-20">
         {children}
       </main>
       
-      <nav className="flex-shrink-0 h-16 border-t border-border bg-card/95 backdrop-blur-sm flex items-center justify-around px-2 safe-area-inset-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 h-16 border-t border-border bg-card/95 backdrop-blur-sm flex items-center justify-around px-2 safe-area-inset-bottom">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = location === tab.path || location.startsWith(tab.path + '/');
