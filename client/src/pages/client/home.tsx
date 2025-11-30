@@ -4,6 +4,7 @@ import { MapboxMap } from '@/components/maps/MapboxMap';
 import { AddressSearchInput } from '@/components/maps/AddressSearchInput';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { calculateRoute, type Coordinates } from '@/lib/maps';
 import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck } from 'lucide-react';
@@ -381,105 +382,110 @@ export default function ClientHome() {
 
       <div 
         className={cn(
-          "bg-background border-t border-border transition-all duration-300 safe-area-inset-bottom",
-          showExpandedCard ? "max-h-[85vh] md:max-h-[75vh]" : "max-h-16"
+          "bg-background border-t border-border transition-all duration-300 flex flex-col",
+          showExpandedCard ? "h-[55vh] md:h-[50vh]" : "h-14"
         )}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <button 
-          className="w-full flex items-center justify-center py-2 text-muted-foreground"
+          className="w-full flex items-center justify-center py-2 text-muted-foreground flex-shrink-0"
           onClick={() => setShowExpandedCard(!showExpandedCard)}
           data-testid="button-toggle-card"
         >
           {showExpandedCard ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
         </button>
 
-        <div className={cn(
-          "transition-all duration-300 px-4 pb-4",
-          showExpandedCard ? "max-h-[calc(85vh-48px)] md:max-h-[calc(75vh-48px)] overflow-y-auto" : "max-h-0 overflow-hidden"
-        )}>
+        {showExpandedCard && (
+          <div className="flex-1 min-h-0 overflow-hidden">
           {step === 'address' && (
-            <div className="space-y-4">
-              <div className="text-center mb-2">
+            <div className="flex flex-col h-full">
+              <div className="text-center px-4 pb-2 flex-shrink-0">
                 <h3 className="text-lg font-bold">¿A dónde vamos?</h3>
                 <p className="text-sm text-muted-foreground">Ingresa las direcciones de recogida y entrega</p>
               </div>
 
-              <AddressSearchInput
-                label="Recoger en"
-                placeholder="¿Dónde está tu vehículo?"
-                value={origenDireccion}
-                coordinates={origin}
-                onAddressChange={handleOriginChange}
-                onClear={() => {
-                  setOrigin(null);
-                  setOrigenDireccion('');
-                  setDistance(null);
-                  setCost(null);
-                }}
-                currentLocation={currentLocation}
-                icon="origin"
-                autoFocus
-              />
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <div className="space-y-4 pb-2">
+                  <AddressSearchInput
+                    label="Recoger en"
+                    placeholder="¿Dónde está tu vehículo?"
+                    value={origenDireccion}
+                    coordinates={origin}
+                    onAddressChange={handleOriginChange}
+                    onClear={() => {
+                      setOrigin(null);
+                      setOrigenDireccion('');
+                      setDistance(null);
+                      setCost(null);
+                    }}
+                    currentLocation={currentLocation}
+                    icon="origin"
+                    autoFocus
+                  />
 
-              <AddressSearchInput
-                label="Llevar a"
-                placeholder="¿A dónde lo llevamos?"
-                value={destinoDireccion}
-                coordinates={destination}
-                onAddressChange={handleDestinationChange}
-                onClear={() => {
-                  setDestination(null);
-                  setDestinoDireccion('');
-                  setDistance(null);
-                  setCost(null);
-                }}
-                currentLocation={currentLocation}
-                icon="destination"
-              />
+                  <AddressSearchInput
+                    label="Llevar a"
+                    placeholder="¿A dónde lo llevamos?"
+                    value={destinoDireccion}
+                    coordinates={destination}
+                    onAddressChange={handleDestinationChange}
+                    onClear={() => {
+                      setDestination(null);
+                      setDestinoDireccion('');
+                      setDistance(null);
+                      setCost(null);
+                    }}
+                    currentLocation={currentLocation}
+                    icon="destination"
+                  />
 
-              {isCalculating && (
-                <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">Calculando ruta...</span>
+                  {isCalculating && (
+                    <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">Calculando ruta...</span>
+                    </div>
+                  )}
+
+                  {distance && cost && !isCalculating && (
+                    <Card className="p-4 bg-muted/50">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Distancia estimada</p>
+                          <p className="text-lg font-bold">{distance.toFixed(1)} km</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Costo estimado</p>
+                          <p className="text-lg font-bold text-primary">RD$ {cost.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
                 </div>
-              )}
+              </ScrollArea>
 
-              {distance && cost && !isCalculating && (
-                <Card className="p-4 bg-muted/50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Distancia estimada</p>
-                      <p className="text-lg font-bold">{distance.toFixed(1)} km</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Costo estimado</p>
-                      <p className="text-lg font-bold text-primary">RD$ {cost.toFixed(2)}</p>
-                    </div>
-                  </div>
-                </Card>
-              )}
-
-              <Button
-                onClick={handleNextStep}
-                disabled={!origin || !destination || isCalculating}
-                className="w-full h-12 text-base"
-                data-testid="button-next"
-              >
-                {isCalculating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Calculando...
-                  </>
-                ) : (
-                  'Continuar'
-                )}
-              </Button>
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+                <Button
+                  onClick={handleNextStep}
+                  disabled={!origin || !destination || isCalculating}
+                  className="w-full h-12 text-base"
+                  data-testid="button-next"
+                >
+                  {isCalculating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Calculando...
+                    </>
+                  ) : (
+                    'Continuar'
+                  )}
+                </Button>
+              </div>
             </div>
           )}
 
           {step === 'serviceCategory' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -494,25 +500,29 @@ export default function ClientHome() {
                 </div>
               </div>
 
-              <ServiceCategorySelector 
-                value={servicioCategoria} 
-                onChange={handleCategoryChange} 
-              />
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <ServiceCategorySelector 
+                  value={servicioCategoria} 
+                  onChange={handleCategoryChange} 
+                />
+              </ScrollArea>
 
-              <Button
-                onClick={handleNextStep}
-                disabled={!servicioCategoria}
-                className="w-full h-12 text-base"
-                data-testid="button-next"
-              >
-                Continuar
-              </Button>
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+                <Button
+                  onClick={handleNextStep}
+                  disabled={!servicioCategoria}
+                  className="w-full h-12 text-base"
+                  data-testid="button-next"
+                >
+                  Continuar
+                </Button>
+              </div>
             </div>
           )}
 
           {step === 'serviceSubtype' && servicioCategoria && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -527,25 +537,29 @@ export default function ClientHome() {
                 </div>
               </div>
 
-              <ServiceSubtypeSelector 
-                category={servicioCategoria}
-                value={servicioSubtipo} 
-                onChange={setServicioSubtipo} 
-              />
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <ServiceSubtypeSelector 
+                  category={servicioCategoria}
+                  value={servicioSubtipo} 
+                  onChange={setServicioSubtipo} 
+                />
+              </ScrollArea>
 
-              <Button
-                onClick={handleNextStep}
-                className="w-full h-12 text-base"
-                data-testid="button-next"
-              >
-                {servicioSubtipo ? 'Continuar' : 'Omitir'}
-              </Button>
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+                <Button
+                  onClick={handleNextStep}
+                  className="w-full h-12 text-base"
+                  data-testid="button-next"
+                >
+                  {servicioSubtipo ? 'Continuar' : 'Omitir'}
+                </Button>
+              </div>
             </div>
           )}
 
           {step === 'vehicleType' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -560,22 +574,26 @@ export default function ClientHome() {
                 </div>
               </div>
 
-              <VehicleTypeSelector value={tipoVehiculo} onChange={setTipoVehiculo} />
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <VehicleTypeSelector value={tipoVehiculo} onChange={setTipoVehiculo} />
+              </ScrollArea>
 
-              <Button
-                onClick={handleNextStep}
-                disabled={!tipoVehiculo}
-                className="w-full h-12 text-base"
-                data-testid="button-next"
-              >
-                Continuar
-              </Button>
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+                <Button
+                  onClick={handleNextStep}
+                  disabled={!tipoVehiculo}
+                  className="w-full h-12 text-base"
+                  data-testid="button-next"
+                >
+                  Continuar
+                </Button>
+              </div>
             </div>
           )}
 
           {step === 'payment' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -590,42 +608,48 @@ export default function ClientHome() {
                 </div>
               </div>
 
-              <PaymentMethodSelector 
-                value={metodoPago} 
-                onChange={setMetodoPago} 
-                selectedCardId={selectedCardId}
-                onCardSelect={setSelectedCardId}
-                insuranceStatus={insuranceStatus} 
-              />
-              
-              {metodoPago === 'aseguradora' && (
-                <div className="mt-4">
-                  <Separator className="my-4" />
-                  <h4 className="text-sm font-semibold mb-3">Información de Aseguradora</h4>
-                  <InsuranceForm
-                    aseguradoraNombre={aseguradoraNombre}
-                    aseguradoraPoliza={aseguradoraPoliza}
-                    onChange={(data) => {
-                      setAseguradoraNombre(data.aseguradoraNombre);
-                      setAseguradoraPoliza(data.aseguradoraPoliza);
-                    }}
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <div className="space-y-4 pb-2">
+                  <PaymentMethodSelector 
+                    value={metodoPago} 
+                    onChange={setMetodoPago} 
+                    selectedCardId={selectedCardId}
+                    onCardSelect={setSelectedCardId}
+                    insuranceStatus={insuranceStatus} 
                   />
+                  
+                  {metodoPago === 'aseguradora' && (
+                    <div className="mt-4">
+                      <Separator className="my-4" />
+                      <h4 className="text-sm font-semibold mb-3">Información de Aseguradora</h4>
+                      <InsuranceForm
+                        aseguradoraNombre={aseguradoraNombre}
+                        aseguradoraPoliza={aseguradoraPoliza}
+                        onChange={(data) => {
+                          setAseguradoraNombre(data.aseguradoraNombre);
+                          setAseguradoraPoliza(data.aseguradoraPoliza);
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
+              </ScrollArea>
 
-              <Button
-                onClick={handleNextStep}
-                className="w-full h-12 text-base"
-                data-testid="button-next"
-              >
-                Continuar
-              </Button>
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+                <Button
+                  onClick={handleNextStep}
+                  className="w-full h-12 text-base"
+                  data-testid="button-next"
+                >
+                  Continuar
+                </Button>
+              </div>
             </div>
           )}
 
           {step === 'confirm' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -641,104 +665,109 @@ export default function ClientHome() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                  {servicioCategoria === 'auxilio_vial' ? (
-                    <Wrench className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  ) : servicioCategoria === 'camiones_pesados' ? (
-                    <Truck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <Car className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">Servicio</p>
-                    <p className="font-semibold">{getCategoryLabel(servicioCategoria)}</p>
-                    {servicioSubtipo && (
-                      <p className="text-sm text-muted-foreground">
-                        {getSubtypeLabel(servicioCategoria, servicioSubtipo)}
-                      </p>
-                    )}
-                    {tipoVehiculo && (
-                      <p className="text-sm text-muted-foreground capitalize">
-                        Vehículo: {tipoVehiculo}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                    <div className="w-0.5 h-8 bg-border" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Origen</p>
-                      <p className="text-sm font-medium truncate">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Destino</p>
-                      <p className="text-sm font-medium truncate">{destinoDireccion || `${destination?.lat.toFixed(4)}, ${destination?.lng.toFixed(4)}`}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                  <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">Método de Pago</p>
-                    <p className="font-semibold capitalize">{metodoPago}</p>
-                    {metodoPago === 'aseguradora' && (
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        <p>{aseguradoraNombre}</p>
-                        <p>Póliza: {aseguradoraPoliza}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Distancia</p>
-                    <p className="text-xl font-bold" data-testid="text-distance">
-                      {distance?.toFixed(1)} km
-                    </p>
-                  </div>
-                  <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
-                    <p className="text-xs text-muted-foreground mb-1">Costo Total</p>
-                    {calculatePricingMutation.isPending ? (
-                      <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <div className="space-y-3 pb-2">
+                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                    {servicioCategoria === 'auxilio_vial' ? (
+                      <Wrench className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    ) : servicioCategoria === 'camiones_pesados' ? (
+                      <Truck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                     ) : (
-                      <p className="text-xl font-bold text-primary" data-testid="text-cost">
-                        RD$ {cost?.toFixed(2)}
-                      </p>
+                      <Car className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                     )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">Servicio</p>
+                      <p className="font-semibold">{getCategoryLabel(servicioCategoria)}</p>
+                      {servicioSubtipo && (
+                        <p className="text-sm text-muted-foreground">
+                          {getSubtypeLabel(servicioCategoria, servicioSubtipo)}
+                        </p>
+                      )}
+                      {tipoVehiculo && (
+                        <p className="text-sm text-muted-foreground capitalize">
+                          Vehículo: {tipoVehiculo}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                      <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                      <div className="w-0.5 h-8 bg-border" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Origen</p>
+                        <p className="text-sm font-medium truncate">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Destino</p>
+                        <p className="text-sm font-medium truncate">{destinoDireccion || `${destination?.lat.toFixed(4)}, ${destination?.lng.toFixed(4)}`}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                    <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">Método de Pago</p>
+                      <p className="font-semibold capitalize">{metodoPago}</p>
+                      {metodoPago === 'aseguradora' && (
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          <p>{aseguradoraNombre}</p>
+                          <p>Póliza: {aseguradoraPoliza}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-3 bg-muted rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Distancia</p>
+                      <p className="text-xl font-bold" data-testid="text-distance">
+                        {distance?.toFixed(1)} km
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
+                      <p className="text-xs text-muted-foreground mb-1">Costo Total</p>
+                      {calculatePricingMutation.isPending ? (
+                        <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
+                      ) : (
+                        <p className="text-xl font-bold text-primary" data-testid="text-cost">
+                          RD$ {cost?.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </ScrollArea>
 
-              <Button
-                onClick={handleConfirmRequest}
-                disabled={!distance || createServiceMutation.isPending}
-                className="w-full h-14 text-base font-semibold"
-                data-testid="button-confirm"
-              >
-                {createServiceMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Enviando solicitud...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    Confirmar Solicitud
-                  </>
-                )}
-              </Button>
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+                <Button
+                  onClick={handleConfirmRequest}
+                  disabled={!distance || createServiceMutation.isPending}
+                  className="w-full h-14 text-base font-semibold"
+                  data-testid="button-confirm"
+                >
+                  {createServiceMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Enviando solicitud...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Confirmar Solicitud
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
