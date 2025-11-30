@@ -1915,6 +1915,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/services/:id/confirm-payment", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+      const servicio = await storage.getServicioById(servicioId);
+      
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.clienteId !== req.user!.id) {
+        return res.status(403).json({ message: "Solo el cliente puede confirmar el pago" });
+      }
+
+      logSystem.info('Payment confirmed by client', { 
+        servicioId, 
+        clienteId: req.user!.id,
+        montoConfirmado: req.body.montoConfirmado,
+        metodoPago: servicio.metodoPago
+      });
+
+      res.json({ success: true, message: "Pago confirmado" });
+    } catch (error: any) {
+      logSystem.error('Confirm payment error', error, { servicioId: req.params.id });
+      res.status(500).json({ message: "Error al confirmar el pago" });
+    }
+  });
+
   // Rating endpoints (Module 3.3)
   app.post("/api/services/:id/calificar", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {

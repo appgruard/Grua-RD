@@ -12,6 +12,7 @@ import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from '@/lib/auth';
 import { ChatBox } from '@/components/chat/ChatBox';
 import { RatingModal, StarRating } from '@/components/RatingModal';
+import { PaymentConfirmationModal } from '@/components/PaymentConfirmationModal';
 import type { ServicioWithDetails, Calificacion } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
 
@@ -21,7 +22,8 @@ export default function ClientTracking() {
   const [driverLocation, setDriverLocation] = useState<Coordinates | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
-  const [hasShownRatingModal, setHasShownRatingModal] = useState(false);
+  const [paymentConfirmationOpen, setPaymentConfirmationOpen] = useState(false);
+  const [hasShownCompletionFlow, setHasShownCompletionFlow] = useState(false);
   const { user } = useAuth();
 
   const { data: service, isLoading } = useQuery<ServicioWithDetails>({
@@ -34,6 +36,19 @@ export default function ClientTracking() {
     enabled: !!serviceId && service?.estado === 'completado',
   });
 
+  const showCompletionFlow = () => {
+    if (service?.metodoPago === 'efectivo') {
+      setPaymentConfirmationOpen(true);
+    } else {
+      setRatingModalOpen(true);
+    }
+  };
+
+  const handlePaymentConfirmed = () => {
+    setPaymentConfirmationOpen(false);
+    setTimeout(() => setRatingModalOpen(true), 300);
+  };
+
   const { send } = useWebSocket((message) => {
     if (message.type === 'driver_location_update' && message.payload.servicioId === serviceId) {
       setDriverLocation({
@@ -42,9 +57,9 @@ export default function ClientTracking() {
       });
     }
     if (message.type === 'service_status_change' && message.payload.id === serviceId) {
-      if (message.payload.estado === 'completado' && !hasShownRatingModal && isRatingFetched && existingRating === null) {
-        setHasShownRatingModal(true);
-        setRatingModalOpen(true);
+      if (message.payload.estado === 'completado' && !hasShownCompletionFlow && isRatingFetched && existingRating === null) {
+        setHasShownCompletionFlow(true);
+        showCompletionFlow();
       }
     }
   });
@@ -56,11 +71,11 @@ export default function ClientTracking() {
   }, [serviceId, send]);
 
   useEffect(() => {
-    if (service?.estado === 'completado' && !hasShownRatingModal && isRatingFetched && existingRating === null) {
-      setHasShownRatingModal(true);
-      setTimeout(() => setRatingModalOpen(true), 500);
+    if (service?.estado === 'completado' && !hasShownCompletionFlow && isRatingFetched && existingRating === null) {
+      setHasShownCompletionFlow(true);
+      setTimeout(() => showCompletionFlow(), 500);
     }
-  }, [service?.estado, hasShownRatingModal, existingRating, isRatingFetched]);
+  }, [service?.estado, hasShownCompletionFlow, existingRating, isRatingFetched, service?.metodoPago]);
 
   if (isLoading || !service) {
     return (
@@ -213,12 +228,22 @@ export default function ClientTracking() {
       </Drawer>
 
       {service.conductor && (
-        <RatingModal
-          isOpen={ratingModalOpen}
-          onClose={() => setRatingModalOpen(false)}
-          serviceId={serviceId!}
-          driverName={driverName}
-        />
+        <>
+          <PaymentConfirmationModal
+            isOpen={paymentConfirmationOpen}
+            onClose={() => setPaymentConfirmationOpen(false)}
+            onConfirmed={handlePaymentConfirmed}
+            serviceId={serviceId!}
+            expectedAmount={parseFloat(service.costoTotal as string)}
+            metodoPago={service.metodoPago}
+          />
+          <RatingModal
+            isOpen={ratingModalOpen}
+            onClose={() => setRatingModalOpen(false)}
+            serviceId={serviceId!}
+            driverName={driverName}
+          />
+        </>
       )}
     </div>
   );
