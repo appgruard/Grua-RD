@@ -32,6 +32,46 @@ export const estadoServicioEnum = pgEnum("estado_servicio", [
 ]);
 export const metodoPagoEnum = pgEnum("metodo_pago", ["efectivo", "tarjeta", "aseguradora"]);
 export const tipoVehiculoEnum = pgEnum("tipo_vehiculo", ["carro", "motor", "jeep", "camion"]);
+
+export const servicioCategoriaEnum = pgEnum("servicio_categoria", [
+  "remolque_estandar",
+  "auxilio_vial",
+  "remolque_especializado",
+  "camiones_pesados",
+  "izaje_construccion",
+  "remolque_recreativo"
+]);
+
+export const servicioSubtipoEnum = pgEnum("servicio_subtipo", [
+  "cambio_goma",
+  "inflado_neumatico",
+  "paso_corriente",
+  "cerrajero_automotriz",
+  "suministro_combustible",
+  "envio_bateria",
+  "diagnostico_obd",
+  "extraccion_vehiculo",
+  "vehiculo_sin_llanta",
+  "vehiculo_sin_direccion",
+  "vehiculo_chocado",
+  "vehiculo_lujo",
+  "vehiculo_electrico",
+  "camion_liviano",
+  "camion_mediano",
+  "patana_cabezote",
+  "volteo",
+  "transporte_maquinarias",
+  "montacargas",
+  "retroexcavadora",
+  "tractor",
+  "izaje_materiales",
+  "subida_muebles",
+  "transporte_equipos",
+  "remolque_botes",
+  "remolque_jetski",
+  "remolque_cuatrimoto"
+]);
+
 export const aseguradoraEstadoEnum = pgEnum("aseguradora_estado", ["pendiente", "aprobado", "rechazado"]);
 export const documentoTipoEnum = pgEnum("documento_tipo", [
   "licencia",
@@ -114,6 +154,8 @@ export const servicios = pgTable("servicios", {
   stripePaymentId: text("stripe_payment_id"),
   azulTransactionId: text("azul_transaction_id"),
   tipoVehiculo: tipoVehiculoEnum("tipo_vehiculo"),
+  servicioCategoria: servicioCategoriaEnum("servicio_categoria").default("remolque_estandar"),
+  servicioSubtipo: servicioSubtipoEnum("servicio_subtipo"),
   aseguradoraNombre: text("aseguradora_nombre"),
   aseguradoraPoliza: text("aseguradora_poliza"),
   aseguradoraEstado: aseguradoraEstadoEnum("aseguradora_estado"),
@@ -573,6 +615,43 @@ export const insertServicioSchema = createInsertSchema(servicios, {
   origenDireccion: z.string().min(1),
   destinoDireccion: z.string().min(1),
   tipoVehiculo: z.enum(["carro", "motor", "jeep", "camion"]).optional(),
+  servicioCategoria: z.enum([
+    "remolque_estandar",
+    "auxilio_vial",
+    "remolque_especializado",
+    "camiones_pesados",
+    "izaje_construccion",
+    "remolque_recreativo"
+  ]).optional(),
+  servicioSubtipo: z.enum([
+    "cambio_goma",
+    "inflado_neumatico",
+    "paso_corriente",
+    "cerrajero_automotriz",
+    "suministro_combustible",
+    "envio_bateria",
+    "diagnostico_obd",
+    "extraccion_vehiculo",
+    "vehiculo_sin_llanta",
+    "vehiculo_sin_direccion",
+    "vehiculo_chocado",
+    "vehiculo_lujo",
+    "vehiculo_electrico",
+    "camion_liviano",
+    "camion_mediano",
+    "patana_cabezote",
+    "volteo",
+    "transporte_maquinarias",
+    "montacargas",
+    "retroexcavadora",
+    "tractor",
+    "izaje_materiales",
+    "subida_muebles",
+    "transporte_equipos",
+    "remolque_botes",
+    "remolque_jetski",
+    "remolque_cuatrimoto"
+  ]).optional(),
   aseguradoraNombre: z.string().optional(),
   aseguradoraPoliza: z.string().optional(),
   aseguradoraEstado: z.enum(["pendiente", "aprobado", "rechazado"]).optional(),

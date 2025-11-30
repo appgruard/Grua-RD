@@ -6,16 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { calculateRoute, type Coordinates } from '@/lib/maps';
-import { MapPin, Loader2, Navigation, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown } from 'lucide-react';
+import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { VehicleTypeSelector } from '@/components/VehicleTypeSelector';
+import { ServiceCategorySelector, serviceCategories } from '@/components/ServiceCategorySelector';
+import { ServiceSubtypeSelector, hasSubtypes, subtypesByCategory } from '@/components/ServiceSubtypeSelector';
 import { PaymentMethodSelector } from '@/components/PaymentMethodSelector';
 import { InsuranceForm } from '@/components/InsuranceForm';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
-type Step = 'address' | 'vehicleType' | 'payment' | 'confirm';
+type Step = 'address' | 'serviceCategory' | 'serviceSubtype' | 'vehicleType' | 'payment' | 'confirm';
 
 export default function ClientHome() {
   const [, setLocation] = useLocation();
@@ -29,6 +31,8 @@ export default function ClientHome() {
   const [duration, setDuration] = useState<number | null>(null);
   const [cost, setCost] = useState<number | null>(null);
   const [step, setStep] = useState<Step>('address');
+  const [servicioCategoria, setServicioCategoria] = useState<string | null>(null);
+  const [servicioSubtipo, setServicioSubtipo] = useState<string | null>(null);
   const [tipoVehiculo, setTipoVehiculo] = useState<string | null>(null);
   const [metodoPago, setMetodoPago] = useState<string>('efectivo');
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -144,12 +148,20 @@ export default function ClientHome() {
     setDestination(coords);
   };
 
+  const requiresVehicleType = (category: string | null): boolean => {
+    return category === 'remolque_estandar' || category === 'remolque_especializado';
+  };
+
+  const requiresSubtype = (category: string | null): boolean => {
+    return category !== null && category !== 'remolque_estandar' && hasSubtypes(category);
+  };
+
   const handleNextStep = () => {
     if (step === 'address') {
       if (!origin) {
         toast({
           title: 'Seleccione origen',
-          description: 'Debe seleccionar la ubicación donde se encuentra tu vehículo',
+          description: 'Debe seleccionar la ubicación donde se encuentra',
           variant: 'destructive',
         });
         return;
@@ -157,12 +169,34 @@ export default function ClientHome() {
       if (!destination) {
         toast({
           title: 'Seleccione destino',
-          description: 'Debe seleccionar el destino donde llevar tu vehículo',
+          description: 'Debe seleccionar el destino',
           variant: 'destructive',
         });
         return;
       }
-      setStep('vehicleType');
+      setStep('serviceCategory');
+    } else if (step === 'serviceCategory') {
+      if (!servicioCategoria) {
+        toast({
+          title: 'Seleccione categoría',
+          description: 'Debe seleccionar un tipo de servicio',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (requiresSubtype(servicioCategoria)) {
+        setStep('serviceSubtype');
+      } else if (requiresVehicleType(servicioCategoria)) {
+        setStep('vehicleType');
+      } else {
+        setStep('payment');
+      }
+    } else if (step === 'serviceSubtype') {
+      if (requiresVehicleType(servicioCategoria)) {
+        setStep('vehicleType');
+      } else {
+        setStep('payment');
+      }
     } else if (step === 'vehicleType') {
       if (!tipoVehiculo) {
         toast({
@@ -197,17 +231,39 @@ export default function ClientHome() {
   };
 
   const handlePrevStep = () => {
-    if (step === 'vehicleType') {
+    if (step === 'serviceCategory') {
       setStep('address');
+    } else if (step === 'serviceSubtype') {
+      setStep('serviceCategory');
+    } else if (step === 'vehicleType') {
+      if (requiresSubtype(servicioCategoria)) {
+        setStep('serviceSubtype');
+      } else {
+        setStep('serviceCategory');
+      }
     } else if (step === 'payment') {
-      setStep('vehicleType');
+      if (requiresVehicleType(servicioCategoria)) {
+        setStep('vehicleType');
+      } else if (requiresSubtype(servicioCategoria)) {
+        setStep('serviceSubtype');
+      } else {
+        setStep('serviceCategory');
+      }
     } else if (step === 'confirm') {
       setStep('payment');
     }
   };
 
+  const handleCategoryChange = (category: string) => {
+    setServicioCategoria(category);
+    setServicioSubtipo(null);
+    if (!requiresVehicleType(category)) {
+      setTipoVehiculo(null);
+    }
+  };
+
   const handleConfirmRequest = () => {
-    if (!origin || !destination || !tipoVehiculo) return;
+    if (!origin || !destination || !servicioCategoria) return;
     
     const currentDistance = distanceRef.current || distance;
     if (!currentDistance) return;
@@ -225,8 +281,16 @@ export default function ClientHome() {
       distanciaKm: currentDistance.toFixed(2),
       costoTotal: finalCost.toFixed(2),
       metodoPago,
-      tipoVehiculo,
+      servicioCategoria,
     };
+
+    if (servicioSubtipo) {
+      serviceData.servicioSubtipo = servicioSubtipo;
+    }
+
+    if (tipoVehiculo) {
+      serviceData.tipoVehiculo = tipoVehiculo;
+    }
 
     if (metodoPago === 'aseguradora') {
       serviceData.aseguradoraNombre = aseguradoraNombre;
@@ -248,12 +312,26 @@ export default function ClientHome() {
     setDistance(null);
     setDuration(null);
     setCost(null);
+    setServicioCategoria(null);
+    setServicioSubtipo(null);
     setTipoVehiculo(null);
     setMetodoPago('efectivo');
     setSelectedCardId(null);
     setAseguradoraNombre('');
     setAseguradoraPoliza('');
     setStep('address');
+  };
+
+  const getCategoryLabel = (categoryId: string | null): string => {
+    const category = serviceCategories.find(c => c.id === categoryId);
+    return category?.label || '';
+  };
+
+  const getSubtypeLabel = (categoryId: string | null, subtypeId: string | null): string => {
+    if (!categoryId || !subtypeId) return '';
+    const subtypes = subtypesByCategory[categoryId];
+    const subtype = subtypes?.find(s => s.id === subtypeId);
+    return subtype?.label || '';
   };
 
   const markers = [
@@ -399,6 +477,72 @@ export default function ClientHome() {
             </div>
           )}
 
+          {step === 'serviceCategory' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePrevStep}
+                  data-testid="button-back"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h3 className="text-lg font-bold">Tipo de Servicio</h3>
+                  <p className="text-sm text-muted-foreground">Selecciona el servicio que necesitas</p>
+                </div>
+              </div>
+
+              <ServiceCategorySelector 
+                value={servicioCategoria} 
+                onChange={handleCategoryChange} 
+              />
+
+              <Button
+                onClick={handleNextStep}
+                disabled={!servicioCategoria}
+                className="w-full h-12 text-base"
+                data-testid="button-next"
+              >
+                Continuar
+              </Button>
+            </div>
+          )}
+
+          {step === 'serviceSubtype' && servicioCategoria && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePrevStep}
+                  data-testid="button-back"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h3 className="text-lg font-bold">Detalle del Servicio</h3>
+                  <p className="text-sm text-muted-foreground">Selecciona el tipo específico</p>
+                </div>
+              </div>
+
+              <ServiceSubtypeSelector 
+                category={servicioCategoria}
+                value={servicioSubtipo} 
+                onChange={setServicioSubtipo} 
+              />
+
+              <Button
+                onClick={handleNextStep}
+                className="w-full h-12 text-base"
+                data-testid="button-next"
+              >
+                {servicioSubtipo ? 'Continuar' : 'Omitir'}
+              </Button>
+            </div>
+          )}
+
           {step === 'vehicleType' && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
@@ -499,10 +643,26 @@ export default function ClientHome() {
 
               <div className="space-y-3">
                 <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                  <Car className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  {servicioCategoria === 'auxilio_vial' ? (
+                    <Wrench className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  ) : servicioCategoria === 'camiones_pesados' ? (
+                    <Truck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <Car className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">Vehículo</p>
-                    <p className="font-semibold capitalize">{tipoVehiculo}</p>
+                    <p className="text-xs text-muted-foreground">Servicio</p>
+                    <p className="font-semibold">{getCategoryLabel(servicioCategoria)}</p>
+                    {servicioSubtipo && (
+                      <p className="text-sm text-muted-foreground">
+                        {getSubtypeLabel(servicioCategoria, servicioSubtipo)}
+                      </p>
+                    )}
+                    {tipoVehiculo && (
+                      <p className="text-sm text-muted-foreground capitalize">
+                        Vehículo: {tipoVehiculo}
+                      </p>
+                    )}
                   </div>
                 </div>
 
