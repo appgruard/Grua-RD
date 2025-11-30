@@ -177,8 +177,6 @@ export async function getSMSService(): Promise<SMSService> {
   return smsServiceInstance;
 }
 
-export const smsService: SMSService = new ReplitTwilioSMSService();
-
 export function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }

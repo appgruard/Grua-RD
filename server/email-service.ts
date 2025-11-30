@@ -420,5 +420,3 @@ export async function getEmailService(): Promise<EmailService> {
   }
   return emailServiceInstance;
 }
-
-export const emailService: EmailService = new ResendEmailService();

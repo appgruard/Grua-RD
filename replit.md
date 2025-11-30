@@ -53,10 +53,44 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Azul Payment Gateway**: Dominican payment provider for card transactions, tokenization (DataVault), HOLD/POST/REFUND operations.
 - **Web Push API**: For sending push notifications.
 - **Replit Object Storage**: For document storage.
-- **Twilio**: SMS service for OTP delivery.
+- **Twilio**: SMS service for OTP delivery. Configured via Replit Connector (connection:conn_twilio_01KB9WVTM5Z8DY14CV50JWTYHP).
+- **Resend**: Email service for transactional emails and notifications. Configured via Replit Connector (connection:conn_resend_01KB9X4F9ETMAVF38PMRQR6VR8).
 - **Verifik**: OCR scanning (`/v2/ocr/scan-prompt`) and Dominican government database verification (`/v2/do/cedula`) for cédula validation.
 
+## Notification Services Configuration
+
+### SMS Service (Twilio via Replit Connector)
+- **File**: `server/sms-service.ts`
+- **Integration**: Twilio connector managed by Replit
+- **Features**: OTP codes, service notifications
+- **Fallback**: Mock service for development when Twilio is not configured
+
+### Email Service (Resend via Replit Connector)
+- **File**: `server/email-service.ts`
+- **Integration**: Resend connector managed by Replit
+- **Features**: 
+  - OTP verification emails
+  - Welcome emails
+  - Password reset emails
+  - Service notifications
+  - Document approval/rejection notifications
+- **Fallback**: Mock service for development when Resend is not configured
+
 ## Recent Changes
+
+### November 30, 2025 - Notification Services Integration (Twilio + Resend)
+- **SMS Service**: Updated to use Replit Twilio Connector for OTP delivery
+  - Lazy initialization for credentials from Replit Connector API
+  - Fallback to mock service in development
+  - File: `server/sms-service.ts`
+- **Email Service**: New service using Resend via Replit Connector
+  - OTP verification emails with branded HTML templates
+  - Welcome emails for new users
+  - Password reset emails
+  - Service notifications
+  - Document approval/rejection emails
+  - File: `server/email-service.ts`
+- **Routes Updated**: `server/routes.ts` now uses async SMS service initialization
 
 ### November 30, 2025 - Driver Service Specialization and Verifik Validation Display
 - **Service Categories**: Drivers can now select multiple service categories and subtypes during registration and edit them post-registration

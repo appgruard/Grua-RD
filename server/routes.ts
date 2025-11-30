@@ -4,7 +4,8 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { storageService } from "./storage-service";
 import { pushService } from "./push-service";
-import { smsService, generateOTP } from "./sms-service";
+import { getSMSService, generateOTP } from "./sms-service";
+import { getEmailService } from "./email-service";
 import { getVerificationHistory } from "./services/identity";
 import session from "express-session";
 import passport from "passport";
@@ -875,6 +876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const mensaje = `Tu código de verificación para GruaRD es: ${codigo}. Válido por 10 minutos.`;
+      const smsService = await getSMSService();
       await smsService.sendSMS(telefono, mensaje);
 
       logAuth.otpSent(telefono);
@@ -1449,6 +1451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const mensaje = `Tu código de recuperación de contraseña para GruaRD es: ${codigo}. Válido por 10 minutos.`;
+      const smsService = await getSMSService();
       await smsService.sendSMS(telefono, mensaje);
 
       res.json({ 
