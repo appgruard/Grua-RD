@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import Map, { Marker, NavigationControl, GeolocateControl } from 'react-map-gl/mapbox';
+import Map, { Marker, GeolocateControl, Source, Layer } from 'react-map-gl/mapbox';
 import type { MapRef, MapMouseEvent } from 'react-map-gl/mapbox';
 import { Loader2, MapPin } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import watermarkLogo from '@assets/20251129_191904_0001_1764458415723.png';
+import type { RouteGeometry } from '@/lib/maps';
 
 export interface Coordinates {
   lat: number;
@@ -24,6 +25,8 @@ interface MapboxMapProps {
   className?: string;
   showHeatmap?: boolean;
   heatmapData?: Array<{ lat: number; lng: number; weight: number }>;
+  routeGeometry?: RouteGeometry | null;
+  focusOnOrigin?: boolean;
 }
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
@@ -60,7 +63,9 @@ export function MapboxMap({
   onAddressChange,
   className = 'w-full h-full',
   showHeatmap = false,
-  heatmapData = []
+  heatmapData = [],
+  routeGeometry = null,
+  focusOnOrigin = false
 }: MapboxMapProps) {
   const mapRef = useRef<MapRef>(null);
   const [loading, setLoading] = useState(true);
@@ -72,12 +77,47 @@ export function MapboxMap({
   });
 
   useEffect(() => {
-    setViewState(prev => ({
-      ...prev,
-      longitude: center.lng,
-      latitude: center.lat
-    }));
-  }, [center.lat, center.lng]);
+    if (focusOnOrigin && markers.length > 0) {
+      const originMarker = markers[0];
+      setViewState(prev => ({
+        ...prev,
+        longitude: originMarker.position.lng,
+        latitude: originMarker.position.lat,
+        zoom: 15
+      }));
+    } else {
+      setViewState(prev => ({
+        ...prev,
+        longitude: center.lng,
+        latitude: center.lat
+      }));
+    }
+  }, [center.lat, center.lng, focusOnOrigin, markers]);
+
+  useEffect(() => {
+    if (routeGeometry && mapRef.current && markers.length >= 2) {
+      const coords = routeGeometry.coordinates;
+      if (coords.length > 0) {
+        const lngs = coords.map(c => c[0]);
+        const lats = coords.map(c => c[1]);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        
+        mapRef.current.fitBounds(
+          [[minLng, minLat], [maxLng, maxLat]],
+          { padding: 60, duration: 500 }
+        );
+      }
+    }
+  }, [routeGeometry, markers.length]);
+
+  const routeGeoJSON = routeGeometry ? {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: routeGeometry
+  } : null;
 
   const handleMapClick = useCallback(async (event: MapMouseEvent) => {
     if (!onMapClick) return;
@@ -248,8 +288,25 @@ export function MapboxMap({
         mapStyle="mapbox://styles/mapbox/streets-v12"
         attributionControl={false}
       >
-        <NavigationControl position="top-right" />
         <GeolocateControl position="top-right" trackUserLocation />
+
+        {routeGeoJSON && (
+          <Source id="route" type="geojson" data={routeGeoJSON}>
+            <Layer
+              id="route-line"
+              type="line"
+              paint={{
+                'line-color': '#0F2947',
+                'line-width': 4,
+                'line-opacity': 0.8
+              }}
+              layout={{
+                'line-join': 'round',
+                'line-cap': 'round'
+              }}
+            />
+          </Source>
+        )}
 
         {markers.map((marker, index) => (
           <Marker

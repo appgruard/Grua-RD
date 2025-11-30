@@ -3874,7 +3874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { origin, destination } = req.body;
 
-      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?access_token=${MAPBOX_ACCESS_TOKEN}`;
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?access_token=${MAPBOX_ACCESS_TOKEN}&geometries=geojson&overview=full`;
       
       const response = await fetch(url);
       const data = await response.json();
@@ -3889,6 +3889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           durationMinutes: durationMinutes,
           distanceText: `${distanceKm.toFixed(1)} km`,
           durationText: `${Math.round(durationMinutes)} min`,
+          geometry: route.geometry,
         });
       } else {
         res.status(400).json({ message: "Failed to calculate route" });

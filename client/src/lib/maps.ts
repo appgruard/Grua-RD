@@ -3,11 +3,17 @@ export interface Coordinates {
   lng: number;
 }
 
+export interface RouteGeometry {
+  type: 'LineString';
+  coordinates: [number, number][];
+}
+
 export interface RouteResult {
   distanceKm: number;
   durationMinutes: number;
   distanceText: string;
   durationText: string;
+  geometry?: RouteGeometry;
 }
 
 let googleMapsPromise: Promise<void> | null = null;

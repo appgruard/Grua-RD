@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { calculateRoute, type Coordinates } from '@/lib/maps';
+import { calculateRoute, type Coordinates, type RouteGeometry } from '@/lib/maps';
 import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -61,6 +61,7 @@ export default function ClientHome() {
   const [aseguradoraPoliza, setAseguradoraPoliza] = useState<string>('');
   const [isCalculating, setIsCalculating] = useState(false);
   const [showExpandedCard, setShowExpandedCard] = useState(true);
+  const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
   const distanceRef = useRef<number | null>(null);
 
   const { data: insuranceStatus } = useQuery<{
@@ -202,6 +203,9 @@ export default function ClientHome() {
       distanceRef.current = route.distanceKm;
       setDistance(route.distanceKm);
       setDuration(route.durationMinutes);
+      if (route.geometry) {
+        setRouteGeometry(route.geometry);
+      }
       calculatePricingMutation.mutate({
         distanceKm: route.distanceKm,
         servicioCategoria: servicioCategoria,
@@ -348,6 +352,7 @@ export default function ClientHome() {
     setDistance(null);
     setDuration(null);
     setCost(null);
+    setRouteGeometry(null);
     distanceRef.current = null;
     if (!requiresVehicleType(category)) {
       setTipoVehiculo(null);
@@ -363,6 +368,7 @@ export default function ClientHome() {
     setDistance(null);
     setDuration(null);
     setCost(null);
+    setRouteGeometry(null);
     distanceRef.current = null;
   };
 
@@ -453,6 +459,7 @@ export default function ClientHome() {
     setDistance(null);
     setDuration(null);
     setCost(null);
+    setRouteGeometry(null);
     setServicioCategoria(null);
     setServicioSubtipo(null);
     setTipoVehiculo(null);
@@ -489,6 +496,8 @@ export default function ClientHome() {
           center={mapCenter}
           markers={markers}
           className="absolute inset-0"
+          routeGeometry={routeGeometry}
+          focusOnOrigin={!!origin && !destination}
         />
         
         {(origin || destination) && (
