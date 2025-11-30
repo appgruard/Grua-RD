@@ -1,5 +1,5 @@
 import { db } from './db';
-import { eq, and, desc, isNull, sql, gte, lte, between } from 'drizzle-orm';
+import { eq, and, desc, isNull, sql, gte, lte, lt, between } from 'drizzle-orm';
 import {
   users,
   conductores,
@@ -127,6 +127,9 @@ export interface IStorage {
   getServiciosByClientId(clientId: string): Promise<ServicioWithDetails[]>;
   getServiciosByConductorId(conductorId: string): Promise<ServicioWithDetails[]>;
   getPendingServicios(): Promise<Servicio[]>;
+  getExpiredPendingServicios(timeoutMinutes: number): Promise<Servicio[]>;
+  cancelExpiredServicios(timeoutMinutes: number): Promise<Servicio[]>;
+  getRecentlyCancelledServices(withinMinutes: number): Promise<Servicio[]>;
   getAllServicios(): Promise<ServicioWithDetails[]>;
   updateServicio(id: string, data: Partial<Servicio>): Promise<Servicio>;
   acceptServicio(id: string, conductorId: string): Promise<Servicio>;
@@ -630,6 +633,52 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(servicios)
       .where(eq(servicios.estado, 'pendiente'))
+      .orderBy(desc(servicios.createdAt));
+  }
+
+  async getExpiredPendingServicios(timeoutMinutes: number): Promise<Servicio[]> {
+    const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+    return db
+      .select()
+      .from(servicios)
+      .where(
+        and(
+          eq(servicios.estado, 'pendiente'),
+          lt(servicios.createdAt, cutoffTime)
+        )
+      )
+      .orderBy(desc(servicios.createdAt));
+  }
+
+  async cancelExpiredServicios(timeoutMinutes: number): Promise<Servicio[]> {
+    const cutoffTime = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+    const result = await db
+      .update(servicios)
+      .set({ 
+        estado: 'cancelado',
+        motivoCancelacion: 'Cancelado automáticamente - Ningún operador disponible'
+      })
+      .where(
+        and(
+          eq(servicios.estado, 'pendiente'),
+          lt(servicios.createdAt, cutoffTime)
+        )
+      )
+      .returning();
+    return result;
+  }
+
+  async getRecentlyCancelledServices(withinMinutes: number): Promise<Servicio[]> {
+    const cutoffTime = new Date(Date.now() - withinMinutes * 60 * 1000);
+    return db
+      .select()
+      .from(servicios)
+      .where(
+        and(
+          eq(servicios.estado, 'cancelado'),
+          gte(servicios.createdAt, cutoffTime)
+        )
+      )
       .orderBy(desc(servicios.createdAt));
   }
 

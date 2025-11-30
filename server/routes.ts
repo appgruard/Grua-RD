@@ -21,6 +21,7 @@ import { uploadDocument, getDocument, isStorageInitialized } from "./services/ob
 import { pdfService } from "./services/pdf-service";
 import { insuranceValidationService, getSupportedInsurers, InsurerCode } from "./services/insurance";
 import { documentValidationService } from "./services/document-validation";
+import { initServiceAutoCancellation, SERVICE_TIMEOUT_MINUTES } from "./services/service-auto-cancel";
 
 // Zod validation schemas for aseguradora/admin endpoints
 const updateAseguradoraPerfilSchema = z.object({
@@ -1659,6 +1660,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get driver data error', error);
       res.status(500).json({ message: "Failed to get driver data" });
+    }
+  });
+
+  app.get("/api/drivers/me/full", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.user!.id;
+      
+      const [conductor, documentos, verifikStatus] = await Promise.all([
+        storage.getConductorByUserId(userId),
+        storage.getDocumentosByUsuarioId(userId),
+        (async () => {
+          try {
+            const { getCedulaVerificationStatus } = await import('./services/identity');
+            return getCedulaVerificationStatus(userId);
+          } catch {
+            return null;
+          }
+        })()
+      ]);
+
+      let servicios: any[] = [];
+      if (conductor) {
+        servicios = await storage.getConductorServicios(conductor.id);
+      }
+
+      res.json({
+        conductor: conductor || null,
+        documentos: documentos || [],
+        servicios: { categorias: servicios || [] },
+        verifikStatus: verifikStatus || null
+      });
+    } catch (error: any) {
+      logSystem.error('Get driver full profile error', error);
+      res.status(500).json({ message: "Failed to get driver profile" });
     }
   });
 
@@ -6299,6 +6338,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error al obtener distribución" });
     }
   });
+
+  initServiceAutoCancellation(serviceSessions);
+  logSystem.info(`Service auto-cancellation initialized (timeout: ${SERVICE_TIMEOUT_MINUTES} minutes)`);
 
   return httpServer;
 }

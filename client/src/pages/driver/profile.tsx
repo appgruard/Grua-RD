@@ -51,6 +51,13 @@ interface StripeAccountStatus {
   detailsSubmitted?: boolean;
 }
 
+interface DriverFullProfile {
+  conductor: Conductor | null;
+  documentos: Documento[];
+  servicios: { categorias: ServiceSelection[] };
+  verifikStatus: VerifikValidation | null;
+}
+
 export default function DriverProfile() {
   const { user, logout, refreshUser } = useAuth();
   const [, setLocation] = useLocation();
@@ -64,29 +71,21 @@ export default function DriverProfile() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const documentsRef = useRef<HTMLDivElement>(null);
 
-  const { data: driverData } = useQuery<Conductor>({
-    queryKey: ['/api/drivers/me'],
-  });
-
-  const { data: documentos = [] } = useQuery<Documento[]>({
-    queryKey: ['/api/documents/my-documents'],
+  const { data: fullProfile, isLoading: isLoadingProfile } = useQuery<DriverFullProfile>({
+    queryKey: ['/api/drivers/me/full'],
     enabled: !!user,
   });
+
+  const driverData = fullProfile?.conductor;
+  const documentos = fullProfile?.documentos || [];
+  const driverServices = fullProfile?.servicios;
+  const verifikStatus = fullProfile?.verifikStatus;
+  const isLoadingServices = isLoadingProfile;
 
   const { data: stripeStatus, isLoading: isLoadingStripe, error: stripeError } = useQuery<StripeAccountStatus>({
     queryKey: ['/api/drivers/stripe-account-status'],
     enabled: !!driverData,
     retry: 2,
-  });
-
-  const { data: driverServices, isLoading: isLoadingServices } = useQuery<{ categorias: ServiceSelection[] }>({
-    queryKey: ['/api/drivers/me/servicios'],
-    enabled: !!driverData,
-  });
-
-  const { data: verifikStatus } = useQuery<VerifikValidation>({
-    queryKey: ['/api/identity/status'],
-    enabled: !!user,
   });
 
   useEffect(() => {
@@ -102,7 +101,7 @@ export default function DriverProfile() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers/me/servicios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/me/full'] });
       toast({ title: 'Servicios actualizados', description: 'Tus categorías de servicio han sido guardadas' });
       setEditingServices(false);
     },
@@ -134,7 +133,7 @@ export default function DriverProfile() {
       return response.json();
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/documents/my-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/me/full'] });
       
       toast({
         title: 'Documento subido',
@@ -182,7 +181,7 @@ export default function DriverProfile() {
     },
     onSuccess: async () => {
       await refreshUser();
-      queryClient.invalidateQueries({ queryKey: ['/api/documents/my-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/me/full'] });
       toast({
         title: 'Foto actualizada',
         description: 'Tu foto de perfil ha sido actualizada y está pendiente de revisión',
