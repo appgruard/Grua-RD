@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { InstallPWA, UpdateAvailable, OfflineIndicator } from '@/components/InstallPWA';
+import { ThemeProvider } from '@/components/ThemeToggle';
 
 const Login = lazy(() => import('@/pages/auth/login'));
 const OnboardingWizard = lazy(() => import('@/pages/auth/onboarding-wizard'));
@@ -343,16 +344,18 @@ function Router() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <OfflineIndicator />
-          <Toaster />
-          <Router />
-          <InstallPWA />
-          <UpdateAvailable />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <OfflineIndicator />
+            <Toaster />
+            <Router />
+            <InstallPWA />
+            <UpdateAvailable />
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

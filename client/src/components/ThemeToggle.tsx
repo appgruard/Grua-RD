@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Moon, Sun, Settings } from 'lucide-react';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 
 type Theme = 'light' | 'dark';
+
+interface ThemeContextType {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 function getSystemTheme(): Theme {
   if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -20,11 +28,13 @@ function getStoredTheme(): Theme | null {
   return null;
 }
 
-export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = getStoredTheme();
-    return stored || getSystemTheme();
-  });
+function getInitialTheme(): Theme {
+  const stored = getStoredTheme();
+  return stored || getSystemTheme();
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -40,18 +50,34 @@ export function useTheme() {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
       if (!getStoredTheme()) {
-        setTheme(e.matches ? 'dark' : 'light');
+        setThemeState(e.matches ? 'dark' : 'light');
       }
     };
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme);
   };
 
-  return { theme, setTheme, toggleTheme };
+  const toggleTheme = () => {
+    setThemeState(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
 }
 
 export function ThemeToggle() {
