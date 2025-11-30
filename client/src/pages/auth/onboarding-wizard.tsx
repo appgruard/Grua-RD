@@ -353,7 +353,7 @@ export default function OnboardingWizard() {
           <SelectTrigger id="userType" data-testid="select-user-type"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="cliente">Cliente</SelectItem>
-            <SelectItem value="conductor">Conductor de Grúa</SelectItem>
+            <SelectItem value="conductor">Operador</SelectItem>
           </SelectContent>
         </Select>
       </div>

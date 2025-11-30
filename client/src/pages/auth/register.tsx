@@ -279,7 +279,7 @@ export default function Register() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cliente">Cliente</SelectItem>
-                  <SelectItem value="conductor">Conductor</SelectItem>
+                  <SelectItem value="conductor">Operador</SelectItem>
                 </SelectContent>
               </Select>
             </div>
