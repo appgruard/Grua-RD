@@ -1513,6 +1513,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      const ONSITE_SUBTYPES = [
+        'cambio_goma',
+        'inflado_neumatico',
+        'paso_corriente',
+        'cerrajero_automotriz',
+        'suministro_combustible',
+        'envio_bateria',
+        'diagnostico_obd',
+      ];
+
+      const isOnsiteService = (categoria: string, subtipo?: string) => {
+        return categoria === 'auxilio_vial' && subtipo && ONSITE_SUBTYPES.includes(subtipo);
+      };
+
       const validationSchema = insertServicioSchema.extend({
         clienteId: z.string().optional(),
       }).refine((data) => {
@@ -1522,6 +1536,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return true;
       }, {
         message: "Nombre de aseguradora y número de póliza son requeridos cuando el método de pago es aseguradora",
+      }).refine((data) => {
+        const isOnsite = isOnsiteService(data.servicioCategoria || '', data.servicioSubtipo || undefined);
+        if (isOnsite) {
+          return true;
+        }
+        const originLat = parseFloat(data.origenLat as string);
+        const originLng = parseFloat(data.origenLng as string);
+        const destLat = parseFloat(data.destinoLat as string);
+        const destLng = parseFloat(data.destinoLng as string);
+        
+        if (isNaN(destLat) || isNaN(destLng)) {
+          return false;
+        }
+        
+        const isSameLocation = Math.abs(originLat - destLat) < 0.0001 && Math.abs(originLng - destLng) < 0.0001;
+        return !isSameLocation;
+      }, {
+        message: "Servicios de transporte requieren un destino diferente al origen",
       });
 
       const validatedData = validationSchema.parse(req.body);
@@ -2335,22 +2367,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/pricing/calculate", pricingLimiter, async (req: Request, res: Response) => {
     try {
-      const { distanceKm } = req.body;
-      const tarifa = await storage.getActiveTarifa();
+      const { distanceKm, servicioCategoria, servicioSubtipo } = req.body;
+      
+      const ONSITE_SERVICE_PRICES: Record<string, number> = {
+        'cambio_goma': 500,
+        'inflado_neumatico': 300,
+        'paso_corriente': 400,
+        'cerrajero_automotriz': 800,
+        'suministro_combustible': 350,
+        'envio_bateria': 1500,
+        'diagnostico_obd': 600,
+      };
 
+      const TRANSPORT_CATEGORY_MULTIPLIERS: Record<string, number> = {
+        'remolque_estandar': 1.0,
+        'remolque_especializado': 1.5,
+        'camiones_pesados': 2.0,
+        'izaje_construccion': 1.8,
+        'remolque_recreativo': 1.3,
+        'auxilio_vial': 1.0,
+      };
+
+      const TRANSPORT_SUBTYPE_ADDITIONAL: Record<string, number> = {
+        'extraccion_vehiculo': 200,
+        'vehiculo_sin_llanta': 100,
+        'vehiculo_sin_direccion': 150,
+        'vehiculo_chocado': 200,
+        'vehiculo_lujo': 300,
+        'vehiculo_electrico': 250,
+        'camion_liviano': 0,
+        'camion_mediano': 200,
+        'patana_cabezote': 500,
+        'volteo': 300,
+        'transporte_maquinarias': 400,
+        'montacargas': 350,
+        'retroexcavadora': 400,
+        'tractor': 350,
+        'izaje_materiales': 0,
+        'subida_muebles': 100,
+        'transporte_equipos': 150,
+        'remolque_botes': 100,
+        'remolque_jetski': 50,
+        'remolque_cuatrimoto': 50,
+      };
+
+      const isOnsiteService = servicioCategoria === 'auxilio_vial' && 
+        servicioSubtipo && 
+        ONSITE_SERVICE_PRICES[servicioSubtipo] !== undefined;
+
+      if (isOnsiteService && servicioSubtipo) {
+        const total = ONSITE_SERVICE_PRICES[servicioSubtipo];
+        return res.json({
+          total,
+          precioBase: total,
+          tarifaPorKm: 0,
+          distanceKm: 0,
+          isOnsiteService: true,
+          servicioSubtipo,
+        });
+      }
+
+      const parsedDistance = typeof distanceKm === 'number' ? distanceKm : parseFloat(distanceKm);
+      if (isNaN(parsedDistance) || parsedDistance < 0) {
+        return res.status(400).json({ 
+          message: "Distancia inválida para servicio de transporte",
+          error: "INVALID_DISTANCE"
+        });
+      }
+
+      if (parsedDistance === 0) {
+        return res.status(400).json({ 
+          message: "Servicios de transporte requieren una distancia mayor a 0",
+          error: "ZERO_DISTANCE"
+        });
+      }
+
+      const tarifa = await storage.getActiveTarifa();
       const DEFAULT_PRECIO_BASE = 150;
       const DEFAULT_TARIFA_POR_KM = 20;
 
       const precioBase = tarifa ? parseFloat(tarifa.precioBase as string) : DEFAULT_PRECIO_BASE;
       const tarifaPorKm = tarifa ? parseFloat(tarifa.tarifaPorKm as string) : DEFAULT_TARIFA_POR_KM;
-      const total = precioBase + (distanceKm * tarifaPorKm);
+      
+      const categoryMultiplier = TRANSPORT_CATEGORY_MULTIPLIERS[servicioCategoria] || 1.0;
+      const subtypeAdditional = servicioSubtipo ? (TRANSPORT_SUBTYPE_ADDITIONAL[servicioSubtipo] || 0) : 0;
+      
+      const baseTotal = precioBase + (parsedDistance * tarifaPorKm);
+      const total = (baseTotal * categoryMultiplier) + subtypeAdditional;
 
       res.json({ 
         total, 
         precioBase, 
         tarifaPorKm, 
-        distanceKm,
-        isDefaultPricing: !tarifa 
+        distanceKm: parsedDistance,
+        categoryMultiplier,
+        subtypeAdditional,
+        isDefaultPricing: !tarifa,
+        isOnsiteService: false,
       });
     } catch (error: any) {
       logSystem.error('Calculate pricing error', error);

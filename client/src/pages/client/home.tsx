@@ -18,7 +18,27 @@ import { InsuranceForm } from '@/components/InsuranceForm';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
-type Step = 'address' | 'serviceCategory' | 'serviceSubtype' | 'vehicleType' | 'payment' | 'confirm';
+type Step = 'serviceCategory' | 'serviceSubtype' | 'location' | 'vehicleType' | 'payment' | 'confirm';
+
+const ONSITE_SUBTYPES = [
+  'cambio_goma',
+  'inflado_neumatico',
+  'paso_corriente',
+  'cerrajero_automotriz',
+  'suministro_combustible',
+  'envio_bateria',
+  'diagnostico_obd',
+];
+
+const ONSITE_SERVICE_PRICES: Record<string, number> = {
+  'cambio_goma': 500,
+  'inflado_neumatico': 300,
+  'paso_corriente': 400,
+  'cerrajero_automotriz': 800,
+  'suministro_combustible': 350,
+  'envio_bateria': 1500,
+  'diagnostico_obd': 600,
+};
 
 export default function ClientHome() {
   const [, setLocation] = useLocation();
@@ -31,7 +51,7 @@ export default function ClientHome() {
   const [distance, setDistance] = useState<number | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [cost, setCost] = useState<number | null>(null);
-  const [step, setStep] = useState<Step>('address');
+  const [step, setStep] = useState<Step>('serviceCategory');
   const [servicioCategoria, setServicioCategoria] = useState<string | null>(null);
   const [servicioSubtipo, setServicioSubtipo] = useState<string | null>(null);
   const [tipoVehiculo, setTipoVehiculo] = useState<string | null>(null);
@@ -53,9 +73,19 @@ export default function ClientHome() {
   const DEFAULT_PRECIO_BASE = 150;
   const DEFAULT_TARIFA_POR_KM = 20;
 
+  const isOnsiteService = (): boolean => {
+    if (servicioCategoria !== 'auxilio_vial') return false;
+    if (!servicioSubtipo) return false;
+    return ONSITE_SUBTYPES.includes(servicioSubtipo);
+  };
+
+  const requiresTransport = (): boolean => {
+    return !isOnsiteService();
+  };
+
   const calculatePricingMutation = useMutation({
-    mutationFn: async (distanceKm: number) => {
-      const res = await apiRequest('POST', '/api/pricing/calculate', { distanceKm });
+    mutationFn: async (params: { distanceKm: number; servicioCategoria: string; servicioSubtipo?: string }) => {
+      const res = await apiRequest('POST', '/api/pricing/calculate', params);
       if (!res.ok) throw new Error('Failed to calculate pricing');
       return res.json();
     },
@@ -113,13 +143,22 @@ export default function ClientHome() {
   }, []);
 
   useEffect(() => {
-    if (origin && destination) {
+    if (origin && destination && servicioCategoria && requiresTransport()) {
       calculateRouteAndCost();
     }
-  }, [origin, destination]);
+  }, [origin, destination, servicioCategoria, servicioSubtipo]);
+
+  useEffect(() => {
+    if (origin && isOnsiteService() && servicioSubtipo && servicioCategoria) {
+      const onsitePrice = ONSITE_SERVICE_PRICES[servicioSubtipo] || 500;
+      setCost(onsitePrice);
+      setDistance(0);
+      setDuration(0);
+    }
+  }, [origin, servicioSubtipo, servicioCategoria]);
 
   const calculateRouteAndCost = async () => {
-    if (!origin || !destination) return;
+    if (!origin || !destination || !servicioCategoria) return;
 
     setIsCalculating(true);
     try {
@@ -127,7 +166,11 @@ export default function ClientHome() {
       distanceRef.current = route.distanceKm;
       setDistance(route.distanceKm);
       setDuration(route.durationMinutes);
-      calculatePricingMutation.mutate(route.distanceKm);
+      calculatePricingMutation.mutate({
+        distanceKm: route.distanceKm,
+        servicioCategoria: servicioCategoria,
+        servicioSubtipo: servicioSubtipo || undefined,
+      });
     } catch (error) {
       toast({
         title: 'Error',
@@ -158,25 +201,7 @@ export default function ClientHome() {
   };
 
   const handleNextStep = () => {
-    if (step === 'address') {
-      if (!origin) {
-        toast({
-          title: 'Seleccione origen',
-          description: 'Debe seleccionar la ubicación donde se encuentra',
-          variant: 'destructive',
-        });
-        return;
-      }
-      if (!destination) {
-        toast({
-          title: 'Seleccione destino',
-          description: 'Debe seleccionar el destino',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setStep('serviceCategory');
-    } else if (step === 'serviceCategory') {
+    if (step === 'serviceCategory') {
       if (!servicioCategoria) {
         toast({
           title: 'Seleccione categoría',
@@ -187,12 +212,36 @@ export default function ClientHome() {
       }
       if (requiresSubtype(servicioCategoria)) {
         setStep('serviceSubtype');
-      } else if (requiresVehicleType(servicioCategoria)) {
-        setStep('vehicleType');
       } else {
-        setStep('payment');
+        setStep('location');
       }
     } else if (step === 'serviceSubtype') {
+      if (!servicioSubtipo) {
+        toast({
+          title: 'Seleccione tipo de servicio',
+          description: 'Debe seleccionar el tipo específico de servicio que necesita',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setStep('location');
+    } else if (step === 'location') {
+      if (!origin) {
+        toast({
+          title: 'Seleccione ubicación',
+          description: 'Debe seleccionar la ubicación donde se encuentra',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (requiresTransport() && !destination) {
+        toast({
+          title: 'Seleccione destino',
+          description: 'Debe seleccionar el destino para el remolque',
+          variant: 'destructive',
+        });
+        return;
+      }
       if (requiresVehicleType(servicioCategoria)) {
         setStep('vehicleType');
       } else {
@@ -232,23 +281,21 @@ export default function ClientHome() {
   };
 
   const handlePrevStep = () => {
-    if (step === 'serviceCategory') {
-      setStep('address');
-    } else if (step === 'serviceSubtype') {
+    if (step === 'serviceSubtype') {
       setStep('serviceCategory');
-    } else if (step === 'vehicleType') {
+    } else if (step === 'location') {
       if (requiresSubtype(servicioCategoria)) {
         setStep('serviceSubtype');
       } else {
         setStep('serviceCategory');
       }
+    } else if (step === 'vehicleType') {
+      setStep('location');
     } else if (step === 'payment') {
       if (requiresVehicleType(servicioCategoria)) {
         setStep('vehicleType');
-      } else if (requiresSubtype(servicioCategoria)) {
-        setStep('serviceSubtype');
       } else {
-        setStep('serviceCategory');
+        setStep('location');
       }
     } else if (step === 'confirm') {
       setStep('payment');
@@ -258,27 +305,84 @@ export default function ClientHome() {
   const handleCategoryChange = (category: string) => {
     setServicioCategoria(category);
     setServicioSubtipo(null);
+    setOrigin(null);
+    setDestination(null);
+    setOrigenDireccion('');
+    setDestinoDireccion('');
+    setDistance(null);
+    setDuration(null);
+    setCost(null);
+    distanceRef.current = null;
     if (!requiresVehicleType(category)) {
       setTipoVehiculo(null);
     }
   };
 
-  const handleConfirmRequest = () => {
-    if (!origin || !destination || !servicioCategoria) return;
-    
-    const currentDistance = distanceRef.current || distance;
-    if (!currentDistance) return;
+  const handleSubtypeChange = (subtype: string) => {
+    setServicioSubtipo(subtype);
+    setOrigin(null);
+    setDestination(null);
+    setOrigenDireccion('');
+    setDestinoDireccion('');
+    setDistance(null);
+    setDuration(null);
+    setCost(null);
+    distanceRef.current = null;
+  };
 
+  const handleConfirmRequest = () => {
+    if (!origin || !servicioCategoria) {
+      toast({
+        title: 'Datos incompletos',
+        description: 'Falta información requerida para crear la solicitud',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const isOnsite = isOnsiteService();
+    
+    if (!isOnsite && !destination) {
+      toast({
+        title: 'Destino requerido',
+        description: 'Para servicios de remolque debe seleccionar un destino',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (!isOnsite && (cost === null || distance === null || distance <= 0)) {
+      toast({
+        title: 'Error de cálculo',
+        description: 'No se ha calculado la ruta y costo del servicio. Por favor seleccione las ubicaciones nuevamente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (!isOnsite && (distanceRef.current === null || distanceRef.current <= 0)) {
+      toast({
+        title: 'Ruta no calculada',
+        description: 'Debe calcular la ruta antes de confirmar. Por favor verifique las ubicaciones.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const finalDestination = isOnsite ? origin : destination!;
+    const finalDestinoDireccion = isOnsite ? origenDireccion : destinoDireccion;
+
+    const currentDistance = isOnsite ? 0 : (distanceRef.current || distance || 0);
     const DEFAULT_MIN_COST = 150;
-    const finalCost = cost || DEFAULT_MIN_COST;
+    const finalCost = cost || (isOnsite ? (ONSITE_SERVICE_PRICES[servicioSubtipo || ''] || DEFAULT_MIN_COST) : DEFAULT_MIN_COST);
 
     const serviceData: any = {
       origenLat: origin.lat.toString(),
       origenLng: origin.lng.toString(),
       origenDireccion: origenDireccion || `${origin.lat}, ${origin.lng}`,
-      destinoLat: destination.lat.toString(),
-      destinoLng: destination.lng.toString(),
-      destinoDireccion: destinoDireccion || `${destination.lat}, ${destination.lng}`,
+      destinoLat: finalDestination.lat.toString(),
+      destinoLng: finalDestination.lng.toString(),
+      destinoDireccion: finalDestinoDireccion || `${finalDestination.lat}, ${finalDestination.lng}`,
       distanciaKm: currentDistance.toFixed(2),
       costoTotal: finalCost.toFixed(2),
       metodoPago,
@@ -320,7 +424,7 @@ export default function ClientHome() {
     setSelectedCardId(null);
     setAseguradoraNombre('');
     setAseguradoraPoliza('');
-    setStep('address');
+    setStep('serviceCategory');
   };
 
   const getCategoryLabel = (categoryId: string | null): string => {
@@ -336,8 +440,8 @@ export default function ClientHome() {
   };
 
   const markers = [
-    origin && { position: origin, title: 'Origen', color: '#22c55e' },
-    destination && { position: destination, title: 'Destino', color: '#ef4444' },
+    origin && { position: origin, title: isOnsiteService() ? 'Ubicación del servicio' : 'Origen', color: '#22c55e' },
+    destination && requiresTransport() && { position: destination, title: 'Destino', color: '#ef4444' },
   ].filter(Boolean) as any[];
 
   const mapCenter = origin || currentLocation;
@@ -355,20 +459,33 @@ export default function ClientHome() {
           <div className="absolute top-3 left-3 right-3 z-10">
             <Card className="p-3 bg-background/95 backdrop-blur-sm">
               <div className="flex items-center gap-3">
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <div className="w-0.5 h-6 bg-border" />
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                </div>
-                <div className="flex-1 min-w-0 space-y-1">
-                  <p className="text-sm truncate font-medium" data-testid="text-origin-summary">
-                    {origenDireccion || 'Origen no seleccionado'}
-                  </p>
-                  <p className="text-sm truncate text-muted-foreground" data-testid="text-destination-summary">
-                    {destinoDireccion || 'Destino no seleccionado'}
-                  </p>
-                </div>
-                {(distance && duration) && (
+                {requiresTransport() ? (
+                  <>
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <div className="w-0.5 h-6 bg-border" />
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="text-sm truncate font-medium" data-testid="text-origin-summary">
+                        {origenDireccion || 'Origen no seleccionado'}
+                      </p>
+                      <p className="text-sm truncate text-muted-foreground" data-testid="text-destination-summary">
+                        {destinoDireccion || 'Destino no seleccionado'}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate font-medium" data-testid="text-location-summary">
+                        {origenDireccion || 'Ubicación no seleccionada'}
+                      </p>
+                    </div>
+                  </>
+                )}
+                {(distance !== null && duration !== null) && requiresTransport() && (
                   <div className="flex-shrink-0 text-right">
                     <p className="text-sm font-bold">{distance.toFixed(1)} km</p>
                     <p className="text-xs text-muted-foreground">{Math.round(duration)} min</p>
@@ -397,107 +514,11 @@ export default function ClientHome() {
 
         {showExpandedCard && (
           <div className="flex-1 min-h-0 overflow-hidden">
-          {step === 'address' && (
-            <div className="flex flex-col h-full">
-              <div className="text-center px-4 pb-2 flex-shrink-0">
-                <h3 className="text-lg font-bold">¿A dónde vamos?</h3>
-                <p className="text-sm text-muted-foreground">Ingresa las direcciones de recogida y entrega</p>
-              </div>
-
-              <ScrollArea className="flex-1 min-h-0 px-4">
-                <div className="space-y-4 pb-2">
-                  <AddressSearchInput
-                    label="Recoger en"
-                    placeholder="¿Dónde está tu vehículo?"
-                    value={origenDireccion}
-                    coordinates={origin}
-                    onAddressChange={handleOriginChange}
-                    onClear={() => {
-                      setOrigin(null);
-                      setOrigenDireccion('');
-                      setDistance(null);
-                      setCost(null);
-                    }}
-                    currentLocation={currentLocation}
-                    icon="origin"
-                    autoFocus
-                  />
-
-                  <AddressSearchInput
-                    label="Llevar a"
-                    placeholder="¿A dónde lo llevamos?"
-                    value={destinoDireccion}
-                    coordinates={destination}
-                    onAddressChange={handleDestinationChange}
-                    onClear={() => {
-                      setDestination(null);
-                      setDestinoDireccion('');
-                      setDistance(null);
-                      setCost(null);
-                    }}
-                    currentLocation={currentLocation}
-                    icon="destination"
-                  />
-
-                  {isCalculating && (
-                    <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Calculando ruta...</span>
-                    </div>
-                  )}
-
-                  {distance && cost && !isCalculating && (
-                    <Card className="p-4 bg-muted/50">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Distancia estimada</p>
-                          <p className="text-lg font-bold">{distance.toFixed(1)} km</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Costo estimado</p>
-                          <p className="text-lg font-bold text-primary">RD$ {cost.toFixed(2)}</p>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </div>
-              </ScrollArea>
-
-              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
-                <Button
-                  onClick={handleNextStep}
-                  disabled={!origin || !destination || isCalculating}
-                  className="w-full h-12 text-base"
-                  data-testid="button-next"
-                >
-                  {isCalculating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Calculando...
-                    </>
-                  ) : (
-                    'Continuar'
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-
           {step === 'serviceCategory' && (
             <div className="flex flex-col h-full">
-              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handlePrevStep}
-                  data-testid="button-back"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <div>
-                  <h3 className="text-lg font-bold">Tipo de Servicio</h3>
-                  <p className="text-sm text-muted-foreground">Selecciona el servicio que necesitas</p>
-                </div>
+              <div className="text-center px-4 pb-2 flex-shrink-0">
+                <h3 className="text-lg font-bold">¿Qué servicio necesitas?</h3>
+                <p className="text-sm text-muted-foreground">Selecciona el tipo de asistencia</p>
               </div>
 
               <ScrollArea className="flex-1 min-h-0 px-4">
@@ -541,17 +562,129 @@ export default function ClientHome() {
                 <ServiceSubtypeSelector 
                   category={servicioCategoria}
                   value={servicioSubtipo} 
-                  onChange={setServicioSubtipo} 
+                  onChange={handleSubtypeChange} 
                 />
               </ScrollArea>
 
               <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
                 <Button
                   onClick={handleNextStep}
+                  disabled={!servicioSubtipo}
                   className="w-full h-12 text-base"
                   data-testid="button-next"
                 >
-                  {servicioSubtipo ? 'Continuar' : 'Omitir'}
+                  {servicioSubtipo ? 'Continuar' : 'Selecciona una opción'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 'location' && (
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePrevStep}
+                  data-testid="button-back"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h3 className="text-lg font-bold">
+                    {requiresTransport() ? '¿A dónde vamos?' : '¿Dónde te encuentras?'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {requiresTransport() 
+                      ? 'Ingresa las direcciones de recogida y entrega' 
+                      : 'Ingresa la ubicación donde necesitas el servicio'}
+                  </p>
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <div className="space-y-4 pb-2">
+                  <AddressSearchInput
+                    label={requiresTransport() ? "Recoger en" : "Ubicación del servicio"}
+                    placeholder={requiresTransport() ? "¿Dónde está tu vehículo?" : "¿Dónde necesitas el servicio?"}
+                    value={origenDireccion}
+                    coordinates={origin}
+                    onAddressChange={handleOriginChange}
+                    onClear={() => {
+                      setOrigin(null);
+                      setOrigenDireccion('');
+                      setDistance(null);
+                      setCost(null);
+                    }}
+                    currentLocation={currentLocation}
+                    icon="origin"
+                    autoFocus
+                  />
+
+                  {requiresTransport() && (
+                    <AddressSearchInput
+                      label="Llevar a"
+                      placeholder="¿A dónde lo llevamos?"
+                      value={destinoDireccion}
+                      coordinates={destination}
+                      onAddressChange={handleDestinationChange}
+                      onClear={() => {
+                        setDestination(null);
+                        setDestinoDireccion('');
+                        setDistance(null);
+                        setCost(null);
+                      }}
+                      currentLocation={currentLocation}
+                      icon="destination"
+                    />
+                  )}
+
+                  {isCalculating && (
+                    <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">Calculando ruta...</span>
+                    </div>
+                  )}
+
+                  {cost !== null && !isCalculating && (
+                    <Card className="p-4 bg-muted/50">
+                      <div className="flex items-center justify-between gap-2">
+                        {requiresTransport() && distance !== null ? (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Distancia estimada</p>
+                            <p className="text-lg font-bold">{distance.toFixed(1)} km</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Servicio</p>
+                            <p className="text-lg font-bold">{getSubtypeLabel(servicioCategoria, servicioSubtipo) || getCategoryLabel(servicioCategoria)}</p>
+                          </div>
+                        )}
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Costo estimado</p>
+                          <p className="text-lg font-bold text-primary">RD$ {cost.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              </ScrollArea>
+
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+                <Button
+                  onClick={handleNextStep}
+                  disabled={!origin || (requiresTransport() && !destination) || isCalculating}
+                  className="w-full h-12 text-base"
+                  data-testid="button-next"
+                >
+                  {isCalculating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Calculando...
+                    </>
+                  ) : (
+                    'Continuar'
+                  )}
                 </Button>
               </div>
             </div>
@@ -692,21 +825,33 @@ export default function ClientHome() {
                   </div>
 
                   <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                      <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                      <div className="w-0.5 h-8 bg-border" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Origen</p>
-                        <p className="text-sm font-medium truncate">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Destino</p>
-                        <p className="text-sm font-medium truncate">{destinoDireccion || `${destination?.lat.toFixed(4)}, ${destination?.lng.toFixed(4)}`}</p>
-                      </div>
-                    </div>
+                    {requiresTransport() ? (
+                      <>
+                        <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                          <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                          <div className="w-0.5 h-8 bg-border" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Origen</p>
+                            <p className="text-sm font-medium truncate">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Destino</p>
+                            <p className="text-sm font-medium truncate">{destinoDireccion || `${destination?.lat.toFixed(4)}, ${destination?.lng.toFixed(4)}`}</p>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0 mt-1" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground">Ubicación del servicio</p>
+                          <p className="text-sm font-medium truncate">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
@@ -723,13 +868,15 @@ export default function ClientHome() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="text-center p-3 bg-muted rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Distancia</p>
-                      <p className="text-xl font-bold" data-testid="text-distance">
-                        {distance?.toFixed(1)} km
-                      </p>
-                    </div>
+                  <div className={requiresTransport() ? "grid grid-cols-2 gap-3" : ""}>
+                    {requiresTransport() && (
+                      <div className="text-center p-3 bg-muted rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Distancia</p>
+                        <p className="text-xl font-bold" data-testid="text-distance">
+                          {distance?.toFixed(1)} km
+                        </p>
+                      </div>
+                    )}
                     <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
                       <p className="text-xs text-muted-foreground mb-1">Costo Total</p>
                       {calculatePricingMutation.isPending ? (
@@ -747,7 +894,7 @@ export default function ClientHome() {
               <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
                 <Button
                   onClick={handleConfirmRequest}
-                  disabled={!distance || createServiceMutation.isPending}
+                  disabled={!origin || createServiceMutation.isPending}
                   className="w-full h-14 text-base font-semibold"
                   data-testid="button-confirm"
                 >
