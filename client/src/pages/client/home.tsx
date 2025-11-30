@@ -558,10 +558,12 @@ export default function ClientHome() {
               </div>
 
               <ScrollArea className="flex-1 min-h-0 px-4">
-                <ServiceCategorySelector 
-                  value={servicioCategoria} 
-                  onChange={handleCategoryChange} 
-                />
+                <div className="pb-2">
+                  <ServiceCategorySelector 
+                    value={servicioCategoria} 
+                    onChange={handleCategoryChange} 
+                  />
+                </div>
               </ScrollArea>
 
               <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">

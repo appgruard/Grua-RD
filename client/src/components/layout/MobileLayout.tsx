@@ -31,8 +31,8 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
   const tabs = userType === 'cliente' ? clientTabs : userType === 'socio' ? socioTabs : driverTabs;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <main className="flex-1 overflow-y-auto pb-20">
+    <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-hidden pb-16">
         {children}
       </main>
       
