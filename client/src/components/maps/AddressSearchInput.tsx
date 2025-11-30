@@ -184,7 +184,7 @@ export function AddressSearchInput({
         
         try {
           const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}`
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}&language=es`
           );
           const data = await response.json();
           const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
@@ -202,7 +202,11 @@ export function AddressSearchInput({
         console.error('Error getting location:', error);
         setIsGettingLocation(false);
       },
-      { enableHighAccuracy: true }
+      { 
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: 30000
+      }
     );
   };
 
