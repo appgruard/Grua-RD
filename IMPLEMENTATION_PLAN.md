@@ -33,7 +33,9 @@ Actualizar la plataforma Grúa RD para soportar especialización de servicios de
 **Archivo Principal:** `client/src/pages/auth/onboarding-wizard.tsx`
 
 #### Descripción
-Agregar un nuevo paso en el wizard de onboarding donde los conductores seleccionen las categorías de servicios que pueden ofrecer y sus subtipos específicos.
+Agregar un nuevo paso en el wizard de onboarding donde los conductores seleccionen **MÚLTIPLES categorías de servicios** que pueden ofrecer y sus subtipos específicos. 
+
+**Requisito Clave:** Los conductores DEBEN poder seleccionar más de una categoría de servicio durante el registro (ej: Remolque Estándar + Auxilio Vial + Remolque Especializado).
 
 #### Cambios Necesarios
 
@@ -79,7 +81,9 @@ Agregar un nuevo paso en el wizard de onboarding donde los conductores seleccion
 **Archivo Principal:** `client/src/pages/driver/profile.tsx`
 
 #### Descripción
-Permitir que conductores vean y editen sus categorías de servicios, y ver el estado de validación de documentos (score Verifik).
+Permitir que conductores veen y editen sus categorías de servicios en cualquier momento DESPUÉS del registro, y ver el estado de validación de documentos (score Verifik).
+
+**Requisito Clave:** Los conductores DEBEN poder añadir o modificar sus servicios en el perfil después de haberse registrado (completar onboarding). Esto permite que evolucionen su oferta de servicios conforme su negocio crece.
 
 #### Cambios Necesarios
 
@@ -208,15 +212,28 @@ PUT    /api/admin/drivers/:driverId/servicios
 5. Click "Siguiente" → POST `/api/drivers/me/servicios`
 6. Continúa con foto de perfil y verificación
 
-### Flujo 2: Validación de Documentos (Perfil del Conductor)
-1. Conductor accede a su perfil
-2. Ve sección "Documentos" con estado de validación
+### Flujo 2: Añadir/Editar Servicios Post-Registro (Perfil del Conductor)
+1. Conductor ya completó el onboarding y está registrado
+2. Accede a su perfil → Tab "Servicios"
+3. Ve sus servicios actuales (ej: "Remolque Estándar" con subtipos)
+4. Hace clic en botón "Editar Servicios" o "Agregar Servicios"
+5. Se abre modal con `ServiceCategorySelector`
+6. Puede:
+   - Agregar nuevas categorías (ej: ahora quiere ofrecer "Auxilio Vial")
+   - Editar subtipos de categorías existentes
+   - Remover categorías que ya no ofrece
+7. Click "Guardar" → PUT `/api/drivers/me/servicios`
+8. Confirmación: "✓ Servicios actualizados"
+
+### Flujo 3: Validación de Documentos (Perfil del Conductor)
+1. Conductor accede a su perfil → Tab "Documentos"
+2. Ve estado de validación de cada documento
 3. Para documento sin validar, hace clic "Validar Ahora"
-4. Sistema inicia validación Verifik
+4. Sistema inicia validación Verifik (face/license)
 5. Resultado: "✓ Aprobado (Score: 0.87)" o "✗ Rechazado: Imagen borrosa"
 6. Se actualiza automáticamente
 
-### Flujo 3: Revisión de Admin
+### Flujo 4: Revisión de Admin
 1. Admin accede a panel de conductores
 2. Filtra por estado de validación (ej: "Pendientes de Validación")
 3. Expande fila de conductor para ver detalles
