@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Navigation, Calendar, DollarSign, ClipboardList, Download } from 'lucide-react';
 import type { ServicioWithDetails } from '@shared/schema';
 import { format } from 'date-fns';
@@ -89,34 +90,38 @@ export default function DriverHistory() {
   const totalEarnings = completedServices.reduce((sum, s) => sum + parseFloat(s.costoTotal as string), 0);
 
   return (
-    <div className="p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6">Historial de Servicios</h1>
-      
-      <Card className="p-4 mb-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Servicios Completados</p>
-            <p className="text-2xl font-bold" data-testid="text-completed-count">{completedServices.length}</p>
+    <div className="flex flex-col h-full">
+      <div className="px-4 pt-4 pb-4 flex-shrink-0 space-y-4">
+        <h1 className="text-2xl font-bold">Historial de Servicios</h1>
+        
+        <Card className="p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Servicios Completados</p>
+              <p className="text-2xl font-bold" data-testid="text-completed-count">{completedServices.length}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Ganancias Totales</p>
+              <p className="text-2xl font-bold" data-testid="text-total-earnings">
+                RD$ {totalEarnings.toFixed(2)}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Ganancias Totales</p>
-            <p className="text-2xl font-bold" data-testid="text-total-earnings">
-              RD$ {totalEarnings.toFixed(2)}
-            </p>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
 
-      {!services || services.length === 0 ? (
-        <EmptyState
-          icon={ClipboardList}
-          title="No hay servicios"
-          description="Aún no has completado ningún servicio. Activa tu disponibilidad para comenzar a recibir solicitudes."
-        />
-      ) : (
-        <div className="space-y-3">
-          {services.map((service) => (
-            <Card key={service.id} className="p-4" data-testid={`service-card-${service.id}`}>
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-4 pb-20">
+          {!services || services.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="No hay servicios"
+              description="Aún no has completado ningún servicio. Activa tu disponibilidad para comenzar a recibir solicitudes."
+            />
+          ) : (
+            <div className="space-y-3">
+              {services.map((service) => (
+                <Card key={service.id} className="p-4" data-testid={`service-card-${service.id}`}>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -186,10 +191,12 @@ export default function DriverHistory() {
                   </Button>
                 </div>
               )}
-            </Card>
-          ))}
+              </Card>
+            ))}
+            </div>
+          )}
         </div>
-      )}
+      </ScrollArea>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -351,30 +352,35 @@ export default function DriverProfile() {
   const hasProfilePhoto = !!user.fotoUrl || !!profilePhotoDoc;
 
   return (
-    <div className="p-4 pb-20">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Mi Perfil</h1>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => setEditModalOpen(true)}
-          data-testid="button-edit-profile"
-        >
-          <Pencil className="w-4 h-4 mr-2" />
-          Editar
-        </Button>
+    <div className="flex flex-col h-full">
+      <div className="px-4 pt-4 pb-2 flex-shrink-0 space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Mi Perfil</h1>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setEditModalOpen(true)}
+            data-testid="button-edit-profile"
+          >
+            <Pencil className="w-4 h-4 mr-2" />
+            Editar
+          </Button>
+        </div>
+
+        <DocumentExpirationAlerts onNavigateToDocuments={scrollToDocuments} />
+
+        {!hasProfilePhoto && (
+          <Alert variant="destructive" data-testid="alert-missing-photo">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Foto de perfil requerida:</strong> Como conductor, es obligatorio que subas una foto de perfil donde se vea tu rostro claramente para poder ser aprobado.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
-      <DocumentExpirationAlerts onNavigateToDocuments={scrollToDocuments} />
-
-      {!hasProfilePhoto && (
-        <Alert variant="destructive" className="mb-4" data-testid="alert-missing-photo">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>Foto de perfil requerida:</strong> Como conductor, es obligatorio que subas una foto de perfil donde se vea tu rostro claramente para poder ser aprobado.
-          </AlertDescription>
-        </Alert>
-      )}
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-4 pb-20">
 
       <Card className="p-6 mb-4">
         <div className="flex items-center gap-4 mb-6">
@@ -917,17 +923,19 @@ export default function DriverProfile() {
         </>
       )}
 
-      <ThemeSettingsCard />
+          <ThemeSettingsCard />
 
-      <Button
-        variant="destructive"
-        className="w-full"
-        onClick={handleLogout}
-        data-testid="button-logout"
-      >
-        <LogOut className="w-4 h-4 mr-2" />
-        Cerrar Sesión
-      </Button>
+          <Button
+            variant="destructive"
+            className="w-full"
+            onClick={handleLogout}
+            data-testid="button-logout"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Cerrar Sesión
+          </Button>
+        </div>
+      </ScrollArea>
 
       <EditProfileModal
         open={editModalOpen}

@@ -4,6 +4,7 @@ import { useLocation } from 'wouter';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Navigation, Calendar, DollarSign, ClipboardList, Download, Star } from 'lucide-react';
 import type { ServicioWithDetails, Calificacion } from '@shared/schema';
 import { format } from 'date-fns';
@@ -93,23 +94,27 @@ export default function ClientHistory() {
   };
 
   return (
-    <div className="p-4 pb-20">
-      <h1 className="text-2xl font-bold mb-6">Historial de Servicios</h1>
-      
-      {!services || services.length === 0 ? (
-        <EmptyState
-          icon={ClipboardList}
-          title="No hay servicios"
-          description="Aun no has solicitado ningun servicio de grua. Solicita tu primer servicio desde la pantalla principal."
-          action={{
-            label: "Solicitar Servicio",
-            onClick: () => setLocation('/client')
-          }}
-        />
-      ) : (
-        <div className="space-y-3">
-          {services.map((service) => (
-            <Card key={service.id} className="p-4" data-testid={`service-card-${service.id}`}>
+    <div className="flex flex-col h-full">
+      <div className="px-4 pt-4 pb-2 flex-shrink-0">
+        <h1 className="text-2xl font-bold">Historial de Servicios</h1>
+      </div>
+
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-4 pb-20">
+          {!services || services.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="No hay servicios"
+              description="Aun no has solicitado ningun servicio de grua. Solicita tu primer servicio desde la pantalla principal."
+              action={{
+                label: "Solicitar Servicio",
+                onClick: () => setLocation('/client')
+              }}
+            />
+          ) : (
+            <div className="space-y-3">
+              {services.map((service) => (
+                <Card key={service.id} className="p-4" data-testid={`service-card-${service.id}`}>
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -200,10 +205,12 @@ export default function ClientHistory() {
                   </Button>
                 </div>
               )}
-            </Card>
-          ))}
+              </Card>
+            ))}
+            </div>
+          )}
         </div>
-      )}
+      </ScrollArea>
 
       {selectedService && selectedService.conductor && (
         <RatingModal

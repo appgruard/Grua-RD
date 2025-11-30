@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2, IdCard, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -120,8 +121,8 @@ export default function ClientProfile() {
   const isCedulaVerified = user.cedulaVerificada;
 
   return (
-    <div className="min-h-full pb-8">
-      <div className="bg-gradient-to-b from-primary/5 to-background px-4 pt-6 pb-8">
+    <div className="flex flex-col h-full">
+      <div className="bg-gradient-to-b from-primary/5 to-background px-4 pt-6 pb-6 flex-shrink-0">
         <div className="flex justify-end mb-2">
           <Button 
             variant="outline" 
@@ -181,7 +182,8 @@ export default function ClientProfile() {
         </div>
       </div>
 
-      <div className="px-4 -mt-4 space-y-4">
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="px-4 pb-8 space-y-4">
         <Card className="overflow-hidden">
           <div className="p-4 border-b border-border">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -299,16 +301,17 @@ export default function ClientProfile() {
 
         <ThemeSettingsCard />
 
-        <Button
-          variant="outline"
-          className="w-full h-12 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-          onClick={handleLogout}
-          data-testid="button-logout"
-        >
-          <LogOut className="w-4 h-4 mr-2" />
-          Cerrar Sesión
-        </Button>
-      </div>
+          <Button
+            variant="outline"
+            className="w-full h-12 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+            onClick={handleLogout}
+            data-testid="button-logout"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Cerrar Sesión
+          </Button>
+        </div>
+      </ScrollArea>
 
       <EditProfileModal
         open={editModalOpen}
