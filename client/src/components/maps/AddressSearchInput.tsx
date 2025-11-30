@@ -52,9 +52,83 @@ export function AddressSearchInput({
     setInputValue(value);
   }, [value]);
 
+  const parseCoordinates = (input: string): Coordinates | null => {
+    const cleaned = input.trim().replace(/\s+/g, ' ');
+    
+    const patterns = [
+      /^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/,
+      /^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/,
+      /^lat[:\s]*(-?\d+\.?\d*)[,\s]+(?:lng|lon)[:\s]*(-?\d+\.?\d*)$/i,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = cleaned.match(pattern);
+      if (match) {
+        const first = parseFloat(match[1]);
+        const second = parseFloat(match[2]);
+        
+        if (first >= -90 && first <= 90 && second >= -180 && second <= 180) {
+          return { lat: first, lng: second };
+        }
+        if (second >= -90 && second <= 90 && first >= -180 && first <= 180) {
+          return { lat: second, lng: first };
+        }
+      }
+    }
+    return null;
+  };
+
+  const reverseGeocode = useCallback(async (coords: Coordinates): Promise<AddressSuggestion | null> => {
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}&language=es`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data.features && data.features.length > 0) {
+          const feature = data.features[0];
+          return {
+            id: `coords-${coords.lat}-${coords.lng}`,
+            placeName: feature.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
+            text: feature.text || 'Ubicación seleccionada',
+            coordinates: coords,
+          };
+        }
+      }
+      return {
+        id: `coords-${coords.lat}-${coords.lng}`,
+        placeName: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
+        text: 'Coordenadas ingresadas',
+        coordinates: coords,
+      };
+    } catch (error) {
+      console.error('Failed to reverse geocode:', error);
+      return {
+        id: `coords-${coords.lat}-${coords.lng}`,
+        placeName: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
+        text: 'Coordenadas ingresadas',
+        coordinates: coords,
+      };
+    }
+  }, []);
+
   const fetchSuggestions = useCallback(async (query: string) => {
     if (query.length < 2) {
       setSuggestions([]);
+      return;
+    }
+
+    const coords = parseCoordinates(query);
+    if (coords) {
+      setIsLoading(true);
+      try {
+        const suggestion = await reverseGeocode(coords);
+        if (suggestion) {
+          setSuggestions([suggestion]);
+        }
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -75,7 +149,7 @@ export function AddressSearchInput({
     } finally {
       setIsLoading(false);
     }
-  }, [currentLocation]);
+  }, [currentLocation, reverseGeocode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
