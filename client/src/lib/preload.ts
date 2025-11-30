@@ -1,7 +1,10 @@
+import { queryClient } from './queryClient';
+
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 const preloadedModules = new Set<string>();
 const addedPreconnects = new Set<string>();
+const prefetchedData = new Set<string>();
 
 type IdleCallbackFn = (callback: () => void, options?: { timeout: number }) => void;
 
@@ -71,6 +74,23 @@ export function preloadDriverModules() {
   });
 }
 
+export function prefetchUserData() {
+  const endpoints = [
+    '/api/services/my-services',
+    '/api/auth/me',
+  ];
+
+  endpoints.forEach((endpoint) => {
+    if (!prefetchedData.has(endpoint)) {
+      prefetchedData.add(endpoint);
+      queryClient.prefetchQuery({
+        queryKey: [endpoint],
+        staleTime: 1000 * 60 * 5,
+      }).catch(() => {});
+    }
+  });
+}
+
 export function initializePreloading() {
   if (typeof window === 'undefined') return;
 
@@ -79,4 +99,8 @@ export function initializePreloading() {
   scheduleIdleTask(() => {
     preloadCriticalModules();
   }, { timeout: 1000 });
+
+  scheduleIdleTask(() => {
+    prefetchUserData();
+  }, { timeout: 1500 });
 }
