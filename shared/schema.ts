@@ -132,8 +132,8 @@ export const conductores = pgTable("conductores", {
   ubicacionLat: decimal("ubicacion_lat", { precision: 10, scale: 7 }),
   ubicacionLng: decimal("ubicacion_lng", { precision: 10, scale: 7 }),
   ultimaUbicacionUpdate: timestamp("ultima_ubicacion_update"),
-  azulMerchantId: text("azul_merchant_id"),
-  azulCardToken: text("azul_card_token"),
+  balanceDisponible: decimal("balance_disponible", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  balancePendiente: decimal("balance_pendiente", { precision: 12, scale: 2 }).default("0.00").notNull(),
 });
 
 // Conductor Service Categories Table (driver can offer multiple service categories)
@@ -167,8 +167,8 @@ export const servicios = pgTable("servicios", {
   costoTotal: decimal("costo_total", { precision: 10, scale: 2 }).notNull(),
   estado: estadoServicioEnum("estado").default("pendiente").notNull(),
   metodoPago: metodoPagoEnum("metodo_pago").default("efectivo").notNull(),
-  stripePaymentId: text("stripe_payment_id"),
-  azulTransactionId: text("azul_transaction_id"),
+  dlocalPaymentId: text("dlocal_payment_id"),
+  dlocalPaymentStatus: text("dlocal_payment_status"),
   tipoVehiculo: tipoVehiculoEnum("tipo_vehiculo"),
   servicioCategoria: servicioCategoriaEnum("servicio_categoria").default("remolque_estandar"),
   servicioSubtipo: servicioSubtipoEnum("servicio_subtipo"),
@@ -274,19 +274,19 @@ export const documentos = pgTable("documentos", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Comisiones Table (for payment commissions 70/30)
+// Comisiones Table (for payment commissions 80/20)
 export const comisiones = pgTable("comisiones", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   servicioId: varchar("servicio_id").notNull().references(() => servicios.id, { onDelete: "cascade" }),
   montoTotal: decimal("monto_total", { precision: 10, scale: 2 }).notNull(),
   montoOperador: decimal("monto_operador", { precision: 10, scale: 2 }).notNull(),
   montoEmpresa: decimal("monto_empresa", { precision: 10, scale: 2 }).notNull(),
-  porcentajeOperador: decimal("porcentaje_operador", { precision: 5, scale: 2 }).default("70.00").notNull(),
-  porcentajeEmpresa: decimal("porcentaje_empresa", { precision: 5, scale: 2 }).default("30.00").notNull(),
+  porcentajeOperador: decimal("porcentaje_operador", { precision: 5, scale: 2 }).default("80.00").notNull(),
+  porcentajeEmpresa: decimal("porcentaje_empresa", { precision: 5, scale: 2 }).default("20.00").notNull(),
   estadoPagoOperador: estadoPagoEnum("estado_pago_operador").default("pendiente").notNull(),
   estadoPagoEmpresa: estadoPagoEnum("estado_pago_empresa").default("pendiente").notNull(),
-  stripeTransferId: text("stripe_transfer_id"),
-  azulTransactionId: text("azul_transaction_id"),
+  dlocalPayoutId: text("dlocal_payout_id"),
+  dlocalPayoutStatus: text("dlocal_payout_status"),
   fechaPagoOperador: timestamp("fecha_pago_operador"),
   fechaPagoEmpresa: timestamp("fecha_pago_empresa"),
   notas: text("notas"),
@@ -574,13 +574,13 @@ export const documentoRecordatoriosRelations = relations(documentoRecordatorios,
   }),
 }));
 
-// ==================== CLIENT PAYMENT METHODS (AZUL) ====================
+// ==================== CLIENT PAYMENT METHODS (dLocal) ====================
 
-// Client Payment Methods Table (Azul DataVault tokens for clients)
+// Client Payment Methods Table (dLocal card tokens for clients)
 export const clientPaymentMethods = pgTable("client_payment_methods", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  azulToken: text("azul_token").notNull(),
+  dlocalCardId: text("dlocal_card_id").notNull(),
   cardBrand: text("card_brand").notNull(),
   last4: text("last4").notNull(),
   expiryMonth: integer("expiry_month").notNull(),
@@ -597,6 +597,61 @@ export const clientPaymentMethodsRelations = relations(clientPaymentMethods, ({ 
     references: [users.id],
   }),
 }));
+
+// ==================== OPERATOR BANK ACCOUNTS (dLocal Payouts) ====================
+
+// Estado de cuenta bancaria del operador
+export const estadoCuentaBancariaEnum = pgEnum("estado_cuenta_bancaria", [
+  "pendiente_verificacion",
+  "verificada",
+  "rechazada"
+]);
+
+// Operator Bank Accounts Table (for dLocal payouts)
+export const operatorBankAccounts = pgTable("operator_bank_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorId: varchar("conductor_id").notNull().unique().references(() => conductores.id, { onDelete: "cascade" }),
+  nombreTitular: text("nombre_titular").notNull(),
+  cedula: text("cedula").notNull(),
+  banco: text("banco").notNull(),
+  tipoCuenta: text("tipo_cuenta").notNull(),
+  numeroCuenta: text("numero_cuenta").notNull(),
+  estado: estadoCuentaBancariaEnum("estado").default("pendiente_verificacion").notNull(),
+  verificadoAt: timestamp("verificado_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Operator Withdrawals Table (payout requests)
+export const operatorWithdrawals = pgTable("operator_withdrawals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
+  monto: decimal("monto", { precision: 12, scale: 2 }).notNull(),
+  estado: estadoPagoEnum("estado").default("pendiente").notNull(),
+  dlocalPayoutId: text("dlocal_payout_id"),
+  dlocalStatus: text("dlocal_status"),
+  errorMessage: text("error_message"),
+  procesadoAt: timestamp("procesado_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Operator Bank Accounts Relations
+export const operatorBankAccountsRelations = relations(operatorBankAccounts, ({ one }) => ({
+  conductor: one(conductores, {
+    fields: [operatorBankAccounts.conductorId],
+    references: [conductores.id],
+  }),
+}));
+
+// Operator Withdrawals Relations
+export const operatorWithdrawalsRelations = relations(operatorWithdrawals, ({ one }) => ({
+  conductor: one(conductores, {
+    fields: [operatorWithdrawals.conductorId],
+    references: [conductores.id],
+  }),
+}));
+
+// ==================== END OPERATOR BANK ACCOUNTS ====================
 
 // ==================== END CLIENT PAYMENT METHODS ====================
 
@@ -870,7 +925,7 @@ export const insertDistribucionSocioSchema = createInsertSchema(distribucionesSo
 });
 
 export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentMethods, {
-  azulToken: z.string().min(1, "Token de Azul es requerido"),
+  dlocalCardId: z.string().min(1, "ID de tarjeta dLocal es requerido"),
   cardBrand: z.string().min(1, "Marca de tarjeta es requerida"),
   last4: z.string().length(4, "Los últimos 4 dígitos son requeridos"),
   expiryMonth: z.number().min(1).max(12),
@@ -880,6 +935,32 @@ export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentM
   id: true,
   createdAt: true,
   isDefault: true,
+});
+
+export const insertOperatorBankAccountSchema = createInsertSchema(operatorBankAccounts, {
+  nombreTitular: z.string().min(1, "Nombre del titular es requerido"),
+  cedula: z.string().regex(/^\d{11}$/, "Cédula debe tener 11 dígitos"),
+  banco: z.string().min(1, "Banco es requerido"),
+  tipoCuenta: z.enum(["ahorro", "corriente"], { errorMap: () => ({ message: "Tipo de cuenta debe ser ahorro o corriente" }) }),
+  numeroCuenta: z.string().min(5, "Número de cuenta inválido"),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  estado: true,
+  verificadoAt: true,
+});
+
+export const insertOperatorWithdrawalSchema = createInsertSchema(operatorWithdrawals, {
+  monto: z.string().refine((val) => parseFloat(val) >= 500, { message: "El monto mínimo de retiro es RD$500" }),
+}).omit({
+  id: true,
+  createdAt: true,
+  estado: true,
+  dlocalPayoutId: true,
+  dlocalStatus: true,
+  errorMessage: true,
+  procesadoAt: true,
 });
 
 // Select Schemas
@@ -901,6 +982,8 @@ export const selectServicioAseguradoraSchema = createSelectSchema(serviciosAsegu
 export const selectSocioSchema = createSelectSchema(socios);
 export const selectDistribucionSocioSchema = createSelectSchema(distribucionesSocios);
 export const selectClientPaymentMethodSchema = createSelectSchema(clientPaymentMethods);
+export const selectOperatorBankAccountSchema = createSelectSchema(operatorBankAccounts);
+export const selectOperatorWithdrawalSchema = createSelectSchema(operatorWithdrawals);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -956,6 +1039,12 @@ export type DistribucionSocio = typeof distribucionesSocios.$inferSelect;
 
 export type InsertClientPaymentMethod = z.infer<typeof insertClientPaymentMethodSchema>;
 export type ClientPaymentMethod = typeof clientPaymentMethods.$inferSelect;
+
+export type InsertOperatorBankAccount = z.infer<typeof insertOperatorBankAccountSchema>;
+export type OperatorBankAccount = typeof operatorBankAccounts.$inferSelect;
+
+export type InsertOperatorWithdrawal = z.infer<typeof insertOperatorWithdrawalSchema>;
+export type OperatorWithdrawal = typeof operatorWithdrawals.$inferSelect;
 
 // Helper types for API responses
 export type UserWithConductor = User & {

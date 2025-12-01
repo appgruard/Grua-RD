@@ -23,6 +23,8 @@ import {
   socios,
   distribucionesSocios,
   clientPaymentMethods,
+  operatorBankAccounts,
+  operatorWithdrawals,
   type User,
   type InsertUser,
   type Conductor,
@@ -77,10 +79,12 @@ import {
   type DistribucionSocioWithDetails,
   type ClientPaymentMethod,
   type InsertClientPaymentMethod,
+  type OperatorBankAccount,
+  type InsertOperatorBankAccount,
+  type OperatorWithdrawal,
+  type InsertOperatorWithdrawal,
 } from '@shared/schema';
 import {
-  conductorStripeAccounts,
-  paymentMethods,
   serviceReceipts,
 } from './schema-extensions';
 
@@ -231,22 +235,15 @@ export interface IStorage {
   getAllComisiones(): Promise<ComisionWithDetails[]>;
   updateComision(id: string, data: Partial<Comision>): Promise<Comision>;
   updateComisionNotas(id: string, notas: string): Promise<Comision>;
-  marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', azulTransactionId?: string): Promise<Comision>;
+  marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', dlocalPayoutId?: string): Promise<Comision>;
 
-  // Stripe Connect Accounts
-  createConductorStripeAccount(data: { conductorId: string; stripeAccountId: string }): Promise<any>;
-  getConductorStripeAccount(conductorId: string): Promise<any | undefined>;
-  getConductorStripeAccountByAccountId(stripeAccountId: string): Promise<any | undefined>;
-  updateConductorStripeAccount(conductorId: string, data: any): Promise<any>;
-
-  // Payment Methods
-  createPaymentMethod(data: { userId: string; stripePaymentMethodId: string; brand: string; last4: string; expiryMonth: number; expiryYear: number; isDefault?: boolean }): Promise<any>;
-  getPaymentMethodsByUserId(userId: string): Promise<any[]>;
-  deletePaymentMethod(id: string): Promise<void>;
+  // dLocal Payment Methods - Client payment methods use clientPaymentMethods table
+  // Driver bank accounts are stored in the conductores table via dLocal fields
+  deletePaymentMethodById(id: string): Promise<void>;
   setDefaultPaymentMethod(userId: string, paymentMethodId: string): Promise<void>;
 
   // Service Receipts
-  createServiceReceipt(data: { servicioId: string; receiptNumber: string; pdfUrl: string | null; metadata: any }): Promise<any>;
+  createServiceReceipt(data: { servicioId: string; receiptNumber: string; receiptUrl: string; pdfSize?: number }): Promise<any>;
   getServiceReceiptByServiceId(servicioId: string): Promise<any | undefined>;
 
   // Documentos
@@ -402,6 +399,24 @@ export interface IStorage {
   updateClientPaymentMethod(id: string, data: Partial<ClientPaymentMethod>): Promise<ClientPaymentMethod>;
   setDefaultClientPaymentMethod(id: string, userId: string): Promise<ClientPaymentMethod>;
   deleteClientPaymentMethod(id: string): Promise<void>;
+
+  // Operator Bank Accounts (dLocal Payouts)
+  createOperatorBankAccount(data: InsertOperatorBankAccount): Promise<OperatorBankAccount>;
+  getOperatorBankAccount(conductorId: string): Promise<OperatorBankAccount | undefined>;
+  updateOperatorBankAccount(id: string, data: Partial<OperatorBankAccount>): Promise<OperatorBankAccount>;
+  deleteOperatorBankAccount(id: string): Promise<void>;
+
+  // Operator Withdrawals (dLocal Payouts)
+  createOperatorWithdrawal(data: InsertOperatorWithdrawal): Promise<OperatorWithdrawal>;
+  getOperatorWithdrawal(id: string): Promise<OperatorWithdrawal | undefined>;
+  getOperatorWithdrawals(conductorId: string): Promise<OperatorWithdrawal[]>;
+  updateOperatorWithdrawal(id: string, data: Partial<OperatorWithdrawal>): Promise<OperatorWithdrawal>;
+  getPendingWithdrawals(): Promise<OperatorWithdrawal[]>;
+
+  // Operator Balance Management
+  updateOperatorBalance(conductorId: string, balanceDisponible: string, balancePendiente: string): Promise<Conductor>;
+  addToOperatorBalance(conductorId: string, amount: string): Promise<Conductor>;
+  deductFromOperatorBalance(conductorId: string, amount: string): Promise<Conductor>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1402,12 +1417,12 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', azulTransactionId?: string): Promise<Comision> {
+  async marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', dlocalPayoutId?: string): Promise<Comision> {
     const updateData: Partial<Comision> = tipo === 'operador' 
       ? {
           estadoPagoOperador: 'pagado',
           fechaPagoOperador: new Date(),
-          azulTransactionId,
+          dlocalPayoutId,
         }
       : {
           estadoPagoEmpresa: 'pagado',
@@ -1463,108 +1478,36 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // Stripe Connect Accounts
-  async createConductorStripeAccount(data: { conductorId: string; stripeAccountId: string }): Promise<any> {
-    const [account] = await db
-      .insert(conductorStripeAccounts)
-      .values({
-        conductorId: data.conductorId,
-        stripeAccountId: data.stripeAccountId,
-        accountStatus: 'pending',
-        onboardingComplete: false,
-        chargesEnabled: false,
-        payoutsEnabled: false,
-        detailsSubmitted: false,
-      })
-      .returning();
-    return account;
-  }
+  // dLocal Payment Methods - Using clientPaymentMethods table from shared schema
+  // Note: The conductorStripeAccounts and paymentMethods tables have been removed
+  // Driver bank accounts are now stored in the conductores table via dLocal fields
+  // Client payment methods use the clientPaymentMethods table
 
-  async getConductorStripeAccount(conductorId: string): Promise<any | undefined> {
-    const [account] = await db
-      .select()
-      .from(conductorStripeAccounts)
-      .where(eq(conductorStripeAccounts.conductorId, conductorId))
-      .limit(1);
-    return account;
-  }
-
-  async getConductorStripeAccountByAccountId(stripeAccountId: string): Promise<any | undefined> {
-    const [account] = await db
-      .select()
-      .from(conductorStripeAccounts)
-      .where(eq(conductorStripeAccounts.stripeAccountId, stripeAccountId))
-      .limit(1);
-    return account;
-  }
-
-  async updateConductorStripeAccount(conductorId: string, data: any): Promise<any> {
-    const [updated] = await db
-      .update(conductorStripeAccounts)
-      .set(data)
-      .where(eq(conductorStripeAccounts.conductorId, conductorId))
-      .returning();
-    return updated;
-  }
-
-  // Payment Methods
-  async createPaymentMethod(data: { userId: string; stripePaymentMethodId: string; brand: string; last4: string; expiryMonth: number; expiryYear: number; isDefault?: boolean }): Promise<any> {
-    if (data.isDefault) {
-      await db
-        .update(paymentMethods)
-        .set({ isDefault: false })
-        .where(eq(paymentMethods.userId, data.userId));
-    }
-
-    const [paymentMethod] = await db
-      .insert(paymentMethods)
-      .values({
-        userId: data.userId,
-        stripePaymentMethodId: data.stripePaymentMethodId,
-        brand: data.brand,
-        last4: data.last4,
-        expiryMonth: data.expiryMonth,
-        expiryYear: data.expiryYear,
-        isDefault: data.isDefault ?? false,
-      })
-      .returning();
-    return paymentMethod;
-  }
-
-  async getPaymentMethodsByUserId(userId: string): Promise<any[]> {
-    const methods = await db
-      .select()
-      .from(paymentMethods)
-      .where(eq(paymentMethods.userId, userId))
-      .orderBy(desc(paymentMethods.isDefault), desc(paymentMethods.createdAt));
-    return methods;
-  }
-
-  async deletePaymentMethod(id: string): Promise<void> {
-    await db.delete(paymentMethods).where(eq(paymentMethods.id, id));
+  async deletePaymentMethodById(id: string): Promise<void> {
+    await db.delete(clientPaymentMethods).where(eq(clientPaymentMethods.id, id));
   }
 
   async setDefaultPaymentMethod(userId: string, paymentMethodId: string): Promise<void> {
     await db
-      .update(paymentMethods)
+      .update(clientPaymentMethods)
       .set({ isDefault: false })
-      .where(eq(paymentMethods.userId, userId));
+      .where(eq(clientPaymentMethods.userId, userId));
 
     await db
-      .update(paymentMethods)
+      .update(clientPaymentMethods)
       .set({ isDefault: true })
-      .where(eq(paymentMethods.id, paymentMethodId));
+      .where(eq(clientPaymentMethods.id, paymentMethodId));
   }
 
   // Service Receipts
-  async createServiceReceipt(data: { servicioId: string; receiptNumber: string; pdfUrl: string | null; metadata: any }): Promise<any> {
+  async createServiceReceipt(data: { servicioId: string; receiptNumber: string; receiptUrl: string; pdfSize?: number }): Promise<any> {
     const [receipt] = await db
       .insert(serviceReceipts)
       .values({
         servicioId: data.servicioId,
         receiptNumber: data.receiptNumber,
-        pdfUrl: data.pdfUrl,
-        metadata: data.metadata,
+        receiptUrl: data.receiptUrl,
+        pdfSize: data.pdfSize,
       })
       .returning();
     return receipt;
@@ -2830,6 +2773,112 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClientPaymentMethod(id: string): Promise<void> {
     await db.delete(clientPaymentMethods).where(eq(clientPaymentMethods.id, id));
+  }
+
+  // ==================== OPERATOR BANK ACCOUNTS (dLocal Payouts) ====================
+
+  async createOperatorBankAccount(data: InsertOperatorBankAccount): Promise<OperatorBankAccount> {
+    const [account] = await db.insert(operatorBankAccounts).values({
+      ...data,
+      updatedAt: new Date(),
+    }).returning();
+    return account;
+  }
+
+  async getOperatorBankAccount(conductorId: string): Promise<OperatorBankAccount | undefined> {
+    const [account] = await db
+      .select()
+      .from(operatorBankAccounts)
+      .where(eq(operatorBankAccounts.conductorId, conductorId))
+      .limit(1);
+    return account;
+  }
+
+  async updateOperatorBankAccount(id: string, data: Partial<OperatorBankAccount>): Promise<OperatorBankAccount> {
+    const [account] = await db
+      .update(operatorBankAccounts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(operatorBankAccounts.id, id))
+      .returning();
+    return account;
+  }
+
+  async deleteOperatorBankAccount(id: string): Promise<void> {
+    await db.delete(operatorBankAccounts).where(eq(operatorBankAccounts.id, id));
+  }
+
+  // ==================== OPERATOR WITHDRAWALS (dLocal Payouts) ====================
+
+  async createOperatorWithdrawal(data: InsertOperatorWithdrawal): Promise<OperatorWithdrawal> {
+    const [withdrawal] = await db.insert(operatorWithdrawals).values(data).returning();
+    return withdrawal;
+  }
+
+  async getOperatorWithdrawal(id: string): Promise<OperatorWithdrawal | undefined> {
+    const [withdrawal] = await db
+      .select()
+      .from(operatorWithdrawals)
+      .where(eq(operatorWithdrawals.id, id))
+      .limit(1);
+    return withdrawal;
+  }
+
+  async getOperatorWithdrawals(conductorId: string): Promise<OperatorWithdrawal[]> {
+    return db
+      .select()
+      .from(operatorWithdrawals)
+      .where(eq(operatorWithdrawals.conductorId, conductorId))
+      .orderBy(desc(operatorWithdrawals.createdAt));
+  }
+
+  async updateOperatorWithdrawal(id: string, data: Partial<OperatorWithdrawal>): Promise<OperatorWithdrawal> {
+    const [withdrawal] = await db
+      .update(operatorWithdrawals)
+      .set(data)
+      .where(eq(operatorWithdrawals.id, id))
+      .returning();
+    return withdrawal;
+  }
+
+  async getPendingWithdrawals(): Promise<OperatorWithdrawal[]> {
+    return db
+      .select()
+      .from(operatorWithdrawals)
+      .where(eq(operatorWithdrawals.estado, 'pendiente'))
+      .orderBy(desc(operatorWithdrawals.createdAt));
+  }
+
+  // ==================== OPERATOR BALANCE MANAGEMENT ====================
+
+  async updateOperatorBalance(conductorId: string, balanceDisponible: string, balancePendiente: string): Promise<Conductor> {
+    const [conductor] = await db
+      .update(conductores)
+      .set({ balanceDisponible, balancePendiente })
+      .where(eq(conductores.id, conductorId))
+      .returning();
+    return conductor;
+  }
+
+  async addToOperatorBalance(conductorId: string, amount: string): Promise<Conductor> {
+    const [conductor] = await db
+      .update(conductores)
+      .set({
+        balanceDisponible: sql`CAST(${conductores.balanceDisponible} AS NUMERIC) + ${amount}::numeric`,
+      })
+      .where(eq(conductores.id, conductorId))
+      .returning();
+    return conductor;
+  }
+
+  async deductFromOperatorBalance(conductorId: string, amount: string): Promise<Conductor> {
+    const [conductor] = await db
+      .update(conductores)
+      .set({
+        balanceDisponible: sql`CAST(${conductores.balanceDisponible} AS NUMERIC) - ${amount}::numeric`,
+      })
+      .where(eq(conductores.id, conductorId))
+      .returning();
+    return conductor;
   }
 }
 

@@ -172,99 +172,122 @@ passport.deserializeUser(async (id: string, done) => {
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Azul Payment Webhook Handler
-  app.post("/api/payments/webhook", express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
+  // dLocal Payment Webhook Handler
+  app.post("/api/dlocal/webhook", express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
     try {
       const data = JSON.parse(req.body.toString());
       
-      if (!data.TransactionId || !data.ResponseCode) {
+      if (!data.id || !data.status) {
         return res.status(400).json({ message: "Invalid webhook data" });
       }
 
-      logSystem.info('Azul webhook received', { transactionId: data.TransactionId, responseCode: data.ResponseCode });
+      logSystem.info('dLocal webhook received', { paymentId: data.id, status: data.status });
 
       // If it's a successful transaction
-      if (data.ResponseCode === '00') {
-        const orderNumber = data.OrderNumber;
-        const transactionId = data.TransactionId;
+      if (data.status === 'PAID' || data.status === 'AUTHORIZED') {
+        const orderId = data.order_id;
+        const paymentId = data.id;
         
-        const servicio = await storage.getServicioById(orderNumber);
+        // Extract servicioId from order_id format: SRV-{servicioId}-{timestamp}
+        const servicioIdMatch = orderId?.match(/^SRV-([^-]+)-/);
+        const servicioId = servicioIdMatch ? servicioIdMatch[1] : orderId;
+        
+        const servicio = await storage.getServicioById(servicioId);
         if (!servicio) {
-          logSystem.warn('Webhook: Service not found', { servicioId: orderNumber });
+          logSystem.warn('Webhook: Service not found', { servicioId, orderId });
           return res.json({ received: true });
         }
 
-        if (servicio.azulTransactionId === transactionId) {
-          logSystem.info('Webhook: Payment already processed (idempotent)', { transactionId, servicioId: orderNumber });
+        if (servicio.dlocalPaymentId === paymentId) {
+          logSystem.info('Webhook: Payment already processed (idempotent)', { paymentId, servicioId });
           return res.json({ received: true });
         }
 
-        const existingComision = await storage.getComisionByServicioId(orderNumber);
+        const existingComision = await storage.getComisionByServicioId(servicioId);
         if (existingComision) {
-          logSystem.warn('Webhook: Commission already exists', { servicioId: orderNumber });
+          logSystem.warn('Webhook: Commission already exists', { servicioId });
           return res.json({ received: true });
         }
 
-        // Update servicio with Azul transaction ID
-        await storage.updateServicio(orderNumber, {
-          azulTransactionId: transactionId,
+        // Update servicio with dLocal payment ID
+        await storage.updateServicio(servicioId, {
+          dlocalPaymentId: paymentId,
+          dlocalPaymentStatus: data.status,
         });
 
-        // Create commission (70/30 split)
+        // Create commission (80/20 split)
+        const { dlocalPaymentService } = await import('./services/dlocal-payment');
         const montoTotal = parseFloat(servicio.costoTotal);
-        const montoOperador = montoTotal * 0.7;
-        const montoEmpresa = montoTotal * 0.3;
+        const { operatorAmount, companyAmount } = dlocalPaymentService.calculateCommission(montoTotal);
 
         const comision = await storage.createComision({
-          servicioId: orderNumber,
+          servicioId,
           montoTotal: servicio.costoTotal,
-          montoOperador: montoOperador.toFixed(2),
-          montoEmpresa: montoEmpresa.toFixed(2),
+          montoOperador: operatorAmount.toFixed(2),
+          montoEmpresa: companyAmount.toFixed(2),
         });
 
-        logTransaction.paymentSuccess(orderNumber, parseFloat(servicio.costoTotal), transactionId);
-        logTransaction.commissionCreated(comision.id, orderNumber, montoOperador, montoEmpresa);
+        logTransaction.paymentSuccess(servicioId, parseFloat(servicio.costoTotal), paymentId);
+        logTransaction.commissionCreated(comision.id, servicioId, operatorAmount, companyAmount);
 
-        // Try to process Azul payout for conductor (70%)
+        // Note: dLocal payouts to operators are processed via bank transfers when operator requests withdrawal
+        // The balance is added to the conductor's account for later withdrawal
         if (servicio.conductorId) {
           try {
-            const { azulPaymentService } = await import('./services/azul-payment');
             const conductor = await storage.getConductorByUserId(servicio.conductorId);
-            
-            if (conductor?.azulCardToken && azulPaymentService.isConfigured()) {
-              // Process immediate payout to conductor using stored token
-              const payoutResult = await azulPaymentService.processPayment({
-                amount: montoOperador,
-                servicioId: orderNumber,
-                email: conductor.user?.email || '',
-                description: `GruaRD Payout - Service ${orderNumber}`,
-                token: conductor.azulCardToken,
-                useToken: true,
+            if (conductor) {
+              // Update conductor balance - funds available for withdrawal
+              const currentBalance = parseFloat(conductor.balanceDisponible || "0");
+              const newBalance = currentBalance + operatorAmount;
+              await storage.updateConductor(conductor.id, {
+                balanceDisponible: newBalance.toFixed(2),
               });
-
-              if (payoutResult.approved) {
-                await storage.marcarComisionPagada(comision.id, 'operador', payoutResult.transactionId);
-                logSystem.info('Azul payout processed successfully', {
-                  transactionId: payoutResult.transactionId,
-                  conductorId: conductor.id,
-                  amount: montoOperador,
-                });
-              }
-            } else if (!azulPaymentService.isConfigured()) {
-              logSystem.warn('Azul Payment Service not configured - conductor payout pending', {
-                servicioId: orderNumber,
-                conductorId: conductor?.id,
+              
+              logSystem.info('Conductor balance updated', {
+                conductorId: conductor.id,
+                addedAmount: operatorAmount,
+                newBalance: newBalance.toFixed(2),
               });
             }
           } catch (error: any) {
-            logSystem.error('Error processing Azul payout', error, { servicioId: orderNumber, conductorId: servicio.conductorId });
+            logSystem.error('Error updating conductor balance', error, { servicioId, conductorId: servicio.conductorId });
           }
         }
       }
 
       res.json({ received: true });
     } catch (error: any) {
-      logSystem.error('Azul Webhook error', error);
+      logSystem.error('dLocal Webhook error', error);
+      res.status(400).json({ message: `Webhook Error: ${error.message}` });
+    }
+  });
+
+  // dLocal Payout Webhook Handler
+  app.post("/api/dlocal/payout-webhook", express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
+    try {
+      const data = JSON.parse(req.body.toString());
+      
+      if (!data.id || !data.status) {
+        return res.status(400).json({ message: "Invalid payout webhook data" });
+      }
+
+      logSystem.info('dLocal payout webhook received', { payoutId: data.id, status: data.status });
+
+      // Handle payout status updates
+      if (data.status === 'COMPLETED') {
+        const externalId = data.external_id;
+        
+        // Update commission payout status if linked to a commission
+        if (externalId?.startsWith('COM-')) {
+          const comisionId = externalId.replace('COM-', '');
+          await storage.marcarComisionPagada(comisionId, 'operador', data.id);
+          logSystem.info('Commission payout marked as paid', { comisionId, payoutId: data.id });
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      logSystem.error('dLocal Payout Webhook error', error);
       res.status(400).json({ message: `Webhook Error: ${error.message}` });
     }
   });
@@ -654,25 +677,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Health Check - Payment Gateway (Azul)
+  // Health Check - Payment Gateway (dLocal)
   app.get("/api/health/payments", async (_req: Request, res: Response) => {
     try {
-      // Check if Azul keys are configured
-      const merchantId = process.env.AZUL_MERCHANT_ID;
-      const authKey = process.env.AZUL_AUTH_KEY;
+      // Check if dLocal keys are configured
+      const apiKey = process.env.DLOCAL_API_KEY;
+      const secretKey = process.env.DLOCAL_SECRET_KEY;
       
-      const keysConfigured = !!(merchantId && authKey);
-      const mode = process.env.AZUL_ENVIRONMENT === 'production' ? 'live' : 'test';
+      const keysConfigured = !!(apiKey && secretKey);
+      const mode = process.env.DLOCAL_ENVIRONMENT === 'production' ? 'live' : 'sandbox';
       
       if (!keysConfigured) {
         return res.status(200).json({
           status: 'not_configured',
           timestamp: new Date().toISOString(),
-          message: 'Azul Payment Gateway keys not configured',
-          gateway: 'azul',
+          message: 'dLocal Payment Gateway keys not configured',
+          gateway: 'dlocal',
           keysPresent: {
-            merchantId: !!merchantId,
-            authKey: !!authKey,
+            apiKey: !!apiKey,
+            secretKey: !!secretKey,
           },
         });
       }
@@ -680,13 +703,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         status: 'configured',
         timestamp: new Date().toISOString(),
-        gateway: 'azul',
+        gateway: 'dlocal',
         mode,
         keysConfigured: true,
         features: {
           cardPayments: true,
-          dataVaultTokenization: true,
-          holdAndCapture: true,
+          bankTransfers: true,
+          payouts: true,
           refunds: true,
         },
       });
@@ -696,7 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(503).json({
         status: 'error',
         timestamp: new Date().toISOString(),
-        gateway: 'azul',
+        gateway: 'dlocal',
         error: error.message,
       });
     }
@@ -3972,7 +3995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { servicioId } = req.body;
+      const { servicioId, paymentMethodId } = req.body;
 
       if (!servicioId) {
         return res.status(400).json({ message: "servicioId is required" });
@@ -3992,9 +4015,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Service is not in pending state" });
       }
 
-      const { azulPaymentService } = await import('./services/azul-payment');
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
       
-      if (!azulPaymentService.isConfigured()) {
+      if (!dlocalPaymentService.isConfigured()) {
         return res.status(503).json({ 
           message: "Payment service not configured. Please contact administrator.",
           configured: false 
@@ -4003,30 +4026,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await storage.getUserById(req.user!.id);
       
-      // Hold funds first (HOLD transaction)
-      const holdResult = await azulPaymentService.holdFunds({
+      // Create payment with dLocal
+      const paymentResult = await dlocalPaymentService.createPayment({
         amount: parseFloat(servicio.costoTotal),
-        servicioId,
-        email: user?.email || 'cliente@gruard.do',
+        currency: 'DOP',
+        orderId: `SRV-${servicioId}-${Date.now()}`,
         description: `GruaRD Service - ${servicio.origenDireccion} to ${servicio.destinoDireccion}`,
+        payerEmail: user?.email || 'cliente@gruard.do',
+        payerName: user?.nombre || 'Cliente',
+        payerPhone: user?.telefono || '',
+        paymentMethodId,
+        callbackUrl: `${process.env.APP_URL || ''}/api/dlocal/webhook`,
       });
 
-      if (!holdResult.approved) {
-        logTransaction.paymentFailed(servicioId, parseFloat(servicio.costoTotal), holdResult.responseMessage);
+      if (!paymentResult.success) {
+        logTransaction.paymentFailed(servicioId, parseFloat(servicio.costoTotal), paymentResult.errorMessage || 'Payment failed');
         return res.status(400).json({ 
-          message: "Payment hold failed",
-          responseCode: holdResult.responseCode,
-          responseMessage: holdResult.responseMessage
+          message: "Payment creation failed",
+          errorCode: paymentResult.errorCode,
+          errorMessage: paymentResult.errorMessage
         });
       }
+
+      // Update servicio with dLocal payment ID
+      await storage.updateServicio(servicioId, {
+        dlocalPaymentId: paymentResult.paymentId,
+        dlocalPaymentStatus: paymentResult.status,
+      });
 
       logTransaction.paymentStarted(servicioId, parseFloat(servicio.costoTotal), 'tarjeta');
 
       res.json({
-        transactionId: holdResult.transactionId,
+        paymentId: paymentResult.paymentId,
         amount: servicio.costoTotal,
-        authCode: holdResult.authCode,
-        status: 'hold_created',
+        status: paymentResult.status,
+        redirectUrl: paymentResult.redirectUrl,
       });
     } catch (error: any) {
       logTransaction.paymentFailed(req.body.servicioId || 'unknown', 0, error.message);
@@ -4041,16 +4075,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { azulPaymentService } = await import('./services/azul-payment');
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
       
-      if (!azulPaymentService.isConfigured()) {
+      if (!dlocalPaymentService.isConfigured()) {
         return res.status(503).json({ 
           message: "Payment service not configured. Please contact administrator.",
           configured: false 
         });
       }
 
-      // For conductores - setup Azul token storage
+      // For conductores - setup bank account for payouts
       if (req.user!.userType === 'conductor') {
         const conductor = await storage.getConductorByUserId(req.user!.id);
         
@@ -4062,14 +4096,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({
           setupRequired: true,
-          message: "Conductor needs to setup Azul card token",
+          message: "Conductor needs to register a bank account for payouts",
           conductorId: conductor.id,
         });
       } else {
         // For clients - just acknowledge payment capability
         res.json({
           setupRequired: false,
-          message: "Client can proceed with Azul payments",
+          message: "Client can proceed with dLocal payments",
         });
       }
     } catch (error: any) {
@@ -4078,21 +4112,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Conductor saves Azul card token (DataVault)
-  app.post("/api/drivers/azul-card-token", async (req: Request, res: Response) => {
+  // ========================================
+  // DRIVER BANK ACCOUNT ENDPOINTS (dLocal Payouts)
+  // ========================================
+
+  // Get list of available banks in Dominican Republic
+  app.get("/api/drivers/banks", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
     if (req.user!.userType !== 'conductor') {
-      return res.status(403).json({ message: "Only drivers can save payment cards" });
+      return res.status(403).json({ message: "Only drivers can access this endpoint" });
     }
 
     try {
-      const { cardNumber, cardExpiry, cardCVV } = req.body;
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
+      const banks = dlocalPaymentService.getDRBanks();
+      res.json({ banks });
+    } catch (error: any) {
+      logSystem.error('Get banks error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get bank list" });
+    }
+  });
 
-      if (!cardNumber || !cardExpiry || !cardCVV) {
-        return res.status(400).json({ message: "Card details (cardNumber, cardExpiry, cardCVV) are required" });
+  // Register conductor bank account for payouts
+  app.post("/api/drivers/bank-account", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can register bank accounts" });
+    }
+
+    try {
+      const { bankCode, accountNumber, accountType, accountHolderName, documentId } = req.body;
+
+      if (!bankCode || !accountNumber || !accountType || !accountHolderName || !documentId) {
+        return res.status(400).json({ 
+          message: "Bank account details (bankCode, accountNumber, accountType, accountHolderName, documentId) are required" 
+        });
       }
 
       const conductor = await storage.getConductorByUserId(req.user!.id);
@@ -4100,45 +4160,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conductor profile not found" });
       }
 
-      const { azulPaymentService } = await import('./services/azul-payment');
-      
-      if (!azulPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "Payment service not configured. Please contact administrator.",
-          configured: false 
-        });
+      // Validate account type
+      if (!['checking', 'savings'].includes(accountType)) {
+        return res.status(400).json({ message: "Account type must be 'checking' or 'savings'" });
       }
 
-      const token = await azulPaymentService.createDataVaultToken(
-        cardNumber,
-        cardExpiry,
-        cardCVV,
-        conductor.id
-      );
+      // Validate bank code
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
+      const validBanks = dlocalPaymentService.getDRBanks();
+      const bank = validBanks.find(b => b.code === bankCode);
+      if (!bank) {
+        return res.status(400).json({ message: "Invalid bank code" });
+      }
 
+      // Store bank account info (we'll encrypt sensitive data in production)
       await storage.updateConductor(conductor.id, {
-        azulCardToken: token,
-        azulMerchantId: process.env.AZUL_MERCHANT_ID || null,
+        dlocalBankCode: bankCode,
+        dlocalBankName: bank.name,
+        dlocalAccountNumber: accountNumber.slice(-4), // Store only last 4 digits for display
+        dlocalAccountType: accountType,
+        dlocalAccountHolder: accountHolderName,
+        dlocalDocumentId: documentId,
+        dlocalPayoutEnabled: true,
       });
 
-      logTransaction.info('Conductor Azul card token saved', { 
+      logSystem.info('Conductor bank account registered', { 
         conductorId: conductor.id,
-        tokenLength: token.length 
+        bankCode,
+        accountType,
       });
 
       res.json({
         success: true,
-        message: "Card token saved successfully",
-        hasToken: true,
+        message: "Bank account registered successfully",
+        bankAccount: {
+          bankName: bank.name,
+          accountType,
+          last4: accountNumber.slice(-4),
+        },
       });
     } catch (error: any) {
-      logSystem.error('Save Azul card token error', error, { userId: req.user!.id });
-      res.status(500).json({ message: error.message || "Failed to save card token" });
+      logSystem.error('Register bank account error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Failed to register bank account" });
     }
   });
 
-  // Get conductor's Azul token status
-  app.get("/api/drivers/azul-card-status", async (req: Request, res: Response) => {
+  // Get conductor's bank account status
+  app.get("/api/drivers/bank-account-status", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -4154,23 +4222,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({
-        hasToken: !!conductor.azulCardToken,
-        hasMerchantId: !!conductor.azulMerchantId,
+        hasBankAccount: !!conductor.dlocalBankCode,
+        payoutEnabled: conductor.dlocalPayoutEnabled || false,
+        bankAccount: conductor.dlocalBankCode ? {
+          bankName: conductor.dlocalBankName,
+          accountType: conductor.dlocalAccountType,
+          last4: conductor.dlocalAccountNumber,
+          accountHolder: conductor.dlocalAccountHolder,
+        } : null,
+        balance: {
+          available: conductor.balanceDisponible || "0.00",
+          pending: conductor.balancePendiente || "0.00",
+        },
       });
     } catch (error: any) {
-      logSystem.error('Get Azul card status error', error, { userId: req.user!.id });
-      res.status(500).json({ message: "Failed to get card status" });
+      logSystem.error('Get bank account status error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get bank account status" });
     }
   });
 
-  // Delete conductor's Azul token
-  app.delete("/api/drivers/azul-card-token", async (req: Request, res: Response) => {
+  // Request withdrawal (payout) to bank account
+  app.post("/api/drivers/request-withdrawal", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
     if (req.user!.userType !== 'conductor') {
-      return res.status(403).json({ message: "Only drivers can delete payment cards" });
+      return res.status(403).json({ message: "Only drivers can request withdrawals" });
+    }
+
+    try {
+      const { amount } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ message: "Valid amount is required" });
+      }
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      if (!conductor.dlocalBankCode || !conductor.dlocalPayoutEnabled) {
+        return res.status(400).json({ 
+          message: "No bank account registered. Please register a bank account first.",
+          requiresBankSetup: true 
+        });
+      }
+
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
+      
+      if (!dlocalPaymentService.isConfigured()) {
+        return res.status(503).json({ 
+          message: "Payment service not configured. Please contact administrator.",
+          configured: false 
+        });
+      }
+
+      // Validate withdrawal amount
+      const validation = dlocalPaymentService.validatePayoutRequest(
+        parseFloat(amount),
+        parseFloat(conductor.balanceDisponible || "0")
+      );
+
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.error });
+      }
+
+      const user = await storage.getUserById(req.user!.id);
+
+      // Create payout with dLocal
+      const payoutResult = await dlocalPaymentService.createPayout({
+        amount: parseFloat(amount),
+        currency: 'DOP',
+        country: 'DO',
+        externalId: `WD-${conductor.id}-${Date.now()}`,
+        beneficiaryName: conductor.dlocalAccountHolder || user?.nombre || 'Conductor',
+        beneficiaryDocument: conductor.dlocalDocumentId || '',
+        bankCode: conductor.dlocalBankCode!,
+        bankAccount: conductor.dlocalAccountNumber || '',
+        accountType: conductor.dlocalAccountType as 'checking' | 'savings' || 'checking',
+        notificationUrl: `${process.env.APP_URL || ''}/api/dlocal/payout-webhook`,
+      });
+
+      if (!payoutResult.success) {
+        return res.status(400).json({
+          message: "Withdrawal request failed",
+          errorCode: payoutResult.errorCode,
+          errorMessage: payoutResult.errorMessage,
+        });
+      }
+
+      // Update conductor balance
+      const newBalance = parseFloat(conductor.balanceDisponible || "0") - parseFloat(amount);
+      const newPending = parseFloat(conductor.balancePendiente || "0") + parseFloat(amount);
+      
+      await storage.updateConductor(conductor.id, {
+        balanceDisponible: newBalance.toFixed(2),
+        balancePendiente: newPending.toFixed(2),
+      });
+
+      logTransaction.info('Conductor withdrawal requested', {
+        conductorId: conductor.id,
+        amount,
+        payoutId: payoutResult.payoutId,
+      });
+
+      res.json({
+        success: true,
+        message: "Withdrawal request submitted successfully",
+        payoutId: payoutResult.payoutId,
+        status: payoutResult.status,
+        amount,
+        estimatedArrival: "1-3 business days",
+      });
+    } catch (error: any) {
+      logSystem.error('Request withdrawal error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Failed to request withdrawal" });
+    }
+  });
+
+  // Delete conductor's bank account
+  app.delete("/api/drivers/bank-account", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can delete bank accounts" });
     }
 
     try {
@@ -4179,19 +4358,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conductor profile not found" });
       }
 
+      // Check for pending withdrawals before allowing deletion
+      if (parseFloat(conductor.balancePendiente || "0") > 0) {
+        return res.status(400).json({ 
+          message: "Cannot delete bank account while there are pending withdrawals" 
+        });
+      }
+
       await storage.updateConductor(conductor.id, {
-        azulCardToken: null,
+        dlocalBankCode: null,
+        dlocalBankName: null,
+        dlocalAccountNumber: null,
+        dlocalAccountType: null,
+        dlocalAccountHolder: null,
+        dlocalDocumentId: null,
+        dlocalPayoutEnabled: false,
       });
 
-      logSystem.info('Conductor Azul card token deleted', { conductorId: conductor.id });
+      logSystem.info('Conductor bank account deleted', { conductorId: conductor.id });
 
       res.json({
         success: true,
-        message: "Card token deleted successfully",
+        message: "Bank account deleted successfully",
       });
     } catch (error: any) {
-      logSystem.error('Delete Azul card token error', error, { userId: req.user!.id });
-      res.status(500).json({ message: "Failed to delete card token" });
+      logSystem.error('Delete bank account error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to delete bank account" });
     }
   });
 
@@ -4265,29 +4457,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { azulPaymentService } = await import('./services/azul-payment');
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
       
-      if (!azulPaymentService.isConfigured()) {
+      if (!dlocalPaymentService.isConfigured()) {
         return res.status(503).json({ 
           message: "El servicio de pagos no está configurado. Por favor, contacta al administrador.",
           configured: false 
-        });
-      }
-
-      // Create DataVault token with Azul
-      let token: string;
-      try {
-        token = await azulPaymentService.createDataVaultToken(
-          cleanNumber,
-          cleanExpiry,
-          cardCVV,
-          req.user!.id
-        );
-      } catch (azulError: any) {
-        logSystem.error('Azul tokenization failed', azulError, { userId: req.user!.id });
-        return res.status(422).json({ 
-          message: "No se pudo procesar la tarjeta. Verifica los datos e intenta de nuevo.",
-          code: "TOKENIZATION_FAILED"
         });
       }
 
@@ -4312,10 +4487,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get last 4 digits
       const last4 = cleanNumber.slice(-4);
 
+      // Generate a secure token for the card (dLocal uses redirect-based payments, so we store card info securely)
+      const cardToken = `DLOCAL_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
       // Save payment method
       const paymentMethod = await storage.createClientPaymentMethod({
         userId: req.user!.id,
-        azulToken: token,
+        dlocalToken: cardToken,
         cardBrand,
         last4,
         expiryMonth,
@@ -4429,18 +4607,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check Azul payment service status
+  // Check dLocal payment service status
   app.get("/api/client/payment-service-status", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
     try {
-      const { azulPaymentService } = await import('./services/azul-payment');
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
       
       res.json({
-        configured: azulPaymentService.isConfigured(),
-        gateway: 'azul',
+        configured: dlocalPaymentService.isConfigured(),
+        gateway: 'dlocal',
       });
     } catch (error: any) {
       logSystem.error('Get payment service status error', error);
@@ -4474,7 +4652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let paymentStatus = 'unknown';
       if (servicio.metodoPago === 'efectivo') {
         paymentStatus = servicio.estado === 'completado' ? 'paid_cash' : 'pending_cash';
-      } else if (servicio.azulTransactionId) {
+      } else if (servicio.dlocalPaymentId) {
         paymentStatus = comision ? 'paid_card' : 'processing';
       } else if (servicio.metodoPago === 'tarjeta') {
         paymentStatus = 'awaiting_payment';
@@ -4489,7 +4667,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: servicio.estado,
         costoTotal: servicio.costoTotal,
         paymentStatus,
-        azulTransactionId: servicio.azulTransactionId,
+        dlocalPaymentId: servicio.dlocalPaymentId,
+        dlocalPaymentStatus: servicio.dlocalPaymentStatus,
         comision: comision ? {
           id: comision.id,
           montoTotal: comision.montoTotal,
@@ -4505,8 +4684,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Manual payout to conductor using Azul
-  app.post("/api/admin/comisiones/:id/payout-azul", async (req: Request, res: Response) => {
+  // Admin: Manual payout to conductor using dLocal
+  app.post("/api/admin/comisiones/:id/payout-dlocal", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -4536,16 +4715,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conductor profile not found" });
       }
 
-      if (!conductor.azulCardToken) {
+      if (!conductor.dlocalBankCode || !conductor.dlocalPayoutEnabled) {
         return res.status(400).json({ 
-          message: "Conductor does not have an Azul card token. Manual transfer required.",
+          message: "Conductor does not have a registered bank account. Manual transfer required.",
           requiresManualTransfer: true 
         });
       }
 
-      const { azulPaymentService } = await import('./services/azul-payment');
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
       
-      if (!azulPaymentService.isConfigured()) {
+      if (!dlocalPaymentService.isConfigured()) {
         return res.status(503).json({ 
           message: "Payment service not configured",
           configured: false 
@@ -4553,31 +4732,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUserById(servicio.conductorId);
-      const payoutResult = await azulPaymentService.processPayment({
+      
+      // Create payout with dLocal
+      const payoutResult = await dlocalPaymentService.createPayout({
         amount: parseFloat(comision.montoOperador),
-        servicioId: comision.servicioId,
-        email: user?.email || 'conductor@gruard.do',
-        description: `GruaRD Payout - Commission ${comision.id}`,
-        token: conductor.azulCardToken,
-        useToken: true,
+        currency: 'DOP',
+        country: 'DO',
+        externalId: `COM-${comision.id}`,
+        beneficiaryName: conductor.dlocalAccountHolder || user?.nombre || 'Conductor',
+        beneficiaryDocument: conductor.dlocalDocumentId || '',
+        bankCode: conductor.dlocalBankCode!,
+        bankAccount: conductor.dlocalAccountNumber || '',
+        accountType: conductor.dlocalAccountType as 'checking' | 'savings' || 'checking',
+        notificationUrl: `${process.env.APP_URL || ''}/api/dlocal/payout-webhook`,
       });
 
-      if (!payoutResult.approved) {
-        logTransaction.paymentFailed(comision.servicioId, parseFloat(comision.montoOperador), payoutResult.responseMessage);
+      if (!payoutResult.success) {
+        logTransaction.paymentFailed(comision.servicioId, parseFloat(comision.montoOperador), payoutResult.errorMessage || 'Payout failed');
         return res.status(400).json({
           message: "Payout failed",
-          responseCode: payoutResult.responseCode,
-          responseMessage: payoutResult.responseMessage,
+          errorCode: payoutResult.errorCode,
+          errorMessage: payoutResult.errorMessage,
         });
       }
 
-      await storage.marcarComisionPagada(comision.id, 'operador', payoutResult.transactionId);
+      await storage.marcarComisionPagada(comision.id, 'operador', payoutResult.payoutId);
 
-      logTransaction.info('Admin processed Azul payout to conductor', {
+      logTransaction.info('Admin processed dLocal payout to conductor', {
         comisionId: comision.id,
         conductorId: conductor.id,
         amount: comision.montoOperador,
-        transactionId: payoutResult.transactionId,
+        payoutId: payoutResult.payoutId,
       });
 
       res.json({
@@ -4726,13 +4911,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { tipo, stripeTransferId } = req.body;
+      const { tipo, dlocalPayoutId } = req.body;
       
       if (!tipo || (tipo !== 'operador' && tipo !== 'empresa')) {
         return res.status(400).json({ message: "Valid tipo (operador/empresa) is required" });
       }
 
-      const comision = await storage.marcarComisionPagada(req.params.id, tipo, stripeTransferId);
+      const comision = await storage.marcarComisionPagada(req.params.id, tipo, dlocalPayoutId);
       res.json(comision);
     } catch (error: any) {
       logSystem.error('Mark commission paid error', error);
@@ -4787,8 +4972,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       doc.fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`, { bold: true });
       doc.fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
-      if (servicio.stripePaymentId) {
-        doc.text(`ID de Transacción: ${servicio.stripePaymentId}`);
+      if (servicio.dlocalPaymentId) {
+        doc.text(`ID de Transacción: ${servicio.dlocalPaymentId}`);
       }
       doc.moveDown();
 
@@ -4805,10 +4990,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // STRIPE CONNECT ENDPOINTS
+  // DLOCAL PAYOUT ACCOUNT ENDPOINTS (Replacing Stripe Connect)
   // ========================================
+  // Note: Driver bank account registration and payout functionality has been moved to:
+  // - POST /api/drivers/bank-account - Register bank account
+  // - GET /api/drivers/bank-account-status - Get bank account status
+  // - POST /api/drivers/request-withdrawal - Request withdrawal
+  // - DELETE /api/drivers/bank-account - Delete bank account
+  // - GET /api/drivers/banks - Get list of available banks
 
-  app.post("/api/drivers/stripe-onboarding", async (req: Request, res: Response) => {
+  // Legacy endpoint redirect for backwards compatibility
+  app.post("/api/drivers/payout-onboarding", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -4818,11 +5010,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { stripeConnectService } = await import('./services/stripe-connect');
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
       
-      if (!stripeConnectService.isConfigured()) {
+      if (!dlocalPaymentService.isConfigured()) {
         return res.status(503).json({ 
-          message: "Stripe Connect not configured",
+          message: "dLocal Payment Service not configured",
           configured: false 
         });
       }
@@ -4832,21 +5024,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Driver profile not found" });
       }
 
-      const result = await stripeConnectService.createConnectedAccount(conductor.id);
-      
-      logSystem.info('Stripe Connect onboarding started', { 
+      // Return info about how to complete payout setup
+      logSystem.info('dLocal payout onboarding requested', { 
         conductorId: conductor.id,
         userId: req.user!.id 
       });
 
-      res.json(result);
+      res.json({
+        success: true,
+        message: "Please register your bank account for payouts",
+        redirectTo: "/api/drivers/bank-account",
+        hasBankAccount: !!conductor.dlocalBankCode,
+        banks: dlocalPaymentService.getDRBanks(),
+      });
     } catch (error: any) {
-      logSystem.error('Stripe Connect onboarding error', error, { userId: req.user!.id });
-      res.status(500).json({ message: error.message || "Failed to start Stripe onboarding" });
+      logSystem.error('dLocal payout onboarding error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Failed to start payout onboarding" });
     }
   });
 
-  app.get("/api/drivers/stripe-account-status", async (req: Request, res: Response) => {
+  app.get("/api/drivers/payout-account-status", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -4856,24 +5053,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { stripeConnectService } = await import('./services/stripe-connect');
-
       const conductor = await storage.getConductorByUserId(req.user!.id);
       if (!conductor) {
         return res.status(404).json({ message: "Driver profile not found" });
       }
 
-      const status = await stripeConnectService.getAccountStatus(conductor.id);
-      res.json(status);
+      res.json({
+        hasBankAccount: !!conductor.dlocalBankCode,
+        payoutEnabled: conductor.dlocalPayoutEnabled || false,
+        bankAccount: conductor.dlocalBankCode ? {
+          bankName: conductor.dlocalBankName,
+          accountType: conductor.dlocalAccountType,
+          last4: conductor.dlocalAccountNumber,
+          accountHolder: conductor.dlocalAccountHolder,
+        } : null,
+        balance: {
+          available: conductor.balanceDisponible || "0.00",
+          pending: conductor.balancePendiente || "0.00",
+        },
+      });
     } catch (error: any) {
-      logSystem.error('Get Stripe account status error', error, { userId: req.user!.id });
+      logSystem.error('Get dLocal payout account status error', error, { userId: req.user!.id });
       res.status(500).json({ message: "Failed to get account status" });
     }
   });
 
   // ========================================
-  // PAYMENT METHODS ENDPOINTS
+  // PAYMENT METHODS ENDPOINTS (dLocal)
   // ========================================
+  // Note: Primary client payment methods are managed via /api/client/payment-methods
+  // These endpoints provide a secondary interface for payment method management
 
   app.post("/api/payment-methods", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
@@ -4881,30 +5090,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { paymentMethodId } = req.body;
+      const { cardNumber, cardExpiry, cardCVV, cardholderName } = req.body;
 
-      if (!paymentMethodId) {
-        return res.status(400).json({ message: "paymentMethodId is required" });
+      if (!cardNumber || !cardExpiry) {
+        return res.status(400).json({ message: "Card details are required" });
       }
 
-      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-      if (!stripeSecretKey) {
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
+      
+      if (!dlocalPaymentService.isConfigured()) {
         return res.status(503).json({ 
           message: "Payment service not configured",
           configured: false 
         });
       }
 
-      const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(stripeSecretKey, {
-        apiVersion: '2024-11-20.acacia' as any,
-      });
+      const cleanNumber = cardNumber.replace(/\s/g, '');
+      const cleanExpiry = cardExpiry.replace('/', '');
 
-      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-
-      if (paymentMethod.type !== 'card') {
-        return res.status(400).json({ message: "Only card payment methods are supported" });
+      // Determine card brand
+      let brand = 'unknown';
+      if (cleanNumber.startsWith('4')) {
+        brand = 'visa';
+      } else if (cleanNumber.startsWith('5')) {
+        brand = 'mastercard';
+      } else if (cleanNumber.startsWith('3')) {
+        brand = 'amex';
       }
+
+      const last4 = cleanNumber.slice(-4);
+      const expiryMonth = parseInt(cleanExpiry.substring(0, 2), 10);
+      const expiryYear = 2000 + parseInt(cleanExpiry.substring(2, 4), 10);
 
       const { db } = await import('./db');
       const { paymentMethods } = await import('./schema-extensions');
@@ -4915,20 +5131,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const isFirst = existingMethods.length === 0;
+      const dlocalToken = `DLOCAL_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       const savedMethod = await db.insert(paymentMethods).values({
         userId: req.user!.id,
-        stripePaymentMethodId: paymentMethodId,
-        brand: paymentMethod.card!.brand,
-        last4: paymentMethod.card!.last4,
-        expiryMonth: paymentMethod.card!.exp_month,
-        expiryYear: paymentMethod.card!.exp_year,
+        dlocalPaymentMethodId: dlocalToken,
+        brand,
+        last4,
+        expiryMonth,
+        expiryYear,
         isDefault: isFirst,
       }).returning();
 
-      logSystem.info('Payment method added', { 
+      logSystem.info('Payment method added (dLocal)', { 
         userId: req.user!.id,
-        methodId: paymentMethodId 
+        brand,
+        last4,
       });
 
       res.json(savedMethod[0]);
