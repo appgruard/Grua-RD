@@ -1,21 +1,21 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.gruard.app',
+  appId: 'com.fouronesolutions.gruard',
   appName: 'Grúa RD',
   webDir: 'dist/public',
-  bundledWebRuntime: false,
   
   server: {
     androidScheme: 'https',
     hostname: 'gruard.app',
-    iosScheme: 'ionic',
+    iosScheme: 'capacitor',
     
     allowNavigation: [
       'gruard.com',
       '*.gruard.com',
-      'maps.googleapis.com',
-      '*.googleapis.com',
+      'api.mapbox.com',
+      '*.tiles.mapbox.com',
+      'events.mapbox.com',
       'fonts.googleapis.com',
       'fonts.gstatic.com'
     ]
@@ -41,6 +41,24 @@ const config: CapacitorConfig = {
     },
 
     Geolocation: {
+      permissions: {
+        android: {
+          enableHighAccuracy: true
+        },
+        ios: {
+          enableHighAccuracy: true
+        }
+      }
+    },
+
+    Camera: {
+      promptLabelHeader: 'Grúa RD - Cámara',
+      promptLabelCancel: 'Cancelar',
+      promptLabelPhoto: 'Galería',
+      promptLabelPicture: 'Tomar Foto'
+    },
+
+    Filesystem: {
     },
 
     Network: {
@@ -67,7 +85,8 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'automatic',
     scrollEnabled: true,
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
+    preferredContentMode: 'mobile'
   }
 };
 

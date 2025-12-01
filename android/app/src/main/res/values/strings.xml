@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Grúa RD</string>
+    <string name="title_activity_main">Grúa RD</string>
+    <string name="package_name">com.fouronesolutions.gruard</string>
+    <string name="custom_url_scheme">com.fouronesolutions.gruard</string>
+</resources>
