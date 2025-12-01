@@ -13,8 +13,8 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema, insertCalificacionSchema } from "@shared/schema";
-import type { User, Servicio } from "@shared/schema";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema, insertCalificacionSchema, insertEmpresaSchema, insertEmpresaEmpleadoSchema, insertEmpresaContratoSchema, insertEmpresaTarifaSchema, insertEmpresaProyectoSchema, insertEmpresaConductorAsignadoSchema, insertServicioProgramadoSchema, insertEmpresaFacturaSchema, insertEmpresaFacturaItemSchema } from "@shared/schema";
+import type { User, Servicio, Empresa } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
 import { uploadDocument, getDocument, isStorageInitialized } from "./services/object-storage";
@@ -118,6 +118,78 @@ const calcularDistribucionSchema = z.object({
 const marcarPagadaSchema = z.object({
   metodoPago: z.string().min(1, "Método de pago es requerido"),
   referenciaTransaccion: z.string().min(1, "Referencia de transacción es requerida"),
+});
+
+// Zod validation schemas for empresas (Module 6)
+const createEmpresaAdminSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  nombre: z.string().min(1, "Nombre del representante es requerido"),
+  apellido: z.string().min(1, "Apellido del representante es requerido").optional().default(""),
+  phone: z.string().optional().nullable(),
+  nombreEmpresa: z.string().min(1, "Nombre de empresa es requerido"),
+  rnc: z.string().min(9, "RNC debe tener al menos 9 caracteres"),
+  tipoEmpresa: z.enum([
+    "constructora", "ferreteria", "logistica", "turistica",
+    "ayuntamiento", "zona_franca", "industria", "rent_car",
+    "maquinaria_pesada", "otro"
+  ]),
+  direccion: z.string().optional().nullable(),
+  telefono: z.string().optional().nullable(),
+  emailContacto: z.string().email("Email de contacto inválido").optional().nullable(),
+  personaContacto: z.string().optional().nullable(),
+  limiteCredito: z.string().optional().nullable(),
+  diasCredito: z.number().optional().nullable(),
+  descuentoVolumen: z.string().optional().nullable(),
+});
+
+const updateEmpresaPerfilSchema = z.object({
+  nombreEmpresa: z.string().min(1, "Nombre de empresa es requerido").optional(),
+  direccion: z.string().optional().nullable(),
+  telefono: z.string().optional().nullable(),
+  emailContacto: z.string().email("Email de contacto inválido").optional().nullable(),
+  personaContacto: z.string().optional().nullable(),
+});
+
+const updateEmpresaAdminSchema = z.object({
+  nombreEmpresa: z.string().min(1, "Nombre de empresa es requerido").optional(),
+  rnc: z.string().min(9, "RNC debe tener al menos 9 caracteres").optional(),
+  tipoEmpresa: z.enum([
+    "constructora", "ferreteria", "logistica", "turistica",
+    "ayuntamiento", "zona_franca", "industria", "rent_car",
+    "maquinaria_pesada", "otro"
+  ]).optional(),
+  direccion: z.string().optional().nullable(),
+  telefono: z.string().optional().nullable(),
+  emailContacto: z.string().email("Email de contacto inválido").optional().nullable(),
+  personaContacto: z.string().optional().nullable(),
+  limiteCredito: z.string().optional().nullable(),
+  diasCredito: z.number().optional().nullable(),
+  descuentoVolumen: z.string().optional().nullable(),
+  notas: z.string().optional().nullable(),
+});
+
+const createServicioProgramadoRequestSchema = z.object({
+  proyectoId: z.string().optional().nullable(),
+  contratoId: z.string().optional().nullable(),
+  fechaProgramada: z.string().min(1, "Fecha programada es requerida"),
+  horaInicio: z.string().min(1, "Hora de inicio es requerida"),
+  horaFin: z.string().optional().nullable(),
+  origenLat: z.string().min(1, "Latitud de origen es requerida"),
+  origenLng: z.string().min(1, "Longitud de origen es requerida"),
+  origenDireccion: z.string().min(1, "Dirección de origen es requerida"),
+  destinoLat: z.string().optional().nullable(),
+  destinoLng: z.string().optional().nullable(),
+  destinoDireccion: z.string().optional().nullable(),
+  servicioCategoria: z.enum([
+    "remolque_estandar", "auxilio_vial", "remolque_especializado",
+    "camiones_pesados", "izaje_construccion", "remolque_recreativo"
+  ]).optional(),
+  servicioSubtipo: z.string().optional().nullable(),
+  descripcion: z.string().optional().nullable(),
+  recurrente: z.boolean().optional(),
+  frecuenciaRecurrencia: z.string().optional().nullable(),
+  notasInternas: z.string().optional().nullable(),
 });
 
 const MAPBOX_ACCESS_TOKEN = process.env.MAPBOX_ACCESS_TOKEN;
@@ -7006,6 +7078,883 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error al obtener distribución" });
     }
   });
+
+  // ==================== EMPRESAS / CONTRATOS EMPRESARIALES (MODULE 6) ====================
+
+  // Get empresa profile for logged-in empresa user
+  app.get("/api/empresa/profile", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+      res.json(empresa);
+    } catch (error: any) {
+      logSystem.error('Get empresa profile error', error);
+      res.status(500).json({ message: "Error al obtener perfil de empresa" });
+    }
+  });
+
+  // Update empresa profile
+  app.put("/api/empresa/profile", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const parsed = updateEmpresaPerfilSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Datos inválidos", errors: parsed.error.errors });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const updated = await storage.updateEmpresa(empresa.id, parsed.data);
+      logSystem.info('Empresa profile updated', { empresaId: empresa.id, updatedBy: req.user!.id });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Update empresa profile error', error);
+      res.status(500).json({ message: "Error al actualizar perfil de empresa" });
+    }
+  });
+
+  // Get empresa dashboard stats
+  app.get("/api/empresa/dashboard", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const stats = await storage.getEmpresaDashboardStats(empresa.id);
+      const contratoActivo = await storage.getEmpresaContratoActivo(empresa.id);
+      const facturasRecientes = await storage.getEmpresaFacturas(empresa.id);
+      const serviciosRecientes = await storage.getEmpresaServiciosHistory(empresa.id, 10);
+
+      res.json({
+        ...stats,
+        contratoActivo,
+        facturasRecientes: facturasRecientes.slice(0, 5),
+        serviciosRecientes,
+        empresa: {
+          id: empresa.id,
+          nombreEmpresa: empresa.nombreEmpresa,
+          limiteCredito: empresa.limiteCredito,
+          verificado: empresa.verificado,
+        },
+      });
+    } catch (error: any) {
+      logSystem.error('Get empresa dashboard error', error);
+      res.status(500).json({ message: "Error al obtener dashboard" });
+    }
+  });
+
+  // Get empresa employees
+  app.get("/api/empresa/empleados", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const empleados = await storage.getEmpresaEmpleados(empresa.id);
+      res.json(empleados);
+    } catch (error: any) {
+      logSystem.error('Get empresa empleados error', error);
+      res.status(500).json({ message: "Error al obtener empleados" });
+    }
+  });
+
+  // Add empresa employee
+  app.post("/api/empresa/empleados", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const { email, rol, departamento, puedeCrearServicios, puedeProgramarServicios, puedeVerFacturas, puedeGestionarEmpleados } = req.body;
+      
+      const existingUser = await storage.getUserByEmail(email);
+      if (!existingUser) {
+        return res.status(404).json({ message: "Usuario no encontrado con ese email" });
+      }
+
+      const empleado = await storage.addEmpresaEmpleado({
+        empresaId: empresa.id,
+        userId: existingUser.id,
+        rol: rol || 'empleado',
+        departamento,
+        puedeCrearServicios: puedeCrearServicios ?? true,
+        puedeProgramarServicios: puedeProgramarServicios ?? true,
+        puedeVerFacturas: puedeVerFacturas ?? false,
+        puedeGestionarEmpleados: puedeGestionarEmpleados ?? false,
+      });
+
+      logSystem.info('Empresa employee added', { empresaId: empresa.id, empleadoId: empleado.id });
+      res.status(201).json(empleado);
+    } catch (error: any) {
+      logSystem.error('Add empresa employee error', error);
+      res.status(500).json({ message: "Error al agregar empleado" });
+    }
+  });
+
+  // Update empresa employee
+  app.put("/api/empresa/empleados/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const empleado = await storage.updateEmpresaEmpleado(req.params.id, req.body);
+      logSystem.info('Empresa employee updated', { empleadoId: req.params.id });
+      res.json(empleado);
+    } catch (error: any) {
+      logSystem.error('Update empresa employee error', error);
+      res.status(500).json({ message: "Error al actualizar empleado" });
+    }
+  });
+
+  // Remove empresa employee
+  app.delete("/api/empresa/empleados/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      await storage.removeEmpresaEmpleado(req.params.id);
+      logSystem.info('Empresa employee removed', { empleadoId: req.params.id });
+      res.json({ message: "Empleado eliminado" });
+    } catch (error: any) {
+      logSystem.error('Remove empresa employee error', error);
+      res.status(500).json({ message: "Error al eliminar empleado" });
+    }
+  });
+
+  // Get empresa contracts
+  app.get("/api/empresa/contratos", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const contratos = await storage.getEmpresaContratos(empresa.id);
+      res.json(contratos);
+    } catch (error: any) {
+      logSystem.error('Get empresa contratos error', error);
+      res.status(500).json({ message: "Error al obtener contratos" });
+    }
+  });
+
+  // Get empresa projects
+  app.get("/api/empresa/proyectos", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const proyectos = await storage.getEmpresaProyectos(empresa.id);
+      res.json(proyectos);
+    } catch (error: any) {
+      logSystem.error('Get empresa proyectos error', error);
+      res.status(500).json({ message: "Error al obtener proyectos" });
+    }
+  });
+
+  // Create empresa project
+  app.post("/api/empresa/proyectos", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const proyecto = await storage.createEmpresaProyecto({
+        empresaId: empresa.id,
+        ...req.body,
+      });
+
+      logSystem.info('Empresa project created', { proyectoId: proyecto.id, empresaId: empresa.id });
+      res.status(201).json(proyecto);
+    } catch (error: any) {
+      logSystem.error('Create empresa project error', error);
+      res.status(500).json({ message: "Error al crear proyecto" });
+    }
+  });
+
+  // Update empresa project
+  app.put("/api/empresa/proyectos/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const proyecto = await storage.updateEmpresaProyecto(req.params.id, req.body);
+      logSystem.info('Empresa project updated', { proyectoId: req.params.id });
+      res.json(proyecto);
+    } catch (error: any) {
+      logSystem.error('Update empresa project error', error);
+      res.status(500).json({ message: "Error al actualizar proyecto" });
+    }
+  });
+
+  // Get project by ID
+  app.get("/api/empresa/proyectos/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const proyecto = await storage.getEmpresaProyectoById(req.params.id);
+      if (!proyecto) {
+        return res.status(404).json({ message: "Proyecto no encontrado" });
+      }
+      res.json(proyecto);
+    } catch (error: any) {
+      logSystem.error('Get empresa project error', error);
+      res.status(500).json({ message: "Error al obtener proyecto" });
+    }
+  });
+
+  // Get empresa scheduled services
+  app.get("/api/empresa/solicitudes", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const servicios = await storage.getServiciosProgramadosEmpresa(empresa.id);
+      res.json(servicios);
+    } catch (error: any) {
+      logSystem.error('Get empresa solicitudes error', error);
+      res.status(500).json({ message: "Error al obtener solicitudes programadas" });
+    }
+  });
+
+  // Create scheduled service request
+  app.post("/api/empresa/solicitudes", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const parsed = createServicioProgramadoRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Datos inválidos", errors: parsed.error.errors });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      if (!empresa.verificado) {
+        return res.status(403).json({ message: "Su empresa debe estar verificada para programar servicios" });
+      }
+
+      const servicio = await storage.createServicioProgramado({
+        empresaId: empresa.id,
+        solicitadoPor: req.user!.id,
+        fechaProgramada: new Date(parsed.data.fechaProgramada),
+        horaInicio: parsed.data.horaInicio,
+        horaFin: parsed.data.horaFin || null,
+        origenLat: parsed.data.origenLat,
+        origenLng: parsed.data.origenLng,
+        origenDireccion: parsed.data.origenDireccion,
+        destinoLat: parsed.data.destinoLat || null,
+        destinoLng: parsed.data.destinoLng || null,
+        destinoDireccion: parsed.data.destinoDireccion || null,
+        proyectoId: parsed.data.proyectoId || null,
+        contratoId: parsed.data.contratoId || null,
+        servicioCategoria: parsed.data.servicioCategoria as any || 'remolque_estandar',
+        servicioSubtipo: parsed.data.servicioSubtipo as any || null,
+        descripcion: parsed.data.descripcion || null,
+        recurrente: parsed.data.recurrente ?? false,
+        frecuenciaRecurrencia: parsed.data.frecuenciaRecurrencia || null,
+        notasInternas: parsed.data.notasInternas || null,
+      });
+
+      logSystem.info('Scheduled service created', { servicioId: servicio.id, empresaId: empresa.id });
+      res.status(201).json(servicio);
+    } catch (error: any) {
+      logSystem.error('Create scheduled service error', error);
+      res.status(500).json({ message: "Error al crear solicitud programada" });
+    }
+  });
+
+  // Update scheduled service
+  app.put("/api/empresa/solicitudes/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const servicio = await storage.updateServicioProgramado(req.params.id, req.body);
+      logSystem.info('Scheduled service updated', { servicioId: req.params.id });
+      res.json(servicio);
+    } catch (error: any) {
+      logSystem.error('Update scheduled service error', error);
+      res.status(500).json({ message: "Error al actualizar solicitud programada" });
+    }
+  });
+
+  // Cancel scheduled service
+  app.put("/api/empresa/solicitudes/:id/cancelar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const servicio = await storage.updateServicioProgramado(req.params.id, { 
+        estado: 'cancelado' as any,
+      });
+      logSystem.info('Scheduled service cancelled', { servicioId: req.params.id });
+      res.json(servicio);
+    } catch (error: any) {
+      logSystem.error('Cancel scheduled service error', error);
+      res.status(500).json({ message: "Error al cancelar solicitud programada" });
+    }
+  });
+
+  // Get empresa special pricing
+  app.get("/api/empresa/tarifas", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const tarifas = await storage.getEmpresaTarifas(empresa.id);
+      res.json(tarifas);
+    } catch (error: any) {
+      logSystem.error('Get empresa tarifas error', error);
+      res.status(500).json({ message: "Error al obtener tarifas especiales" });
+    }
+  });
+
+  // Get empresa assigned drivers
+  app.get("/api/empresa/conductores", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const conductores = await storage.getConductoresAsignadosEmpresa(empresa.id);
+      res.json(conductores);
+    } catch (error: any) {
+      logSystem.error('Get empresa conductores error', error);
+      res.status(500).json({ message: "Error al obtener conductores asignados" });
+    }
+  });
+
+  // Get empresa invoices
+  app.get("/api/empresa/facturas", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const facturas = await storage.getEmpresaFacturas(empresa.id);
+      res.json(facturas);
+    } catch (error: any) {
+      logSystem.error('Get empresa facturas error', error);
+      res.status(500).json({ message: "Error al obtener facturas" });
+    }
+  });
+
+  // Get specific invoice
+  app.get("/api/empresa/facturas/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const factura = await storage.getEmpresaFacturaById(req.params.id);
+      if (!factura) {
+        return res.status(404).json({ message: "Factura no encontrada" });
+      }
+      res.json(factura);
+    } catch (error: any) {
+      logSystem.error('Get empresa factura error', error);
+      res.status(500).json({ message: "Error al obtener factura" });
+    }
+  });
+
+  // Get empresa service history
+  app.get("/api/empresa/historial", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'empresa') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaByUserId(req.user!.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const historial = await storage.getEmpresaServiciosHistory(empresa.id, limit);
+      res.json(historial);
+    } catch (error: any) {
+      logSystem.error('Get empresa historial error', error);
+      res.status(500).json({ message: "Error al obtener historial de servicios" });
+    }
+  });
+
+  // ==================== ADMIN: EMPRESA MANAGEMENT ====================
+
+  // Get all empresas (admin only)
+  app.get("/api/admin/empresas", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const { tipo, verificado } = req.query;
+      let empresas;
+      
+      if (tipo && typeof tipo === 'string') {
+        empresas = await storage.getEmpresasByTipo(tipo);
+      } else {
+        empresas = await storage.getAllEmpresas();
+      }
+
+      if (verificado !== undefined) {
+        const isVerificado = verificado === 'true';
+        empresas = empresas.filter(e => e.verificado === isVerificado);
+      }
+
+      res.json(empresas);
+    } catch (error: any) {
+      logSystem.error('Get all empresas error', error);
+      res.status(500).json({ message: "Error al obtener empresas" });
+    }
+  });
+
+  // Get empresa by ID (admin only)
+  app.get("/api/admin/empresas/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaById(req.params.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+      res.json(empresa);
+    } catch (error: any) {
+      logSystem.error('Get empresa by id error', error);
+      res.status(500).json({ message: "Error al obtener empresa" });
+    }
+  });
+
+  // Create new empresa (admin only)
+  app.post("/api/admin/empresas", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const parsed = createEmpresaAdminSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Datos inválidos", errors: parsed.error.errors });
+    }
+
+    try {
+      const existingUser = await storage.getUserByEmail(parsed.data.email);
+      if (existingUser) {
+        return res.status(409).json({ message: "Ya existe un usuario con ese email" });
+      }
+
+      const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+      const user = await storage.createUser({
+        email: parsed.data.email,
+        passwordHash,
+        nombre: parsed.data.nombre,
+        apellido: parsed.data.apellido || "",
+        phone: parsed.data.phone || null,
+        userType: 'empresa',
+        estadoCuenta: 'activo',
+      });
+
+      const empresa = await storage.createEmpresa({
+        userId: user.id,
+        nombreEmpresa: parsed.data.nombreEmpresa,
+        rnc: parsed.data.rnc,
+        tipoEmpresa: parsed.data.tipoEmpresa as any,
+        direccion: parsed.data.direccion || null,
+        telefono: parsed.data.telefono || null,
+        emailContacto: parsed.data.emailContacto || null,
+        personaContacto: parsed.data.personaContacto || null,
+        limiteCredito: parsed.data.limiteCredito || "0.00",
+        diasCredito: parsed.data.diasCredito || 30,
+        descuentoVolumen: parsed.data.descuentoVolumen || "0.00",
+      });
+
+      logSystem.info('Empresa created by admin', { empresaId: empresa.id, createdBy: req.user!.id });
+      res.status(201).json({ user, empresa });
+    } catch (error: any) {
+      logSystem.error('Create empresa error', error);
+      if (error.code === '23505' && error.constraint?.includes('rnc')) {
+        return res.status(409).json({ message: "Ya existe una empresa con ese RNC" });
+      }
+      res.status(500).json({ message: "Error al crear empresa" });
+    }
+  });
+
+  // Update empresa (admin only)
+  app.put("/api/admin/empresas/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const parsed = updateEmpresaAdminSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Datos inválidos", errors: parsed.error.errors });
+    }
+
+    try {
+      const empresa = await storage.updateEmpresa(req.params.id, parsed.data as any);
+      logSystem.info('Empresa updated by admin', { empresaId: empresa.id, updatedBy: req.user!.id });
+      res.json(empresa);
+    } catch (error: any) {
+      logSystem.error('Update empresa error', error);
+      res.status(500).json({ message: "Error al actualizar empresa" });
+    }
+  });
+
+  // Verify empresa (admin only)
+  app.put("/api/admin/empresas/:id/verificar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.updateEmpresa(req.params.id, {
+        verificado: true,
+        verificadoPor: req.user!.id,
+        fechaVerificacion: new Date(),
+      });
+      logSystem.info('Empresa verified', { empresaId: empresa.id, verifiedBy: req.user!.id });
+      res.json(empresa);
+    } catch (error: any) {
+      logSystem.error('Verify empresa error', error);
+      res.status(500).json({ message: "Error al verificar empresa" });
+    }
+  });
+
+  // Toggle empresa active status (admin only)
+  app.put("/api/admin/empresas/:id/toggle-activo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaById(req.params.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const updated = await storage.updateEmpresa(req.params.id, { activo: !empresa.activo });
+      logSystem.info('Empresa status toggled', { empresaId: updated.id, activo: updated.activo });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Toggle empresa status error', error);
+      res.status(500).json({ message: "Error al cambiar estado de empresa" });
+    }
+  });
+
+  // Create empresa contract (admin only)
+  app.post("/api/admin/empresas/:id/contratos", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaById(req.params.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const contrato = await storage.createEmpresaContrato({
+        empresaId: empresa.id,
+        numeroContrato: req.body.numeroContrato,
+        tipoContrato: req.body.tipoContrato,
+        fechaInicio: new Date(req.body.fechaInicio),
+        fechaFin: req.body.fechaFin ? new Date(req.body.fechaFin) : null,
+        horasContratadas: req.body.horasContratadas || null,
+        serviciosContratados: req.body.serviciosContratados || null,
+        tarifaHora: req.body.tarifaHora || null,
+        tarifaDia: req.body.tarifaDia || null,
+        tarifaServicio: req.body.tarifaServicio || null,
+        descuentoPorcentaje: req.body.descuentoPorcentaje || "0.00",
+        montoMensualMinimo: req.body.montoMensualMinimo || null,
+        notas: req.body.notas || null,
+      });
+
+      logSystem.info('Empresa contract created', { contratoId: contrato.id, empresaId: empresa.id });
+      res.status(201).json(contrato);
+    } catch (error: any) {
+      logSystem.error('Create empresa contract error', error);
+      res.status(500).json({ message: "Error al crear contrato" });
+    }
+  });
+
+  // Create special pricing for empresa (admin only)
+  app.post("/api/admin/empresas/:id/tarifas", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaById(req.params.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const tarifa = await storage.createEmpresaTarifa({
+        empresaId: empresa.id,
+        servicioCategoria: req.body.servicioCategoria || null,
+        precioBase: req.body.precioBase,
+        tarifaPorKm: req.body.tarifaPorKm,
+        descuentoPorcentaje: req.body.descuentoPorcentaje || "0.00",
+        minimoServicios: req.body.minimoServicios || 1,
+      });
+
+      logSystem.info('Empresa tarifa created', { tarifaId: tarifa.id, empresaId: empresa.id });
+      res.status(201).json(tarifa);
+    } catch (error: any) {
+      logSystem.error('Create empresa tarifa error', error);
+      res.status(500).json({ message: "Error al crear tarifa especial" });
+    }
+  });
+
+  // Assign driver to empresa (admin only)
+  app.post("/api/admin/empresas/:id/conductores", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaById(req.params.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const asignacion = await storage.asignarConductorEmpresa({
+        empresaId: empresa.id,
+        conductorId: req.body.conductorId,
+        esPrioridad: req.body.esPrioridad ?? false,
+        notas: req.body.notas || null,
+      });
+
+      logSystem.info('Driver assigned to empresa', { empresaId: empresa.id, conductorId: req.body.conductorId });
+      res.status(201).json(asignacion);
+    } catch (error: any) {
+      logSystem.error('Assign driver to empresa error', error);
+      res.status(500).json({ message: "Error al asignar conductor" });
+    }
+  });
+
+  // Remove driver assignment (admin only)
+  app.delete("/api/admin/empresas/:empresaId/conductores/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      await storage.removeAsignacionConductor(req.params.id);
+      logSystem.info('Driver unassigned from empresa', { asignacionId: req.params.id });
+      res.json({ message: "Conductor desasignado" });
+    } catch (error: any) {
+      logSystem.error('Remove driver assignment error', error);
+      res.status(500).json({ message: "Error al desasignar conductor" });
+    }
+  });
+
+  // Generate monthly invoice for empresa (admin only)
+  app.post("/api/admin/empresas/:id/facturas/generar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresa = await storage.getEmpresaById(req.params.id);
+      if (!empresa) {
+        return res.status(404).json({ message: "Empresa no encontrada" });
+      }
+
+      const { periodo } = req.body;
+      if (!periodo || !/^\d{4}-\d{2}$/.test(periodo)) {
+        return res.status(400).json({ message: "Formato de período inválido (YYYY-MM)" });
+      }
+
+      const servicios = await storage.getServiciosProgramadosEmpresa(empresa.id);
+      const serviciosPeriodo = servicios.filter(s => {
+        const fecha = new Date(s.fechaProgramada);
+        const mes = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+        return mes === periodo && s.estado === 'ejecutado';
+      });
+
+      if (serviciosPeriodo.length === 0) {
+        return res.status(400).json({ message: "No hay servicios completados para facturar en este período" });
+      }
+
+      const numeroFactura = `FAC-${empresa.id.substring(0, 8).toUpperCase()}-${periodo.replace('-', '')}`;
+      const subtotal = serviciosPeriodo.length * 1500;
+      const descuento = parseFloat(empresa.descuentoVolumen || '0') * subtotal / 100;
+      const itbis = (subtotal - descuento) * 0.18;
+      const total = subtotal - descuento + itbis;
+
+      const fechaVencimiento = new Date();
+      fechaVencimiento.setDate(fechaVencimiento.getDate() + (empresa.diasCredito || 30));
+
+      const factura = await storage.createEmpresaFactura({
+        empresaId: empresa.id,
+        numeroFactura,
+        periodo,
+        fechaVencimiento,
+        totalServicios: serviciosPeriodo.length,
+        subtotal: subtotal.toFixed(2),
+        descuento: descuento.toFixed(2),
+        itbis: itbis.toFixed(2),
+        total: total.toFixed(2),
+      });
+
+      for (const servicio of serviciosPeriodo) {
+        await storage.createEmpresaFacturaItem({
+          facturaId: factura.id,
+          servicioId: servicio.servicioCreado || null,
+          proyectoId: servicio.proyectoId || null,
+          descripcion: `Servicio ${servicio.servicioCategoria} - ${servicio.origenDireccion}`,
+          cantidad: 1,
+          precioUnitario: "1500.00",
+          descuento: "0.00",
+          subtotal: "1500.00",
+        });
+      }
+
+      logSystem.info('Invoice generated', { facturaId: factura.id, empresaId: empresa.id, periodo });
+      res.status(201).json(factura);
+    } catch (error: any) {
+      logSystem.error('Generate invoice error', error);
+      if (error.code === '23505') {
+        return res.status(409).json({ message: "Ya existe una factura para este período" });
+      }
+      res.status(500).json({ message: "Error al generar factura" });
+    }
+  });
+
+  // Mark invoice as paid (admin only)
+  app.put("/api/admin/facturas/:id/pagar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const { metodoPago, referenciaTransaccion } = req.body;
+      
+      const factura = await storage.updateEmpresaFactura(req.params.id, {
+        estado: 'pagado' as any,
+        fechaPago: new Date(),
+        metodoPago,
+        referenciaTransaccion,
+      });
+
+      logSystem.info('Invoice marked as paid', { facturaId: req.params.id });
+      res.json(factura);
+    } catch (error: any) {
+      logSystem.error('Mark invoice paid error', error);
+      res.status(500).json({ message: "Error al marcar factura como pagada" });
+    }
+  });
+
+  // Get empresa stats for admin dashboard
+  app.get("/api/admin/empresas-stats", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const empresas = await storage.getAllEmpresas();
+      const stats = {
+        totalEmpresas: empresas.length,
+        empresasVerificadas: empresas.filter(e => e.verificado).length,
+        empresasPendientes: empresas.filter(e => !e.verificado).length,
+        empresasActivas: empresas.filter(e => e.activo).length,
+        porTipo: {} as Record<string, number>,
+      };
+
+      for (const empresa of empresas) {
+        const tipo = empresa.tipoEmpresa || 'otro';
+        stats.porTipo[tipo] = (stats.porTipo[tipo] || 0) + 1;
+      }
+
+      res.json(stats);
+    } catch (error: any) {
+      logSystem.error('Get empresas stats error', error);
+      res.status(500).json({ message: "Error al obtener estadísticas de empresas" });
+    }
+  });
+
+  // ==================== END EMPRESAS / CONTRATOS EMPRESARIALES ====================
 
   initServiceAutoCancellation(serviceSessions);
   logSystem.info(`Service auto-cancellation initialized (timeout: ${SERVICE_TIMEOUT_MINUTES} minutes)`);

@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
+import { EmpresaLayout } from '@/components/layout/EmpresaLayout';
 import { InstallPWA, UpdateAvailable, OfflineIndicator } from '@/components/InstallPWA';
 import { ThemeProvider } from '@/components/ThemeToggle';
 import { initializePreloading, preloadDriverModules } from '@/lib/preload';
@@ -41,8 +42,19 @@ const AdminInsurance = lazy(() => import('@/pages/admin/insurance'));
 const AdminAseguradoras = lazy(() => import('@/pages/admin/aseguradoras'));
 const AdminTickets = lazy(() => import('@/pages/admin/tickets'));
 const AdminSocios = lazy(() => import('@/pages/admin/socios'));
+const AdminEmpresas = lazy(() => import('@/pages/admin/empresas'));
 
 const SocioDashboard = lazy(() => import('@/pages/socio/dashboard'));
+
+const EmpresaDashboard = lazy(() => import('@/pages/empresa/dashboard'));
+const EmpresaSolicitudes = lazy(() => import('@/pages/empresa/solicitudes'));
+const EmpresaHistorial = lazy(() => import('@/pages/empresa/historial'));
+const EmpresaProyectos = lazy(() => import('@/pages/empresa/proyectos'));
+const EmpresaContratos = lazy(() => import('@/pages/empresa/contratos'));
+const EmpresaEmpleados = lazy(() => import('@/pages/empresa/empleados'));
+const EmpresaConductores = lazy(() => import('@/pages/empresa/conductores'));
+const EmpresaFacturacion = lazy(() => import('@/pages/empresa/facturacion'));
+const EmpresaPerfil = lazy(() => import('@/pages/empresa/perfil'));
 
 const SupportPage = lazy(() => import('@/pages/support'));
 
@@ -273,6 +285,13 @@ function Router() {
           </AdminLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/admin/empresas">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminEmpresas />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/admin">
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
@@ -287,6 +306,71 @@ function Router() {
           <MobileLayout userType="socio">
             <SocioDashboard />
           </MobileLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Empresa Routes */}
+      <Route path="/empresa/solicitudes">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaSolicitudes />
+          </EmpresaLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/empresa/historial">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaHistorial />
+          </EmpresaLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/empresa/proyectos">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaProyectos />
+          </EmpresaLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/empresa/contratos">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaContratos />
+          </EmpresaLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/empresa/empleados">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaEmpleados />
+          </EmpresaLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/empresa/conductores">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaConductores />
+          </EmpresaLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/empresa/facturacion">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaFacturacion />
+          </EmpresaLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/empresa/perfil">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaPerfil />
+          </EmpresaLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/empresa">
+        <ProtectedRoute allowedTypes={['empresa']}>
+          <EmpresaLayout>
+            <EmpresaDashboard />
+          </EmpresaLayout>
         </ProtectedRoute>
       </Route>
 
@@ -337,6 +421,8 @@ function Router() {
             <Redirect to="/aseguradora" />
           ) : user.userType === 'socio' ? (
             <Redirect to="/socio" />
+          ) : user.userType === 'empresa' ? (
+            <Redirect to="/empresa" />
           ) : (
             <Redirect to="/client" />
           )
