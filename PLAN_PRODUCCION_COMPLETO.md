@@ -278,5 +278,142 @@ Después de una revisión exhaustiva de toda la aplicación Grúa RD, se han ide
 
 ---
 
+## 9. Integración de Capacitor para Apps Móviles Nativas
+
+### 9.1 Objetivo
+Convertir la PWA en aplicaciones móviles nativas para iOS y Android usando Capacitor, manteniendo la funcionalidad PWA intacta.
+
+### 9.2 Configuración Base
+
+| Elemento | Valor |
+|----------|-------|
+| App ID | `com.fouronesolutions.gruard` |
+| App Name | `Grúa RD` |
+| Web Dir | `dist/public` |
+| Plataformas | Android, iOS |
+
+### 9.3 Plugins Nativos Requeridos
+
+| Plugin | Uso |
+|--------|-----|
+| `@capacitor/camera` | Captura de fotos de vehículos y documentos |
+| `@capacitor/filesystem` | Gestión de archivos locales |
+| `@capacitor/push-notifications` | Notificaciones push nativas |
+| `@capacitor/geolocation` | Ubicación GPS |
+| `@capacitor/network` | Estado de conexión |
+| `@capacitor/app` | Lifecycle de la app |
+| Plugin Custom Tracking | Tracking GPS en background |
+
+### 9.4 Permisos Nativos
+
+#### Android
+- `ACCESS_FINE_LOCATION` - Ubicación precisa
+- `ACCESS_COARSE_LOCATION` - Ubicación aproximada
+- `ACCESS_BACKGROUND_LOCATION` - Ubicación en background
+- `FOREGROUND_SERVICE` - Servicio en primer plano
+- `FOREGROUND_SERVICE_LOCATION` - Servicio de ubicación
+- `CAMERA` - Cámara
+- `READ_EXTERNAL_STORAGE` / `READ_MEDIA_IMAGES` - Lectura de archivos
+- `POST_NOTIFICATIONS` - Notificaciones (Android 13+)
+
+#### iOS
+- `NSLocationWhenInUseUsageDescription` - Ubicación en uso
+- `NSLocationAlwaysAndWhenInUseUsageDescription` - Ubicación siempre
+- `NSLocationAlwaysUsageDescription` - Ubicación always (legacy)
+- `NSCameraUsageDescription` - Cámara
+- `NSPhotoLibraryUsageDescription` - Galería de fotos
+- `UIBackgroundModes` - location, fetch, remote-notification
+
+### 9.5 Plugin de Tracking en Background
+
+Se implementará un plugin nativo personalizado con los siguientes métodos:
+- `startTracking()` - Inicia tracking GPS en background
+- `stopTracking()` - Detiene tracking
+- `onLocationUpdate(callback)` - Recibe actualizaciones de ubicación
+- `getLastLocation()` - Obtiene última ubicación conocida
+
+### 9.6 Estructura de Archivos Capacitor
+
+```
+/
+├── android/                          # Proyecto Android Studio
+│   ├── app/
+│   │   ├── src/main/
+│   │   │   ├── java/.../plugins/     # Plugin nativo tracking
+│   │   │   ├── AndroidManifest.xml   # Permisos
+│   │   │   └── res/                  # Recursos
+│   │   └── build.gradle
+│   └── capacitor.settings.gradle
+├── ios/                              # Proyecto Xcode
+│   └── App/
+│       ├── App/
+│       │   ├── Plugins/              # Plugin nativo tracking
+│       │   └── Info.plist            # Permisos
+│       └── App.xcodeproj
+├── capacitor.config.ts               # Configuración Capacitor
+└── client/src/
+    └── capacitor/
+        └── tracking.ts               # Wrapper JS del plugin
+```
+
+### 9.7 Detección Capacitor vs PWA
+
+El frontend detectará automáticamente el entorno:
+- **Capacitor Nativo:** Usa plugins nativos para tracking, cámara, etc.
+- **PWA/Browser:** Usa Web APIs (Geolocation, MediaDevices, etc.)
+
+### 9.8 Checklist de Implementación
+
+- [x] Configurar capacitor.config.ts con appId correcto
+- [x] Instalar plugins de Capacitor
+- [x] Añadir plataforma Android
+- [x] Añadir plataforma iOS
+- [x] Configurar permisos Android (AndroidManifest.xml)
+- [x] Configurar permisos iOS (Info.plist)
+- [x] Crear plugin nativo tracking Android
+- [x] Crear plugin nativo tracking iOS
+- [x] Crear wrapper JS para tracking
+- [x] Actualizar frontend para detectar Capacitor
+- [x] Crear guía de build CAPACITOR_BUILD_GUIDE.md
+- [ ] Probar en dispositivos reales
+- [ ] Generar APK de prueba
+- [ ] Generar IPA de prueba
+
+### 9.9 Guía de Build Rápida
+
+```bash
+# 1. Build del frontend
+npm run build
+
+# 2. Sincronizar con plataformas nativas
+npx cap sync
+
+# 3. Abrir en IDE
+npx cap open android   # Android Studio
+npx cap open ios       # Xcode
+
+# 4. Compilar desde el IDE
+```
+
+Ver `CAPACITOR_BUILD_GUIDE.md` para instrucciones detalladas.
+
+---
+
+## 10. Estimación de Tiempo Total Actualizada
+
+| Fase | Tiempo Estimado |
+|------|-----------------|
+| Fase 1: Infraestructura | 30 min |
+| Fase 2: Secrets y Configuración | 30 min |
+| Fase 3: Correcciones de Código | 45 min |
+| Fase 4: Integraciones Replit | 20 min |
+| Fase 5: Validación | 30 min |
+| Fase 6: Deployment Web | 15 min |
+| **Fase 7: Capacitor (nuevo)** | **2 horas** |
+| **TOTAL** | **~5 horas** |
+
+---
+
 *Documento generado el 1 de Diciembre, 2025*
+*Actualizado: Integración de Capacitor añadida*
 *Próxima revisión: Después de aprobación del plan*
