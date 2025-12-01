@@ -78,6 +78,58 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 01, 2025 - Module 6: Enterprise Portal (Empresas/Contratos Empresariales)
+- **New User Type**: Added `empresa` userType for B2B clients (construction companies, hardware stores, logistics firms)
+- **Database Schema**: 8 new tables for enterprise functionality:
+  - `empresas`: Main enterprise profiles with company details and contact info
+  - `empresaEmpleados`: Employee management with roles and permissions
+  - `empresaContratos`: Contract types (hourly, daily, monthly, per-service)
+  - `empresaTarifas`: Custom tariff configuration per contract
+  - `empresaProyectos`: Project/budget tracking with service limits
+  - `empresaConductoresAsignados`: Assigned drivers with priority levels
+  - `empresaFacturas`: Monthly invoicing with automatic generation
+  - `serviciosProgramados`: Scheduled/recurring services
+- **Backend API**: 20+ endpoints in `server/routes.ts`:
+  - Dashboard with statistics and active contracts
+  - Service requests (immediate and scheduled)
+  - Service history with filtering
+  - Project CRUD with budget tracking
+  - Contract management with tariff configuration
+  - Employee management (add, edit, remove, permissions)
+  - Assigned driver management with priority
+  - Invoice viewing and PDF generation
+  - Profile management
+  - Admin endpoints for enterprise management
+- **Storage Layer**: Complete CRUD methods in `server/storage.ts`:
+  - Enterprise profile CRUD
+  - Employee management with user association
+  - Contract and tariff management
+  - Project CRUD with details
+  - Driver assignment with conductor details
+  - Invoice management with items
+  - Dashboard statistics aggregation
+  - Service history queries
+- **Frontend Pages**: 9 new pages in `client/src/pages/empresa/`:
+  - Dashboard with KPIs and recent activity
+  - Solicitudes (immediate and scheduled requests)
+  - Historial (service history with filtering)
+  - Proyectos (project management with budgets)
+  - Contratos (contract and tariff management)
+  - Empleados (employee management)
+  - Conductores (assigned drivers with priority)
+  - Facturación (invoices with PDF download)
+  - Perfil (company profile management)
+- **EmpresaLayout Component**: Sidebar navigation following AdminLayout pattern
+- **Admin Management**: New `admin/empresas.tsx` for managing all enterprises
+- **Routing**: Updated `App.tsx` with empresa routes and redirect logic
+- **Key Files**:
+  - `shared/schema.ts` (enterprise tables and types)
+  - `server/routes.ts` (API endpoints)
+  - `server/storage.ts` (CRUD methods)
+  - `client/src/components/layout/EmpresaLayout.tsx`
+  - `client/src/pages/empresa/*.tsx` (9 pages)
+  - `client/src/pages/admin/empresas.tsx`
+
 ### November 30, 2025 - Service Auto-Cancellation and API Optimization
 - **Automatic Service Cancellation**: Services not accepted by operators within 10 minutes are automatically cancelled
   - Atomic UPDATE...RETURNING pattern to prevent race conditions
