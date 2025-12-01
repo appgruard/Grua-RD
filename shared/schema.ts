@@ -14,7 +14,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userTypeEnum = pgEnum("user_type", ["cliente", "conductor", "admin", "aseguradora", "socio"]);
+export const userTypeEnum = pgEnum("user_type", ["cliente", "conductor", "admin", "aseguradora", "socio", "empresa"]);
 export const estadoCuentaEnum = pgEnum("estado_cuenta", [
   "pendiente_verificacion",
   "activo",
@@ -30,7 +30,7 @@ export const estadoServicioEnum = pgEnum("estado_servicio", [
   "completado",
   "cancelado"
 ]);
-export const metodoPagoEnum = pgEnum("metodo_pago", ["efectivo", "tarjeta", "aseguradora"]);
+export const metodoPagoEnum = pgEnum("metodo_pago", ["efectivo", "tarjeta", "aseguradora", "empresa"]);
 export const tipoVehiculoEnum = pgEnum("tipo_vehiculo", ["carro", "motor", "jeep", "camion"]);
 
 export const servicioCategoriaEnum = pgEnum("servicio_categoria", [
@@ -540,6 +540,343 @@ export const distribucionesSociosRelations = relations(distribucionesSocios, ({ 
 
 // ==================== END SOCIOS SYSTEM ====================
 
+// ==================== EMPRESAS / CONTRATOS EMPRESARIALES (MODULE 6) ====================
+
+// Empresa Type Enum
+export const empresaTipoEnum = pgEnum("empresa_tipo", [
+  "constructora",
+  "ferreteria",
+  "logistica",
+  "turistica",
+  "ayuntamiento",
+  "zona_franca",
+  "industria",
+  "rent_car",
+  "maquinaria_pesada",
+  "otro"
+]);
+
+// Empresa Contract Type Enum
+export const empresaContratoTipoEnum = pgEnum("empresa_contrato_tipo", [
+  "por_hora",
+  "por_dia",
+  "por_mes",
+  "por_servicio",
+  "volumen"
+]);
+
+// Empresa Billing Status Enum
+export const empresaFacturacionEstadoEnum = pgEnum("empresa_facturacion_estado", [
+  "pendiente",
+  "facturado",
+  "pagado",
+  "vencido"
+]);
+
+// Empresa Employee Role Enum
+export const empresaRolEmpleadoEnum = pgEnum("empresa_rol_empleado", [
+  "admin_empresa",
+  "supervisor",
+  "empleado"
+]);
+
+// Scheduled Service Status Enum
+export const servicioProgramadoEstadoEnum = pgEnum("servicio_programado_estado", [
+  "programado",
+  "confirmado",
+  "ejecutado",
+  "cancelado"
+]);
+
+// Empresas (Companies) Table
+export const empresas = pgTable("empresas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  nombreEmpresa: text("nombre_empresa").notNull(),
+  rnc: text("rnc").notNull().unique(),
+  tipoEmpresa: empresaTipoEnum("tipo_empresa").notNull(),
+  direccion: text("direccion"),
+  telefono: text("telefono"),
+  emailContacto: text("email_contacto"),
+  personaContacto: text("persona_contacto"),
+  logoUrl: text("logo_url"),
+  limiteCredito: decimal("limite_credito", { precision: 12, scale: 2 }).default("0.00"),
+  diasCredito: integer("dias_credito").default(30),
+  descuentoVolumen: decimal("descuento_volumen", { precision: 5, scale: 2 }).default("0.00"),
+  activo: boolean("activo").default(true).notNull(),
+  verificado: boolean("verificado").default(false).notNull(),
+  verificadoPor: varchar("verificado_por").references(() => users.id),
+  fechaVerificacion: timestamp("fecha_verificacion"),
+  notas: text("notas"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Empresa Empleados (Company Employees) Table
+export const empresaEmpleados = pgTable("empresa_empleados", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  rol: empresaRolEmpleadoEnum("rol").default("empleado").notNull(),
+  departamento: text("departamento"),
+  puedeCrearServicios: boolean("puede_crear_servicios").default(true).notNull(),
+  puedeProgramarServicios: boolean("puede_programar_servicios").default(true).notNull(),
+  puedeVerFacturas: boolean("puede_ver_facturas").default(false).notNull(),
+  puedeGestionarEmpleados: boolean("puede_gestionar_empleados").default(false).notNull(),
+  activo: boolean("activo").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Empresa Contratos (Company Contracts) Table
+export const empresaContratos = pgTable("empresa_contratos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: "cascade" }),
+  numeroContrato: text("numero_contrato").notNull().unique(),
+  tipoContrato: empresaContratoTipoEnum("tipo_contrato").notNull(),
+  fechaInicio: timestamp("fecha_inicio").notNull(),
+  fechaFin: timestamp("fecha_fin"),
+  horasContratadas: integer("horas_contratadas"),
+  horasUtilizadas: integer("horas_utilizadas").default(0),
+  serviciosContratados: integer("servicios_contratados"),
+  serviciosUtilizados: integer("servicios_utilizados").default(0),
+  tarifaHora: decimal("tarifa_hora", { precision: 10, scale: 2 }),
+  tarifaDia: decimal("tarifa_dia", { precision: 10, scale: 2 }),
+  tarifaServicio: decimal("tarifa_servicio", { precision: 10, scale: 2 }),
+  descuentoPorcentaje: decimal("descuento_porcentaje", { precision: 5, scale: 2 }).default("0.00"),
+  montoMensualMinimo: decimal("monto_mensual_minimo", { precision: 12, scale: 2 }),
+  activo: boolean("activo").default(true).notNull(),
+  notas: text("notas"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Empresa Tarifas Especiales (Special Pricing) Table
+export const empresaTarifas = pgTable("empresa_tarifas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: "cascade" }),
+  servicioCategoria: servicioCategoriaEnum("servicio_categoria"),
+  precioBase: decimal("precio_base", { precision: 10, scale: 2 }).notNull(),
+  tarifaPorKm: decimal("tarifa_por_km", { precision: 10, scale: 2 }).notNull(),
+  descuentoPorcentaje: decimal("descuento_porcentaje", { precision: 5, scale: 2 }).default("0.00"),
+  minimoServicios: integer("minimo_servicios").default(1),
+  activo: boolean("activo").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Empresa Proyectos (Company Projects/Works) Table
+export const empresaProyectos = pgTable("empresa_proyectos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: "cascade" }),
+  nombreProyecto: text("nombre_proyecto").notNull(),
+  codigo: text("codigo"),
+  descripcion: text("descripcion"),
+  ubicacionLat: decimal("ubicacion_lat", { precision: 10, scale: 7 }),
+  ubicacionLng: decimal("ubicacion_lng", { precision: 10, scale: 7 }),
+  direccion: text("direccion"),
+  responsable: text("responsable"),
+  telefonoResponsable: text("telefono_responsable"),
+  fechaInicio: timestamp("fecha_inicio"),
+  fechaFin: timestamp("fecha_fin"),
+  presupuestoServicios: decimal("presupuesto_servicios", { precision: 12, scale: 2 }),
+  gastoActual: decimal("gasto_actual", { precision: 12, scale: 2 }).default("0.00"),
+  activo: boolean("activo").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Empresa Conductores Asignados (Assigned Drivers) Table
+export const empresaConductoresAsignados = pgTable("empresa_conductores_asignados", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: "cascade" }),
+  conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
+  esPrioridad: boolean("es_prioridad").default(false).notNull(),
+  notas: text("notas"),
+  activo: boolean("activo").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Servicios Programados (Scheduled Services) Table
+export const serviciosProgramados = pgTable("servicios_programados", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: "cascade" }),
+  proyectoId: varchar("proyecto_id").references(() => empresaProyectos.id, { onDelete: "set null" }),
+  contratoId: varchar("contrato_id").references(() => empresaContratos.id, { onDelete: "set null" }),
+  solicitadoPor: varchar("solicitado_por").notNull().references(() => users.id),
+  conductorAsignadoId: varchar("conductor_asignado_id").references(() => conductores.id, { onDelete: "set null" }),
+  fechaProgramada: timestamp("fecha_programada").notNull(),
+  horaInicio: text("hora_inicio").notNull(),
+  horaFin: text("hora_fin"),
+  origenLat: decimal("origen_lat", { precision: 10, scale: 7 }).notNull(),
+  origenLng: decimal("origen_lng", { precision: 10, scale: 7 }).notNull(),
+  origenDireccion: text("origen_direccion").notNull(),
+  destinoLat: decimal("destino_lat", { precision: 10, scale: 7 }),
+  destinoLng: decimal("destino_lng", { precision: 10, scale: 7 }),
+  destinoDireccion: text("destino_direccion"),
+  servicioCategoria: servicioCategoriaEnum("servicio_categoria").default("remolque_estandar"),
+  servicioSubtipo: servicioSubtipoEnum("servicio_subtipo"),
+  descripcion: text("descripcion"),
+  estado: servicioProgramadoEstadoEnum("estado").default("programado").notNull(),
+  servicioCreado: varchar("servicio_creado").references(() => servicios.id, { onDelete: "set null" }),
+  recurrente: boolean("recurrente").default(false).notNull(),
+  frecuenciaRecurrencia: text("frecuencia_recurrencia"),
+  notasInternas: text("notas_internas"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Empresa Facturas Mensuales (Monthly Invoices) Table
+export const empresaFacturas = pgTable("empresa_facturas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresaId: varchar("empresa_id").notNull().references(() => empresas.id, { onDelete: "cascade" }),
+  numeroFactura: text("numero_factura").notNull().unique(),
+  periodo: text("periodo").notNull(),
+  fechaEmision: timestamp("fecha_emision").defaultNow().notNull(),
+  fechaVencimiento: timestamp("fecha_vencimiento").notNull(),
+  totalServicios: integer("total_servicios").default(0).notNull(),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
+  descuento: decimal("descuento", { precision: 12, scale: 2 }).default("0.00"),
+  itbis: decimal("itbis", { precision: 12, scale: 2 }).default("0.00"),
+  total: decimal("total", { precision: 12, scale: 2 }).notNull(),
+  estado: empresaFacturacionEstadoEnum("estado").default("pendiente").notNull(),
+  fechaPago: timestamp("fecha_pago"),
+  metodoPago: text("metodo_pago"),
+  referenciaTransaccion: text("referencia_transaccion"),
+  notas: text("notas"),
+  pdfUrl: text("pdf_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Empresa Factura Items (Invoice Line Items) Table
+export const empresaFacturaItems = pgTable("empresa_factura_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  facturaId: varchar("factura_id").notNull().references(() => empresaFacturas.id, { onDelete: "cascade" }),
+  servicioId: varchar("servicio_id").references(() => servicios.id, { onDelete: "set null" }),
+  proyectoId: varchar("proyecto_id").references(() => empresaProyectos.id, { onDelete: "set null" }),
+  descripcion: text("descripcion").notNull(),
+  cantidad: integer("cantidad").default(1).notNull(),
+  precioUnitario: decimal("precio_unitario", { precision: 10, scale: 2 }).notNull(),
+  descuento: decimal("descuento", { precision: 10, scale: 2 }).default("0.00"),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Empresas Relations
+export const empresasRelations = relations(empresas, ({ one, many }) => ({
+  user: one(users, {
+    fields: [empresas.userId],
+    references: [users.id],
+  }),
+  verificadoPorUsuario: one(users, {
+    fields: [empresas.verificadoPor],
+    references: [users.id],
+  }),
+  empleados: many(empresaEmpleados),
+  contratos: many(empresaContratos),
+  tarifas: many(empresaTarifas),
+  proyectos: many(empresaProyectos),
+  conductoresAsignados: many(empresaConductoresAsignados),
+  serviciosProgramados: many(serviciosProgramados),
+  facturas: many(empresaFacturas),
+}));
+
+export const empresaEmpleadosRelations = relations(empresaEmpleados, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [empresaEmpleados.empresaId],
+    references: [empresas.id],
+  }),
+  user: one(users, {
+    fields: [empresaEmpleados.userId],
+    references: [users.id],
+  }),
+}));
+
+export const empresaContratosRelations = relations(empresaContratos, ({ one, many }) => ({
+  empresa: one(empresas, {
+    fields: [empresaContratos.empresaId],
+    references: [empresas.id],
+  }),
+  serviciosProgramados: many(serviciosProgramados),
+}));
+
+export const empresaTarifasRelations = relations(empresaTarifas, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [empresaTarifas.empresaId],
+    references: [empresas.id],
+  }),
+}));
+
+export const empresaProyectosRelations = relations(empresaProyectos, ({ one, many }) => ({
+  empresa: one(empresas, {
+    fields: [empresaProyectos.empresaId],
+    references: [empresas.id],
+  }),
+  serviciosProgramados: many(serviciosProgramados),
+  facturaItems: many(empresaFacturaItems),
+}));
+
+export const empresaConductoresAsignadosRelations = relations(empresaConductoresAsignados, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [empresaConductoresAsignados.empresaId],
+    references: [empresas.id],
+  }),
+  conductor: one(conductores, {
+    fields: [empresaConductoresAsignados.conductorId],
+    references: [conductores.id],
+  }),
+}));
+
+export const serviciosProgramadosRelations = relations(serviciosProgramados, ({ one }) => ({
+  empresa: one(empresas, {
+    fields: [serviciosProgramados.empresaId],
+    references: [empresas.id],
+  }),
+  proyecto: one(empresaProyectos, {
+    fields: [serviciosProgramados.proyectoId],
+    references: [empresaProyectos.id],
+  }),
+  contrato: one(empresaContratos, {
+    fields: [serviciosProgramados.contratoId],
+    references: [empresaContratos.id],
+  }),
+  solicitadoPorUsuario: one(users, {
+    fields: [serviciosProgramados.solicitadoPor],
+    references: [users.id],
+  }),
+  conductorAsignado: one(conductores, {
+    fields: [serviciosProgramados.conductorAsignadoId],
+    references: [conductores.id],
+  }),
+  servicio: one(servicios, {
+    fields: [serviciosProgramados.servicioCreado],
+    references: [servicios.id],
+  }),
+}));
+
+export const empresaFacturasRelations = relations(empresaFacturas, ({ one, many }) => ({
+  empresa: one(empresas, {
+    fields: [empresaFacturas.empresaId],
+    references: [empresas.id],
+  }),
+  items: many(empresaFacturaItems),
+}));
+
+export const empresaFacturaItemsRelations = relations(empresaFacturaItems, ({ one }) => ({
+  factura: one(empresaFacturas, {
+    fields: [empresaFacturaItems.facturaId],
+    references: [empresaFacturas.id],
+  }),
+  servicio: one(servicios, {
+    fields: [empresaFacturaItems.servicioId],
+    references: [servicios.id],
+  }),
+  proyecto: one(empresaProyectos, {
+    fields: [empresaFacturaItems.proyectoId],
+    references: [empresaProyectos.id],
+  }),
+}));
+
+// ==================== END EMPRESAS / CONTRATOS EMPRESARIALES ====================
+
 // Enum for document reminder types
 export const tipoRecordatorioEnum = pgEnum("tipo_recordatorio", [
   "30_dias",
@@ -1042,6 +1379,115 @@ export const insertScheduledPayoutItemSchema = createInsertSchema(scheduledPayou
   procesadoAt: true,
 });
 
+// ==================== INSERT SCHEMAS: EMPRESAS / CONTRATOS EMPRESARIALES ====================
+
+export const insertEmpresaSchema = createInsertSchema(empresas, {
+  nombreEmpresa: z.string().min(1, "Nombre de empresa es requerido"),
+  rnc: z.string().min(1, "RNC es requerido"),
+  tipoEmpresa: z.enum([
+    "constructora", "ferreteria", "logistica", "turistica",
+    "ayuntamiento", "zona_franca", "industria", "rent_car",
+    "maquinaria_pesada", "otro"
+  ]),
+  emailContacto: z.string().email("Email de contacto inválido").optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  activo: true,
+  verificado: true,
+  verificadoPor: true,
+  fechaVerificacion: true,
+});
+
+export const insertEmpresaEmpleadoSchema = createInsertSchema(empresaEmpleados, {
+  rol: z.enum(["admin_empresa", "supervisor", "empleado"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  activo: true,
+});
+
+export const insertEmpresaContratoSchema = createInsertSchema(empresaContratos, {
+  numeroContrato: z.string().min(1, "Número de contrato es requerido"),
+  tipoContrato: z.enum(["por_hora", "por_dia", "por_mes", "por_servicio", "volumen"]),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  activo: true,
+  horasUtilizadas: true,
+  serviciosUtilizados: true,
+});
+
+export const insertEmpresaTarifaSchema = createInsertSchema(empresaTarifas, {
+  precioBase: z.string().min(1, "Precio base es requerido"),
+  tarifaPorKm: z.string().min(1, "Tarifa por km es requerida"),
+  servicioCategoria: z.enum([
+    "remolque_estandar", "auxilio_vial", "remolque_especializado",
+    "camiones_pesados", "izaje_construccion", "remolque_recreativo"
+  ]).optional().nullable(),
+}).omit({
+  id: true,
+  createdAt: true,
+  activo: true,
+});
+
+export const insertEmpresaProyectoSchema = createInsertSchema(empresaProyectos, {
+  nombreProyecto: z.string().min(1, "Nombre del proyecto es requerido"),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  activo: true,
+  gastoActual: true,
+});
+
+export const insertEmpresaConductorAsignadoSchema = createInsertSchema(empresaConductoresAsignados).omit({
+  id: true,
+  createdAt: true,
+  activo: true,
+});
+
+export const insertServicioProgramadoSchema = createInsertSchema(serviciosProgramados, {
+  origenDireccion: z.string().min(1, "Dirección de origen es requerida"),
+  horaInicio: z.string().min(1, "Hora de inicio es requerida"),
+  servicioCategoria: z.enum([
+    "remolque_estandar", "auxilio_vial", "remolque_especializado",
+    "camiones_pesados", "izaje_construccion", "remolque_recreativo"
+  ]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  estado: true,
+  servicioCreado: true,
+});
+
+export const insertEmpresaFacturaSchema = createInsertSchema(empresaFacturas, {
+  numeroFactura: z.string().min(1, "Número de factura es requerido"),
+  periodo: z.string().regex(/^\d{4}-\d{2}$/, "Formato de período inválido (YYYY-MM)"),
+  subtotal: z.string().min(1, "Subtotal es requerido"),
+  total: z.string().min(1, "Total es requerido"),
+}).omit({
+  id: true,
+  createdAt: true,
+  estado: true,
+  fechaEmision: true,
+  fechaPago: true,
+});
+
+export const insertEmpresaFacturaItemSchema = createInsertSchema(empresaFacturaItems, {
+  descripcion: z.string().min(1, "Descripción es requerida"),
+  precioUnitario: z.string().min(1, "Precio unitario es requerido"),
+  subtotal: z.string().min(1, "Subtotal es requerido"),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ==================== END INSERT SCHEMAS: EMPRESAS / CONTRATOS EMPRESARIALES ====================
+
 // Select Schemas
 export const selectUserSchema = createSelectSchema(users);
 export const selectConductorSchema = createSelectSchema(conductores);
@@ -1065,6 +1511,17 @@ export const selectOperatorBankAccountSchema = createSelectSchema(operatorBankAc
 export const selectOperatorWithdrawalSchema = createSelectSchema(operatorWithdrawals);
 export const selectScheduledPayoutSchema = createSelectSchema(scheduledPayouts);
 export const selectScheduledPayoutItemSchema = createSelectSchema(scheduledPayoutItems);
+
+// Select Schemas: Empresas / Contratos Empresariales
+export const selectEmpresaSchema = createSelectSchema(empresas);
+export const selectEmpresaEmpleadoSchema = createSelectSchema(empresaEmpleados);
+export const selectEmpresaContratoSchema = createSelectSchema(empresaContratos);
+export const selectEmpresaTarifaSchema = createSelectSchema(empresaTarifas);
+export const selectEmpresaProyectoSchema = createSelectSchema(empresaProyectos);
+export const selectEmpresaConductorAsignadoSchema = createSelectSchema(empresaConductoresAsignados);
+export const selectServicioProgramadoSchema = createSelectSchema(serviciosProgramados);
+export const selectEmpresaFacturaSchema = createSelectSchema(empresaFacturas);
+export const selectEmpresaFacturaItemSchema = createSelectSchema(empresaFacturaItems);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1180,6 +1637,91 @@ export type DistribucionSocioWithDetails = DistribucionSocio & {
   calculadoPorUsuario?: User;
   aprobadoPorUsuario?: User;
 };
+
+// ==================== TYPES: EMPRESAS / CONTRATOS EMPRESARIALES ====================
+
+export type InsertEmpresa = z.infer<typeof insertEmpresaSchema>;
+export type Empresa = typeof empresas.$inferSelect;
+
+export type InsertEmpresaEmpleado = z.infer<typeof insertEmpresaEmpleadoSchema>;
+export type EmpresaEmpleado = typeof empresaEmpleados.$inferSelect;
+
+export type InsertEmpresaContrato = z.infer<typeof insertEmpresaContratoSchema>;
+export type EmpresaContrato = typeof empresaContratos.$inferSelect;
+
+export type InsertEmpresaTarifa = z.infer<typeof insertEmpresaTarifaSchema>;
+export type EmpresaTarifa = typeof empresaTarifas.$inferSelect;
+
+export type InsertEmpresaProyecto = z.infer<typeof insertEmpresaProyectoSchema>;
+export type EmpresaProyecto = typeof empresaProyectos.$inferSelect;
+
+export type InsertEmpresaConductorAsignado = z.infer<typeof insertEmpresaConductorAsignadoSchema>;
+export type EmpresaConductorAsignado = typeof empresaConductoresAsignados.$inferSelect;
+
+export type InsertServicioProgramado = z.infer<typeof insertServicioProgramadoSchema>;
+export type ServicioProgramado = typeof serviciosProgramados.$inferSelect;
+
+export type InsertEmpresaFactura = z.infer<typeof insertEmpresaFacturaSchema>;
+export type EmpresaFactura = typeof empresaFacturas.$inferSelect;
+
+export type InsertEmpresaFacturaItem = z.infer<typeof insertEmpresaFacturaItemSchema>;
+export type EmpresaFacturaItem = typeof empresaFacturaItems.$inferSelect;
+
+// Helper types for Empresas API responses
+export type EmpresaWithDetails = Empresa & {
+  user?: User;
+  verificadoPorUsuario?: User;
+  empleados?: EmpresaEmpleadoWithUser[];
+  contratos?: EmpresaContrato[];
+  tarifas?: EmpresaTarifa[];
+  proyectos?: EmpresaProyecto[];
+  conductoresAsignados?: EmpresaConductorAsignadoWithDetails[];
+  facturas?: EmpresaFactura[];
+};
+
+export type EmpresaEmpleadoWithUser = EmpresaEmpleado & {
+  user?: User;
+  empresa?: Empresa;
+};
+
+export type EmpresaConductorAsignadoWithDetails = EmpresaConductorAsignado & {
+  conductor?: Conductor & { user?: User };
+  empresa?: Empresa;
+};
+
+export type ServicioProgramadoWithDetails = ServicioProgramado & {
+  empresa?: Empresa;
+  proyecto?: EmpresaProyecto;
+  contrato?: EmpresaContrato;
+  solicitadoPorUsuario?: User;
+  conductorAsignado?: Conductor & { user?: User };
+  servicio?: Servicio;
+};
+
+export type EmpresaFacturaWithItems = EmpresaFactura & {
+  empresa?: Empresa;
+  items?: EmpresaFacturaItemWithDetails[];
+};
+
+export type EmpresaFacturaItemWithDetails = EmpresaFacturaItem & {
+  servicio?: Servicio;
+  proyecto?: EmpresaProyecto;
+};
+
+export type EmpresaProyectoWithDetails = EmpresaProyecto & {
+  empresa?: Empresa;
+  serviciosProgramados?: ServicioProgramado[];
+  serviciosCompletados?: number;
+  gastoTotal?: number;
+};
+
+export type EmpresaContratoWithDetails = EmpresaContrato & {
+  empresa?: Empresa;
+  serviciosProgramados?: ServicioProgramado[];
+  porcentajeUtilizado?: number;
+};
+
+// ==================== END TYPES: EMPRESAS / CONTRATOS EMPRESARIALES ====================
 
 // ==================== TICKET SYSTEM ====================
 

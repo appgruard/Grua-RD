@@ -1,5 +1,5 @@
 import { db } from './db';
-import { eq, and, desc, isNull, sql, gte, lte, lt, between } from 'drizzle-orm';
+import { eq, and, desc, isNull, sql, gte, lte, lt, between, ne } from 'drizzle-orm';
 import {
   users,
   conductores,
@@ -27,6 +27,15 @@ import {
   operatorWithdrawals,
   scheduledPayouts,
   scheduledPayoutItems,
+  empresas,
+  empresaEmpleados,
+  empresaContratos,
+  empresaTarifas,
+  empresaProyectos,
+  empresaConductoresAsignados,
+  serviciosProgramados,
+  empresaFacturas,
+  empresaFacturaItems,
   type User,
   type InsertUser,
   type Conductor,
@@ -89,6 +98,32 @@ import {
   type InsertScheduledPayout,
   type ScheduledPayoutItem,
   type InsertScheduledPayoutItem,
+  type Empresa,
+  type InsertEmpresa,
+  type EmpresaEmpleado,
+  type InsertEmpresaEmpleado,
+  type EmpresaContrato,
+  type InsertEmpresaContrato,
+  type EmpresaTarifa,
+  type InsertEmpresaTarifa,
+  type EmpresaProyecto,
+  type InsertEmpresaProyecto,
+  type EmpresaConductorAsignado,
+  type InsertEmpresaConductorAsignado,
+  type ServicioProgramado,
+  type InsertServicioProgramado,
+  type EmpresaFactura,
+  type InsertEmpresaFactura,
+  type EmpresaFacturaItem,
+  type InsertEmpresaFacturaItem,
+  type EmpresaWithDetails,
+  type EmpresaEmpleadoWithUser,
+  type EmpresaConductorAsignadoWithDetails,
+  type ServicioProgramadoWithDetails,
+  type EmpresaFacturaWithItems,
+  type EmpresaFacturaItemWithDetails,
+  type EmpresaProyectoWithDetails,
+  type EmpresaContratoWithDetails,
 } from '@shared/schema';
 import {
   serviceReceipts,
@@ -435,6 +470,70 @@ export interface IStorage {
   updateScheduledPayoutItem(conductorId: string, scheduledPayoutId: string, data: Partial<ScheduledPayoutItem>): Promise<ScheduledPayoutItem>;
   getScheduledPayoutItems(scheduledPayoutId: string): Promise<ScheduledPayoutItem[]>;
   updateConductorBalance(conductorId: string, balanceChange: number, pendingChange: number, setToZero?: boolean): Promise<Conductor>;
+
+  // ==================== EMPRESAS / CONTRATOS EMPRESARIALES (Module 6) ====================
+
+  // Empresas CRUD
+  createEmpresa(empresa: InsertEmpresa): Promise<Empresa>;
+  getEmpresaById(id: string): Promise<EmpresaWithDetails | undefined>;
+  getEmpresaByUserId(userId: string): Promise<EmpresaWithDetails | undefined>;
+  getAllEmpresas(): Promise<EmpresaWithDetails[]>;
+  updateEmpresa(id: string, data: Partial<Empresa>): Promise<Empresa>;
+  getEmpresasByTipo(tipo: string): Promise<EmpresaWithDetails[]>;
+
+  // Empleados CRUD
+  addEmpresaEmpleado(empleado: InsertEmpresaEmpleado): Promise<EmpresaEmpleado>;
+  getEmpresaEmpleados(empresaId: string): Promise<EmpresaEmpleadoWithUser[]>;
+  updateEmpresaEmpleado(id: string, data: Partial<EmpresaEmpleado>): Promise<EmpresaEmpleado>;
+  removeEmpresaEmpleado(id: string): Promise<void>;
+
+  // Contratos CRUD
+  createEmpresaContrato(contrato: InsertEmpresaContrato): Promise<EmpresaContrato>;
+  getEmpresaContratos(empresaId: string): Promise<EmpresaContratoWithDetails[]>;
+  updateEmpresaContrato(id: string, data: Partial<EmpresaContrato>): Promise<EmpresaContrato>;
+  getEmpresaContratoActivo(empresaId: string): Promise<EmpresaContratoWithDetails | undefined>;
+
+  // Tarifas CRUD
+  createEmpresaTarifa(tarifa: InsertEmpresaTarifa): Promise<EmpresaTarifa>;
+  getEmpresaTarifas(empresaId: string): Promise<EmpresaTarifa[]>;
+  updateEmpresaTarifa(id: string, data: Partial<EmpresaTarifa>): Promise<EmpresaTarifa>;
+
+  // Proyectos CRUD
+  createEmpresaProyecto(proyecto: InsertEmpresaProyecto): Promise<EmpresaProyecto>;
+  getEmpresaProyectos(empresaId: string): Promise<EmpresaProyectoWithDetails[]>;
+  updateEmpresaProyecto(id: string, data: Partial<EmpresaProyecto>): Promise<EmpresaProyecto>;
+  getEmpresaProyectoById(id: string): Promise<EmpresaProyectoWithDetails | undefined>;
+
+  // Conductores Asignados
+  asignarConductorEmpresa(asignacion: InsertEmpresaConductorAsignado): Promise<EmpresaConductorAsignado>;
+  getConductoresAsignadosEmpresa(empresaId: string): Promise<EmpresaConductorAsignadoWithDetails[]>;
+  removeAsignacionConductor(id: string): Promise<void>;
+
+  // Servicios Programados
+  createServicioProgramado(servicio: InsertServicioProgramado): Promise<ServicioProgramado>;
+  getServiciosProgramadosEmpresa(empresaId: string): Promise<ServicioProgramadoWithDetails[]>;
+  updateServicioProgramado(id: string, data: Partial<ServicioProgramado>): Promise<ServicioProgramado>;
+  getServiciosProgramadosPendientes(): Promise<ServicioProgramadoWithDetails[]>;
+
+  // Facturas
+  createEmpresaFactura(factura: InsertEmpresaFactura): Promise<EmpresaFactura>;
+  getEmpresaFacturas(empresaId: string): Promise<EmpresaFacturaWithItems[]>;
+  updateEmpresaFactura(id: string, data: Partial<EmpresaFactura>): Promise<EmpresaFactura>;
+  getEmpresaFacturaById(id: string): Promise<EmpresaFacturaWithItems | undefined>;
+  createEmpresaFacturaItem(item: InsertEmpresaFacturaItem): Promise<EmpresaFacturaItem>;
+
+  // Dashboard Stats
+  getEmpresaDashboardStats(empresaId: string): Promise<{
+    serviciosTotales: number;
+    serviciosCompletados: number;
+    serviciosPendientes: number;
+    serviciosProgramados: number;
+    gastoTotalMes: number;
+    proyectosActivos: number;
+    empleadosActivos: number;
+    conductoresAsignados: number;
+  }>;
+  getEmpresaServiciosHistory(empresaId: string, limit?: number): Promise<ServicioProgramadoWithDetails[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2999,6 +3098,600 @@ export class DatabaseStorage implements IStorage {
       .where(eq(conductores.id, conductorId))
       .returning();
     return conductor;
+  }
+
+  // ==================== EMPRESAS / CONTRATOS EMPRESARIALES (Module 6) ====================
+
+  // Empresas CRUD
+  async createEmpresa(insertEmpresa: InsertEmpresa): Promise<Empresa> {
+    const [empresa] = await db.insert(empresas).values(insertEmpresa).returning();
+    return empresa;
+  }
+
+  async getEmpresaById(id: string): Promise<EmpresaWithDetails | undefined> {
+    const result = await db.query.empresas.findFirst({
+      where: eq(empresas.id, id),
+      with: {
+        user: true,
+        verificadoPorUsuario: true,
+        empleados: {
+          with: {
+            user: true,
+          },
+          where: eq(empresaEmpleados.activo, true),
+        },
+        contratos: {
+          orderBy: desc(empresaContratos.createdAt),
+        },
+        tarifas: {
+          where: eq(empresaTarifas.activo, true),
+        },
+        proyectos: {
+          where: eq(empresaProyectos.activo, true),
+          orderBy: desc(empresaProyectos.createdAt),
+        },
+        conductoresAsignados: {
+          where: eq(empresaConductoresAsignados.activo, true),
+          with: {
+            conductor: {
+              with: {
+                user: true,
+              },
+            },
+          },
+        },
+        facturas: {
+          orderBy: desc(empresaFacturas.createdAt),
+          limit: 10,
+        },
+      },
+    });
+    return result as EmpresaWithDetails | undefined;
+  }
+
+  async getEmpresaByUserId(userId: string): Promise<EmpresaWithDetails | undefined> {
+    const result = await db.query.empresas.findFirst({
+      where: eq(empresas.userId, userId),
+      with: {
+        user: true,
+        verificadoPorUsuario: true,
+        empleados: {
+          with: {
+            user: true,
+          },
+          where: eq(empresaEmpleados.activo, true),
+        },
+        contratos: {
+          orderBy: desc(empresaContratos.createdAt),
+        },
+        tarifas: {
+          where: eq(empresaTarifas.activo, true),
+        },
+        proyectos: {
+          where: eq(empresaProyectos.activo, true),
+          orderBy: desc(empresaProyectos.createdAt),
+        },
+        conductoresAsignados: {
+          where: eq(empresaConductoresAsignados.activo, true),
+          with: {
+            conductor: {
+              with: {
+                user: true,
+              },
+            },
+          },
+        },
+        facturas: {
+          orderBy: desc(empresaFacturas.createdAt),
+          limit: 10,
+        },
+      },
+    });
+    return result as EmpresaWithDetails | undefined;
+  }
+
+  async getAllEmpresas(): Promise<EmpresaWithDetails[]> {
+    const results = await db.query.empresas.findMany({
+      with: {
+        user: true,
+        verificadoPorUsuario: true,
+        empleados: {
+          with: {
+            user: true,
+          },
+          where: eq(empresaEmpleados.activo, true),
+        },
+        contratos: {
+          orderBy: desc(empresaContratos.createdAt),
+        },
+        tarifas: {
+          where: eq(empresaTarifas.activo, true),
+        },
+        proyectos: {
+          where: eq(empresaProyectos.activo, true),
+        },
+        conductoresAsignados: {
+          where: eq(empresaConductoresAsignados.activo, true),
+          with: {
+            conductor: {
+              with: {
+                user: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: desc(empresas.createdAt),
+    });
+    return results as EmpresaWithDetails[];
+  }
+
+  async updateEmpresa(id: string, data: Partial<Empresa>): Promise<Empresa> {
+    const [empresa] = await db
+      .update(empresas)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(empresas.id, id))
+      .returning();
+    return empresa;
+  }
+
+  async getEmpresasByTipo(tipo: string): Promise<EmpresaWithDetails[]> {
+    const results = await db.query.empresas.findMany({
+      where: eq(empresas.tipoEmpresa, tipo as any),
+      with: {
+        user: true,
+        verificadoPorUsuario: true,
+        empleados: {
+          with: {
+            user: true,
+          },
+          where: eq(empresaEmpleados.activo, true),
+        },
+        contratos: {
+          where: eq(empresaContratos.activo, true),
+        },
+      },
+      orderBy: desc(empresas.createdAt),
+    });
+    return results as EmpresaWithDetails[];
+  }
+
+  // Empleados CRUD
+  async addEmpresaEmpleado(insertEmpleado: InsertEmpresaEmpleado): Promise<EmpresaEmpleado> {
+    const [empleado] = await db.insert(empresaEmpleados).values(insertEmpleado).returning();
+    return empleado;
+  }
+
+  async getEmpresaEmpleados(empresaId: string): Promise<EmpresaEmpleadoWithUser[]> {
+    const results = await db.query.empresaEmpleados.findMany({
+      where: and(
+        eq(empresaEmpleados.empresaId, empresaId),
+        eq(empresaEmpleados.activo, true)
+      ),
+      with: {
+        user: true,
+        empresa: true,
+      },
+      orderBy: desc(empresaEmpleados.createdAt),
+    });
+    return results as EmpresaEmpleadoWithUser[];
+  }
+
+  async updateEmpresaEmpleado(id: string, data: Partial<EmpresaEmpleado>): Promise<EmpresaEmpleado> {
+    const [empleado] = await db
+      .update(empresaEmpleados)
+      .set(data)
+      .where(eq(empresaEmpleados.id, id))
+      .returning();
+    return empleado;
+  }
+
+  async removeEmpresaEmpleado(id: string): Promise<void> {
+    await db
+      .update(empresaEmpleados)
+      .set({ activo: false })
+      .where(eq(empresaEmpleados.id, id));
+  }
+
+  // Contratos CRUD
+  async createEmpresaContrato(insertContrato: InsertEmpresaContrato): Promise<EmpresaContrato> {
+    const [contrato] = await db.insert(empresaContratos).values(insertContrato).returning();
+    return contrato;
+  }
+
+  async getEmpresaContratos(empresaId: string): Promise<EmpresaContratoWithDetails[]> {
+    const results = await db.query.empresaContratos.findMany({
+      where: eq(empresaContratos.empresaId, empresaId),
+      with: {
+        empresa: true,
+      },
+      orderBy: desc(empresaContratos.createdAt),
+    });
+    
+    return results.map(contrato => {
+      let porcentajeUtilizado = 0;
+      if (contrato.tipoContrato === 'por_hora' && contrato.horasContratadas && contrato.horasUtilizadas) {
+        porcentajeUtilizado = (parseFloat(contrato.horasUtilizadas) / parseFloat(contrato.horasContratadas)) * 100;
+      } else if (contrato.tipoContrato === 'por_servicio' && contrato.serviciosContratados && contrato.serviciosUtilizados) {
+        porcentajeUtilizado = (contrato.serviciosUtilizados / contrato.serviciosContratados) * 100;
+      }
+      return {
+        ...contrato,
+        porcentajeUtilizado,
+      };
+    }) as EmpresaContratoWithDetails[];
+  }
+
+  async updateEmpresaContrato(id: string, data: Partial<EmpresaContrato>): Promise<EmpresaContrato> {
+    const [contrato] = await db
+      .update(empresaContratos)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(empresaContratos.id, id))
+      .returning();
+    return contrato;
+  }
+
+  async getEmpresaContratoActivo(empresaId: string): Promise<EmpresaContratoWithDetails | undefined> {
+    const now = new Date();
+    const result = await db.query.empresaContratos.findFirst({
+      where: and(
+        eq(empresaContratos.empresaId, empresaId),
+        eq(empresaContratos.activo, true),
+        lte(empresaContratos.fechaInicio, now),
+        gte(empresaContratos.fechaFin, now)
+      ),
+      with: {
+        empresa: true,
+      },
+      orderBy: desc(empresaContratos.createdAt),
+    });
+    
+    if (!result) return undefined;
+    
+    let porcentajeUtilizado = 0;
+    if (result.tipoContrato === 'por_hora' && result.horasContratadas && result.horasUtilizadas) {
+      porcentajeUtilizado = (parseFloat(result.horasUtilizadas) / parseFloat(result.horasContratadas)) * 100;
+    } else if (result.tipoContrato === 'por_servicio' && result.serviciosContratados && result.serviciosUtilizados) {
+      porcentajeUtilizado = (result.serviciosUtilizados / result.serviciosContratados) * 100;
+    }
+    
+    return {
+      ...result,
+      porcentajeUtilizado,
+    } as EmpresaContratoWithDetails;
+  }
+
+  // Tarifas CRUD
+  async createEmpresaTarifa(insertTarifa: InsertEmpresaTarifa): Promise<EmpresaTarifa> {
+    const [tarifa] = await db.insert(empresaTarifas).values(insertTarifa).returning();
+    return tarifa;
+  }
+
+  async getEmpresaTarifas(empresaId: string): Promise<EmpresaTarifa[]> {
+    return db
+      .select()
+      .from(empresaTarifas)
+      .where(and(
+        eq(empresaTarifas.empresaId, empresaId),
+        eq(empresaTarifas.activo, true)
+      ))
+      .orderBy(desc(empresaTarifas.createdAt));
+  }
+
+  async updateEmpresaTarifa(id: string, data: Partial<EmpresaTarifa>): Promise<EmpresaTarifa> {
+    const [tarifa] = await db
+      .update(empresaTarifas)
+      .set(data)
+      .where(eq(empresaTarifas.id, id))
+      .returning();
+    return tarifa;
+  }
+
+  // Proyectos CRUD
+  async createEmpresaProyecto(insertProyecto: InsertEmpresaProyecto): Promise<EmpresaProyecto> {
+    const [proyecto] = await db.insert(empresaProyectos).values(insertProyecto).returning();
+    return proyecto;
+  }
+
+  async getEmpresaProyectos(empresaId: string): Promise<EmpresaProyectoWithDetails[]> {
+    const results = await db.query.empresaProyectos.findMany({
+      where: and(
+        eq(empresaProyectos.empresaId, empresaId),
+        eq(empresaProyectos.activo, true)
+      ),
+      with: {
+        empresa: true,
+        serviciosProgramados: true,
+      },
+      orderBy: desc(empresaProyectos.createdAt),
+    });
+    
+    return results.map(proyecto => {
+      const serviciosCompletados = proyecto.serviciosProgramados?.filter(
+        s => s.estado === 'completado'
+      ).length || 0;
+      
+      return {
+        ...proyecto,
+        serviciosCompletados,
+        gastoTotal: parseFloat(proyecto.gastoActual || '0'),
+      };
+    }) as EmpresaProyectoWithDetails[];
+  }
+
+  async updateEmpresaProyecto(id: string, data: Partial<EmpresaProyecto>): Promise<EmpresaProyecto> {
+    const [proyecto] = await db
+      .update(empresaProyectos)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(empresaProyectos.id, id))
+      .returning();
+    return proyecto;
+  }
+
+  async getEmpresaProyectoById(id: string): Promise<EmpresaProyectoWithDetails | undefined> {
+    const result = await db.query.empresaProyectos.findFirst({
+      where: eq(empresaProyectos.id, id),
+      with: {
+        empresa: true,
+        serviciosProgramados: true,
+      },
+    });
+    
+    if (!result) return undefined;
+    
+    const serviciosCompletados = result.serviciosProgramados?.filter(
+      s => s.estado === 'completado'
+    ).length || 0;
+    
+    return {
+      ...result,
+      serviciosCompletados,
+      gastoTotal: parseFloat(result.gastoActual || '0'),
+    } as EmpresaProyectoWithDetails;
+  }
+
+  // Conductores Asignados
+  async asignarConductorEmpresa(insertAsignacion: InsertEmpresaConductorAsignado): Promise<EmpresaConductorAsignado> {
+    const [asignacion] = await db.insert(empresaConductoresAsignados).values(insertAsignacion).returning();
+    return asignacion;
+  }
+
+  async getConductoresAsignadosEmpresa(empresaId: string): Promise<EmpresaConductorAsignadoWithDetails[]> {
+    const results = await db.query.empresaConductoresAsignados.findMany({
+      where: and(
+        eq(empresaConductoresAsignados.empresaId, empresaId),
+        eq(empresaConductoresAsignados.activo, true)
+      ),
+      with: {
+        conductor: {
+          with: {
+            user: true,
+          },
+        },
+        empresa: true,
+      },
+      orderBy: desc(empresaConductoresAsignados.createdAt),
+    });
+    return results as EmpresaConductorAsignadoWithDetails[];
+  }
+
+  async removeAsignacionConductor(id: string): Promise<void> {
+    await db
+      .update(empresaConductoresAsignados)
+      .set({ activo: false })
+      .where(eq(empresaConductoresAsignados.id, id));
+  }
+
+  // Servicios Programados
+  async createServicioProgramado(insertServicio: InsertServicioProgramado): Promise<ServicioProgramado> {
+    const [servicio] = await db.insert(serviciosProgramados).values(insertServicio).returning();
+    return servicio;
+  }
+
+  async getServiciosProgramadosEmpresa(empresaId: string): Promise<ServicioProgramadoWithDetails[]> {
+    const results = await db.query.serviciosProgramados.findMany({
+      where: eq(serviciosProgramados.empresaId, empresaId),
+      with: {
+        empresa: true,
+        proyecto: true,
+        contrato: true,
+        solicitadoPorUsuario: true,
+        conductorAsignado: {
+          with: {
+            user: true,
+          },
+        },
+        servicio: true,
+      },
+      orderBy: desc(serviciosProgramados.fechaProgramada),
+    });
+    return results as ServicioProgramadoWithDetails[];
+  }
+
+  async updateServicioProgramado(id: string, data: Partial<ServicioProgramado>): Promise<ServicioProgramado> {
+    const [servicio] = await db
+      .update(serviciosProgramados)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(serviciosProgramados.id, id))
+      .returning();
+    return servicio;
+  }
+
+  async getServiciosProgramadosPendientes(): Promise<ServicioProgramadoWithDetails[]> {
+    const now = new Date();
+    const results = await db.query.serviciosProgramados.findMany({
+      where: and(
+        eq(serviciosProgramados.estado, 'pendiente'),
+        gte(serviciosProgramados.fechaProgramada, now)
+      ),
+      with: {
+        empresa: true,
+        proyecto: true,
+        contrato: true,
+        solicitadoPorUsuario: true,
+        conductorAsignado: {
+          with: {
+            user: true,
+          },
+        },
+      },
+      orderBy: serviciosProgramados.fechaProgramada,
+    });
+    return results as ServicioProgramadoWithDetails[];
+  }
+
+  // Facturas
+  async createEmpresaFactura(insertFactura: InsertEmpresaFactura): Promise<EmpresaFactura> {
+    const [factura] = await db.insert(empresaFacturas).values(insertFactura).returning();
+    return factura;
+  }
+
+  async getEmpresaFacturas(empresaId: string): Promise<EmpresaFacturaWithItems[]> {
+    const results = await db.query.empresaFacturas.findMany({
+      where: eq(empresaFacturas.empresaId, empresaId),
+      with: {
+        empresa: true,
+        items: {
+          with: {
+            servicio: true,
+            proyecto: true,
+          },
+        },
+      },
+      orderBy: desc(empresaFacturas.createdAt),
+    });
+    return results as EmpresaFacturaWithItems[];
+  }
+
+  async updateEmpresaFactura(id: string, data: Partial<EmpresaFactura>): Promise<EmpresaFactura> {
+    const [factura] = await db
+      .update(empresaFacturas)
+      .set(data)
+      .where(eq(empresaFacturas.id, id))
+      .returning();
+    return factura;
+  }
+
+  async getEmpresaFacturaById(id: string): Promise<EmpresaFacturaWithItems | undefined> {
+    const result = await db.query.empresaFacturas.findFirst({
+      where: eq(empresaFacturas.id, id),
+      with: {
+        empresa: true,
+        items: {
+          with: {
+            servicio: true,
+            proyecto: true,
+          },
+        },
+      },
+    });
+    return result as EmpresaFacturaWithItems | undefined;
+  }
+
+  async createEmpresaFacturaItem(insertItem: InsertEmpresaFacturaItem): Promise<EmpresaFacturaItem> {
+    const [item] = await db.insert(empresaFacturaItems).values(insertItem).returning();
+    return item;
+  }
+
+  // Dashboard Stats
+  async getEmpresaDashboardStats(empresaId: string): Promise<{
+    serviciosTotales: number;
+    serviciosCompletados: number;
+    serviciosPendientes: number;
+    serviciosProgramados: number;
+    gastoTotalMes: number;
+    proyectosActivos: number;
+    empleadosActivos: number;
+    conductoresAsignados: number;
+  }> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const [servicioStats] = await db
+      .select({
+        serviciosTotales: sql<number>`count(*)::int`,
+        serviciosCompletados: sql<number>`count(*) filter (where ${serviciosProgramados.estado} = 'completado')::int`,
+        serviciosPendientes: sql<number>`count(*) filter (where ${serviciosProgramados.estado} = 'pendiente')::int`,
+        serviciosProgramados: sql<number>`count(*) filter (where ${serviciosProgramados.estado} = 'programado')::int`,
+      })
+      .from(serviciosProgramados)
+      .where(eq(serviciosProgramados.empresaId, empresaId));
+
+    const [gastoMes] = await db
+      .select({
+        gastoTotalMes: sql<number>`COALESCE(SUM(${empresaFacturaItems.subtotal}::numeric), 0)::float`,
+      })
+      .from(empresaFacturas)
+      .innerJoin(empresaFacturaItems, eq(empresaFacturas.id, empresaFacturaItems.facturaId))
+      .where(and(
+        eq(empresaFacturas.empresaId, empresaId),
+        gte(empresaFacturas.fechaEmision, startOfMonth),
+        lte(empresaFacturas.fechaEmision, endOfMonth)
+      ));
+
+    const [proyectosActivos] = await db
+      .select({
+        count: sql<number>`count(*)::int`,
+      })
+      .from(empresaProyectos)
+      .where(and(
+        eq(empresaProyectos.empresaId, empresaId),
+        eq(empresaProyectos.activo, true),
+        eq(empresaProyectos.estado, 'en_progreso')
+      ));
+
+    const [empleadosActivos] = await db
+      .select({
+        count: sql<number>`count(*)::int`,
+      })
+      .from(empresaEmpleados)
+      .where(and(
+        eq(empresaEmpleados.empresaId, empresaId),
+        eq(empresaEmpleados.activo, true)
+      ));
+
+    const [conductoresAsignados] = await db
+      .select({
+        count: sql<number>`count(*)::int`,
+      })
+      .from(empresaConductoresAsignados)
+      .where(and(
+        eq(empresaConductoresAsignados.empresaId, empresaId),
+        eq(empresaConductoresAsignados.activo, true)
+      ));
+
+    return {
+      serviciosTotales: servicioStats?.serviciosTotales || 0,
+      serviciosCompletados: servicioStats?.serviciosCompletados || 0,
+      serviciosPendientes: servicioStats?.serviciosPendientes || 0,
+      serviciosProgramados: servicioStats?.serviciosProgramados || 0,
+      gastoTotalMes: gastoMes?.gastoTotalMes || 0,
+      proyectosActivos: proyectosActivos?.count || 0,
+      empleadosActivos: empleadosActivos?.count || 0,
+      conductoresAsignados: conductoresAsignados?.count || 0,
+    };
+  }
+
+  async getEmpresaServiciosHistory(empresaId: string, limit: number = 50): Promise<ServicioProgramadoWithDetails[]> {
+    const results = await db.query.serviciosProgramados.findMany({
+      where: eq(serviciosProgramados.empresaId, empresaId),
+      with: {
+        empresa: true,
+        proyecto: true,
+        contrato: true,
+        solicitadoPorUsuario: true,
+        conductorAsignado: {
+          with: {
+            user: true,
+          },
+        },
+        servicio: true,
+      },
+      orderBy: desc(serviciosProgramados.fechaProgramada),
+      limit,
+    });
+    return results as ServicioProgramadoWithDetails[];
   }
 }
 
