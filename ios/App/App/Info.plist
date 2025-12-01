@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>es-DO</string>
 	<key>CFBundleDisplayName</key>
-        <string>Grúa RD</string>
+	<string>Grúa RD</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -29,6 +29,8 @@
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>
+		<string>location-services</string>
+		<string>gps</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -45,5 +47,54 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	
+	<!-- Location Permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Grúa RD necesita acceder a tu ubicación para mostrar tu posición en el mapa y conectarte con conductores cercanos.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Grúa RD necesita acceso continuo a tu ubicación para el seguimiento en tiempo real del servicio de grúa, incluso cuando la app está en segundo plano.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Grúa RD necesita acceso continuo a tu ubicación para el seguimiento en tiempo real del servicio.</string>
+	
+	<!-- Camera Permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>Grúa RD necesita acceso a la cámara para tomar fotos de vehículos y documentos durante el servicio.</string>
+	
+	<!-- Photo Library Permissions -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Grúa RD necesita acceso a tu galería de fotos para seleccionar imágenes de vehículos y documentos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Grúa RD necesita guardar fotos del servicio en tu galería.</string>
+	
+	<!-- Background Modes -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+		<string>processing</string>
+	</array>
+	
+	<!-- Push Notifications -->
+	<key>UIUserNotificationSettings</key>
+	<dict>
+		<key>UIUserNotificationTypes</key>
+		<integer>7</integer>
+	</dict>
+	
+	<!-- App Transport Security -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>
