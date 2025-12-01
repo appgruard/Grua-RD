@@ -35,23 +35,26 @@ Luego accede a: `http://tu-ip-vps:3000`
 
 ## Paso 2: Preparar tu proyecto para CapRover
 
-### Archivo captain-definition.json
+### Archivo captain-definition
 
-Ya existe en tu proyecto. Verifica que esté:
+Ya existe en tu proyecto. Verifica que esté (nota: sin extensión `.json`):
 
 ```json
 {
   "schemaVersion": 2,
-  "dockerfilePath": "./Dockerfile",
-  "imageName": "gruard-rd",
-  "containerName": "gruard-rd-app",
-  "ports": ["5000:5000"]
+  "dockerfilePath": "./Dockerfile"
 }
 ```
 
 ### Dockerfile
 
-Ya existe con todo configurado. Solo verifica que esté en la raíz del proyecto.
+Ya existe con todo configurado para producción:
+- Usa Node 20 Alpine (imagen optimizada)
+- Build multi-stage para reducir tamaño
+- Puerto 80 (estándar para CapRover)
+- Health check en `/health`
+
+**IMPORTANTE**: En CapRover, configura el **Container HTTP Port** a `80`.
 
 ---
 
@@ -62,24 +65,40 @@ Ya existe con todo configurado. Solo verifica que esté en la raíz del proyecto
 1. En el dashboard, ve a: **Apps → Crear Nueva App**
 2. Nombra tu app: `gruard-rd`
 3. Ve a la sección **Environment Variables**
-4. Agrega TODAS las variables de `.env.example`:
+4. Agrega TODAS las variables necesarias:
 
-```
+```bash
+# Base de datos
 DATABASE_URL=postgresql://...
+
+# Entorno
 NODE_ENV=production
-ALLOWED_ORIGINS=https://tu-dominio.com
-SESSION_SECRET=your_generated_secret
-VAPID_PRIVATE_KEY=your_vapid_key
-VITE_VAPID_PUBLIC_KEY=your_vapid_key
-VITE_MAPBOX_ACCESS_TOKEN=tu_token
-STRIPE_SECRET_KEY=tu_key
-... (todas las demás)
+
+# CORS - Dominios permitidos (separados por coma)
+ALLOWED_ORIGINS=https://tu-dominio.com,https://app.tu-dominio.com
+
+# Sesión
+SESSION_SECRET=your_generated_secret_32_chars_min
+
+# Push Notifications
+VAPID_PRIVATE_KEY=your_vapid_private_key
+VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
+
+# Mapbox
+VITE_MAPBOX_ACCESS_TOKEN=pk.xxx
+
+# Stripe
+STRIPE_SECRET_KEY=sk_live_xxx
+VITE_STRIPE_PUBLIC_KEY=pk_live_xxx
+
+# API URL para apps móviles (IMPORTANTE para iOS/Android)
+VITE_API_URL=https://tu-dominio.com
 ```
 
 **IMPORTANTE**: 
 - No uses `VITE_` como prefijo para secretos en backend
 - Solo usa `VITE_` para variables que necesita el frontend compilado
-- Las demás variables de backend pueden ser normales
+- `VITE_API_URL` es CRÍTICO para que las apps iOS/Android se conecten al servidor
 
 ---
 
@@ -177,11 +196,52 @@ git push caprover main
 
 ---
 
+## Configuración para Apps Móviles (iOS/Android)
+
+Para que las apps móviles compiladas con Capacitor se conecten correctamente al servidor:
+
+### 1. Configurar VITE_API_URL
+
+Antes de compilar las apps, asegúrate de que `VITE_API_URL` esté configurado:
+
+```bash
+# En tu .env o al compilar
+VITE_API_URL=https://tu-dominio-en-caprover.com
+```
+
+### 2. Compilar con la URL correcta
+
+```bash
+# Establecer la variable y compilar
+export VITE_API_URL=https://tu-dominio.com
+npm run build
+npx cap sync
+```
+
+### 3. CORS para Apps Móviles
+
+El servidor ya está configurado para aceptar conexiones desde:
+- `capacitor://` (esquema nativo de Capacitor)
+- `ionic://` (esquema alternativo)
+- `file://` (para testing local)
+
+No necesitas agregar estos orígenes a `ALLOWED_ORIGINS`.
+
+### 4. Verificar Conectividad
+
+En la app móvil, las peticiones API se harán a:
+```
+https://tu-dominio.com/api/...
+```
+
+---
+
 ## Checklist Previo a Producción
 
 - [ ] Base de datos configurada y accesible
 - [ ] Todas las variables de entorno definidas
 - [ ] ALLOWED_ORIGINS contiene tu dominio de producción
+- [ ] VITE_API_URL configurado para apps móviles
 - [ ] VAPID keys generadas: `npx web-push generate-vapid-keys`
 - [ ] Certificado SSL habilitado en CapRover
 - [ ] Health check pasando (verifica logs)
@@ -190,6 +250,7 @@ git push caprover main
 - [ ] WebSockets funcionando correctamente
 - [ ] Notificaciones push configuradas
 - [ ] Backups de base de datos configurados
+- [ ] Apps móviles probadas conectándose al servidor
 
 ---
 

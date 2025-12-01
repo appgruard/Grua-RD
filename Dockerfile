@@ -1,46 +1,42 @@
+# Grúa RD - Production Dockerfile
+# Optimized for CapRover deployment
+
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar package files
 COPY package*.json ./
 
-# Instalar dependencias
 RUN npm ci
 
-# Copiar código
 COPY . .
 
-# Build
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Instalar dumb-init para manejar señales correctamente
 RUN apk add --no-cache dumb-init
 
-# Copiar package files
 COPY package*.json ./
 
-# Instalar solo dependencias de producción
-RUN npm ci --only=production
+RUN npm ci --only=production && npm cache clean --force
 
-# Copiar archivos compilados del build stage
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 
-# Exponer puerto
-EXPOSE 5000
+ENV NODE_ENV=production
+ENV PORT=80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:5000/api/auth/me', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+EXPOSE 80
 
-# Usar dumb-init para manejar signals correctamente
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
+
 ENTRYPOINT ["dumb-init", "--"]
 
-# Comando de inicio
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]

@@ -2,6 +2,9 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Production API URL - set this to your CapRover deployed server
+const API_URL = process.env.VITE_API_URL || 'https://gruard.app';
+
 const config: CapacitorConfig = {
   appId: 'com.fouronesolutions.gruard',
   appName: 'Grúa RD',
@@ -11,6 +14,10 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     hostname: 'gruard.app',
     iosScheme: 'capacitor',
+    
+    // URL to the production server for native apps
+    url: isProduction ? API_URL : undefined,
+    cleartext: false,
     
     allowNavigation: [
       'gruard.com',

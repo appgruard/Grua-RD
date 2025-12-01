@@ -85,6 +85,16 @@ app.use(
         return callback(null, true);
       }
       
+      // Allow Capacitor native apps (capacitor:// and ionic:// schemes)
+      if (origin.startsWith('capacitor://') || origin.startsWith('ionic://')) {
+        return callback(null, true);
+      }
+      
+      // Allow file:// for local testing on mobile devices
+      if (origin.startsWith('file://')) {
+        return callback(null, true);
+      }
+      
       if (allowedOrigins.length === 0) {
         logger.error("ALLOWED_ORIGINS not configured in production. Blocking CORS request from origin: " + origin);
         logger.error("Set ALLOWED_ORIGINS environment variable with comma-separated origins (e.g., 'https://app.gruard.com,https://www.gruard.com')");
@@ -100,7 +110,7 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
 
