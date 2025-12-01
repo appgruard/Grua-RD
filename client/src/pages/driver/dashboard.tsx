@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
 import { MapboxMap } from '@/components/maps/MapboxMap';
 import { Card } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/lib/websocket';
 import { ChatBox } from '@/components/chat/ChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useLocationTracking } from '@/hooks/useLocation';
 import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car } from 'lucide-react';
 import { SiWaze } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
@@ -279,27 +280,16 @@ export default function DriverDashboard() {
     return { complete: missingCount === 0, missing: missingCount };
   };
 
-  useEffect(() => {
-    if ('geolocation' in navigator && driverData?.disponible) {
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const newLocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setCurrentLocation(newLocation);
+  const handleLocationUpdate = useCallback((location: Coordinates) => {
+    setCurrentLocation(location);
+    apiRequest('PUT', '/api/drivers/location', location);
+  }, []);
 
-          apiRequest('PUT', '/api/drivers/location', newLocation);
-        },
-        (error) => {
-          console.error('Error watching location:', error);
-        },
-        { enableHighAccuracy: true, maximumAge: 5000 }
-      );
-
-      return () => navigator.geolocation.clearWatch(watchId);
-    }
-  }, [driverData?.disponible]);
+  useLocationTracking(
+    handleLocationUpdate,
+    driverData?.disponible || false,
+    { interval: 5000, minDistance: 10 }
+  );
 
   const getStatusBadgeVariant = (estado: string) => {
     switch (estado) {
