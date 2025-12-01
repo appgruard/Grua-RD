@@ -414,9 +414,118 @@ npx cap ls
 └── client/src/lib/capacitor.ts
 ```
 
+## Configuración de Producción (Google Play / App Store)
+
+### Variables de Entorno para Firma de Android
+
+Antes de generar builds de producción, configura las siguientes variables de entorno:
+
+```bash
+# Ruta al archivo keystore
+export ANDROID_KEYSTORE_PATH=/path/to/gruard-release.jks
+
+# Contraseña del keystore
+export ANDROID_KEYSTORE_PASSWORD=tu_password_seguro
+
+# Alias de la key
+export ANDROID_KEY_ALIAS=gruard
+
+# Contraseña de la key
+export ANDROID_KEY_PASSWORD=tu_password_seguro
+```
+
+### Generar Keystore para Play Store (Primera vez)
+
+```bash
+keytool -genkey -v \
+  -keystore gruard-release.jks \
+  -keyalg RSA \
+  -keysize 2048 \
+  -validity 10000 \
+  -alias gruard \
+  -storetype JKS
+```
+
+**IMPORTANTE:** Guarda el keystore y las contraseñas en un lugar seguro. Perder el keystore significa que no podrás actualizar la app en Play Store.
+
+### Build de Producción para Android (AAB)
+
+```bash
+# 1. Build del frontend
+npm run build
+
+# 2. Sincronizar con Android
+npx cap sync android
+
+# 3. Generar AAB (requiere variables de entorno configuradas)
+cd android && ./gradlew bundleRelease
+
+# El AAB se genera en: android/app/build/outputs/bundle/release/app-release.aab
+```
+
+### Build de Producción para iOS
+
+1. **Configurar en Xcode:**
+   - Abre: `npx cap open ios`
+   - Ve a **Signing & Capabilities**
+   - Selecciona tu **Team** de Apple Developer
+   - Activa **Automatically manage signing**
+
+2. **Entitlements configurados:**
+   - Push Notifications (aps-environment: production)
+   - Associated Domains (gruard.app)
+
+3. **Generar Archive:**
+   - Selecciona "Any iOS Device (arm64)"
+   - **Product > Archive**
+   - Usa **Organizer** para subir a App Store Connect
+
+### Checklist Pre-Publicación
+
+#### Android (Google Play)
+- [ ] versionCode incrementado en `android/app/build.gradle`
+- [ ] versionName actualizado (ej: 1.0.0 → 1.0.1)
+- [ ] Keystore configurado y seguro
+- [ ] ProGuard habilitado para minificación
+- [ ] Ícono de app (512x512)
+- [ ] Feature graphic (1024x500)
+- [ ] Screenshots de todas las pantallas principales
+- [ ] Descripción en español
+- [ ] Política de privacidad URL
+
+#### iOS (App Store)
+- [ ] CURRENT_PROJECT_VERSION incrementado
+- [ ] MARKETING_VERSION actualizado
+- [ ] Certificados y perfiles configurados
+- [ ] Push Notification entitlements
+- [ ] Associated Domains configurados
+- [ ] Ícono de app (1024x1024, sin transparencia)
+- [ ] Screenshots para todos los tamaños
+- [ ] App Preview video (opcional)
+- [ ] Descripción en español
+- [ ] Política de privacidad URL
+
+### Incrementar Versiones
+
+**Android:**
+```groovy
+// android/app/build.gradle
+defaultConfig {
+    versionCode 2  // Incrementar para cada release
+    versionName "1.0.1"  // Versión visible
+}
+```
+
+**iOS (en Xcode):**
+- CURRENT_PROJECT_VERSION: Incrementar (build number)
+- MARKETING_VERSION: Versión visible (ej: 1.0.1)
+
 ## Notas Finales
 
 - La PWA sigue funcionando en paralelo con las apps nativas
 - El código detecta automáticamente si está en Capacitor o navegador
 - Los plugins nativos solo se activan en las apps nativas
 - El tracking en segundo plano consume batería; optimiza el intervalo según las necesidades
+- Para producción, asegúrate de que `webContentsDebuggingEnabled` esté en `false`
+- Usa AAB (Android App Bundle) para Play Store, no APK
+- Los builds de iOS requieren macOS con Xcode

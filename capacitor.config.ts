@@ -1,5 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const config: CapacitorConfig = {
   appId: 'com.fouronesolutions.gruard',
   appName: 'Grúa RD',
@@ -13,11 +15,15 @@ const config: CapacitorConfig = {
     allowNavigation: [
       'gruard.com',
       '*.gruard.com',
+      'gruard.app',
+      '*.gruard.app',
       'api.mapbox.com',
       '*.tiles.mapbox.com',
       'events.mapbox.com',
       'fonts.googleapis.com',
-      'fonts.gstatic.com'
+      'fonts.gstatic.com',
+      'api.stripe.com',
+      '*.stripe.com'
     ]
   },
 
@@ -65,6 +71,14 @@ const config: CapacitorConfig = {
     },
 
     App: {
+    },
+    
+    CapacitorCookies: {
+      enabled: true
+    },
+    
+    CapacitorHttp: {
+      enabled: true
     }
   },
 
@@ -72,14 +86,14 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     backgroundColor: '#ffffff',
     buildOptions: {
-      keystorePath: undefined,
-      keystorePassword: undefined,
-      keystoreAlias: undefined,
-      keystoreAliasPassword: undefined,
-      releaseType: 'APK',
-      signingType: 'jarsigner'
+      keystorePath: process.env.ANDROID_KEYSTORE_PATH,
+      keystorePassword: process.env.ANDROID_KEYSTORE_PASSWORD,
+      keystoreAlias: process.env.ANDROID_KEY_ALIAS || 'gruard',
+      keystoreAliasPassword: process.env.ANDROID_KEY_PASSWORD,
+      releaseType: 'AAB',
+      signingType: 'apksigner'
     },
-    webContentsDebuggingEnabled: false
+    webContentsDebuggingEnabled: !isProduction
   },
 
   ios: {
