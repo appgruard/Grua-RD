@@ -10,7 +10,7 @@ import { useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import AzulPaymentMethodsManager from '@/components/AzulPaymentMethodsManager';
+import DLocalPaymentManager from '@/components/DLocalPaymentManager';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { CedulaScanner } from '@/components/CedulaScanner';
@@ -296,7 +296,7 @@ export default function ClientProfile() {
         </div>
 
         <div className="space-y-4">
-          <AzulPaymentMethodsManager />
+          <DLocalPaymentManager />
         </div>
 
         <ThemeSettingsCard />

@@ -18,6 +18,7 @@ import { EditProfileModal } from '@/components/EditProfileModal';
 import { DocumentExpirationAlerts } from '@/components/DocumentExpirationAlerts';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
+import DLocalOperatorBankAccountManager from '@/components/DLocalOperatorBankAccountManager';
 import type { Conductor, Documento } from '@shared/schema';
 
 interface VerifikValidation {
@@ -43,13 +44,10 @@ const REQUIRED_DOCUMENTS = [
 
 const DOCUMENTOS_CON_VENCIMIENTO = ['seguro_grua', 'licencia', 'matricula'];
 
-interface StripeAccountStatus {
+interface PayoutAccountStatus {
   configured: boolean;
-  accountStatus?: string;
-  onboardingComplete?: boolean;
-  chargesEnabled?: boolean;
-  payoutsEnabled?: boolean;
-  detailsSubmitted?: boolean;
+  balanceDisponible: string;
+  balancePendiente: string;
 }
 
 interface DriverFullProfile {
@@ -83,8 +81,8 @@ export default function DriverProfile() {
   const verifikStatus = fullProfile?.verifikStatus;
   const isLoadingServices = isLoadingProfile;
 
-  const { data: stripeStatus, isLoading: isLoadingStripe, error: stripeError } = useQuery<StripeAccountStatus>({
-    queryKey: ['/api/drivers/stripe-account-status'],
+  const { data: payoutStatus, isLoading: isLoadingPayout } = useQuery<PayoutAccountStatus>({
+    queryKey: ['/api/drivers/payout-account-status'],
     enabled: !!driverData,
     retry: 2,
   });
@@ -821,105 +819,7 @@ export default function DriverProfile() {
             </div>
           </Card>
 
-          <Card className="p-6 mb-4">
-            <div className="flex items-center gap-2 mb-4">
-              <CreditCard className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-semibold">Cuenta de Pagos</h3>
-            </div>
-
-            {isLoadingStripe ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : stripeError ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-destructive mb-2">Error al cargar información de pagos</p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/drivers/stripe-account-status'] })}
-                  data-testid="button-retry-stripe-status"
-                >
-                  Reintentar
-                </Button>
-              </div>
-            ) : !stripeStatus?.configured ? (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Configura tu cuenta de pagos para recibir el 70% de cada servicio completado directamente en tu cuenta bancaria.
-                </p>
-                <Button
-                  className="w-full"
-                  onClick={() => stripeOnboardingMutation.mutate()}
-                  disabled={stripeOnboardingMutation.isPending}
-                  data-testid="button-setup-payments"
-                >
-                  {stripeOnboardingMutation.isPending ? (
-                    'Configurando...'
-                  ) : (
-                    <>
-                      Configurar Cuenta de Pagos
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : stripeStatus.onboardingComplete ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Estado de la cuenta</span>
-                  <Badge variant="default" className="gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    Activa
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Recibir pagos</span>
-                  <Badge variant={stripeStatus.chargesEnabled ? 'default' : 'secondary'}>
-                    {stripeStatus.chargesEnabled ? 'Habilitado' : 'Pendiente'}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Transferencias bancarias</span>
-                  <Badge variant={stripeStatus.payoutsEnabled ? 'default' : 'secondary'}>
-                    {stripeStatus.payoutsEnabled ? 'Habilitado' : 'Pendiente'}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">
-                  Recibes automáticamente el 70% del costo de cada servicio completado.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Estado</span>
-                  <Badge variant="secondary" className="gap-1">
-                    <Clock className="w-3 h-3" />
-                    Configuración pendiente
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Debes completar la configuración de tu cuenta para poder recibir pagos.
-                </p>
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  onClick={() => stripeOnboardingMutation.mutate()}
-                  disabled={stripeOnboardingMutation.isPending}
-                  data-testid="button-continue-setup"
-                >
-                  {stripeOnboardingMutation.isPending ? (
-                    'Redirigiendo...'
-                  ) : (
-                    <>
-                      Continuar Configuración
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </Card>
+          <DLocalOperatorBankAccountManager />
         </>
       )}
 
