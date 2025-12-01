@@ -1,0 +1,387 @@
+# Integración dLocal API - Progreso y Plan de Completación
+
+**Proyecto:** Sistema de Pagos y Nómina para Servicio de Grúas - República Dominicana  
+**Fecha de Inicio:** Diciembre 2024  
+**Estado Actual:** 60% completado
+
+---
+
+## 📋 Resumen Ejecutivo
+
+Se está implementando la integración con dLocal para:
+- ✅ Autorización y captura de pagos con tarjeta (flujo de pre-autorización)
+- ✅ Cancelación de autorizaciones y reembolsos
+- ⏳ Sistema de nómina programada (lunes y viernes)
+- ⏳ Retiros del mismo día con comisión de 100 DOP
+- ⏳ Interfaz de usuario para saldo de operadores
+
+---
+
+## ✅ COMPLETADO (60%)
+
+### 1. **Servicio dLocal Payment Service** ✓
+- **Archivo:** `server/services/dlocal-payment.ts`
+- **Métodos implementados:**
+  - `createPayment()` - Pagos completos con captura inmediata
+  - `createAuthorization()` - Pre-autorización de pagos (sin captura)
+  - `captureAuthorization()` - Captura de pago autorizado
+  - `cancelAuthorization()` - Cancelación de autorización
+  - `refundPayment()` - Reembolso de pagos capturados
+  - `createPayout()` - Pagos a operadores
+  - `getPaymentStatus()` - Consulta de estado de pago
+
+**Características:**
+- Reintentos automáticos con backoff exponencial
+- Validación de configuración
+- Logging detallado
+- Manejo de errores
+
+### 2. **Esquema de Base de Datos** ✓
+- **Archivo:** `shared/schema.ts`
+- **Cambios realizados:**
+  - Añadido campo `dlocalAuthorizationId` en tabla `servicios`
+  - Nueva tabla `scheduledPayouts` - Lotes de nómina programados
+  - Nueva tabla `scheduledPayoutItems` - Detalles de pagos individuales
+  - Actualizada tabla `operatorWithdrawals` con campos:
+    - `montoNeto` - Monto después de comisiones
+    - `comision` - Comisión cobrada
+    - `tipoRetiro` - 'programado' o 'inmediato'
+  - Nuevo enum `tipoRetiroEnum`
+  - Relaciones y esquemas de inserción/selección
+
+**Estado de BD:**
+- ✅ Tablas creadas
+- ✅ Campos añadidos
+- ✅ Enums configurados
+- ✅ Relaciones definidas
+
+### 3. **Flujo de Autorización en Solicitud de Servicio** ✓
+- **Archivo:** `server/routes.ts` (línea ~1600)
+- **Endpoint:** `POST /api/services/request`
+- **Implementación:**
+  - Verifica disponibilidad de método de pago tarjeta
+  - Obtiene tarjeta de pago por defecto del cliente
+  - Crea autorización sin captura
+  - Guarda `dlocalAuthorizationId` en servicio
+  - Manejo de errores con mensajes claros
+
+### 4. **Captura de Pago al Aceptar Servicio** ✓
+- **Archivo:** `server/routes.ts` (línea ~2060)
+- **Endpoint:** `POST /api/services/:id/accept`
+- **Implementación:**
+  - Verifica si hay autorización pendiente
+  - Captura el monto autorizado
+  - Guarda `dlocalPaymentId` y estado
+  - Permite que conductor acepte solo si captura es exitosa
+  - Manejo de fallos en captura
+
+### 5. **Cancelación de Autorizaciones** ✓
+- **Archivos:** 
+  - `server/services/service-auto-cancel.ts`
+  - `server/routes.ts` (línea ~2271)
+
+**Cancelación Automática:**
+- Se ejecuta cada 60 segundos
+- Cancela servicios sin aceptar después de 10 minutos
+- Cancela autorizaciones de pago
+- Notifica al cliente
+
+**Cancelación Manual:**
+- Endpoint: `POST /api/services/:id/cancel`
+- Cliente, conductor o admin pueden cancelar
+- Cancela autorización si está pendiente
+- Reembolsa si ya fue capturado
+- Notificaciones a ambas partes
+
+### 6. **Servicio de Nómina Programada** ✓
+- **Archivo:** `server/services/scheduled-payouts.ts` (nuevo)
+- **Funcionalidades:**
+  - `initScheduledPayouts()` - Inicia el servicio
+  - `processScheduledPayouts()` - Procesa pagos de lunes y viernes
+  - `requestImmediateWithdrawal()` - Retiro del mismo día (100 DOP de comisión)
+  - `getNextPayoutDate()` - Calcula próxima fecha de nómina
+  - `getBankCode()` - Mapeo de nombres de bancos a códigos dLocal
+
+**Lógica:**
+- Se ejecuta automáticamente los lunes y viernes a las 8-9 AM
+- Procesa todos los operadores con saldo > RD$100
+- Verifica cuenta bancaria verificada
+- Crea batch de pagos en tabla `scheduledPayouts`
+- Registra cada pago en `scheduledPayoutItems`
+- Actualiza balance del operador a $0
+- Manejo de errores por operador
+
+**Retiro Inmediato:**
+- Disponible 24/7
+- Comisión fija de 100 DOP
+- Monto mínimo: 500 DOP
+- Requiere cuenta bancaria verificada
+- Registra en `operatorWithdrawals` con `tipoRetiro='inmediato'`
+
+---
+
+## ⏳ POR HACER (40%)
+
+### FASE 2: Rutas API para Operador (25% del trabajo)
+
+#### 2.1 Endpoints de Nómina y Retiros
+- **Ubicación:** `server/routes.ts`
+- **Tareas:**
+  - [ ] `GET /api/operator/balance` - Obtener saldo disponible y pendiente
+  - [ ] `GET /api/operator/bank-account` - Obtener cuenta bancaria registrada
+  - [ ] `POST /api/operator/bank-account` - Registrar/actualizar cuenta bancaria
+  - [ ] `POST /api/operator/withdrawals/immediate` - Solicitar retiro del mismo día
+  - [ ] `GET /api/operator/withdrawals` - Listar historial de retiros
+  - [ ] `GET /api/operator/payouts/scheduled` - Próxima fecha de nómina
+  - [ ] `GET /api/admin/scheduled-payouts` - Admin: Ver lotes de nómina
+  - [ ] `GET /api/admin/scheduled-payouts/:id` - Admin: Detalles del lote
+
+**Puntos de implementación:**
+- Validación de autenticación (conductores/admin)
+- Validación de datos (cuenta bancaria, montos)
+- Actualización de balances
+- Transacciones seguras
+- Manejo de errores específicos
+
+#### 2.2 Integración con Storage
+- **Archivo:** `server/storage.ts`
+- **Métodos a añadir:**
+  - `getConductoresWithPositiveBalance()` - Para procesamiento de nómina
+  - `getOperatorBankAccountByCondutorId()` - Obtener cuenta bancaria
+  - `createOperatorWithdrawal()` - Crear registro de retiro
+  - `updateOperatorWithdrawal()` - Actualizar estado de retiro
+  - `createScheduledPayout()` - Crear lote de nómina
+  - `updateScheduledPayout()` - Actualizar lote
+  - `createScheduledPayoutItem()` - Crear pago individual
+  - `updateScheduledPayoutItem()` - Actualizar pago individual
+  - `updateConductorBalance()` - Actualizar balance disponible/pendiente
+  - `getConductorById()` - Obtener conductor por ID (si no existe)
+
+### FASE 3: Interfaz de Usuario (15% del trabajo)
+
+#### 3.1 Componente de Balance del Operador
+- **Ubicación:** `client/src/pages/driver/profile.tsx`
+- **Elementos a añadir:**
+  - Tarjeta de saldo disponible (grande, destacado)
+  - Tarjeta de saldo pendiente (próximo pago programado)
+  - Botón "Retirar Hoy" (con comisión visible)
+  - Botón "Ver Historial"
+  - Modal de confirmación para retiros
+
+**Diseño:**
+- Mostrar:
+  - Balance disponible: RD$ X,XXX.XX
+  - Próximo pago programado: Día/Fecha
+  - Comisión de retiro del mismo día: RD$ 100
+  - Historial de últimos 5 retiros
+
+#### 3.2 Gestión de Cuenta Bancaria
+- **Ubicación:** `client/src/pages/driver/profile.tsx`
+- **Elementos:**
+  - Formulario de registro de cuenta (si no existe)
+  - Vista de cuenta verificada (si existe)
+  - Botón para editar
+  - Estado de verificación
+
+**Campos:**
+- Nombre del titular
+- Cédula
+- Banco (select dropdown)
+- Tipo de cuenta (Ahorro/Corriente)
+- Número de cuenta
+
+#### 3.3 Modal de Retiro del Mismo Día
+- Monto a retirar (input con validación)
+- Comisión visible (RD$ 100)
+- Monto neto a recibir (cálculo automático)
+- Alertas de validación
+- Confirmación y procesamiento
+- Feedback de resultado
+
+#### 3.4 Historial de Retiros
+- Tabla/lista de retiros anteriores
+- Columnas:
+  - Fecha
+  - Tipo (Programado/Inmediato)
+  - Monto
+  - Comisión
+  - Monto Neto
+  - Estado (Pendiente/Procesando/Pagado/Fallido)
+- Filtros por tipo/estado
+- Opcional: Exportar a PDF
+
+### FASE 4: Testing y Validación (5-10% del trabajo)
+
+#### 4.1 Testing Manual
+- [ ] Flujo completo de solicitud de servicio con tarjeta
+- [ ] Autorización y captura de pago
+- [ ] Cancelación antes de captura (revertir autorización)
+- [ ] Cancelación después de captura (reembolso)
+- [ ] Retiro inmediato del operador
+- [ ] Procesamiento de nómina programada
+- [ ] Manejo de errores (tarjeta rechazada, cuenta no verificada, etc.)
+
+#### 4.2 Casos de Prueba
+**Pago:**
+- ✓ Cliente con tarjeta válida solicita servicio
+- ✓ Operador acepta → pago se captura
+- ✓ Operador rechaza → autorización se cancela
+- ✓ Cliente cancela antes de aceptación → autorización se cancela
+- ✓ Cliente cancela después de aceptación → pago se reembolsa
+
+**Nómina:**
+- ✓ Lunes 8 AM: Procesamiento automático de pagos
+- ✓ Viernes 8 AM: Procesamiento automático de pagos
+- ✓ Operador con balance < 100 DOP: No se procesa
+- ✓ Operador sin cuenta verificada: No se procesa
+- ✓ Error en dLocal: Se registra y se reintenta
+
+**Retiro Inmediato:**
+- ✓ Monto válido, cuenta verificada: Procesado
+- ✓ Monto < 500 DOP: Error
+- ✓ Monto > balance: Error
+- ✓ Sin cuenta bancaria: Error
+- ✓ Comisión de 100 DOP: Aplicada correctamente
+
+#### 4.3 Debugging y Logs
+- [ ] Verificar logs de autorización
+- [ ] Verificar logs de captura
+- [ ] Verificar logs de procesamiento de nómina
+- [ ] Verificar actualización de balances en BD
+- [ ] Verificar estado de retiros
+
+---
+
+## 📊 Estado de Tareas
+
+| Tarea | Estado | % | Notas |
+|-------|--------|---|-------|
+| 1. Auth/Capture Service | ✅ | 100% | Completado |
+| 2. Esquema BD | ✅ | 100% | Tablas creadas |
+| 3. Autorización en solicitud | ✅ | 100% | Implementado |
+| 4. Captura en aceptación | ✅ | 100% | Implementado |
+| 5. Cancelación de auth | ✅ | 100% | Implementado |
+| 6. Servicio de nómina | ✅ | 100% | Lógica completada |
+| 7. **API Routes** | ⏳ | 0% | **PRÓXIMO** |
+| 8. **UI del Operador** | ⏳ | 0% | **DESPUÉS DE ROUTES** |
+| 9. **Testing** | ⏳ | 0% | **AL FINAL** |
+
+---
+
+## 🎯 Plan de Ejecución - Próximos Pasos
+
+### TURNO 1: Completar Routes API (2-3 horas)
+1. Añadir métodos faltantes al `server/storage.ts`
+2. Crear endpoints de balance y nómina en `server/routes.ts`
+3. Crear endpoints de retiros (inmediato e historial)
+4. Crear endpoints admin para gestión de nómina
+5. Verificar LSP diagnostics
+
+### TURNO 2: Implementar UI (2-3 horas)
+1. Crear/actualizar componente `OperatorBalance` en driver profile
+2. Implementar modal de retiro del mismo día
+3. Implementar tabla de historial de retiros
+4. Implementar formulario de cuenta bancaria
+5. Añadir validaciones y feedback
+6. Estilizar con diseño existente
+
+### TURNO 3: Testing e Integración (1-2 horas)
+1. Iniciar servidor
+2. Ejecutar flujos de prueba manualmente
+3. Verificar logs y BD
+4. Corregir bugs encontrados
+5. Testing del flujo completo de pago a payout
+6. Documentar resultados
+
+---
+
+## 🔧 Requisitos Técnicos
+
+### Variables de Entorno Requeridas
+```
+DLOCAL_X_LOGIN=***
+DLOCAL_X_TRANS_KEY=***
+DLOCAL_SECRET_KEY=***
+ALLOWED_ORIGINS=http://localhost:5000
+```
+
+### Dependencias Instaladas
+- ✅ @neondatabase/serverless (PostgreSQL)
+- ✅ drizzle-orm + drizzle-kit
+- ✅ @stripe/react-stripe-js (no se usa, pero disponible)
+- ✅ @tanstack/react-query
+- ✅ react-hook-form + @hookform/resolvers
+- ✅ zod (validación)
+- ✅ lucide-react (iconos)
+- ✅ tailwindcss + shadcn/ui (estilos)
+
+### Tablas de BD Relacionadas
+```
+servicios (dlocalAuthorizationId, dlocalPaymentId)
+    ↓
+operator_bank_accounts (verificación de cuenta)
+    ↓
+operator_withdrawals (retiros)
+    ↓
+scheduled_payouts (lotes de nómina)
+    └→ scheduled_payout_items (pagos individuales)
+```
+
+---
+
+## 💡 Notas Importantes
+
+### Comisión de Retiro del Mismo Día
+- **Fija:** RD$ 100
+- **Aplica a:** Retiros solicitados fuera del martes/viernes 8-9 AM
+- **No aplica a:** Nómina programada (lunes y viernes)
+
+### Balance del Operador
+- **`balanceDisponible`:** Dinero listo para retirar
+- **`balancePendiente`:** Dinero que llegará en próxima nómina programada
+
+### Flujo de Dinero
+```
+Pago del Cliente
+       ↓
+Autorización (hold)
+       ↓
+[Aceptación del Operador]
+       ↓
+Captura del Pago
+       ↓
+Dinero → balanceDisponible (80% operador, 20% empresa)
+       ↓
+[Retiro Inmediato o Esperar Nómina]
+       ↓
+Payout a cuenta bancaria
+```
+
+### Manejo de Errores
+- **Autorización fallida:** Usuario debe verificar tarjeta
+- **Captura fallida:** Autorización se revierte automáticamente
+- **Payout fallido:** Se registra y puede reintentar admin
+- **Cuenta no verificada:** Operador no puede retirar
+
+---
+
+## 📝 Archivos Modificados
+
+| Archivo | Cambios |
+|---------|---------|
+| `server/services/dlocal-payment.ts` | ✅ Métodos auth/capture/cancel |
+| `shared/schema.ts` | ✅ Nuevas tablas y campos |
+| `server/routes.ts` | ✅ Auth en solicitud, captura en aceptación, cancelación |
+| `server/services/service-auto-cancel.ts` | ✅ Cancelación de auth |
+| `server/services/scheduled-payouts.ts` | ✅ NUEVO - Lógica de nómina |
+| `server/storage.ts` | ⏳ Métodos faltantes |
+| `client/src/pages/driver/profile.tsx` | ⏳ UI de balance |
+| `server/routes.ts` | ⏳ API routes faltantes |
+
+---
+
+## ✨ Próximo Enfoque
+
+**Inmediato:** Implementar API routes y métodos de storage
+**Meta:** Poder hacer peticiones GET/POST desde UI del operador
+**Validación:** Verificar flujos en logs y BD
