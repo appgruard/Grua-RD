@@ -57,3 +57,11 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Resend**: Email service for transactional emails and notifications (via Replit Connector).
 - **Verifik**: OCR scanning and Dominican government database verification for cédula validation.
 - **Capacitor**: For native mobile app functionalities and plugins (e.g., Camera, Filesystem, Geolocation, Push Notifications, Network, App).
+
+## Deployment Configuration
+- **CapRover**: Production deployment via Docker multi-stage build (Node 20 Alpine)
+- **Container Port**: 80 (standard for CapRover)
+- **Health Check**: `/health` endpoint for container monitoring
+- **CORS**: Configured for web domains, plus `capacitor://`, `ionic://`, and `file://` schemes for mobile apps
+- **API URL**: Use `VITE_API_URL` environment variable to configure production server URL for mobile builds
+- **Documentation**: See `DEPLOYMENT_CAPROVER.md` for full deployment guide and `CAPACITOR_BUILD_GUIDE.md` for mobile app builds
