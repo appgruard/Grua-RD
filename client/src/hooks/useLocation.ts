@@ -176,6 +176,12 @@ export function useLocationTracking(
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const callbackRef = useRef<((location: LocationData) => void) | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const onLocationUpdateRef = useRef(onLocationUpdate);
+
+  useEffect(() => {
+    onLocationUpdateRef.current = onLocationUpdate;
+  }, [onLocationUpdate]);
 
   useEffect(() => {
     if (!enabled) {
@@ -183,12 +189,16 @@ export function useLocationTracking(
         LocationService.stopTracking(callbackRef.current);
         callbackRef.current = null;
       }
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
       setIsTracking(false);
       return;
     }
 
     const callback = (locationData: LocationData) => {
-      onLocationUpdate({
+      onLocationUpdateRef.current({
         lat: locationData.latitude,
         lng: locationData.longitude,
       });
@@ -196,41 +206,64 @@ export function useLocationTracking(
 
     callbackRef.current = callback;
 
-    const start = async () => {
+    const startWithCapacitor = async () => {
       try {
         const hasPerms = await LocationService.checkPermissions();
         if (!hasPerms) {
           const granted = await LocationService.requestPermissions();
           if (!granted) {
-            setError('Se requieren permisos de ubicación');
-            return;
+            throw new Error('Permission denied');
           }
         }
 
         await LocationService.startTracking(callback, options);
         setIsTracking(true);
         setError(null);
+        return true;
       } catch (err) {
-        console.error('Error starting location tracking:', err);
+        console.error('Capacitor location tracking error:', err);
+        return false;
+      }
+    };
+
+    const startWithBrowser = () => {
+      if (!('geolocation' in navigator)) {
+        setError('Geolocalización no disponible');
+        return false;
+      }
+
+      try {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            onLocationUpdateRef.current({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            });
+          },
+          (geoError) => {
+            console.error('Browser geolocation error:', geoError);
+            setError('Error de ubicación: ' + geoError.message);
+          },
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+        );
+        setIsTracking(true);
+        setError(null);
+        return true;
+      } catch (err) {
+        console.error('Browser geolocation error:', err);
         setError('Error al iniciar seguimiento');
-        if (!isCapacitor() || isWeb()) {
-          if ('geolocation' in navigator) {
-            const watchId = navigator.geolocation.watchPosition(
-              (position) => {
-                onLocationUpdate({
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                });
-              },
-              (err) => console.error('Fallback geolocation error:', err),
-              { enableHighAccuracy: true, maximumAge: 5000 }
-            );
-            setIsTracking(true);
-            setError(null);
-            
-            return () => navigator.geolocation.clearWatch(watchId);
-          }
+        return false;
+      }
+    };
+
+    const start = async () => {
+      if (isCapacitor() && !isWeb()) {
+        const success = await startWithCapacitor();
+        if (!success) {
+          startWithBrowser();
         }
+      } else {
+        startWithBrowser();
       }
     };
 
@@ -241,9 +274,13 @@ export function useLocationTracking(
         LocationService.stopTracking(callbackRef.current);
         callbackRef.current = null;
       }
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
       setIsTracking(false);
     };
-  }, [enabled, onLocationUpdate, options?.interval, options?.minDistance]);
+  }, [enabled, options?.interval, options?.minDistance]);
 
   return { isTracking, error };
 }
