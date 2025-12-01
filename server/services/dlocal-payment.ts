@@ -25,6 +25,41 @@ interface DLocalPaymentResponse {
   cardId?: string;
 }
 
+interface DLocalAuthorizationRequest {
+  amount: number;
+  servicioId: string;
+  email: string;
+  name: string;
+  document: string;
+  description: string;
+  cardNumber?: string;
+  cardExpiry?: string;
+  cardCVV?: string;
+  cardToken?: string;
+}
+
+interface DLocalAuthorizationResponse {
+  authorizationId: string;
+  status: string;
+  statusCode: string;
+  statusDetail: string;
+  amount: number;
+  currency: string;
+  authorized: boolean;
+  cardId?: string;
+}
+
+interface DLocalCaptureResponse {
+  paymentId: string;
+  authorizationId: string;
+  status: string;
+  statusCode: string;
+  statusDetail: string;
+  amount: number;
+  currency: string;
+  captured: boolean;
+}
+
 interface DLocalPayoutRequest {
   externalId: string;
   amount: number;
@@ -266,6 +301,200 @@ export class DLocalPaymentService {
       },
       "dLocal Payment",
       { servicioId: request.servicioId, amount: request.amount }
+    );
+  }
+
+  async createAuthorization(request: DLocalAuthorizationRequest): Promise<DLocalAuthorizationResponse> {
+    if (!this.isConfigured()) {
+      throw new Error("dLocal payment service not configured. Configure DLOCAL_X_LOGIN, DLOCAL_X_TRANS_KEY, and DLOCAL_SECRET_KEY.");
+    }
+
+    return this.executeWithRetry(
+      async () => {
+        const orderId = `AUTH-${request.servicioId}-${Date.now()}`;
+        
+        const payload: any = {
+          amount: request.amount,
+          currency: "DOP",
+          country: "DO",
+          payment_method_id: "CARD",
+          payment_method_flow: "DIRECT",
+          order_id: orderId,
+          description: request.description,
+          notification_url: `${process.env.ALLOWED_ORIGINS?.split(',')[0] || 'http://localhost:5000'}/api/dlocal/webhook`,
+          payer: {
+            name: request.name,
+            email: request.email,
+            document: request.document,
+            address: {
+              country: "DO",
+            },
+          },
+        };
+
+        if (request.cardToken) {
+          payload.card = {
+            card_id: request.cardToken,
+            capture: false,
+          };
+        } else if (request.cardNumber && request.cardExpiry && request.cardCVV) {
+          const [expMonth, expYear] = request.cardExpiry.split('/');
+          payload.card = {
+            holder_name: request.name,
+            number: request.cardNumber.replace(/\s/g, ''),
+            cvv: request.cardCVV,
+            expiration_month: parseInt(expMonth),
+            expiration_year: parseInt(expYear.length === 2 ? `20${expYear}` : expYear),
+            capture: false,
+          };
+        }
+
+        const payloadStr = JSON.stringify(payload);
+        
+        const response = await fetch(`${this.apiUrl}/secure_payments`, {
+          method: "POST",
+          headers: this.getHeaders(payloadStr),
+          body: payloadStr,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          logger.error("dLocal authorization failed", {
+            servicioId: request.servicioId,
+            status: response.status,
+            error: data,
+          });
+          throw new Error(data.message || `Authorization failed: ${response.status}`);
+        }
+
+        const authorized = data.status === "AUTHORIZED";
+
+        logger.info("dLocal authorization created", {
+          authorizationId: data.id,
+          servicioId: request.servicioId,
+          status: data.status,
+          authorized,
+          amount: request.amount,
+        });
+
+        return {
+          authorizationId: data.id,
+          status: data.status,
+          statusCode: data.status_code || "100",
+          statusDetail: data.status_detail || this.getStatusMessage(data.status_code || "100"),
+          amount: request.amount,
+          currency: "DOP",
+          authorized,
+          cardId: data.card?.card_id,
+        };
+      },
+      "dLocal Authorization",
+      { servicioId: request.servicioId, amount: request.amount }
+    );
+  }
+
+  async captureAuthorization(authorizationId: string, amount: number, orderId: string): Promise<DLocalCaptureResponse> {
+    if (!this.isConfigured()) {
+      throw new Error("dLocal payment service not configured.");
+    }
+
+    return this.executeWithRetry(
+      async () => {
+        const payload = {
+          authorization_id: authorizationId,
+          amount: amount,
+          currency: "DOP",
+          order_id: `${orderId}-CAP-${Date.now()}`,
+        };
+
+        const payloadStr = JSON.stringify(payload);
+        
+        const response = await fetch(`${this.apiUrl}/payments`, {
+          method: "POST",
+          headers: this.getHeaders(payloadStr),
+          body: payloadStr,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          logger.error("dLocal capture failed", {
+            authorizationId,
+            status: response.status,
+            error: data,
+          });
+          throw new Error(data.message || `Capture failed: ${response.status}`);
+        }
+
+        const captured = data.status === "PAID";
+
+        logger.info("dLocal payment captured", {
+          paymentId: data.id,
+          authorizationId,
+          status: data.status,
+          captured,
+          amount,
+        });
+
+        return {
+          paymentId: data.id,
+          authorizationId: authorizationId,
+          status: data.status,
+          statusCode: data.status_code || "100",
+          statusDetail: data.status_detail || this.getStatusMessage(data.status_code || "100"),
+          amount: amount,
+          currency: "DOP",
+          captured,
+        };
+      },
+      "dLocal Capture",
+      { authorizationId, amount }
+    );
+  }
+
+  async cancelAuthorization(authorizationId: string): Promise<{ cancelled: boolean; status: string }> {
+    if (!this.isConfigured()) {
+      throw new Error("dLocal payment service not configured.");
+    }
+
+    return this.executeWithRetry(
+      async () => {
+        const response = await fetch(`${this.apiUrl}/payments/${authorizationId}/cancel`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Login": this.xLogin,
+            "X-Trans-Key": this.xTransKey,
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          logger.error("dLocal cancel authorization failed", {
+            authorizationId,
+            status: response.status,
+            error: data,
+          });
+          throw new Error(data.message || `Cancel authorization failed: ${response.status}`);
+        }
+
+        const cancelled = data.status === "CANCELLED" || data.status === "VOIDED";
+
+        logger.info("dLocal authorization cancelled", {
+          authorizationId,
+          status: data.status,
+          cancelled,
+        });
+
+        return {
+          cancelled,
+          status: data.status,
+        };
+      },
+      "dLocal Cancel Authorization",
+      { authorizationId }
     );
   }
 

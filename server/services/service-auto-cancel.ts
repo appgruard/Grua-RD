@@ -34,6 +34,37 @@ export function stopServiceAutoCancellation() {
   }
 }
 
+async function cancelPaymentAuthorization(service: any): Promise<void> {
+  if (service.metodoPago !== 'tarjeta' || !service.dlocalAuthorizationId) {
+    return;
+  }
+
+  try {
+    const { dlocalPaymentService } = await import('./dlocal-payment');
+    
+    if (!dlocalPaymentService.isConfigured()) {
+      logSystem.warn('dLocal not configured, cannot cancel authorization', { 
+        servicioId: service.id 
+      });
+      return;
+    }
+
+    const result = await dlocalPaymentService.cancelAuthorization(service.dlocalAuthorizationId);
+    
+    logSystem.info('Payment authorization cancelled for auto-cancelled service', { 
+      servicioId: service.id,
+      authorizationId: service.dlocalAuthorizationId,
+      cancelled: result.cancelled,
+      status: result.status
+    });
+  } catch (error) {
+    logSystem.error('Failed to cancel payment authorization', error, { 
+      servicioId: service.id,
+      authorizationId: service.dlocalAuthorizationId 
+    });
+  }
+}
+
 async function checkAndCancelExpiredServices() {
   try {
     const cancelledServices = await storage.cancelExpiredServicios(SERVICE_TIMEOUT_MINUTES);
@@ -50,6 +81,8 @@ async function checkAndCancelExpiredServices() {
         clienteId: service.clienteId,
         createdAt: service.createdAt
       });
+
+      await cancelPaymentAuthorization(service);
 
       try {
         await pushService.sendNotification(

@@ -169,6 +169,7 @@ export const servicios = pgTable("servicios", {
   metodoPago: metodoPagoEnum("metodo_pago").default("efectivo").notNull(),
   dlocalPaymentId: text("dlocal_payment_id"),
   dlocalPaymentStatus: text("dlocal_payment_status"),
+  dlocalAuthorizationId: text("dlocal_authorization_id"),
   tipoVehiculo: tipoVehiculoEnum("tipo_vehiculo"),
   servicioCategoria: servicioCategoriaEnum("servicio_categoria").default("remolque_estandar"),
   servicioSubtipo: servicioSubtipoEnum("servicio_subtipo"),
@@ -622,9 +623,44 @@ export const operatorBankAccounts = pgTable("operator_bank_accounts", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Tipo de retiro enum
+export const tipoRetiroEnum = pgEnum("tipo_retiro", [
+  "programado",
+  "inmediato"
+]);
+
 // Operator Withdrawals Table (payout requests)
 export const operatorWithdrawals = pgTable("operator_withdrawals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
+  monto: decimal("monto", { precision: 12, scale: 2 }).notNull(),
+  montoNeto: decimal("monto_neto", { precision: 12, scale: 2 }).notNull(),
+  comision: decimal("comision", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  tipoRetiro: tipoRetiroEnum("tipo_retiro").default("programado").notNull(),
+  estado: estadoPagoEnum("estado").default("pendiente").notNull(),
+  dlocalPayoutId: text("dlocal_payout_id"),
+  dlocalStatus: text("dlocal_status"),
+  errorMessage: text("error_message"),
+  procesadoAt: timestamp("procesado_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Scheduled Payouts Table (for Monday/Friday automatic payouts)
+export const scheduledPayouts = pgTable("scheduled_payouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fechaProgramada: timestamp("fecha_programada").notNull(),
+  fechaProcesado: timestamp("fecha_procesado"),
+  estado: estadoPagoEnum("estado").default("pendiente").notNull(),
+  totalPagos: integer("total_pagos").default(0).notNull(),
+  montoTotal: decimal("monto_total", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  notas: text("notas"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Scheduled Payout Items (individual payouts within a scheduled batch)
+export const scheduledPayoutItems = pgTable("scheduled_payout_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scheduledPayoutId: varchar("scheduled_payout_id").notNull().references(() => scheduledPayouts.id, { onDelete: "cascade" }),
   conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
   monto: decimal("monto", { precision: 12, scale: 2 }).notNull(),
   estado: estadoPagoEnum("estado").default("pendiente").notNull(),
@@ -647,6 +683,23 @@ export const operatorBankAccountsRelations = relations(operatorBankAccounts, ({ 
 export const operatorWithdrawalsRelations = relations(operatorWithdrawals, ({ one }) => ({
   conductor: one(conductores, {
     fields: [operatorWithdrawals.conductorId],
+    references: [conductores.id],
+  }),
+}));
+
+// Scheduled Payouts Relations
+export const scheduledPayoutsRelations = relations(scheduledPayouts, ({ many }) => ({
+  items: many(scheduledPayoutItems),
+}));
+
+// Scheduled Payout Items Relations
+export const scheduledPayoutItemsRelations = relations(scheduledPayoutItems, ({ one }) => ({
+  scheduledPayout: one(scheduledPayouts, {
+    fields: [scheduledPayoutItems.scheduledPayoutId],
+    references: [scheduledPayouts.id],
+  }),
+  conductor: one(conductores, {
+    fields: [scheduledPayoutItems.conductorId],
     references: [conductores.id],
   }),
 }));
@@ -953,6 +1006,32 @@ export const insertOperatorBankAccountSchema = createInsertSchema(operatorBankAc
 
 export const insertOperatorWithdrawalSchema = createInsertSchema(operatorWithdrawals, {
   monto: z.string().refine((val) => parseFloat(val) >= 500, { message: "El monto mínimo de retiro es RD$500" }),
+  montoNeto: z.string().min(1, "Monto neto es requerido"),
+  comision: z.string().optional(),
+  tipoRetiro: z.enum(["programado", "inmediato"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  estado: true,
+  dlocalPayoutId: true,
+  dlocalStatus: true,
+  errorMessage: true,
+  procesadoAt: true,
+});
+
+export const insertScheduledPayoutSchema = createInsertSchema(scheduledPayouts, {
+  fechaProgramada: z.date(),
+}).omit({
+  id: true,
+  createdAt: true,
+  fechaProcesado: true,
+  estado: true,
+  totalPagos: true,
+  montoTotal: true,
+});
+
+export const insertScheduledPayoutItemSchema = createInsertSchema(scheduledPayoutItems, {
+  monto: z.string().min(1, "Monto es requerido"),
 }).omit({
   id: true,
   createdAt: true,
@@ -984,6 +1063,8 @@ export const selectDistribucionSocioSchema = createSelectSchema(distribucionesSo
 export const selectClientPaymentMethodSchema = createSelectSchema(clientPaymentMethods);
 export const selectOperatorBankAccountSchema = createSelectSchema(operatorBankAccounts);
 export const selectOperatorWithdrawalSchema = createSelectSchema(operatorWithdrawals);
+export const selectScheduledPayoutSchema = createSelectSchema(scheduledPayouts);
+export const selectScheduledPayoutItemSchema = createSelectSchema(scheduledPayoutItems);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1045,6 +1126,12 @@ export type OperatorBankAccount = typeof operatorBankAccounts.$inferSelect;
 
 export type InsertOperatorWithdrawal = z.infer<typeof insertOperatorWithdrawalSchema>;
 export type OperatorWithdrawal = typeof operatorWithdrawals.$inferSelect;
+
+export type InsertScheduledPayout = z.infer<typeof insertScheduledPayoutSchema>;
+export type ScheduledPayout = typeof scheduledPayouts.$inferSelect;
+
+export type InsertScheduledPayoutItem = z.infer<typeof insertScheduledPayoutItemSchema>;
+export type ScheduledPayoutItem = typeof scheduledPayoutItems.$inferSelect;
 
 // Helper types for API responses
 export type UserWithConductor = User & {

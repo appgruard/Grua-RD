@@ -1594,6 +1594,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         servicioData.aseguradoraEstado = "pendiente";
       }
 
+      if (validatedData.metodoPago === "tarjeta") {
+        const { dlocalPaymentService } = await import('./services/dlocal-payment');
+        
+        if (!dlocalPaymentService.isConfigured()) {
+          return res.status(503).json({ 
+            message: "El servicio de pagos con tarjeta no está disponible en este momento",
+            paymentServiceUnavailable: true 
+          });
+        }
+
+        const paymentMethod = await storage.getDefaultPaymentMethodByUserId(req.user!.id);
+        if (!paymentMethod) {
+          return res.status(400).json({ 
+            message: "No tienes un método de pago registrado. Por favor agrega una tarjeta antes de solicitar el servicio.",
+            noPaymentMethod: true 
+          });
+        }
+
+        const serviceAmount = parseFloat(validatedData.costoTotal as string);
+        
+        try {
+          const authResult = await dlocalPaymentService.createAuthorization({
+            servicioId: `PRE-${Date.now()}`,
+            amount: serviceAmount,
+            name: `${req.user!.nombre} ${req.user!.apellido}`,
+            email: req.user!.email,
+            document: req.user!.cedula || '00000000000',
+            cardToken: paymentMethod.dlocalCardId,
+            description: `Autorización - Servicio de grúa: ${validatedData.origenDireccion} a ${validatedData.destinoDireccion}`,
+          });
+
+          if (!authResult.authorized) {
+            return res.status(400).json({ 
+              message: "No se pudo autorizar el pago. Por favor verifica tu método de pago.",
+              paymentAuthorizationFailed: true,
+              statusDetail: authResult.statusDetail
+            });
+          }
+
+          servicioData.dlocalAuthorizationId = authResult.authorizationId;
+          logService.info('Card payment authorized', { 
+            authorizationId: authResult.authorizationId, 
+            amount: serviceAmount,
+            clienteId: req.user!.id 
+          });
+        } catch (authError: any) {
+          logSystem.error('Card authorization failed', authError, { clienteId: req.user!.id });
+          return res.status(400).json({ 
+            message: "Error al procesar la autorización del pago. Por favor intenta de nuevo.",
+            paymentAuthorizationFailed: true 
+          });
+        }
+      }
+
       const servicio = await storage.createServicio(servicioData);
 
       logService.created(servicio.id, req.user!.id, req.body.origenDireccion || 'N/A', req.body.destinoDireccion || 'N/A');
@@ -2007,6 +2061,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      const existingServicio = await storage.getServicioById(req.params.id);
+      if (!existingServicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (existingServicio.metodoPago === 'tarjeta' && existingServicio.dlocalAuthorizationId) {
+        const { dlocalPaymentService } = await import('./services/dlocal-payment');
+        
+        if (!dlocalPaymentService.isConfigured()) {
+          return res.status(503).json({ 
+            message: "El servicio de pagos no está disponible. No se puede aceptar el servicio.",
+            paymentServiceUnavailable: true 
+          });
+        }
+
+        try {
+          const captureResult = await dlocalPaymentService.captureAuthorization(
+            existingServicio.dlocalAuthorizationId,
+            parseFloat(existingServicio.costoTotal),
+            `SVC-${existingServicio.id}`
+          );
+
+          if (!captureResult.captured) {
+            logSystem.error('Payment capture failed', { 
+              servicioId: existingServicio.id,
+              authorizationId: existingServicio.dlocalAuthorizationId,
+              status: captureResult.status,
+              statusDetail: captureResult.statusDetail
+            });
+            return res.status(400).json({ 
+              message: "No se pudo capturar el pago. El cliente puede haber cancelado la autorización.",
+              paymentCaptureFailed: true 
+            });
+          }
+
+          await storage.updateServicio(req.params.id, {
+            dlocalPaymentId: captureResult.paymentId,
+            dlocalPaymentStatus: captureResult.status,
+          });
+
+          logService.info('Card payment captured on acceptance', { 
+            servicioId: existingServicio.id,
+            paymentId: captureResult.paymentId,
+            amount: existingServicio.costoTotal 
+          });
+        } catch (captureError: any) {
+          logSystem.error('Payment capture error', captureError, { 
+            servicioId: existingServicio.id,
+            authorizationId: existingServicio.dlocalAuthorizationId 
+          });
+          return res.status(400).json({ 
+            message: "Error al procesar el pago. Por favor intenta de nuevo.",
+            paymentCaptureFailed: true 
+          });
+        }
+      }
+
       const servicio = await storage.acceptServicio(req.params.id, req.user!.id);
       
       logService.accepted(servicio.id, req.user!.id);
@@ -2151,6 +2262,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Confirm payment error', error, { servicioId: req.params.id });
       res.status(500).json({ message: "Error al confirmar el pago" });
+    }
+  });
+
+  app.post("/api/services/:id/cancel", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+      const servicio = await storage.getServicioById(servicioId);
+      
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      const isClient = servicio.clienteId === req.user!.id;
+      const isDriver = servicio.conductorId === req.user!.id;
+      const isAdmin = req.user!.userType === 'admin';
+
+      if (!isClient && !isDriver && !isAdmin) {
+        return res.status(403).json({ message: "No autorizado para cancelar este servicio" });
+      }
+
+      if (servicio.estado === 'cancelado') {
+        return res.status(400).json({ message: "El servicio ya está cancelado" });
+      }
+
+      if (servicio.estado === 'completado') {
+        return res.status(400).json({ message: "No se puede cancelar un servicio completado" });
+      }
+
+      if (servicio.metodoPago === 'tarjeta') {
+        const { dlocalPaymentService } = await import('./services/dlocal-payment');
+        
+        if (dlocalPaymentService.isConfigured()) {
+          if (servicio.dlocalAuthorizationId && !servicio.dlocalPaymentId) {
+            try {
+              const cancelResult = await dlocalPaymentService.cancelAuthorization(servicio.dlocalAuthorizationId);
+              logService.info('Payment authorization cancelled', { 
+                servicioId,
+                authorizationId: servicio.dlocalAuthorizationId,
+                cancelled: cancelResult.cancelled,
+                status: cancelResult.status
+              });
+            } catch (cancelError: any) {
+              logSystem.error('Failed to cancel payment authorization', cancelError, { servicioId });
+            }
+          } else if (servicio.dlocalPaymentId) {
+            try {
+              const refundResult = await dlocalPaymentService.refundPayment(
+                servicio.dlocalPaymentId,
+                parseFloat(servicio.costoTotal)
+              );
+              logService.info('Payment refunded', { 
+                servicioId,
+                paymentId: servicio.dlocalPaymentId,
+                refundId: refundResult.refundId,
+                status: refundResult.status
+              });
+            } catch (refundError: any) {
+              logSystem.error('Failed to refund payment', refundError, { servicioId });
+              return res.status(400).json({ 
+                message: "No se pudo procesar el reembolso. Por favor contacta a soporte.",
+                refundFailed: true 
+              });
+            }
+          }
+        }
+      }
+
+      const cancelledService = await storage.updateServicio(servicioId, {
+        estado: 'cancelado',
+        canceladoAt: new Date(),
+      });
+
+      logService.info('Service cancelled', { 
+        servicioId,
+        cancelledBy: req.user!.id,
+        userType: req.user!.userType,
+        previousState: servicio.estado
+      });
+
+      if (isDriver && servicio.clienteId) {
+        await pushService.sendNotification(
+          servicio.clienteId,
+          'Servicio cancelado',
+          'El operador ha cancelado el servicio. Puedes solicitar uno nuevo.',
+          { type: 'service_cancelled', servicioId }
+        );
+      } else if (isClient && servicio.conductorId) {
+        await pushService.sendNotification(
+          servicio.conductorId,
+          'Servicio cancelado',
+          'El cliente ha cancelado el servicio.',
+          { type: 'service_cancelled', servicioId }
+        );
+      }
+
+      res.json(cancelledService);
+    } catch (error: any) {
+      logSystem.error('Cancel service error', error, { servicioId: req.params.id });
+      res.status(500).json({ message: "Error al cancelar el servicio" });
     }
   });
 
