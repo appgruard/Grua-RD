@@ -4601,6 +4601,241 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get conductor's withdrawal history
+  app.get("/api/drivers/withdrawal-history", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can view withdrawal history" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const withdrawals = await storage.getOperatorWithdrawals(conductor.id);
+
+      res.json({
+        withdrawals: withdrawals.map(w => ({
+          id: w.id,
+          monto: w.monto,
+          montoNeto: w.montoNeto,
+          comision: w.comision,
+          tipoRetiro: w.tipoRetiro,
+          estado: w.estado,
+          createdAt: w.createdAt,
+          procesadoAt: w.procesadoAt,
+        })),
+        total: withdrawals.length,
+      });
+    } catch (error: any) {
+      logSystem.error('Get withdrawal history error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get withdrawal history" });
+    }
+  });
+
+  // Get next scheduled payout date
+  app.get("/api/drivers/next-payout", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can view payout schedule" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const { getNextPayoutDate, SAME_DAY_WITHDRAWAL_COMMISSION, SCHEDULED_PAYOUT_DAYS } = await import('./services/scheduled-payouts');
+      const nextPayoutDate = getNextPayoutDate();
+      
+      const payoutDayNames = SCHEDULED_PAYOUT_DAYS.map(d => 
+        ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][d]
+      );
+
+      res.json({
+        nextPayoutDate: nextPayoutDate.toISOString(),
+        nextPayoutFormatted: nextPayoutDate.toLocaleDateString('es-DO', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        scheduledDays: payoutDayNames,
+        immediateWithdrawalCommission: SAME_DAY_WITHDRAWAL_COMMISSION,
+        balanceDisponible: conductor.balanceDisponible,
+        balancePendiente: conductor.balancePendiente,
+      });
+    } catch (error: any) {
+      logSystem.error('Get next payout error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get payout schedule" });
+    }
+  });
+
+  // Request immediate withdrawal (with commission)
+  app.post("/api/drivers/immediate-withdrawal", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can request withdrawals" });
+    }
+
+    try {
+      const { amount } = req.body;
+      
+      const parsedAmount = parseFloat(amount);
+      if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ message: "Monto inválido", success: false });
+      }
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found", success: false });
+      }
+
+      const { requestImmediateWithdrawal, SAME_DAY_WITHDRAWAL_COMMISSION } = await import('./services/scheduled-payouts');
+      
+      const availableBalance = parseFloat(conductor.balanceDisponible || '0');
+      if (parsedAmount > availableBalance) {
+        return res.status(400).json({ 
+          message: `Saldo insuficiente. Disponible: RD$${availableBalance.toFixed(2)}`,
+          success: false 
+        });
+      }
+
+      if (parsedAmount < 500) {
+        return res.status(400).json({ 
+          message: "El monto mínimo de retiro es RD$500",
+          success: false 
+        });
+      }
+
+      if (parsedAmount <= SAME_DAY_WITHDRAWAL_COMMISSION) {
+        return res.status(400).json({ 
+          message: `El monto debe ser mayor a la comisión de RD$${SAME_DAY_WITHDRAWAL_COMMISSION}`,
+          success: false 
+        });
+      }
+      
+      const result = await requestImmediateWithdrawal(conductor.id, parsedAmount);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: result.error || "Error al procesar el retiro",
+          success: false 
+        });
+      }
+
+      const netAmount = parsedAmount - SAME_DAY_WITHDRAWAL_COMMISSION;
+
+      logTransaction.info('Immediate withdrawal requested', {
+        conductorId: conductor.id,
+        amount: parsedAmount,
+        commission: SAME_DAY_WITHDRAWAL_COMMISSION,
+        netAmount,
+        withdrawalId: result.withdrawalId,
+      });
+
+      res.json({
+        success: true,
+        message: "Retiro procesado exitosamente",
+        withdrawalId: result.withdrawalId,
+        amount: parsedAmount,
+        commission: SAME_DAY_WITHDRAWAL_COMMISSION,
+        netAmount,
+        estimatedArrival: "Mismo día hábil",
+      });
+    } catch (error: any) {
+      logSystem.error('Immediate withdrawal error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Failed to process withdrawal", success: false });
+    }
+  });
+
+  // Admin: Get all scheduled payouts
+  app.get("/api/admin/scheduled-payouts", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const payouts = await storage.getScheduledPayouts();
+      
+      res.json({
+        payouts: payouts.map(p => ({
+          id: p.id,
+          fechaProgramada: p.fechaProgramada,
+          fechaProcesado: p.fechaProcesado,
+          estado: p.estado,
+          totalPagos: p.totalPagos,
+          montoTotal: p.montoTotal,
+          notas: p.notas,
+          createdAt: p.createdAt,
+        })),
+        total: payouts.length,
+      });
+    } catch (error: any) {
+      logSystem.error('Get scheduled payouts error', error);
+      res.status(500).json({ message: "Failed to get scheduled payouts" });
+    }
+  });
+
+  // Admin: Get scheduled payout details with items
+  app.get("/api/admin/scheduled-payouts/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const payout = await storage.getScheduledPayoutById(req.params.id);
+      
+      if (!payout) {
+        return res.status(404).json({ message: "Scheduled payout not found" });
+      }
+
+      const items = await storage.getScheduledPayoutItems(payout.id);
+      
+      // Get conductor details for each item
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item) => {
+          const conductor = await storage.getConductorById(item.conductorId);
+          const user = conductor ? await storage.getUserById(conductor.userId) : null;
+          return {
+            ...item,
+            conductorName: user ? `${user.nombre} ${user.apellido}` : 'Unknown',
+            conductorEmail: user?.email,
+          };
+        })
+      );
+
+      res.json({
+        payout: {
+          id: payout.id,
+          fechaProgramada: payout.fechaProgramada,
+          fechaProcesado: payout.fechaProcesado,
+          estado: payout.estado,
+          totalPagos: payout.totalPagos,
+          montoTotal: payout.montoTotal,
+          notas: payout.notas,
+          createdAt: payout.createdAt,
+        },
+        items: itemsWithDetails,
+      });
+    } catch (error: any) {
+      logSystem.error('Get scheduled payout details error', error);
+      res.status(500).json({ message: "Failed to get scheduled payout details" });
+    }
+  });
+
   // ==================== CLIENT PAYMENT METHODS (AZUL) ====================
 
   // Get client's payment methods

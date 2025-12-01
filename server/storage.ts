@@ -25,6 +25,8 @@ import {
   clientPaymentMethods,
   operatorBankAccounts,
   operatorWithdrawals,
+  scheduledPayouts,
+  scheduledPayoutItems,
   type User,
   type InsertUser,
   type Conductor,
@@ -83,6 +85,10 @@ import {
   type InsertOperatorBankAccount,
   type OperatorWithdrawal,
   type InsertOperatorWithdrawal,
+  type ScheduledPayout,
+  type InsertScheduledPayout,
+  type ScheduledPayoutItem,
+  type InsertScheduledPayoutItem,
 } from '@shared/schema';
 import {
   serviceReceipts,
@@ -417,6 +423,18 @@ export interface IStorage {
   updateOperatorBalance(conductorId: string, balanceDisponible: string, balancePendiente: string): Promise<Conductor>;
   addToOperatorBalance(conductorId: string, amount: string): Promise<Conductor>;
   deductFromOperatorBalance(conductorId: string, amount: string): Promise<Conductor>;
+
+  // Scheduled Payouts (dLocal Nómina)
+  getConductoresWithPositiveBalance(): Promise<Conductor[]>;
+  getOperatorBankAccountByCondutorId(conductorId: string): Promise<OperatorBankAccount | undefined>;
+  createScheduledPayout(data: InsertScheduledPayout): Promise<ScheduledPayout>;
+  updateScheduledPayout(id: string, data: Partial<ScheduledPayout>): Promise<ScheduledPayout>;
+  getScheduledPayouts(): Promise<ScheduledPayout[]>;
+  getScheduledPayoutById(id: string): Promise<ScheduledPayout | undefined>;
+  createScheduledPayoutItem(data: InsertScheduledPayoutItem): Promise<ScheduledPayoutItem>;
+  updateScheduledPayoutItem(conductorId: string, scheduledPayoutId: string, data: Partial<ScheduledPayoutItem>): Promise<ScheduledPayoutItem>;
+  getScheduledPayoutItems(scheduledPayoutId: string): Promise<ScheduledPayoutItem[]>;
+  updateConductorBalance(conductorId: string, balanceChange: number, pendingChange: number, setToZero?: boolean): Promise<Conductor>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2875,6 +2893,108 @@ export class DatabaseStorage implements IStorage {
       .update(conductores)
       .set({
         balanceDisponible: sql`CAST(${conductores.balanceDisponible} AS NUMERIC) - ${amount}::numeric`,
+      })
+      .where(eq(conductores.id, conductorId))
+      .returning();
+    return conductor;
+  }
+
+  // ==================== SCHEDULED PAYOUTS (dLocal Nómina) ====================
+
+  async getConductoresWithPositiveBalance(): Promise<Conductor[]> {
+    return db
+      .select()
+      .from(conductores)
+      .where(sql`CAST(${conductores.balanceDisponible} AS NUMERIC) > 0`);
+  }
+
+  async getOperatorBankAccountByCondutorId(conductorId: string): Promise<OperatorBankAccount | undefined> {
+    const [account] = await db
+      .select()
+      .from(operatorBankAccounts)
+      .where(eq(operatorBankAccounts.conductorId, conductorId))
+      .limit(1);
+    return account;
+  }
+
+  async createScheduledPayout(data: InsertScheduledPayout): Promise<ScheduledPayout> {
+    const [payout] = await db.insert(scheduledPayouts).values(data).returning();
+    return payout;
+  }
+
+  async updateScheduledPayout(id: string, data: Partial<ScheduledPayout>): Promise<ScheduledPayout> {
+    const [payout] = await db
+      .update(scheduledPayouts)
+      .set(data)
+      .where(eq(scheduledPayouts.id, id))
+      .returning();
+    return payout;
+  }
+
+  async getScheduledPayouts(): Promise<ScheduledPayout[]> {
+    return db
+      .select()
+      .from(scheduledPayouts)
+      .orderBy(desc(scheduledPayouts.createdAt));
+  }
+
+  async getScheduledPayoutById(id: string): Promise<ScheduledPayout | undefined> {
+    const [payout] = await db
+      .select()
+      .from(scheduledPayouts)
+      .where(eq(scheduledPayouts.id, id))
+      .limit(1);
+    return payout;
+  }
+
+  async createScheduledPayoutItem(data: InsertScheduledPayoutItem): Promise<ScheduledPayoutItem> {
+    const [item] = await db.insert(scheduledPayoutItems).values(data).returning();
+    return item;
+  }
+
+  async updateScheduledPayoutItem(conductorId: string, scheduledPayoutId: string, data: Partial<ScheduledPayoutItem>): Promise<ScheduledPayoutItem> {
+    const [item] = await db
+      .update(scheduledPayoutItems)
+      .set(data)
+      .where(
+        and(
+          eq(scheduledPayoutItems.conductorId, conductorId),
+          eq(scheduledPayoutItems.scheduledPayoutId, scheduledPayoutId)
+        )
+      )
+      .returning();
+    return item;
+  }
+
+  async getScheduledPayoutItems(scheduledPayoutId: string): Promise<ScheduledPayoutItem[]> {
+    return db
+      .select()
+      .from(scheduledPayoutItems)
+      .where(eq(scheduledPayoutItems.scheduledPayoutId, scheduledPayoutId))
+      .orderBy(desc(scheduledPayoutItems.createdAt));
+  }
+
+  async updateConductorBalance(conductorId: string, balanceChange: number, pendingChange: number, setToZero?: boolean): Promise<Conductor> {
+    if (setToZero) {
+      const [conductor] = await db
+        .update(conductores)
+        .set({
+          balanceDisponible: "0.00",
+          balancePendiente: "0.00",
+        })
+        .where(eq(conductores.id, conductorId))
+        .returning();
+      return conductor;
+    }
+
+    const balanceChangeStr = balanceChange.toFixed(2);
+    const pendingChangeStr = pendingChange.toFixed(2);
+
+    const [conductor] = await db
+      .update(conductores)
+      .set({
+        balanceDisponible: sql`(COALESCE(CAST(${conductores.balanceDisponible} AS NUMERIC), 0) + ${sql.raw(balanceChangeStr)}::numeric)::text`,
+        balancePendiente: sql`(COALESCE(CAST(${conductores.balancePendiente} AS NUMERIC), 0) + ${sql.raw(pendingChangeStr)}::numeric)::text`,
       })
       .where(eq(conductores.id, conductorId))
       .returning();

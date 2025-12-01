@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema de Pagos y Nómina para Servicio de Grúas - República Dominicana  
 **Fecha de Inicio:** Diciembre 2024  
-**Estado Actual:** 60% completado
+**Estado Actual:** 95% completado
 
 ---
 
@@ -11,9 +11,9 @@
 Se está implementando la integración con dLocal para:
 - ✅ Autorización y captura de pagos con tarjeta (flujo de pre-autorización)
 - ✅ Cancelación de autorizaciones y reembolsos
-- ⏳ Sistema de nómina programada (lunes y viernes)
-- ⏳ Retiros del mismo día con comisión de 100 DOP
-- ⏳ Interfaz de usuario para saldo de operadores
+- ✅ Sistema de nómina programada (lunes y viernes)
+- ✅ Retiros del mismo día con comisión de 100 DOP
+- ✅ Interfaz de usuario para saldo de operadores
 
 ---
 
@@ -120,44 +120,56 @@ Se está implementando la integración con dLocal para:
 
 ---
 
-## ⏳ POR HACER (40%)
+## ✅ COMPLETADO RECIENTEMENTE
 
-### FASE 2: Rutas API para Operador (25% del trabajo)
+### FASE 2: Rutas API para Operador ✓
 
 #### 2.1 Endpoints de Nómina y Retiros
 - **Ubicación:** `server/routes.ts`
-- **Tareas:**
-  - [ ] `GET /api/operator/balance` - Obtener saldo disponible y pendiente
-  - [ ] `GET /api/operator/bank-account` - Obtener cuenta bancaria registrada
-  - [ ] `POST /api/operator/bank-account` - Registrar/actualizar cuenta bancaria
-  - [ ] `POST /api/operator/withdrawals/immediate` - Solicitar retiro del mismo día
-  - [ ] `GET /api/operator/withdrawals` - Listar historial de retiros
-  - [ ] `GET /api/operator/payouts/scheduled` - Próxima fecha de nómina
-  - [ ] `GET /api/admin/scheduled-payouts` - Admin: Ver lotes de nómina
-  - [ ] `GET /api/admin/scheduled-payouts/:id` - Admin: Detalles del lote
+- **Tareas Completadas:**
+  - [x] `GET /api/drivers/withdrawal-history` - Historial de retiros del operador
+  - [x] `GET /api/drivers/next-payout` - Próxima fecha de nómina programada
+  - [x] `POST /api/drivers/immediate-withdrawal` - Retiro del mismo día (100 DOP comisión)
+  - [x] `GET /api/admin/scheduled-payouts` - Admin: Ver lotes de nómina
+  - [x] `GET /api/admin/scheduled-payouts/:id` - Admin: Detalles del lote con items
 
-**Puntos de implementación:**
-- Validación de autenticación (conductores/admin)
-- Validación de datos (cuenta bancaria, montos)
-- Actualización de balances
-- Transacciones seguras
-- Manejo de errores específicos
+**Implementación:**
+- ✅ Validación de autenticación (conductores/admin)
+- ✅ Validación de datos (montos mínimos, balance suficiente)
+- ✅ Actualización de balances con operaciones atómicas
+- ✅ Manejo de errores específicos con códigos HTTP apropiados
 
-#### 2.2 Integración con Storage
+#### 2.2 Integración con Storage ✓
 - **Archivo:** `server/storage.ts`
-- **Métodos a añadir:**
-  - `getConductoresWithPositiveBalance()` - Para procesamiento de nómina
-  - `getOperatorBankAccountByCondutorId()` - Obtener cuenta bancaria
-  - `createOperatorWithdrawal()` - Crear registro de retiro
-  - `updateOperatorWithdrawal()` - Actualizar estado de retiro
-  - `createScheduledPayout()` - Crear lote de nómina
-  - `updateScheduledPayout()` - Actualizar lote
-  - `createScheduledPayoutItem()` - Crear pago individual
-  - `updateScheduledPayoutItem()` - Actualizar pago individual
-  - `updateConductorBalance()` - Actualizar balance disponible/pendiente
-  - `getConductorById()` - Obtener conductor por ID (si no existe)
+- **Métodos Añadidos:**
+  - ✅ `getConductoresWithPositiveBalance()` - Para procesamiento de nómina
+  - ✅ `getOperatorBankAccountByCondutorId()` - Obtener cuenta bancaria
+  - ✅ `createScheduledPayout()` - Crear lote de nómina
+  - ✅ `updateScheduledPayout()` - Actualizar lote
+  - ✅ `getScheduledPayouts()` - Listar todos los pagos programados
+  - ✅ `getScheduledPayoutById()` - Obtener pago programado por ID
+  - ✅ `createScheduledPayoutItem()` - Crear pago individual
+  - ✅ `updateScheduledPayoutItem()` - Actualizar pago individual
+  - ✅ `getScheduledPayoutItems()` - Listar items de un pago programado
+  - ✅ `updateConductorBalance()` - Actualizar balance con operaciones atómicas
 
-### FASE 3: Interfaz de Usuario (15% del trabajo)
+### FASE 3: Interfaz de Usuario ✓
+
+#### Componente DLocalOperatorBankAccountManager.tsx ✓
+- **Ubicación:** `client/src/components/DLocalOperatorBankAccountManager.tsx`
+- **Funcionalidades Implementadas:**
+  - ✅ Modal de retiro con pestañas (Programado / Inmediato)
+  - ✅ Visualización de próxima fecha de nómina
+  - ✅ Historial de retiros con scroll y estado
+  - ✅ Cálculo de comisión y monto neto en tiempo real
+  - ✅ Validación de formulario con botón deshabilitado si inválido
+  - ✅ Manejo de errores con toasts
+
+---
+
+## ⏳ POR HACER (5%)
+
+### FASE 4: Configuración y Testing
 
 #### 3.1 Componente de Balance del Operador
 - **Ubicación:** `client/src/pages/driver/profile.tsx`
@@ -262,9 +274,9 @@ Se está implementando la integración con dLocal para:
 | 4. Captura en aceptación | ✅ | 100% | Implementado |
 | 5. Cancelación de auth | ✅ | 100% | Implementado |
 | 6. Servicio de nómina | ✅ | 100% | Lógica completada |
-| 7. **API Routes** | ⏳ | 0% | **PRÓXIMO** |
-| 8. **UI del Operador** | ⏳ | 0% | **DESPUÉS DE ROUTES** |
-| 9. **Testing** | ⏳ | 0% | **AL FINAL** |
+| 7. **API Routes** | ✅ | 100% | **Completado** - Historial, próximo pago, retiro inmediato, admin |
+| 8. **UI del Operador** | ✅ | 100% | **Completado** - Modal retiro, historial, validaciones |
+| 9. **Testing** | ⏳ | 0% | **Pendiente - Requiere credenciales dLocal** |
 
 ---
 
