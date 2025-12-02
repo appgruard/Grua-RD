@@ -1,4 +1,4 @@
-# Plan de Corrección: Verificación de Identidad y Validación de Foto de Perfil
+conductoructoran de Corrección: Verificación de Identidad y Validación de Foto de Perfil
 
 ## Bug Actual
 Los operadores pueden saltarse la verificación de identidad (cédula OCR) y acceder a su cuenta sin haberse verificado. Aunque no completen la validación, pueden:
