@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { Calendar, Download, Clock, CheckCircle, XCircle, DollarSign, Car, FileText } from 'lucide-react';
+import { Calendar, Download, Clock, CheckCircle, XCircle, DollarSign, Car, FileText, MapPin } from 'lucide-react';
 import {
   LineChart,
   Line,
