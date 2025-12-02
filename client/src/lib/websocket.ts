@@ -20,6 +20,7 @@ export function useWebSocket(
   const [isConnected, setIsConnected] = useState(false);
   const reconnectAttempts = useRef(0);
   const hasShownDisconnectToast = useRef(false);
+  const isIntentionalClose = useRef(false);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
@@ -83,8 +84,14 @@ export function useWebSocket(
     };
 
     ws.current.onclose = () => {
-      console.log('WebSocket disconnected, reconnecting...');
       setIsConnected(false);
+      
+      if (isIntentionalClose.current) {
+        console.log('WebSocket closed intentionally');
+        return;
+      }
+      
+      console.log('WebSocket disconnected, reconnecting...');
       
       if (!hasShownDisconnectToast.current) {
         toast({
@@ -104,6 +111,7 @@ export function useWebSocket(
     connect();
 
     return () => {
+      isIntentionalClose.current = true;
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
