@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera, Loader2, User, AlertCircle } from 'lucide-react';
+import { Camera, Loader2, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface EditProfileModalProps {
@@ -29,6 +29,15 @@ interface EditProfileModalProps {
     marcaGrua: string;
     modeloGrua: string;
   };
+}
+
+interface FaceValidationResult {
+  verified: boolean;
+  score: number;
+  error?: string;
+  message?: string;
+  skipped?: boolean;
+  requiresManualReview?: boolean;
 }
 
 export function EditProfileModal({
@@ -48,6 +57,10 @@ export function EditProfileModal({
   const [phone, setPhone] = useState(user?.phone || '');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  const [faceValidationStatus, setFaceValidationStatus] = useState<'idle' | 'validating' | 'success' | 'failed' | 'skipped'>('idle');
+  const [faceValidationError, setFaceValidationError] = useState<string | null>(null);
+  const [faceValidationScore, setFaceValidationScore] = useState<number | null>(null);
   
   const [licencia, setLicencia] = useState(conductorData?.licencia || '');
   const [placaGrua, setPlacaGrua] = useState(conductorData?.placaGrua || '');
@@ -108,6 +121,9 @@ export function EditProfileModal({
       await refreshUser();
       setSelectedFile(null);
       setPreviewUrl(null);
+      setFaceValidationStatus('idle');
+      setFaceValidationError(null);
+      setFaceValidationScore(null);
       toast({
         title: 'Foto actualizada',
         description: 'Tu foto de perfil ha sido actualizada',
@@ -122,7 +138,38 @@ export function EditProfileModal({
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const validateFacePhoto = async (imageBase64: string): Promise<FaceValidationResult> => {
+    try {
+      const response = await fetch('/api/identity/verify-profile-photo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ image: imageBase64 }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        return {
+          verified: false,
+          score: 0,
+          error: data.message || data.error || 'Error al validar la foto',
+        };
+      }
+      
+      return data;
+    } catch (error: any) {
+      return {
+        verified: false,
+        score: 0,
+        error: error.message || 'Error de conexión al validar la foto',
+      };
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
@@ -144,9 +191,50 @@ export function EditProfileModal({
       }
 
       setSelectedFile(file);
+      setFaceValidationStatus('idle');
+      setFaceValidationError(null);
+      setFaceValidationScore(null);
+      
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        setPreviewUrl(base64);
+        
+        if (isDriver) {
+          setFaceValidationStatus('validating');
+          
+          try {
+            const result = await validateFacePhoto(base64);
+            
+            if (result.skipped && result.requiresManualReview) {
+              setFaceValidationStatus('skipped');
+              setFaceValidationScore(null);
+              toast({
+                title: 'Validación no disponible',
+                description: result.message || 'La foto será revisada manualmente por el equipo.',
+              });
+            } else if (result.verified) {
+              setFaceValidationStatus('success');
+              setFaceValidationScore(result.score);
+              toast({
+                title: 'Foto validada',
+                description: `Rostro detectado correctamente (${Math.round(result.score * 100)}% de confianza)`,
+              });
+            } else {
+              setFaceValidationStatus('failed');
+              setFaceValidationError(result.error || result.message || 'No se pudo validar el rostro en la imagen');
+              setFaceValidationScore(result.score);
+              toast({
+                title: 'Foto no válida',
+                description: result.error || result.message || 'La foto no parece ser de un rostro humano válido',
+                variant: 'destructive',
+              });
+            }
+          } catch (error: any) {
+            setFaceValidationStatus('failed');
+            setFaceValidationError(error.message || 'Error al validar la foto');
+          }
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -159,6 +247,15 @@ export function EditProfileModal({
       toast({
         title: 'Foto requerida',
         description: 'Como conductor, debes subir una foto de perfil donde se vea tu rostro claramente',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isDriver && selectedFile && faceValidationStatus === 'failed') {
+      toast({
+        title: 'Foto no válida',
+        description: 'Por favor, sube una foto donde se vea claramente tu rostro',
         variant: 'destructive',
       });
       return;
@@ -197,7 +294,15 @@ export function EditProfileModal({
   };
 
   const isLoading = updateProfileMutation.isPending || uploadPhotoMutation.isPending;
+  const isValidating = faceValidationStatus === 'validating';
   const displayPhotoUrl = previewUrl || currentPhotoUrl;
+
+  const canSubmit = !isLoading && !isValidating && (
+    !isDriver || 
+    !selectedFile || 
+    faceValidationStatus === 'success' || 
+    faceValidationStatus === 'skipped'
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -226,10 +331,14 @@ export function EditProfileModal({
                 variant="secondary"
                 className="absolute bottom-0 right-0 rounded-full shadow-md"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading}
+                disabled={isLoading || isValidating}
                 data-testid="button-change-photo"
               >
-                <Camera className="w-4 h-4" />
+                {isValidating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4" />
+                )}
               </Button>
               <input
                 ref={fileInputRef}
@@ -241,6 +350,43 @@ export function EditProfileModal({
               />
             </div>
 
+            {isDriver && faceValidationStatus === 'validating' && (
+              <Alert className="text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription>
+                  Validando rostro en la imagen...
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {isDriver && faceValidationStatus === 'success' && (
+              <Alert className="text-sm border-green-500/50 bg-green-50 dark:bg-green-950/20">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-700 dark:text-green-400">
+                  Rostro validado correctamente 
+                  {faceValidationScore !== null && ` (${Math.round(faceValidationScore * 100)}%)`}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {isDriver && faceValidationStatus === 'failed' && (
+              <Alert variant="destructive" className="text-sm">
+                <XCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {faceValidationError || 'No se detectó un rostro válido. Por favor, sube otra foto.'}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {isDriver && faceValidationStatus === 'skipped' && (
+              <Alert className="text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Validación de rostro no disponible. La foto será revisada manualmente.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {isDriver && !currentPhotoUrl && !selectedFile && (
               <Alert variant="destructive" className="text-sm">
                 <AlertCircle className="h-4 w-4" />
@@ -250,7 +396,7 @@ export function EditProfileModal({
               </Alert>
             )}
 
-            {isDriver && (
+            {isDriver && faceValidationStatus === 'idle' && (
               <p className="text-xs text-muted-foreground text-center">
                 Tu foto debe mostrar claramente tu rostro para identificación
               </p>
@@ -370,7 +516,7 @@ export function EditProfileModal({
               variant="outline"
               className="flex-1"
               onClick={() => onOpenChange(false)}
-              disabled={isLoading}
+              disabled={isLoading || isValidating}
               data-testid="button-cancel"
             >
               Cancelar
@@ -378,13 +524,18 @@ export function EditProfileModal({
             <Button
               type="submit"
               className="flex-1"
-              disabled={isLoading}
+              disabled={!canSubmit}
               data-testid="button-save"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Guardando...
+                </>
+              ) : isValidating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Validando...
                 </>
               ) : (
                 'Guardar'

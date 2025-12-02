@@ -1634,6 +1634,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Validate profile photo with Verifik face detection (pre-upload validation)
+  app.post("/api/identity/verify-profile-photo", ocrScanLimiter, async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const { image } = req.body;
+
+      if (!image) {
+        return res.status(400).json({ 
+          message: "Se requiere una imagen para validar",
+          verified: false 
+        });
+      }
+
+      // Validate image size (max 10MB base64 ~ 7.5MB actual image)
+      const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+      if (typeof image !== 'string' || image.length > MAX_IMAGE_SIZE) {
+        return res.status(400).json({
+          message: "La imagen es demasiado grande. El tamaño máximo es 5MB.",
+          verified: false
+        });
+      }
+
+      // Basic format validation - must be base64 data URL or raw base64
+      const base64Pattern = /^(data:image\/[a-zA-Z+]+;base64,)?[A-Za-z0-9+/=]+$/;
+      if (!base64Pattern.test(image.substring(0, 100))) {
+        return res.status(400).json({
+          message: "Formato de imagen inválido",
+          verified: false
+        });
+      }
+
+      const { validateFacePhoto, isVerifikConfigured } = await import("./services/verifik-ocr");
+
+      if (!isVerifikConfigured()) {
+        logSystem.warn("Verifik not configured, photo requires manual review");
+        return res.json({
+          verified: false,
+          score: 0,
+          skipped: true,
+          requiresManualReview: true,
+          message: "Validación de rostro no disponible. La foto será revisada manualmente."
+        });
+      }
+
+      const result = await validateFacePhoto(image);
+
+      logSystem.info("Profile photo face validation completed", {
+        userId: req.user!.id,
+        success: result.success,
+        isHumanFace: result.isHumanFace,
+        score: result.score
+      });
+
+      if (!result.success) {
+        return res.json({
+          verified: false,
+          score: 0,
+          error: result.error || "Error al validar la foto"
+        });
+      }
+
+      res.json({
+        verified: result.isHumanFace,
+        score: result.score,
+        scanId: result.scanId,
+        details: result.details,
+        error: result.isHumanFace ? undefined : (result.details || "La foto no parece ser de un rostro humano válido")
+      });
+    } catch (error: any) {
+      logSystem.error("Verify profile photo error", error, { userId: req.user?.id });
+      res.status(500).json({ 
+        message: "Error al validar la foto de perfil",
+        verified: false 
+      });
+    }
+  });
+
   app.patch("/api/users/me", async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {

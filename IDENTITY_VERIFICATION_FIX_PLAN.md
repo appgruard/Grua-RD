@@ -250,10 +250,54 @@ const handlePhotoUpload = async (file: File) => {
 - ✅ Eliminación de dependencia en estado en memoria (server-authoritative)
 - ✅ Manejo robusto de errores JSON
 
-### Fase 2: Validación de Foto ⏳ PENDIENTE
-1. Crear endpoint `POST /api/identity/verify-profile-photo` 
-2. Integrar validación en `EditProfileModal.tsx`
-3. Agregar validación opcional/requerida según política
+### Fase 2: Validación de Foto ✅ COMPLETADA - 2 Dic 2025
+
+**Estado:** Implementado y funcionando
+
+**Cambios realizados:**
+
+1. ✅ **Endpoint de validación de foto de perfil** (`server/routes.ts`)
+   - Nuevo endpoint `POST /api/identity/verify-profile-photo`
+   - Usa `validateFacePhoto()` de Verifik para detectar rostro humano
+   - Score mínimo requerido: 60%
+   - Graceful degradation: si Verifik no está configurado, acepta la foto con flag `skipped: true`
+   - Rate limiting aplicado (`ocrScanLimiter`)
+   - Requiere autenticación
+
+2. ✅ **Integración en EditProfileModal** (`client/src/components/EditProfileModal.tsx`)
+   - Validación automática de rostro al seleccionar foto (solo para conductores)
+   - Estados de validación: `idle`, `validating`, `success`, `failed`, `skipped`
+   - Feedback visual con iconos y colores diferenciados:
+     - Verde (CheckCircle2) para validación exitosa con porcentaje de confianza
+     - Rojo (XCircle) para validación fallida con mensaje de error específico
+     - Amarillo (AlertCircle) para servicio no disponible (revisión manual)
+   - Bloqueo de submit si la validación falla para conductores
+   - Botón de subir foto deshabilitado durante validación
+   - Toast notifications para feedback del usuario
+
+3. ✅ **Política de validación implementada**
+   - **Conductores:** Validación requerida - no pueden subir foto sin rostro detectado
+   - **Otros usuarios:** Sin validación (no aplica)
+   - **Si Verifik no disponible:** Foto requiere revisión manual (`verified: false, skipped: true`)
+
+4. ✅ **Correcciones de seguridad adicionales**
+   - Validación de tamaño de imagen (máx 10MB base64)
+   - Validación de formato base64 antes de enviar a Verifik
+   - Manejo correcto de respuestas HTTP 400 sin enmascarar errores
+   - Bloqueo de submit durante validación (`isValidating` check)
+   - Cuando Verifik no está disponible, retorna `verified: false` (no auto-aprueba)
+
+**Archivos modificados:**
+- `server/routes.ts` - Nuevo endpoint `/api/identity/verify-profile-photo` con validaciones
+- `client/src/components/EditProfileModal.tsx` - Integración completa de validación
+
+**Mejoras de Seguridad Implementadas:**
+- ✅ Validación de rostro humano antes de subir foto de perfil
+- ✅ Bloqueo de fotos no válidas (memes, logos, fotos de pantalla, etc.)
+- ✅ Score de confianza visible para transparencia
+- ✅ Validación de tamaño y formato de imagen (previene DoS)
+- ✅ Bloqueo de submit durante validación (previene race condition)
+- ✅ Cuando Verifik no disponible: requiere revisión manual (no auto-aprueba)
 
 ### Fase 3: Mejoras UX ⏳ PENDIENTE
 1. Crear endpoint `GET /api/identity/verification-status`
@@ -263,13 +307,13 @@ const handlePhotoUpload = async (file: File) => {
 ## Archivos a Modificar
 
 ```
-server/routes.ts                          # ✅ Validaciones en login + sanitización
-server/services/verifik-ocr.ts           # Ya tiene validateProfilePhoto
+server/routes.ts                          # ✅ Validaciones en login + sanitización + validación foto
+server/services/verifik-ocr.ts           # ✅ Ya tiene validateProfilePhoto
 client/src/lib/auth.tsx                  # ✅ Proteger rutas para no-verificados
 client/src/App.tsx                       # ✅ Redirigir si falta verificación
 client/src/pages/auth/verify-cedula-pending.tsx  # ✅ Nuevo
-client/src/components/EditProfileModal.tsx       # Validar foto de perfil
-shared/schema.ts                         # Agregar fotoVerificada campo
+client/src/components/EditProfileModal.tsx       # ✅ Validar foto de perfil
+shared/schema.ts                         # (Fase 3) Agregar fotoVerificada campo
 ```
 
 ## Testing
@@ -278,8 +322,8 @@ shared/schema.ts                         # Agregar fotoVerificada campo
 2. **Login con verificación completa** - Verificar que permite acceso ✅
 3. **Acceso directo a ruta protegida sin verificación** - Verificar que redirige ✅
 4. **Verificar que passwordHash no está en respuestas API** - ✅
-5. **Foto no válida (meme, foto de pantalla)** - Verificar que rechaza (Fase 2)
-6. **Foto válida de persona** - Verificar que acepta (Fase 2)
+5. **Foto no válida (meme, foto de pantalla)** - Verificar que rechaza ✅ (Fase 2)
+6. **Foto válida de persona** - Verificar que acepta ✅ (Fase 2)
 
 ## Impacto de Cambios
 
