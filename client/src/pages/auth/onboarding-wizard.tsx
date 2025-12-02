@@ -13,6 +13,7 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ServiceCategoryMultiSelect } from '@/components/ServiceCategoryMultiSelect';
+import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import { 
   Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard,
   CheckCircle2, ArrowRight, Clock, Upload, Truck
@@ -65,6 +66,7 @@ export default function OnboardingWizard() {
   const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
+  const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -91,6 +93,7 @@ export default function OnboardingWizard() {
         setFormData(parsed.formData || formData);
         setCompletedSteps(new Set(parsed.completedSteps || []));
         setSelectedServices(parsed.selectedServices || []);
+        setVehicleData(parsed.vehicleData || []);
       }
     } catch (error) {
       console.error('Error restoring wizard state:', error);
@@ -106,12 +109,13 @@ export default function OnboardingWizard() {
         currentStep, formData,
         completedSteps: Array.from(completedSteps),
         selectedServices,
+        vehicleData,
       };
       sessionStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (error) {
       console.error('Error saving wizard state:', error);
     }
-  }, [currentStep, formData, completedSteps, selectedServices, isInitialized]);
+  }, [currentStep, formData, completedSteps, selectedServices, vehicleData, isInitialized]);
 
   const updateField = (field: keyof OnboardingData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -250,13 +254,39 @@ export default function OnboardingWizard() {
     },
   });
 
+  const saveVehiclesMutation = useMutation({
+    mutationFn: async () => {
+      const promises = vehicleData.map(async (vehicle) => {
+        const res = await apiRequest('POST', '/api/drivers/me/vehiculos', vehicle);
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || `Error al guardar vehículo para ${vehicle.categoria}`);
+        }
+        return res.json();
+      });
+      return Promise.all(promises);
+    },
+    onSuccess: () => {
+      toast({ title: '¡Vehículos guardados!', description: 'Los datos de tus vehículos han sido registrados' });
+      setCompletedSteps(prev => new Set(prev).add(6));
+      setCurrentStep(7);
+    },
+    onError: (error: any) => {
+      setErrors({ vehicles: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
+    },
+  });
+
   const finalizeProfileMutation = useMutation({
     mutationFn: async () => {
       const updateData: any = { nombre: formData.nombre, apellido: formData.apellido };
       if (formData.userType === 'conductor') {
+        const firstVehicle = vehicleData[0];
         updateData.conductorData = {
-          licencia: formData.licencia, placaGrua: formData.placaGrua,
-          marcaGrua: formData.marcaGrua, modeloGrua: formData.modeloGrua,
+          licencia: formData.licencia,
+          placaGrua: firstVehicle?.placa || formData.placaGrua || '',
+          marcaGrua: firstVehicle?.marca || formData.marcaGrua || '',
+          modeloGrua: firstVehicle?.modelo || formData.modeloGrua || '',
         };
       }
       const res = await apiRequest('PATCH', '/api/users/me', updateData);
@@ -333,10 +363,17 @@ export default function OnboardingWizard() {
 
   const validateStep6 = (): boolean => {
     const newErrors: StepErrors = {};
+    const selectedCategories = selectedServices.map(s => s.categoria);
+    
+    for (const categoria of selectedCategories) {
+      const vehicle = vehicleData.find(v => v.categoria === categoria);
+      if (!vehicle || !vehicle.placa || !vehicle.color) {
+        newErrors[`vehicle_${categoria}`] = 'Placa y color son requeridos';
+      }
+    }
+    
     if (!formData.licencia.trim()) newErrors.licencia = 'Número de licencia requerido';
-    if (!formData.placaGrua.trim()) newErrors.placaGrua = 'Placa de la grúa requerida';
-    if (!formData.marcaGrua.trim()) newErrors.marcaGrua = 'Marca de la grúa requerida';
-    if (!formData.modeloGrua.trim()) newErrors.modeloGrua = 'Modelo de la grúa requerido';
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -487,28 +524,48 @@ export default function OnboardingWizard() {
 
   const renderStep6 = () => (
     <div className="space-y-4">
+      {errors.vehicles && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errors.vehicles}</AlertDescription>
+        </Alert>
+      )}
+      
       <div className="space-y-2">
-        <Label htmlFor="licencia">Número de Licencia</Label>
-        <Input id="licencia" placeholder="Licencia de conducir" value={formData.licencia} onChange={(e) => updateField('licencia', e.target.value)} disabled={finalizeProfileMutation.isPending} data-testid="input-licencia" />
+        <Label htmlFor="licencia">Número de Licencia *</Label>
+        <Input 
+          id="licencia" 
+          placeholder="Licencia de conducir" 
+          value={formData.licencia} 
+          onChange={(e) => updateField('licencia', e.target.value)} 
+          disabled={saveVehiclesMutation.isPending} 
+          data-testid="input-licencia" 
+        />
         {errors.licencia && <p className="text-sm text-destructive">{errors.licencia}</p>}
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="placaGrua">Placa de la Grúa</Label>
-        <Input id="placaGrua" placeholder="A123456" value={formData.placaGrua} onChange={(e) => updateField('placaGrua', e.target.value.toUpperCase())} disabled={finalizeProfileMutation.isPending} data-testid="input-placa-grua" />
-        {errors.placaGrua && <p className="text-sm text-destructive">{errors.placaGrua}</p>}
+
+      <div className="max-h-[350px] overflow-y-auto pr-1">
+        <VehicleCategoryForm
+          selectedCategories={selectedServices.map(s => s.categoria)}
+          vehicles={vehicleData}
+          onChange={setVehicleData}
+          disabled={saveVehiclesMutation.isPending}
+          errors={errors}
+        />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="marcaGrua">Marca de la Grúa</Label>
-        <Input id="marcaGrua" placeholder="Ej: Ford" value={formData.marcaGrua} onChange={(e) => updateField('marcaGrua', e.target.value)} disabled={finalizeProfileMutation.isPending} data-testid="input-marca-grua" />
-        {errors.marcaGrua && <p className="text-sm text-destructive">{errors.marcaGrua}</p>}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="modeloGrua">Modelo de la Grúa</Label>
-        <Input id="modeloGrua" placeholder="Ej: F-450" value={formData.modeloGrua} onChange={(e) => updateField('modeloGrua', e.target.value)} disabled={finalizeProfileMutation.isPending} data-testid="input-modelo-grua" />
-        {errors.modeloGrua && <p className="text-sm text-destructive">{errors.modeloGrua}</p>}
-      </div>
-      <Button type="button" className="w-full" onClick={() => validateStep6() && setCurrentStep(7)} disabled={finalizeProfileMutation.isPending} data-testid="button-continue-step6">
-        Continuar
+
+      <Button 
+        type="button" 
+        className="w-full" 
+        onClick={() => validateStep6() && saveVehiclesMutation.mutate()} 
+        disabled={saveVehiclesMutation.isPending} 
+        data-testid="button-save-vehicles"
+      >
+        {saveVehiclesMutation.isPending ? (
+          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+        ) : (
+          <>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
+        )}
       </Button>
     </div>
   );
@@ -527,7 +584,7 @@ export default function OnboardingWizard() {
   );
 
   const getStepTitle = () => {
-    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Teléfono', 'Subir Documentos', 'Servicios Ofrecidos', 'Datos de la Grúa', 'Confirmación'];
+    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Teléfono', 'Subir Documentos', 'Servicios Ofrecidos', 'Vehículos por Categoría', 'Confirmación'];
     return titles[currentStep - 1] || '';
   };
 
@@ -538,7 +595,7 @@ export default function OnboardingWizard() {
       'Verifica tu número de teléfono',
       'Sube tus documentos requeridos',
       'Selecciona los servicios que ofreces',
-      'Completa los datos de tu grúa',
+      'Configura un vehículo para cada categoría',
       'Finaliza tu registro',
     ];
     return descs[currentStep - 1] || '';
