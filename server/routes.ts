@@ -1038,15 +1038,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", passport.authenticate("local"), (req: Request, res: Response) => {
     const user = req.user as any;
     
-    // For conductores (operators), validate that identity verification is complete
-    if (user && user.userType === 'conductor') {
+    // Skip verification check for admin, aseguradora, socio, and empresa users
+    const skipVerificationTypes = ['admin', 'aseguradora', 'socio', 'empresa'];
+    
+    // For clientes and conductores, validate that identity verification is complete
+    if (user && !skipVerificationTypes.includes(user.userType)) {
       const verificationStatus = {
         cedulaVerificada: user.cedulaVerificada === true,
         telefonoVerificado: user.telefonoVerificado === true,
+        fotoVerificada: user.fotoVerificada === true,
       };
       
-      // If either verification is missing, return 403 with minimal safe data
-      if (!verificationStatus.cedulaVerificada || !verificationStatus.telefonoVerificado) {
+      // Determine what's required based on user type
+      const isConductor = user.userType === 'conductor';
+      const needsVerification = isConductor 
+        ? (!verificationStatus.cedulaVerificada || !verificationStatus.telefonoVerificado || !verificationStatus.fotoVerificada)
+        : (!verificationStatus.cedulaVerificada || !verificationStatus.telefonoVerificado);
+      
+      // If verification is missing, return 403 with minimal safe data and redirect to complete registration
+      if (needsVerification) {
         // Return only safe, non-sensitive user data for the verification page
         const safeUserData = {
           id: user.id,
@@ -1057,6 +1067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userType: user.userType,
           cedulaVerificada: user.cedulaVerificada,
           telefonoVerificado: user.telefonoVerificado,
+          fotoVerificada: user.fotoVerificada,
         };
         
         return res.status(403).json({

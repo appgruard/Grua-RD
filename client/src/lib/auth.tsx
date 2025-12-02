@@ -6,6 +6,7 @@ import type { User, UserWithConductor } from '@shared/schema';
 interface VerificationStatus {
   cedulaVerificada: boolean;
   telefonoVerificado: boolean;
+  fotoVerificada?: boolean;
 }
 
 interface VerificationError extends Error {
