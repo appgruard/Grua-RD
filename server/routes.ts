@@ -2332,7 +2332,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const servicio = await storage.acceptServicio(req.params.id, req.user!.id);
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(400).json({ message: "Perfil de conductor no encontrado" });
+      }
+
+      let vehiculoId: string | undefined;
+      if (existingServicio.servicioCategoria) {
+        const vehiculo = await storage.getConductorVehiculoByCategoria(conductor.id, existingServicio.servicioCategoria);
+        if (vehiculo) {
+          vehiculoId = vehiculo.id;
+        } else {
+          return res.status(400).json({ 
+            message: "No tienes un vehículo configurado para esta categoría de servicio. Por favor, configura tu vehículo en tu perfil.",
+            noVehicleForCategory: true 
+          });
+        }
+      }
+
+      const servicio = await storage.acceptServicio(req.params.id, req.user!.id, vehiculoId);
       
       logService.accepted(servicio.id, req.user!.id);
       

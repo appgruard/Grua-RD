@@ -406,6 +406,10 @@ export const serviciosRelations = relations(servicios, ({ one, many }) => ({
     references: [users.id],
     relationName: "conductor",
   }),
+  vehiculo: one(conductorVehiculos, {
+    fields: [servicios.vehiculoId],
+    references: [conductorVehiculos.id],
+  }),
   calificacion: one(calificaciones),
   ubicacionesTracking: many(ubicacionesTracking),
   mensajesChat: many(mensajesChat),
@@ -1666,6 +1670,7 @@ export type ServicioWithDetails = Servicio & {
   cliente?: User;
   conductor?: User;
   calificacion?: Calificacion;
+  vehiculo?: ConductorVehiculo;
 };
 
 export type MensajeChatWithRemitente = MensajeChat & {

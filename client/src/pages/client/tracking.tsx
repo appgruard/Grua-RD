@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
-import { Phone, MessageCircle, Loader2, Star } from 'lucide-react';
+import { Phone, MessageCircle, Loader2, Star, Truck, Car } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from '@/lib/auth';
@@ -192,6 +192,40 @@ export default function ClientTracking() {
                 </p>
               </div>
             </div>
+            
+            {service.vehiculo && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                    {service.vehiculo.fotoUrl ? (
+                      <img
+                        src={service.vehiculo.fotoUrl}
+                        alt="Vehículo"
+                        className="w-10 h-10 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <Truck className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" data-testid="badge-vehicle-plate">
+                        {service.vehiculo.placa}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground" data-testid="text-vehicle-color">
+                        {service.vehiculo.color}
+                      </span>
+                    </div>
+                    {(service.vehiculo.marca || service.vehiculo.modelo) && (
+                      <p className="text-sm text-muted-foreground truncate" data-testid="text-vehicle-model">
+                        {[service.vehiculo.marca, service.vehiculo.modelo, service.vehiculo.anio].filter(Boolean).join(' ')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {existingRating && (
               <div className="mt-3 pt-3 border-t border-border">
                 <p className="text-sm text-muted-foreground mb-1">Tu calificacion:</p>

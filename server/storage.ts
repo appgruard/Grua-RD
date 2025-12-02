@@ -188,7 +188,7 @@ export interface IStorage {
   getRecentlyCancelledServices(withinMinutes: number): Promise<Servicio[]>;
   getAllServicios(): Promise<ServicioWithDetails[]>;
   updateServicio(id: string, data: Partial<Servicio>): Promise<Servicio>;
-  acceptServicio(id: string, conductorId: string): Promise<Servicio>;
+  acceptServicio(id: string, conductorId: string, vehiculoId?: string): Promise<Servicio>;
 
   // Tarifas
   createTarifa(tarifa: InsertTarifa): Promise<Tarifa>;
@@ -811,6 +811,7 @@ export class DatabaseStorage implements IStorage {
         cliente: true,
         conductor: true,
         calificacion: true,
+        vehiculo: true,
       },
     });
     return result as any;
@@ -823,6 +824,7 @@ export class DatabaseStorage implements IStorage {
         cliente: true,
         conductor: true,
         calificacion: true,
+        vehiculo: true,
       },
       orderBy: desc(servicios.createdAt),
     });
@@ -836,6 +838,7 @@ export class DatabaseStorage implements IStorage {
         cliente: true,
         conductor: true,
         calificacion: true,
+        vehiculo: true,
       },
       orderBy: desc(servicios.createdAt),
     });
@@ -902,6 +905,7 @@ export class DatabaseStorage implements IStorage {
         cliente: true,
         conductor: true,
         calificacion: true,
+        vehiculo: true,
       },
       orderBy: desc(servicios.createdAt),
     });
@@ -913,14 +917,20 @@ export class DatabaseStorage implements IStorage {
     return servicio;
   }
 
-  async acceptServicio(id: string, conductorId: string): Promise<Servicio> {
+  async acceptServicio(id: string, conductorId: string, vehiculoId?: string): Promise<Servicio> {
+    const updateData: any = {
+      conductorId,
+      estado: 'aceptado',
+      aceptadoAt: new Date(),
+    };
+    
+    if (vehiculoId) {
+      updateData.vehiculoId = vehiculoId;
+    }
+    
     const [servicio] = await db
       .update(servicios)
-      .set({
-        conductorId,
-        estado: 'aceptado',
-        aceptadoAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(servicios.id, id))
       .returning();
     return servicio;
@@ -1839,6 +1849,7 @@ export class DatabaseStorage implements IStorage {
         cliente: true,
         conductor: true,
         calificacion: true,
+        vehiculo: true,
       },
       orderBy: desc(servicios.createdAt),
     });
