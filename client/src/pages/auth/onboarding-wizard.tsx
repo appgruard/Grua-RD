@@ -95,14 +95,31 @@ export default function OnboardingWizard() {
     }
   }, [otpTimer]);
 
+  // Define stopOCRCamera early
+  const stopOCRCameraEarly = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setShowCamera(false);
+  };
+
   // Reset OCR state when user type changes
   useEffect(() => {
     setCedulaVerified(false);
     setOcrScore(null);
     setCapturedImage(null);
     setErrors({});
-    stopOCRCamera();
+    stopOCRCameraEarly();
   }, [formData.userType]);
+
+  // Advance to next step when cedula is verified for operators
+  useEffect(() => {
+    if (cedulaVerified && formData.userType === 'conductor' && currentStep === 2) {
+      setCompletedSteps(prev => new Set(prev).add(2));
+      setCurrentStep(3);
+    }
+  }, [cedulaVerified, formData.userType, currentStep]);
 
   useEffect(() => {
     try {
