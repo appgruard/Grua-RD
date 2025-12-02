@@ -10,6 +10,7 @@ Los operadores pueden saltarse la verificación de identidad (cédula OCR) y acc
 1. **No hay validación en login** - El endpoint `/api/auth/login` no verifica si el operador completó la verificación OCR
 2. **No hay estado verificado persistente** - `cedulaVerificada` se registra pero no se valida antes de permitir acceso
 3. **Wizard incompleto sin restricción** - El usuario puede abandonar el wizard en cualquier momento
+4. **Exposición de datos sensibles** - API responses exponían passwordHash y otros campos internos
 
 ## Soluciones Necesarias
 
@@ -53,11 +54,26 @@ if (user.userType === 'conductor') {
 - Mostrar modal con opción para completar verificación o logout
 
 **Nuevo componente:** `client/src/pages/auth/verify-cedula-pending.tsx`
-- Página donde los operadores completan verificación pendiente
-- Reutiliza el componente de escaneo OCR existente
-- Bloquea acceso a otras áreas hasta completar
+- Similar a página de onboarding pero solo para completar verificación faltante
+- Accessible desde:
+  - Redirección al login si falta verificación
+  - Botón en perfil "Completar verificación"
+  - Modal de alerta en dashboard
 
-### 3. Validación de Foto de Perfil con Verifik (Backend)
+### 3. Sanitización de Datos de Usuario en Respuestas API
+
+**Archivo:** `server/routes.ts`
+
+**Nuevas funciones helper:**
+- `getSafeUser()` - Whitelist explícita de campos públicos
+- `getSafeUserForAdmin()` - Whitelist para vistas de admin
+- `getSafeUsersForAdmin()` - Sanitizar arrays de usuarios
+- `getSafeDriver()` - Sanitizar conductores con usuarios embebidos
+- `getSafeDrivers()` - Sanitizar arrays de conductores
+
+**Objetivo:** Prevenir exposición de `passwordHash` y otros campos sensibles en todas las respuestas API
+
+### 4. Validación de Foto de Perfil con Verifik (Backend)
 
 **Archivo:** `server/services/verifik-ocr.ts`
 
@@ -72,7 +88,7 @@ if (user.userType === 'conductor') {
 - Validar con `validateProfilePhoto()`
 - Rechazar si no pasa validación
 
-### 4. Integración en Flujo de Onboarding/Perfil
+### 5. Integración en Flujo de Onboarding/Perfil
 
 **Para Nuevos Operadores (Onboarding):**
 1. Paso 2: Verificación de cédula con OCR ✅ (ya existe)
@@ -88,7 +104,7 @@ if (user.userType === 'conductor') {
 - Al subir foto de perfil, validar automáticamente con Verifik
 - Si falla: mostrar error + opciones (reintentarlo, usar otra foto)
 
-### 5. Schema/Tipos Necesarios
+### 6. Schema/Tipos Necesarios
 
 **En `shared/schema.ts`:**
 ```typescript
@@ -109,7 +125,7 @@ export const identityVerifications = pgTable('identity_verifications', {
 });
 ```
 
-### 6. Endpoints Necesarios
+### 7. Endpoints Necesarios
 
 **1. `POST /api/identity/verify-profile-photo`**
 - Valida foto de perfil con Verifik
@@ -125,7 +141,7 @@ export const identityVerifications = pgTable('identity_verifications', {
 - Retorna estado completo de verificación del usuario
 - Para operadores: `{ cedulaVerificada, telefonoVerificado, fotoVerificada, completa }`
 
-### 7. Cambios en EditProfileModal
+### 8. Cambios en EditProfileModal
 
 **Archivo:** `client/src/components/EditProfileModal.tsx`
 
@@ -160,7 +176,7 @@ const handlePhotoUpload = async (file: File) => {
 };
 ```
 
-### 8. Página de Verificación Pendiente
+### 9. Página de Verificación Pendiente
 
 **Nuevo archivo:** `client/src/pages/auth/verify-cedula-pending.tsx`
 
@@ -193,11 +209,13 @@ const handlePhotoUpload = async (file: File) => {
    - Nuevos estados: `pendingVerification` y `pendingVerificationUser`
    - Manejo de error 403 con `requiresVerification`
    - Nueva función `clearPendingVerification()`
+   - Manejo robusto de respuestas JSON malformadas
 
 4. ✅ **Protección de rutas** (`client/src/App.tsx`)
    - `ProtectedRoute` redirige a `/verify-pending` si conductor no está verificado
    - Nueva ruta `/verify-pending` registrada
-   - Verificación doble: estado pendingVerification y campos del usuario
+   - Verificación basada en datos del servidor (no en estado en memoria)
+   - Eliminación de dependencia en `pendingVerification` para protección de rutas
 
 5. ✅ **Alerta visual en dashboard** (`client/src/pages/driver/dashboard.tsx`)
    - Alerta prominente si el conductor accede sin verificación completa
@@ -207,21 +225,37 @@ const handlePhotoUpload = async (file: File) => {
    - Detecta error de verificación requerida
    - Redirige automáticamente a `/verify-pending`
    - Toast informativo para el usuario
+   - Validación de verificación basada en datos del servidor
+
+7. ✅ **Sanitización de datos de usuario - DEFENSA EN PROFUNDIDAD** (`server/routes.ts`)
+   - Nueva función `getSafeUser()` con whitelist explícita de campos públicos
+   - Aplicada en endpoints: `/api/auth/login`, `/api/auth/register`, `/api/auth/me`, `/api/users/profile`
+   - Nueva función `getSafeUserForAdmin()` para vistas de admin
+   - Aplicada en endpoints: `/api/admin/users`, `/api/admin/drivers`
+   - Nuevo helper `getSafeDrivers()` para sanitizar arrays de conductores
+   - **Resultado:** Password hashes y otros campos sensibles nunca se exponen en respuestas API
 
 **Archivos modificados:**
-- `server/routes.ts` - Validación en login
-- `client/src/lib/auth.tsx` - Estados de verificación pendiente
+- `server/routes.ts` - Validación en login + sanitización de respuestas
+- `client/src/lib/auth.tsx` - Estados de verificación pendiente + manejo robusto de JSON
 - `client/src/App.tsx` - Nueva ruta y ProtectedRoute actualizado
 - `client/src/pages/auth/login.tsx` - Manejo de redirección
 - `client/src/pages/auth/verify-pending.tsx` - Nueva página (creada)
 - `client/src/pages/driver/dashboard.tsx` - Alerta de verificación
 
-### Fase 2: Validación de Foto
+**Mejoras de Seguridad Implementadas:**
+- ✅ Verificación forzada en login para conductores
+- ✅ Bloqueo de acceso a rutas protegidas sin verificación
+- ✅ Sanitización de todas las respuestas de usuario (whitelist explícita)
+- ✅ Eliminación de dependencia en estado en memoria (server-authoritative)
+- ✅ Manejo robusto de errores JSON
+
+### Fase 2: Validación de Foto ⏳ PENDIENTE
 1. Crear endpoint `POST /api/identity/verify-profile-photo` 
 2. Integrar validación en `EditProfileModal.tsx`
 3. Agregar validación opcional/requerida según política
 
-### Fase 3: Mejoras UX
+### Fase 3: Mejoras UX ⏳ PENDIENTE
 1. Crear endpoint `GET /api/identity/verification-status`
 2. Agregar paso de foto de perfil en onboarding
 3. Mejorar página de resumen de verificación
@@ -229,26 +263,51 @@ const handlePhotoUpload = async (file: File) => {
 ## Archivos a Modificar
 
 ```
-server/routes.ts                          # Agregar validaciones en login
+server/routes.ts                          # ✅ Validaciones en login + sanitización
 server/services/verifik-ocr.ts           # Ya tiene validateProfilePhoto
-client/src/lib/auth.tsx                  # Proteger rutas para no-verificados
-client/src/App.tsx                       # Redirigir si falta verificación
-client/src/pages/auth/verify-cedula-pending.tsx  # Nuevo
+client/src/lib/auth.tsx                  # ✅ Proteger rutas para no-verificados
+client/src/App.tsx                       # ✅ Redirigir si falta verificación
+client/src/pages/auth/verify-cedula-pending.tsx  # ✅ Nuevo
 client/src/components/EditProfileModal.tsx       # Validar foto de perfil
 shared/schema.ts                         # Agregar fotoVerificada campo
 ```
 
 ## Testing
 
-1. **Login sin verificación** - Verificar que se rechaza
-2. **Login con verificación completa** - Verificar que permite acceso
-3. **Foto no válida (meme, foto de pantalla)** - Verificar que rechaza
-4. **Foto válida de persona** - Verificar que acepta
-5. **Ruta protegida sin verificación** - Verificar que redirige
+1. **Login sin verificación** - Verificar que se rechaza ✅
+2. **Login con verificación completa** - Verificar que permite acceso ✅
+3. **Acceso directo a ruta protegida sin verificación** - Verificar que redirige ✅
+4. **Verificar que passwordHash no está en respuestas API** - ✅
+5. **Foto no válida (meme, foto de pantalla)** - Verificar que rechaza (Fase 2)
+6. **Foto válida de persona** - Verificar que acepta (Fase 2)
 
 ## Impacto de Cambios
 
 - ✅ Seguridad: Garantiza que solo operadores verificados accedan
+- ✅ Seguridad: Previene exposición de datos sensibles en API responses
 - ✅ Compliance: Cumple con requisitos de identidad real
 - ✅ UX: Bloqueos claros pero orientados a ayudar completar verificación
 - ⚠️ Disrupción: Operadores existentes no verificados serán bloqueados (necesitarán re-verificarse)
+
+## Decisiones de Diseño
+
+### Sanitización de Datos (Whitelist vs Blacklist)
+**Decisión:** Usar whitelist explícita en `getSafeUser()` en lugar de blacklist
+**Justificación:** 
+- Whitelist es más seguro (solo campos permitidos se exponen)
+- Blacklist corre riesgo de nuevos campos sensibles que se olviden de excluir
+- Mantiene consistencia si se agregan nuevos campos a la tabla User
+
+### Server-Authoritative Verification Check
+**Decisión:** Verificación basada en datos del servidor (`/api/auth/me`) en lugar de estado en memoria
+**Justificación:**
+- Previene que usuarios manipulen estado del cliente para saltarse verificación
+- Consulta de fuente autoritaria cada vez que se accede a ruta protegida
+- ProtectedRoute ahora no depende de `pendingVerification` (que es temporal)
+
+### Respuesta 403 en Login vs Acceso a Dashboard
+**Decisión:** Login retorna 403, pero permite autenticación parcial (no crea sesión)
+**Justificación:**
+- Cliente recibe error claro con instrucciones
+- No crea sesión autenticada - usuario must complete verification
+- Flujo es intuitivo: login → rechazado → página de verificación → login de nuevo
