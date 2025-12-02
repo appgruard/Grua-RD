@@ -68,7 +68,7 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Code Audits
 
-### December 2024 - Code Cleanup
+### December 2025 - Code Cleanup
 **Files Removed:**
 - `client/src/pages/auth/register.tsx` - Obsolete file replaced by `onboarding-wizard.tsx`
 - `client/src/components/maps/GoogleMap.tsx` - Unused file (app uses Mapbox)
