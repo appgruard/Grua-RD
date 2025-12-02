@@ -1036,6 +1036,8 @@ export default function DriverProfile() {
         isDriver={true}
         currentPhotoUrl={user.fotoUrl}
         cedulaVerificada={user.cedulaVerificada || false}
+        fotoVerificada={user.fotoVerificada || false}
+        fotoVerificadaScore={user.fotoVerificadaScore ? parseFloat(user.fotoVerificadaScore) : null}
         conductorData={driverData ? {
           licencia: driverData.licencia,
           placaGrua: driverData.placaGrua,

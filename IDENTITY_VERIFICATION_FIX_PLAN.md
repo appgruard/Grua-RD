@@ -373,26 +373,96 @@ const handlePhotoUpload = async (file: File) => {
 - ✅ Persistencia de estado en base de datos (no depende de sesión)
 - ✅ Endpoint de estado completo para troubleshooting
 
-### Fase 4: Mejoras UX Adicionales ⏳ PENDIENTE (Futura)
-1. Mejorar página de resumen de verificación (`verify-pending.tsx`) con nueva interfaz tipo tarjetas
-2. Agregar endpoint admin para revisar fotos de perfil sin verificar
-3. Agregar opción para re-verificar foto de perfil en perfil de usuario
+### Fase 4: Mejoras UX Adicionales ✅ COMPLETADA - 2 Dic 2025
+
+**Estado:** Implementado y funcionando
+
+**Cambios realizados:**
+
+1. ✅ **Mejora de página verify-pending.tsx** (`client/src/pages/auth/verify-pending.tsx`)
+   - Nueva interfaz tipo tarjetas con mejor organización visual
+   - Indicador de progreso visual (pasos 1-2-3)
+   - Estados claros para cada paso de verificación
+   - Badges con iconos para estado de verificación
+   - Botón prominente "Verificar Ahora" para paso actual
+   - Fondo con gradiente sutil para mejor estética
+   - Separadores visuales entre tarjetas
+   - Mensaje de éxito al completar verificación
+
+2. ✅ **Endpoint admin para listar fotos pendientes** (`server/routes.ts`)
+   - Nuevo endpoint `GET /api/admin/pending-photo-verifications`
+   - Retorna lista de conductores con `fotoVerificada = false` y `photoUrl` existente
+   - Incluye estadísticas: total pending, total drivers, total with photo, total verified
+   - Datos del conductor: id, nombre, email, cédula, teléfono, photoUrl, estado de verificaciones
+
+3. ✅ **Endpoint admin para aprobar foto** (`server/routes.ts`)
+   - Nuevo endpoint `POST /api/admin/users/:userId/approve-photo`
+   - Valida que el usuario sea conductor y tenga foto
+   - Actualiza `fotoVerificada = true` y `fotoVerificadaScore = "1.00"`
+   - Log de auditoría con adminId y adminEmail
+   - Solo accesible por administradores
+
+4. ✅ **Endpoint admin para rechazar foto** (`server/routes.ts`)
+   - Nuevo endpoint `POST /api/admin/users/:userId/reject-photo`
+   - Acepta razón opcional para el rechazo
+   - Limpia `fotoVerificada = false`, `fotoVerificadaScore = null`, `photoUrl = null`
+   - El usuario deberá subir una nueva foto
+   - Log de auditoría con razón de rechazo
+
+5. ✅ **Sección de revisión de fotos en admin** (`client/src/pages/admin/verifications.tsx`)
+   - Nueva pestaña "Fotos de Perfil" en la página de verificaciones
+   - Badge de notificación con cantidad de fotos pendientes
+   - Grid de tarjetas con avatar y datos del conductor
+   - Estadísticas de fotos: total conductores, con foto, verificadas, pendientes
+   - Dialog para revisar foto en detalle
+   - Botones de Aprobar y Rechazar con confirmación
+   - Dialog separado para razón de rechazo
+   - Integración con mutations de TanStack Query
+   - Invalidación de cache al aprobar/rechazar
+   - Estados de loading en botones
+
+6. ✅ **Re-verificación de foto en EditProfileModal** (`client/src/components/EditProfileModal.tsx`)
+   - Nuevos props: `fotoVerificada` y `fotoVerificadaScore`
+   - Badge visual del estado de verificación de la foto
+   - Botón "Re-verificar Foto" para conductores sin foto verificada
+   - Funcionalidad de re-verificación: carga la foto actual y la envía a validar
+   - Estados de loading durante re-verificación
+   - Feedback con toast de éxito/error
+   - Actualización automática de datos del usuario tras re-verificación exitosa
+   - Integración con `/api/identity/verify-profile-photo`
+
+7. ✅ **Actualización del perfil del conductor** (`client/src/pages/driver/profile.tsx`)
+   - Paso de nuevos props `fotoVerificada` y `fotoVerificadaScore` a EditProfileModal
+   - Conversión de `fotoVerificadaScore` de string a number para el componente
+
+**Archivos modificados:**
+- `server/routes.ts` - 3 nuevos endpoints de admin para gestión de fotos
+- `client/src/pages/auth/verify-pending.tsx` - Nueva interfaz tipo tarjetas
+- `client/src/pages/admin/verifications.tsx` - Nueva sección de revisión de fotos
+- `client/src/components/EditProfileModal.tsx` - Re-verificación de foto
+- `client/src/pages/driver/profile.tsx` - Props de verificación de foto
+
+**Mejoras de Seguridad Implementadas:**
+- ✅ Revisión manual de fotos por admin cuando Verifik no disponible
+- ✅ Audit logging de aprobaciones/rechazos con ID de admin
+- ✅ Validación de tipo de usuario antes de aprobar/rechazar
+- ✅ Re-verificación permitida solo para fotos no verificadas
+- ✅ Limpieza completa de foto al rechazar (requiere nueva subida)
 
 ## Archivos Modificados (Resumen)
 
 ```
 ✅ Completados:
-server/routes.ts                                # Fase 1,2,3: Validaciones login + sanitización + endpoints de verificación
+server/routes.ts                                # Fase 1,2,3,4: Validaciones login + sanitización + endpoints de verificación + admin endpoints
 server/services/verifik-ocr.ts                 # Fase 2: validateProfilePhoto
 client/src/lib/auth.tsx                        # Fase 1: Proteger rutas
 client/src/App.tsx                             # Fase 1: Redirigir si falta verificación
-client/src/pages/auth/verify-pending.tsx       # Fase 1: Nueva página
+client/src/pages/auth/verify-pending.tsx       # Fase 1,4: Nueva página + mejora UI con tarjetas
 client/src/pages/auth/onboarding-wizard.tsx    # Fase 3: Nuevo paso 5 foto de perfil
-client/src/components/EditProfileModal.tsx     # Fase 2: Validar foto de perfil
+client/src/components/EditProfileModal.tsx     # Fase 2,4: Validar foto de perfil + re-verificación
+client/src/pages/admin/verifications.tsx       # Fase 4: Sección de revisión de fotos
+client/src/pages/driver/profile.tsx            # Fase 4: Props de verificación de foto
 shared/schema.ts                               # Fase 3: Campos fotoVerificada + fotoVerificadaScore
-
-⏳ Pendientes para futuras mejoras:
-client/src/pages/auth/verify-pending.tsx       # Mejorar UI con tarjetas (Fase 4)
 ```
 
 ## Testing
@@ -414,6 +484,17 @@ client/src/pages/auth/verify-pending.tsx       # Mejorar UI con tarjetas (Fase 4
 10. ✅ Score de confianza guardado en BD
 11. ✅ Bloqueo de avance sin foto validada
 
+**Fase 4 - Mejoras UX Adicionales:**
+12. ✅ Página verify-pending muestra tarjetas con indicador de progreso
+13. ✅ Endpoint /api/admin/pending-photo-verifications retorna fotos pendientes
+14. ✅ Endpoint /api/admin/users/:userId/approve-photo aprueba foto
+15. ✅ Endpoint /api/admin/users/:userId/reject-photo rechaza foto y limpia URL
+16. ✅ Panel admin muestra sección de fotos pendientes con pestañas
+17. ✅ Admin puede aprobar foto con un click
+18. ✅ Admin puede rechazar foto con razón opcional
+19. ✅ Conductor puede re-verificar foto desde EditProfileModal
+20. ✅ Badge de estado de verificación visible en EditProfileModal
+
 ## Impacto de Cambios
 
 **Positivos:**
@@ -424,11 +505,15 @@ client/src/pages/auth/verify-pending.tsx       # Mejorar UI con tarjetas (Fase 4
 - ✅ Transparencia: Score de confianza de validación visible para usuarios
 - ✅ Facilidad: Foto de perfil capturada con cámara o subida durante onboarding
 - ✅ Auditabilidad: Estado completo de verificación guardado en BD
+- ✅ Administración: Panel admin para revisar y aprobar/rechazar fotos manualmente
+- ✅ Flexibilidad: Conductores pueden re-verificar fotos sin subir nuevamente
+- ✅ Degradación elegante: Si Verifik no disponible, admin puede aprobar manualmente
 
 **A Considerar:**
 - ⚠️ Disrupción: Operadores existentes no verificados serán bloqueados (necesitarán re-verificarse)
 - ⚠️ Capacidad: Validación de rostro requiere Verifik configurado (tiene fallback a revisión manual)
 - ⚠️ Privacidad: Datos biométricos de rostro procesados por Verifik (cumplir RGPD si aplica)
+- ⚠️ Carga Admin: Sin Verifik, las fotos requieren revisión manual por administradores
 
 ## Decisiones de Diseño
 

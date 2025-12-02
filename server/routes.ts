@@ -3523,6 +3523,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/pending-photo-verifications", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allUsers = await storage.getAllUsers();
+      const driversWithPendingPhoto = allUsers.filter(user => 
+        user.userType === 'conductor' && 
+        !user.fotoVerificada &&
+        user.photoUrl
+      );
+
+      const pendingPhotos = driversWithPendingPhoto.map(user => ({
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        cedula: user.cedula,
+        phone: user.phone,
+        photoUrl: user.photoUrl,
+        cedulaVerificada: user.cedulaVerificada,
+        telefonoVerificado: user.telefonoVerificado,
+        fotoVerificada: user.fotoVerificada,
+        fotoVerificadaScore: user.fotoVerificadaScore,
+        createdAt: user.createdAt,
+      }));
+
+      const stats = {
+        totalPending: pendingPhotos.length,
+        totalDrivers: allUsers.filter(u => u.userType === 'conductor').length,
+        totalWithPhoto: allUsers.filter(u => u.userType === 'conductor' && u.photoUrl).length,
+        totalVerified: allUsers.filter(u => u.userType === 'conductor' && u.fotoVerificada).length,
+      };
+
+      res.json({
+        pendingPhotos,
+        stats,
+      });
+    } catch (error: any) {
+      logSystem.error('Get pending photo verifications error', error);
+      res.status(500).json({ message: "Failed to get pending photo verifications" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/approve-photo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.userType !== 'conductor') {
+        return res.status(400).json({ message: "User is not a driver" });
+      }
+
+      if (!user.photoUrl) {
+        return res.status(400).json({ message: "User has no profile photo to approve" });
+      }
+
+      await storage.updateUser(userId, {
+        fotoVerificada: true,
+        fotoVerificadaScore: "1.00",
+      });
+
+      logSystem.info('Admin approved photo manually', { 
+        adminId: req.user!.id, 
+        userId, 
+        adminEmail: req.user!.email 
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Photo approved successfully",
+        userId,
+      });
+    } catch (error: any) {
+      logSystem.error('Approve photo error', error);
+      res.status(500).json({ message: "Failed to approve photo" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/reject-photo", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = parseInt(req.params.userId);
+      const { reason } = req.body;
+
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.userType !== 'conductor') {
+        return res.status(400).json({ message: "User is not a driver" });
+      }
+
+      await storage.updateUser(userId, {
+        fotoVerificada: false,
+        fotoVerificadaScore: null,
+        photoUrl: null,
+      });
+
+      logSystem.info('Admin rejected photo', { 
+        adminId: req.user!.id, 
+        userId, 
+        adminEmail: req.user!.email,
+        reason: reason || 'No reason provided'
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Photo rejected successfully. User will need to upload a new photo.",
+        userId,
+      });
+    } catch (error: any) {
+      logSystem.error('Reject photo error', error);
+      res.status(500).json({ message: "Failed to reject photo" });
+    }
+  });
+
   app.post("/api/pricing/calculate", pricingLimiter, async (req: Request, res: Response) => {
     try {
       const { distanceKm, servicioCategoria, servicioSubtipo } = req.body;

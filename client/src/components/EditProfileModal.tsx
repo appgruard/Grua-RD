@@ -14,7 +14,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera, Loader2, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Camera, Loader2, AlertCircle, CheckCircle2, XCircle, RefreshCcw, ShieldCheck } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface EditProfileModalProps {
@@ -23,6 +25,8 @@ interface EditProfileModalProps {
   isDriver?: boolean;
   currentPhotoUrl?: string | null;
   cedulaVerificada?: boolean;
+  fotoVerificada?: boolean;
+  fotoVerificadaScore?: number | null;
   conductorData?: {
     licencia: string;
     placaGrua: string;
@@ -46,6 +50,8 @@ export function EditProfileModal({
   isDriver = false,
   currentPhotoUrl,
   cedulaVerificada = false,
+  fotoVerificada = false,
+  fotoVerificadaScore = null,
   conductorData,
 }: EditProfileModalProps) {
   const { user, refreshUser } = useAuth();
@@ -61,6 +67,7 @@ export function EditProfileModal({
   const [faceValidationStatus, setFaceValidationStatus] = useState<'idle' | 'validating' | 'success' | 'failed' | 'skipped'>('idle');
   const [faceValidationError, setFaceValidationError] = useState<string | null>(null);
   const [faceValidationScore, setFaceValidationScore] = useState<number | null>(null);
+  const [isReverifying, setIsReverifying] = useState(false);
   
   const [licencia, setLicencia] = useState(conductorData?.licencia || '');
   const [placaGrua, setPlacaGrua] = useState(conductorData?.placaGrua || '');
@@ -166,6 +173,61 @@ export function EditProfileModal({
         score: 0,
         error: error.message || 'Error de conexión al validar la foto',
       };
+    }
+  };
+
+  const handleReverifyPhoto = async () => {
+    if (!currentPhotoUrl) return;
+    
+    setIsReverifying(true);
+    setFaceValidationStatus('validating');
+    
+    try {
+      const response = await fetch(currentPhotoUrl);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        
+        const result = await validateFacePhoto(base64);
+        
+        if (result.verified) {
+          setFaceValidationStatus('success');
+          setFaceValidationScore(result.score);
+          await refreshUser();
+          toast({
+            title: 'Foto re-verificada',
+            description: `Rostro verificado exitosamente (${Math.round(result.score * 100)}% de confianza)`,
+          });
+        } else if (result.skipped && result.requiresManualReview) {
+          setFaceValidationStatus('skipped');
+          toast({
+            title: 'Verificación pendiente',
+            description: 'La foto será revisada manualmente por el equipo.',
+          });
+        } else {
+          setFaceValidationStatus('failed');
+          setFaceValidationError(result.error || 'No se pudo verificar la foto');
+          toast({
+            title: 'Verificación fallida',
+            description: result.error || 'La foto no cumple con los requisitos. Sube una nueva foto.',
+            variant: 'destructive',
+          });
+        }
+        
+        setIsReverifying(false);
+      };
+      reader.readAsDataURL(blob);
+    } catch (error: any) {
+      setFaceValidationStatus('failed');
+      setFaceValidationError('Error al procesar la foto');
+      setIsReverifying(false);
+      toast({
+        title: 'Error',
+        description: 'No se pudo re-verificar la foto',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -297,7 +359,7 @@ export function EditProfileModal({
   const isValidating = faceValidationStatus === 'validating';
   const displayPhotoUrl = previewUrl || currentPhotoUrl;
 
-  const canSubmit = !isLoading && !isValidating && (
+  const canSubmit = !isLoading && !isValidating && !isReverifying && (
     !isDriver || 
     !selectedFile || 
     faceValidationStatus === 'success' || 
@@ -331,10 +393,10 @@ export function EditProfileModal({
                 variant="secondary"
                 className="absolute bottom-0 right-0 rounded-full shadow-md"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading || isValidating}
+                disabled={isLoading || isValidating || isReverifying}
                 data-testid="button-change-photo"
               >
-                {isValidating ? (
+                {isValidating || isReverifying ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Camera className="w-4 h-4" />
@@ -350,7 +412,71 @@ export function EditProfileModal({
               />
             </div>
 
-            {isDriver && faceValidationStatus === 'validating' && (
+            {isDriver && currentPhotoUrl && !selectedFile && (
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  {fotoVerificada ? (
+                    <Badge variant="default" className="gap-1 bg-green-500 hover:bg-green-600">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Foto Verificada
+                      {fotoVerificadaScore && ` (${Math.round(fotoVerificadaScore * 100)}%)`}
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Pendiente de Verificación
+                    </Badge>
+                  )}
+                </div>
+                
+                {!fotoVerificada && (
+                  <div className="flex justify-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleReverifyPhoto}
+                      disabled={isReverifying || isValidating || isLoading}
+                      className="gap-2"
+                      data-testid="button-reverify-photo"
+                    >
+                      {isReverifying ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Verificando...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCcw className="w-4 h-4" />
+                          Re-verificar Foto
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {faceValidationStatus === 'success' && !selectedFile && (
+                  <Alert className="text-sm border-green-500/50 bg-green-50 dark:bg-green-950/20">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700 dark:text-green-400">
+                      Foto re-verificada exitosamente
+                      {faceValidationScore !== null && ` (${Math.round(faceValidationScore * 100)}%)`}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {faceValidationStatus === 'failed' && !selectedFile && (
+                  <Alert variant="destructive" className="text-sm">
+                    <XCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {faceValidationError || 'La foto no pasó la verificación. Sube una nueva foto.'}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
+            {isDriver && faceValidationStatus === 'validating' && selectedFile && (
               <Alert className="text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <AlertDescription>
@@ -359,7 +485,7 @@ export function EditProfileModal({
               </Alert>
             )}
 
-            {isDriver && faceValidationStatus === 'success' && (
+            {isDriver && faceValidationStatus === 'success' && selectedFile && (
               <Alert className="text-sm border-green-500/50 bg-green-50 dark:bg-green-950/20">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-700 dark:text-green-400">
@@ -369,7 +495,7 @@ export function EditProfileModal({
               </Alert>
             )}
 
-            {isDriver && faceValidationStatus === 'failed' && (
+            {isDriver && faceValidationStatus === 'failed' && selectedFile && (
               <Alert variant="destructive" className="text-sm">
                 <XCircle className="h-4 w-4" />
                 <AlertDescription>
@@ -378,7 +504,7 @@ export function EditProfileModal({
               </Alert>
             )}
 
-            {isDriver && faceValidationStatus === 'skipped' && (
+            {isDriver && faceValidationStatus === 'skipped' && selectedFile && (
               <Alert className="text-sm">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
@@ -396,7 +522,7 @@ export function EditProfileModal({
               </Alert>
             )}
 
-            {isDriver && faceValidationStatus === 'idle' && (
+            {isDriver && faceValidationStatus === 'idle' && !currentPhotoUrl && (
               <p className="text-xs text-muted-foreground text-center">
                 Tu foto debe mostrar claramente tu rostro para identificación
               </p>
@@ -406,7 +532,7 @@ export function EditProfileModal({
           <div className="space-y-4">
             {isDriver && cedulaVerificada && (
               <Alert className="text-sm">
-                <AlertCircle className="h-4 w-4" />
+                <ShieldCheck className="h-4 w-4" />
                 <AlertDescription>
                   Tu nombre no puede ser modificado porque tu cédula ya fue verificada. El nombre debe coincidir con tu documento de identidad.
                 </AlertDescription>
@@ -452,7 +578,8 @@ export function EditProfileModal({
 
             {isDriver && (
               <>
-                <div className="border-t pt-4 mt-4">
+                <Separator className="my-4" />
+                <div>
                   <h4 className="text-sm font-semibold mb-3">Información de la Grúa</h4>
                   
                   <div className="space-y-3">
@@ -516,7 +643,7 @@ export function EditProfileModal({
               variant="outline"
               className="flex-1"
               onClick={() => onOpenChange(false)}
-              disabled={isLoading || isValidating}
+              disabled={isLoading || isValidating || isReverifying}
               data-testid="button-cancel"
             >
               Cancelar
@@ -532,7 +659,7 @@ export function EditProfileModal({
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Guardando...
                 </>
-              ) : isValidating ? (
+              ) : isValidating || isReverifying ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Validando...

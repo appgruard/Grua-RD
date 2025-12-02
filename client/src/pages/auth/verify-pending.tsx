@@ -8,16 +8,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { 
   Loader2, IdCard, Phone, CheckCircle2, AlertCircle, 
-  Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, UserCircle
+  Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, 
+  UserCircle, ArrowRight, Circle, CheckCircle
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 type VerificationStep = 'cedula' | 'phone' | 'photo' | 'complete';
+
+interface VerificationStepInfo {
+  id: VerificationStep;
+  title: string;
+  shortTitle: string;
+  description: string;
+  icon: typeof IdCard;
+  completed: boolean;
+  current: boolean;
+}
 
 export default function VerifyPending() {
   const [, setLocation] = useLocation();
@@ -111,20 +124,48 @@ export default function VerifyPending() {
     }
   }, [otpTimer]);
 
-  const calculateProgress = () => {
+  const getSteps = (): VerificationStepInfo[] => {
+    const baseSteps: VerificationStepInfo[] = [
+      {
+        id: 'cedula',
+        title: 'Verificar Cédula',
+        shortTitle: 'Cédula',
+        description: 'Escanea tu documento de identidad',
+        icon: IdCard,
+        completed: cedulaVerified,
+        current: currentStep === 'cedula'
+      },
+      {
+        id: 'phone',
+        title: 'Verificar Teléfono',
+        shortTitle: 'Teléfono',
+        description: 'Confirma tu número con un código SMS',
+        icon: Phone,
+        completed: phoneVerified,
+        current: currentStep === 'phone'
+      }
+    ];
+
     if (isDriver) {
-      if (cedulaVerified && phoneVerified && photoVerified) return 100;
-      if (cedulaVerified && phoneVerified) return 66;
-      if (cedulaVerified) return 33;
-      return 0;
-    } else {
-      if (cedulaVerified && phoneVerified) return 100;
-      if (cedulaVerified) return 50;
-      return 0;
+      baseSteps.push({
+        id: 'photo',
+        title: 'Foto de Perfil',
+        shortTitle: 'Foto',
+        description: 'Sube una foto clara de tu rostro',
+        icon: UserCircle,
+        completed: photoVerified,
+        current: currentStep === 'photo'
+      });
     }
+
+    return baseSteps;
   };
 
-  const progress = calculateProgress();
+  const steps = getSteps();
+  const completedSteps = steps.filter(s => s.completed).length;
+  const totalSteps = steps.length;
+  const progress = Math.round((completedSteps / totalSteps) * 100);
+  const currentStepIndex = steps.findIndex(s => s.current);
 
   const convertToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -439,7 +480,7 @@ export default function VerifyPending() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="flex items-center justify-between p-4 border-b">
+      <header className="flex items-center justify-between p-4 border-b bg-card">
         <div className="flex items-center gap-3">
           <img src={logoUrl} alt="Grúa RD" className="h-10 w-auto" />
           <div>
@@ -452,27 +493,129 @@ export default function VerifyPending() {
         </Button>
       </header>
 
-      <div className="flex-1 p-4 max-w-lg mx-auto w-full">
+      <div className="flex-1 p-4 max-w-2xl mx-auto w-full">
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Progreso de verificación</span>
-            <span className="text-sm font-medium">{progress}%</span>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-lg font-semibold" data-testid="heading-verification-progress">
+                Paso {currentStepIndex + 1} de {totalSteps}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {completedSteps} de {totalSteps} verificaciones completadas
+              </p>
+            </div>
+            <Badge variant={progress === 100 ? "default" : "secondary"} className="text-sm" data-testid="badge-progress">
+              {progress}%
+            </Badge>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={progress} className="h-2" data-testid="progress-bar" />
+        </div>
+
+        <div className="flex items-center justify-center gap-2 mb-6 overflow-x-auto pb-2" data-testid="step-indicators">
+          {steps.map((step, index) => (
+            <div key={step.id} className="flex items-center">
+              <div className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg transition-all",
+                step.completed ? "bg-green-100 dark:bg-green-900/30" :
+                step.current ? "bg-primary/10 ring-2 ring-primary" : "bg-muted"
+              )}>
+                <div className={cn(
+                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium",
+                  step.completed ? "bg-green-500 text-white" :
+                  step.current ? "bg-primary text-primary-foreground" : "bg-muted-foreground/30 text-muted-foreground"
+                )}>
+                  {step.completed ? <CheckCircle className="w-4 h-4" /> : index + 1}
+                </div>
+                <span className={cn(
+                  "text-sm font-medium whitespace-nowrap",
+                  step.completed ? "text-green-700 dark:text-green-400" :
+                  step.current ? "text-primary" : "text-muted-foreground"
+                )}>
+                  {step.shortTitle}
+                </span>
+              </div>
+              {index < steps.length - 1 && (
+                <ArrowRight className={cn(
+                  "w-4 h-4 mx-1 flex-shrink-0",
+                  steps[index].completed ? "text-green-500" : "text-muted-foreground/30"
+                )} />
+              )}
+            </div>
+          ))}
         </div>
 
         <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
           <ShieldCheck className="h-4 w-4 text-amber-500" />
-          <AlertDescription className="text-amber-700 dark:text-amber-400">
-            Para continuar usando Grúa RD como {isDriver ? 'operador' : 'cliente'}, debes completar la verificación de identidad.
+          <AlertTitle className="text-amber-700 dark:text-amber-400">Verificación requerida</AlertTitle>
+          <AlertDescription className="text-amber-600 dark:text-amber-400/80">
+            Para continuar usando Grúa RD como {isDriver ? 'operador' : 'cliente'}, debes completar todos los pasos de verificación.
           </AlertDescription>
         </Alert>
+
+        <Card className="mb-6" data-testid="card-summary">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5" />
+              Resumen de Verificación
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3">
+              {steps.map((step) => (
+                <div 
+                  key={step.id} 
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-lg border transition-all",
+                    step.completed ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20" :
+                    step.current ? "border-primary bg-primary/5" : "border-muted bg-muted/30"
+                  )}
+                  data-testid={`summary-step-${step.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-10 h-10 rounded-full flex items-center justify-center",
+                      step.completed ? "bg-green-100 dark:bg-green-800" :
+                      step.current ? "bg-primary/10" : "bg-muted"
+                    )}>
+                      {step.completed ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <step.icon className={cn(
+                          "w-5 h-5",
+                          step.current ? "text-primary" : "text-muted-foreground"
+                        )} />
+                      )}
+                    </div>
+                    <div>
+                      <p className={cn(
+                        "font-medium text-sm",
+                        step.completed ? "text-green-700 dark:text-green-400" :
+                        step.current ? "text-primary" : "text-muted-foreground"
+                      )}>
+                        {step.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{step.description}</p>
+                    </div>
+                  </div>
+                  <Badge 
+                    variant={step.completed ? "default" : step.current ? "outline" : "secondary"}
+                    className={cn(
+                      step.completed && "bg-green-500 hover:bg-green-600"
+                    )}
+                  >
+                    {step.completed ? 'Completado' : step.current ? 'En progreso' : 'Pendiente'}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="space-y-4">
           <Card className={cn(
             "transition-all",
-            cedulaVerified ? "border-green-500/50 bg-green-500/5" : currentStep === 'cedula' ? "ring-2 ring-primary" : ""
-          )}>
+            cedulaVerified ? "border-green-500/50 bg-green-500/5" : currentStep === 'cedula' ? "ring-2 ring-primary" : "opacity-60"
+          )} data-testid="card-cedula-verification">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
                 <div className={cn(
@@ -485,10 +628,15 @@ export default function VerifyPending() {
                     <IdCard className="w-5 h-5" />
                   )}
                 </div>
-                <div>
-                  <CardTitle className="text-base">Verificación de Cédula</CardTitle>
+                <div className="flex-1">
+                  <CardTitle className="text-base flex items-center justify-between gap-2">
+                    <span>Paso 1: Verificación de Cédula</span>
+                    {cedulaVerified && (
+                      <Badge className="bg-green-500 hover:bg-green-600">Verificado</Badge>
+                    )}
+                  </CardTitle>
                   <CardDescription>
-                    {cedulaVerified ? 'Verificado' : 'Escanea tu cédula de identidad'}
+                    {cedulaVerified ? 'Tu cédula ha sido verificada exitosamente' : 'Escanea tu cédula de identidad dominicana'}
                   </CardDescription>
                 </div>
               </div>
@@ -564,7 +712,7 @@ export default function VerifyPending() {
             "transition-all",
             phoneVerified ? "border-green-500/50 bg-green-500/5" : 
             currentStep === 'phone' && cedulaVerified ? "ring-2 ring-primary" : "opacity-60"
-          )}>
+          )} data-testid="card-phone-verification">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
                 <div className={cn(
@@ -577,10 +725,15 @@ export default function VerifyPending() {
                     <Phone className="w-5 h-5" />
                   )}
                 </div>
-                <div>
-                  <CardTitle className="text-base">Verificación de Teléfono</CardTitle>
+                <div className="flex-1">
+                  <CardTitle className="text-base flex items-center justify-between gap-2">
+                    <span>Paso 2: Verificación de Teléfono</span>
+                    {phoneVerified && (
+                      <Badge className="bg-green-500 hover:bg-green-600">Verificado</Badge>
+                    )}
+                  </CardTitle>
                   <CardDescription>
-                    {phoneVerified ? 'Verificado' : currentUser?.phone || 'Sin teléfono registrado'}
+                    {phoneVerified ? 'Tu teléfono ha sido verificado' : currentUser?.phone || 'Sin teléfono registrado'}
                   </CardDescription>
                 </div>
               </div>
@@ -595,6 +748,11 @@ export default function VerifyPending() {
                   </Alert>
                 )}
 
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Enviaremos un código SMS a:</p>
+                  <p className="font-medium">{currentUser?.phone}</p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="otp">Código de verificación</Label>
                   <Input
@@ -606,6 +764,7 @@ export default function VerifyPending() {
                       setErrors({});
                     }}
                     maxLength={6}
+                    className="text-center text-lg tracking-widest"
                     data-testid="input-otp-code"
                   />
                 </div>
@@ -648,7 +807,7 @@ export default function VerifyPending() {
               "transition-all",
               photoVerified ? "border-green-500/50 bg-green-500/5" : 
               currentStep === 'photo' && cedulaVerified && phoneVerified ? "ring-2 ring-primary" : "opacity-60"
-            )}>
+            )} data-testid="card-photo-verification">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-3">
                   <div className={cn(
@@ -661,10 +820,15 @@ export default function VerifyPending() {
                       <UserCircle className="w-5 h-5" />
                     )}
                   </div>
-                  <div>
-                    <CardTitle className="text-base">Foto de Perfil Verificada</CardTitle>
+                  <div className="flex-1">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <span>Paso 3: Foto de Perfil Verificada</span>
+                      {photoVerified && (
+                        <Badge className="bg-green-500 hover:bg-green-600">Verificado</Badge>
+                      )}
+                    </CardTitle>
                     <CardDescription>
-                      {photoVerified ? 'Verificado' : 'Sube una foto clara de tu rostro'}
+                      {photoVerified ? 'Tu foto de perfil ha sido verificada' : 'Sube una foto clara de tu rostro'}
                     </CardDescription>
                   </div>
                 </div>
