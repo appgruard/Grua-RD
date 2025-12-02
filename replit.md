@@ -28,7 +28,7 @@ Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js 
 **Core Features:**
 - **Authentication & Security**: Role-based (Client/Driver/Admin/Empresa) with Passport.js, bcrypt, session management.
 - **Client Features**: Map-based requests, real-time tracking, service history, profiles, automatic price calculation, multiple insurance document management.
-- **Driver Features**: Request dashboard, accept/reject services, real-time GPS updates, status management, availability toggle, truck information, service category specialization.
+- **Driver Features**: Request dashboard, accept/reject services, real-time GPS updates, status management, availability toggle, truck information, service category specialization, vehicle-per-category management (one vehicle with photo, plate, color, and capacity per service category).
 - **Admin Features**: Dashboard with statistics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration, insurance claim validation, analytics, document validation, ticket support system.
 - **Enterprise Portal (B2B)**: Dedicated portal for businesses with employee management, contract/tariff configuration, project tracking, scheduled services, and invoicing.
 - **Real-time Communication**: WebSockets for location updates and client-driver chat, automatic service cancellation.
@@ -44,7 +44,7 @@ Grúa RD is built with a React 18 (TypeScript, Vite) frontend and an Express.js 
 - **Support Ticket System**: Complete management for clients and drivers with category-based tickets, priority levels, state tracking, and admin panel.
 
 ### System Design Choices
-The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security measures include bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage is on Replit Object Storage with strict authorization. Azul Payment Gateway integration prioritizes server-side processing with a HOLD/POST flow, webhook verification, and automatic commission distribution. Insurance API integrations use an Adapter pattern. Driver profile API is optimized for single-call data retrieval. Service auto-cancellation employs atomic updates and real-time notifications.
+The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security measures include bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage is on Replit Object Storage with strict authorization. Azul Payment Gateway integration prioritizes server-side processing with a HOLD/POST flow, webhook verification, and automatic commission distribution. Insurance API integrations use an Adapter pattern. Driver profile API is optimized for single-call data retrieval. Service auto-cancellation employs atomic updates and real-time notifications. Vehicle-per-category system uses unique constraint (conductorId, categoria) with active-only filtering for matching and acceptance flows.
 
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
