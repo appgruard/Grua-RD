@@ -243,6 +243,112 @@ passport.deserializeUser(async (id: string, done) => {
   }
 });
 
+// Helper function to sanitize user data before sending to client
+// Uses explicit whitelist of allowed properties to prevent sensitive data exposure
+export const getSafeUser = (user: any) => {
+  if (!user) return null;
+  
+  // Explicit whitelist of public user fields
+  const safeUser: Record<string, any> = {
+    id: user.id,
+    email: user.email,
+    phone: user.phone,
+    cedula: user.cedula,
+    cedulaVerificada: user.cedulaVerificada,
+    userType: user.userType,
+    estadoCuenta: user.estadoCuenta,
+    nombre: user.nombre,
+    apellido: user.apellido,
+    fotoUrl: user.fotoUrl,
+    calificacionPromedio: user.calificacionPromedio,
+    telefonoVerificado: user.telefonoVerificado,
+    createdAt: user.createdAt,
+  };
+  
+  // Include conductor data if present (for driver users)
+  if (user.conductor) {
+    safeUser.conductor = {
+      id: user.conductor.id,
+      userId: user.conductor.userId,
+      licencia: user.conductor.licencia,
+      placaGrua: user.conductor.placaGrua,
+      marcaGrua: user.conductor.marcaGrua,
+      modeloGrua: user.conductor.modeloGrua,
+      disponible: user.conductor.disponible,
+      ubicacionLat: user.conductor.ubicacionLat,
+      ubicacionLng: user.conductor.ubicacionLng,
+      ultimaUbicacionUpdate: user.conductor.ultimaUbicacionUpdate,
+      balanceDisponible: user.conductor.balanceDisponible,
+      balancePendiente: user.conductor.balancePendiente,
+    };
+  }
+  
+  return safeUser;
+};
+
+// Helper function to sanitize user data for admin views
+// Uses explicit whitelist including admin-relevant fields while excluding sensitive auth data
+export const getSafeUserForAdmin = (user: any) => {
+  if (!user) return null;
+  
+  // Explicit whitelist of admin-viewable fields (excludes passwordHash, tokens, internal flags)
+  const safeUser: Record<string, any> = {
+    id: user.id,
+    email: user.email,
+    phone: user.phone,
+    cedula: user.cedula,
+    cedulaVerificada: user.cedulaVerificada,
+    userType: user.userType,
+    estadoCuenta: user.estadoCuenta,
+    nombre: user.nombre,
+    apellido: user.apellido,
+    fotoUrl: user.fotoUrl,
+    calificacionPromedio: user.calificacionPromedio,
+    telefonoVerificado: user.telefonoVerificado,
+    createdAt: user.createdAt,
+  };
+  
+  // Include conductor data if present
+  if (user.conductor) {
+    safeUser.conductor = {
+      id: user.conductor.id,
+      userId: user.conductor.userId,
+      licencia: user.conductor.licencia,
+      placaGrua: user.conductor.placaGrua,
+      marcaGrua: user.conductor.marcaGrua,
+      modeloGrua: user.conductor.modeloGrua,
+      disponible: user.conductor.disponible,
+      ubicacionLat: user.conductor.ubicacionLat,
+      ubicacionLng: user.conductor.ubicacionLng,
+      ultimaUbicacionUpdate: user.conductor.ultimaUbicacionUpdate,
+      balanceDisponible: user.conductor.balanceDisponible,
+      balancePendiente: user.conductor.balancePendiente,
+    };
+  }
+  
+  return safeUser;
+};
+
+// Helper to sanitize arrays of users for admin endpoints
+export const getSafeUsersForAdmin = (users: any[]) => {
+  return users.map(getSafeUserForAdmin);
+};
+
+// Helper to sanitize driver/conductor records with embedded user objects
+export const getSafeDriver = (driver: any) => {
+  if (!driver) return null;
+  const safeDriver = { ...driver };
+  if (safeDriver.user) {
+    safeDriver.user = getSafeUserForAdmin(safeDriver.user);
+  }
+  return safeDriver;
+};
+
+// Helper to sanitize arrays of drivers
+export const getSafeDrivers = (drivers: any[]) => {
+  return drivers.map(getSafeDriver);
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // dLocal Payment Webhook Handler
   app.post("/api/dlocal/webhook", express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
@@ -612,7 +718,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           logSystem.error("Login failed after registration", err, { userId: user.id });
           return res.status(500).json({ message: "Login failed after registration" });
         }
-        res.json({ user: updatedUser || user });
+        // Return sanitized user data
+        res.json({ user: getSafeUser(updatedUser || user) });
       });
     } catch (error: any) {
       logSystem.error('Registration error', error);
@@ -929,7 +1036,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/login", passport.authenticate("local"), (req: Request, res: Response) => {
-    res.json({ user: req.user });
+    const user = req.user as any;
+    
+    // For conductores (operators), validate that identity verification is complete
+    if (user && user.userType === 'conductor') {
+      const verificationStatus = {
+        cedulaVerificada: user.cedulaVerificada === true,
+        telefonoVerificado: user.telefonoVerificado === true,
+      };
+      
+      // If either verification is missing, return 403 with minimal safe data
+      if (!verificationStatus.cedulaVerificada || !verificationStatus.telefonoVerificado) {
+        // Return only safe, non-sensitive user data for the verification page
+        const safeUserData = {
+          id: user.id,
+          email: user.email,
+          nombre: user.nombre,
+          apellido: user.apellido,
+          phone: user.phone,
+          userType: user.userType,
+          cedulaVerificada: user.cedulaVerificada,
+          telefonoVerificado: user.telefonoVerificado,
+        };
+        
+        return res.status(403).json({
+          message: "Debe completar la verificación de identidad antes de acceder",
+          requiresVerification: true,
+          verificationStatus,
+          redirectTo: '/verify-pending',
+          user: safeUserData,
+        });
+      }
+    }
+    
+    // Return sanitized user data (without passwordHash)
+    res.json({ user: getSafeUser(user) });
   });
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {
@@ -940,7 +1081,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/me", (req: Request, res: Response) => {
     if (req.isAuthenticated()) {
-      res.json(req.user);
+      // Return sanitized user data (without passwordHash)
+      res.json(getSafeUser(req.user));
     } else {
       res.status(401).json({ message: "Not authenticated" });
     }
@@ -1549,7 +1691,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedUser = await storage.getUserById(userId);
       logSystem.info('User profile updated', { userId });
 
-      res.json({ user: updatedUser });
+      // Return sanitized user data
+      res.json({ user: getSafeUser(updatedUser) });
     } catch (error: any) {
       logSystem.error('Update user profile error', error, { userId: req.user?.id });
       res.status(500).json({ message: "Error al actualizar perfil" });
@@ -2956,7 +3099,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const users = await storage.getAllUsers();
-      res.json(users);
+      // Sanitize user data to remove password hashes
+      res.json(getSafeUsersForAdmin(users));
     } catch (error: any) {
       logSystem.error('Get users error', error);
       res.status(500).json({ message: "Failed to get users" });
@@ -2970,7 +3114,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const drivers = await storage.getAllDrivers();
-      res.json(drivers);
+      // Sanitize all driver data including embedded user objects
+      res.json(getSafeDrivers(drivers));
     } catch (error: any) {
       logSystem.error('Get drivers error', error);
       res.status(500).json({ message: "Failed to get drivers" });
@@ -3039,7 +3184,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const drivers = await storage.getAvailableDrivers();
-      res.json(drivers);
+      // Sanitize driver data including embedded user objects
+      res.json(getSafeDrivers(drivers));
     } catch (error: any) {
       logSystem.error('Get active drivers error', error);
       res.status(500).json({ message: "Failed to get active drivers" });
@@ -6483,7 +6629,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       logSystem.info('Insurance company created', { aseguradoraId: aseguradora.id, rnc });
-      res.json({ user, aseguradora });
+      // Return sanitized user data
+      res.json({ user: getSafeUser(user), aseguradora });
     } catch (error: any) {
       logSystem.error('Create insurance company error', error);
       res.status(500).json({ message: "Failed to create insurance company" });

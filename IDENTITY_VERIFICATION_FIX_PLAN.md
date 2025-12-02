@@ -172,11 +172,49 @@ const handlePhotoUpload = async (file: File) => {
 
 ## Orden de Implementación
 
-### Fase 1: Crítica (Bloquear acceso sin verificación)
-1. Agregar validación en `POST /api/auth/login` - validar `cedulaVerificada && telefonoVerificado`
-2. Crear página `verify-cedula-pending.tsx` con protección de ruta
-3. Actualizar router para redirigir si falta verificación
-4. Agregar bloques visuales en dashboard alertando sobre verificación incompleta
+### Fase 1: Crítica (Bloquear acceso sin verificación) ✅ COMPLETADA - 2 Dic 2025
+
+**Estado:** Implementado y funcionando
+
+**Cambios realizados:**
+
+1. ✅ **Validación en login backend** (`server/routes.ts`)
+   - Endpoint `POST /api/auth/login` ahora valida `cedulaVerificada` y `telefonoVerificado` para conductores
+   - Retorna 403 con `requiresVerification: true` si falta alguna verificación
+   - Incluye `verificationStatus` con el estado de cada verificación
+
+2. ✅ **Página de verificación pendiente** (`client/src/pages/auth/verify-pending.tsx`)
+   - Nueva página que permite completar verificación de cédula y teléfono
+   - Reutiliza lógica de escaneo OCR existente
+   - Flujo de 2 pasos: primero cédula, luego teléfono
+   - Indicador de progreso visual
+
+3. ✅ **Actualización del hook de autenticación** (`client/src/lib/auth.tsx`)
+   - Nuevos estados: `pendingVerification` y `pendingVerificationUser`
+   - Manejo de error 403 con `requiresVerification`
+   - Nueva función `clearPendingVerification()`
+
+4. ✅ **Protección de rutas** (`client/src/App.tsx`)
+   - `ProtectedRoute` redirige a `/verify-pending` si conductor no está verificado
+   - Nueva ruta `/verify-pending` registrada
+   - Verificación doble: estado pendingVerification y campos del usuario
+
+5. ✅ **Alerta visual en dashboard** (`client/src/pages/driver/dashboard.tsx`)
+   - Alerta prominente si el conductor accede sin verificación completa
+   - Botón directo para completar verificación
+
+6. ✅ **Página de login actualizada** (`client/src/pages/auth/login.tsx`)
+   - Detecta error de verificación requerida
+   - Redirige automáticamente a `/verify-pending`
+   - Toast informativo para el usuario
+
+**Archivos modificados:**
+- `server/routes.ts` - Validación en login
+- `client/src/lib/auth.tsx` - Estados de verificación pendiente
+- `client/src/App.tsx` - Nueva ruta y ProtectedRoute actualizado
+- `client/src/pages/auth/login.tsx` - Manejo de redirección
+- `client/src/pages/auth/verify-pending.tsx` - Nueva página (creada)
+- `client/src/pages/driver/dashboard.tsx` - Alerta de verificación
 
 ### Fase 2: Validación de Foto
 1. Crear endpoint `POST /api/identity/verify-profile-photo` 

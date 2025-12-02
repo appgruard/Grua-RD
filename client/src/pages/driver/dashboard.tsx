@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { MapboxMap } from '@/components/maps/MapboxMap';
 import { Card } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -14,7 +16,7 @@ import { useWebSocket } from '@/lib/websocket';
 import { ChatBox } from '@/components/chat/ChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLocationTracking } from '@/hooks/useLocation';
-import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car } from 'lucide-react';
+import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert } from 'lucide-react';
 import { SiWaze } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
@@ -23,6 +25,7 @@ import { cn } from '@/lib/utils';
 
 export default function DriverDashboard() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [currentLocation, setCurrentLocation] = useState<Coordinates>({ lat: 18.4861, lng: -69.9312 });
@@ -313,8 +316,28 @@ export default function DriverDashboard() {
     }
   };
 
+  const needsVerification = user && (!user.cedulaVerificada || !user.telefonoVerificado);
+
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
+      {needsVerification && (
+        <Alert className="m-3 border-amber-500/50 bg-amber-500/10 z-20" data-testid="alert-verification-pending">
+          <ShieldAlert className="h-4 w-4 text-amber-500" />
+          <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-amber-700 dark:text-amber-400">
+              Debes completar la verificación de identidad para continuar.
+            </span>
+            <Button 
+              size="sm" 
+              onClick={() => setLocation('/verify-pending')}
+              data-testid="button-complete-verification"
+            >
+              Completar verificación
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="flex-1 relative min-h-0">
         <MapboxMap
           center={currentLocation}

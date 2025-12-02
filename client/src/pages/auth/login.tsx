@@ -12,7 +12,7 @@ import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 export default function Login() {
   const [location, setLocation] = useLocation();
-  const { login, user, isLoading } = useAuth();
+  const { login, user, isLoading, pendingVerification } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,16 +20,34 @@ export default function Login() {
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   useEffect(() => {
+    // Redirect to verify-pending if there's a pending verification from login attempt
+    if (pendingVerification) {
+      setLocation('/verify-pending');
+      return;
+    }
+    
     if (user && !isLoading) {
-      if (user.userType === 'admin') {
-        setLocation('/admin');
-      } else if (user.userType === 'conductor') {
+      // Check if conductor needs verification using server data
+      if (user.userType === 'conductor') {
+        const needsVerification = !user.cedulaVerificada || !user.telefonoVerificado;
+        if (needsVerification) {
+          setLocation('/verify-pending');
+          return;
+        }
         setLocation('/driver');
+      } else if (user.userType === 'admin') {
+        setLocation('/admin');
+      } else if (user.userType === 'aseguradora') {
+        setLocation('/aseguradora');
+      } else if (user.userType === 'socio') {
+        setLocation('/socio');
+      } else if (user.userType === 'empresa') {
+        setLocation('/empresa');
       } else {
         setLocation('/client');
       }
     }
-  }, [user, isLoading, setLocation]);
+  }, [user, isLoading, setLocation, pendingVerification]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -76,6 +94,17 @@ export default function Login() {
         setLocation('/client');
       }
     } catch (error: any) {
+      // Check if this is a verification required error
+      if (error?.requiresVerification) {
+        toast({
+          title: 'Verificación requerida',
+          description: 'Debes completar la verificación de identidad para continuar',
+          variant: 'default',
+        });
+        setLocation('/verify-pending');
+        return;
+      }
+      
       const errorMessage = error?.message || 'Credenciales inválidas';
       setErrors({ general: errorMessage });
       toast({

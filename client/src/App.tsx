@@ -18,6 +18,7 @@ const Login = lazy(() => import('@/pages/auth/login'));
 const OnboardingWizard = lazy(() => import('@/pages/auth/onboarding-wizard'));
 const VerifyOTP = lazy(() => import('@/pages/auth/verify-otp'));
 const ForgotPassword = lazy(() => import('@/pages/auth/forgot-password'));
+const VerifyPending = lazy(() => import('@/pages/auth/verify-pending'));
 
 const ClientHome = lazy(() => import('@/pages/client/home'));
 const ClientTracking = lazy(() => import('@/pages/client/tracking'));
@@ -107,6 +108,14 @@ function ProtectedRoute({
     return <Redirect to="/login" />;
   }
 
+  // For conductors, check if verification is complete using authoritative server data
+  if (user.userType === 'conductor') {
+    const needsVerification = !user.cedulaVerificada || !user.telefonoVerificado;
+    if (needsVerification) {
+      return <Redirect to="/verify-pending" />;
+    }
+  }
+
   if (!allowedTypes.includes(user.userType)) {
     return <Redirect to="/login" />;
   }
@@ -124,6 +133,7 @@ function Router() {
         <Route path="/onboarding" component={OnboardingWizard} />
         <Route path="/verify-otp" component={VerifyOTP} />
         <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/verify-pending" component={VerifyPending} />
         <Route path="/privacy-policy" component={PrivacyPolicy} />
       
       {/* Client Routes - Most specific first */}
