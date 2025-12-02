@@ -160,6 +160,23 @@ export const conductorServicioSubtipos = pgTable("conductor_servicio_subtipos", 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Conductor Vehicles Table (one vehicle per category per driver)
+export const conductorVehiculos = pgTable("conductor_vehiculos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
+  categoria: servicioCategoriaEnum("categoria").notNull(),
+  fotoUrl: text("foto_url"),
+  placa: text("placa").notNull(),
+  color: text("color").notNull(),
+  capacidad: text("capacidad"),
+  marca: text("marca"),
+  modelo: text("modelo"),
+  anio: text("anio"),
+  detalles: text("detalles"),
+  activo: boolean("activo").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Servicios (Services) Table
 export const servicios = pgTable("servicios", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -184,6 +201,11 @@ export const servicios = pgTable("servicios", {
   aseguradoraNombre: text("aseguradora_nombre"),
   aseguradoraPoliza: text("aseguradora_poliza"),
   aseguradoraEstado: aseguradoraEstadoEnum("aseguradora_estado"),
+  vehiculoId: varchar("vehiculo_id").references(() => conductorVehiculos.id),
+  vehiculoPlaca: text("vehiculo_placa"),
+  vehiculoColor: text("vehiculo_color"),
+  vehiculoFotoUrl: text("vehiculo_foto_url"),
+  vehiculoCapacidad: text("vehiculo_capacidad"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   aceptadoAt: timestamp("aceptado_at"),
   iniciadoAt: timestamp("iniciado_at"),
@@ -1156,6 +1178,30 @@ export const insertConductorServicioSubtipoSchema = createInsertSchema(conductor
   createdAt: true,
 });
 
+export const insertConductorVehiculoSchema = createInsertSchema(conductorVehiculos, {
+  categoria: z.enum([
+    "remolque_estandar",
+    "auxilio_vial",
+    "remolque_especializado",
+    "vehiculos_pesados",
+    "maquinarias",
+    "izaje_construccion",
+    "remolque_recreativo"
+  ]),
+  placa: z.string().min(1, "Placa es requerida"),
+  color: z.string().min(1, "Color es requerido"),
+  capacidad: z.string().optional(),
+  marca: z.string().optional(),
+  modelo: z.string().optional(),
+  anio: z.string().optional(),
+  detalles: z.string().optional(),
+  fotoUrl: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  activo: true,
+});
+
 export const insertServicioSchema = createInsertSchema(servicios, {
   origenDireccion: z.string().min(1),
   destinoDireccion: z.string().min(1),
@@ -1553,6 +1599,9 @@ export type ConductorServicio = typeof conductorServicios.$inferSelect;
 
 export type InsertConductorServicioSubtipo = z.infer<typeof insertConductorServicioSubtipoSchema>;
 export type ConductorServicioSubtipo = typeof conductorServicioSubtipos.$inferSelect;
+
+export type InsertConductorVehiculo = z.infer<typeof insertConductorVehiculoSchema>;
+export type ConductorVehiculo = typeof conductorVehiculos.$inferSelect;
 
 export type InsertServicio = z.infer<typeof insertServicioSchema>;
 export type Servicio = typeof servicios.$inferSelect;
