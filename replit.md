@@ -65,3 +65,19 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **CORS**: Configured for web domains, plus `capacitor://`, `ionic://`, and `file://` schemes for mobile apps
 - **API URL**: Use `VITE_API_URL` environment variable to configure production server URL for mobile builds
 - **Documentation**: See `DEPLOYMENT_CAPROVER.md` for full deployment guide and `CAPACITOR_BUILD_GUIDE.md` for mobile app builds
+
+## Recent Code Audits
+
+### December 2024 - Code Cleanup
+**Files Removed:**
+- `client/src/pages/auth/register.tsx` - Obsolete file replaced by `onboarding-wizard.tsx`
+- `client/src/components/maps/GoogleMap.tsx` - Unused file (app uses Mapbox)
+
+**Code Cleaned:**
+- `client/src/lib/maps.ts` - Removed unused `loadGoogleMapsScript` function (Google Maps legacy code)
+
+**Technical Debt Identified:**
+- `server/routes.ts` (8,128 lines) - Consider modular split
+- `server/storage.ts` (3,791 lines) - Consider modular split
+- `shared/schema.ts` (1,958 lines) - Consider domain-based organization
+- Enum `servicio_categoria` contains both "camiones_pesados" and "vehiculos_pesados" for backward compatibility
