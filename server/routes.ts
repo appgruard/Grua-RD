@@ -1296,6 +1296,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // License OCR Scan endpoint for operators during registration
+  app.post("/api/identity/scan-license", ocrScanLimiter, async (req: Request, res: Response) => {
+    try {
+      const { image, nombre, apellido } = req.body;
+
+      if (!image) {
+        return res.status(400).json({ message: "Imagen de la licencia es requerida" });
+      }
+
+      if (image.length > 10 * 1024 * 1024) {
+        return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
+      }
+
+      const { scanAndVerifyLicense, isVerifikConfigured } = await import("./services/verifik-ocr");
+      
+      if (!isVerifikConfigured()) {
+        return res.status(503).json({ 
+          message: "El servicio de verificación OCR no está configurado" 
+        });
+      }
+
+      // Get user name for comparison (from authenticated user or request body for registration)
+      let userNombre: string | undefined;
+      let userApellido: string | undefined;
+      
+      if (req.isAuthenticated()) {
+        userNombre = req.user!.nombre;
+        userApellido = req.user!.apellido;
+      } else if (nombre && apellido) {
+        // For registration flow - name provided in request body
+        userNombre = nombre;
+        userApellido = apellido;
+      }
+
+      const result = await scanAndVerifyLicense(image, userNombre, userApellido);
+
+      if (!result.success) {
+        logSystem.warn('License OCR scan failed', { 
+          error: result.error, 
+          userId: req.user?.id 
+        });
+        return res.status(400).json({ 
+          message: result.error || "No se pudo escanear la licencia"
+        });
+      }
+
+      // Check name match result
+      if (!result.nameMatch && userNombre && userApellido) {
+        logSystem.warn('Name mismatch during license verification', {
+          userId: req.user?.id,
+          registeredName: `${userNombre} ${userApellido}`,
+          documentName: `${result.nombre} ${result.apellido}`,
+          similarity: result.nameSimilarity
+        });
+        
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          nameMatch: false,
+          confidenceScore: result.confidenceScore,
+          similarity: result.nameSimilarity,
+          message: result.error || `La licencia no coincide con sus datos de registro.`
+        });
+      }
+
+      logSystem.info('License OCR scan successful', { 
+        licenseNumber: result.licenseNumber?.slice(0, 3) + '***', 
+        verified: result.verified,
+        confidenceScore: result.confidenceScore,
+        nameMatch: result.nameMatch,
+        userId: req.user?.id 
+      });
+
+      res.json({
+        success: true,
+        licenseNumber: result.licenseNumber,
+        nombre: result.nombre,
+        apellido: result.apellido,
+        expirationDate: result.expirationDate,
+        licenseClass: result.licenseClass,
+        verified: result.verified,
+        nameMatch: result.nameMatch,
+        confidenceScore: result.confidenceScore,
+        message: result.verified 
+          ? "Licencia escaneada y verificada exitosamente"
+          : "Licencia escaneada. Verificación pendiente."
+      });
+    } catch (error: any) {
+      logSystem.error('Scan license error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al escanear licencia" });
+    }
+  });
+
   app.post("/api/identity/send-phone-otp", sendOTPLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {
@@ -1407,10 +1500,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { nombre, apellido, phone, conductorData } = req.body;
       const userId = req.user!.id;
+      const currentUser = await storage.getUserById(userId);
+
+      if (!currentUser) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
 
       const updateData: any = {};
-      if (nombre !== undefined) updateData.nombre = nombre;
-      if (apellido !== undefined) updateData.apellido = apellido;
+      
+      // Block name changes for operators (conductores) with verified cédula
+      if (currentUser.userType === 'conductor' && currentUser.cedulaVerificada) {
+        if ((nombre !== undefined && nombre !== currentUser.nombre) || 
+            (apellido !== undefined && apellido !== currentUser.apellido)) {
+          logSystem.warn('Attempted name change blocked for verified conductor', { 
+            userId, 
+            cedulaVerificada: currentUser.cedulaVerificada 
+          });
+          return res.status(403).json({ 
+            message: "No puedes cambiar tu nombre después de que tu cédula haya sido verificada. El nombre debe coincidir con tu documento de identidad." 
+          });
+        }
+      } else {
+        if (nombre !== undefined) updateData.nombre = nombre;
+        if (apellido !== undefined) updateData.apellido = apellido;
+      }
+      
       if (phone !== undefined) updateData.phone = phone;
 
       if (Object.keys(updateData).length > 0) {

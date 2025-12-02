@@ -1035,6 +1035,7 @@ export default function DriverProfile() {
         onOpenChange={setEditModalOpen}
         isDriver={true}
         currentPhotoUrl={user.fotoUrl}
+        cedulaVerificada={user.cedulaVerificada || false}
         conductorData={driverData ? {
           licencia: driverData.licencia,
           placaGrua: driverData.placaGrua,

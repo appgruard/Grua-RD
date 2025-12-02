@@ -753,6 +753,110 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
   }
 }
 
+// ==================== SCAN AND VERIFY LICENSE WITH NAME COMPARISON ====================
+
+export interface ScanAndVerifyLicenseResult {
+  success: boolean;
+  licenseNumber?: string;
+  nombre?: string;
+  apellido?: string;
+  expirationDate?: string;
+  licenseClass?: string;
+  verified: boolean;
+  confidenceScore?: number;
+  nameMatch?: boolean;
+  nameSimilarity?: number;
+  error?: string;
+}
+
+export async function scanAndVerifyLicense(
+  imageBase64: string, 
+  userNombre?: string, 
+  userApellido?: string
+): Promise<ScanAndVerifyLicenseResult> {
+  const scanResult = await validateDriverLicense(imageBase64);
+  
+  if (!scanResult.success || !scanResult.licenseNumber) {
+    return {
+      success: false,
+      verified: false,
+      confidenceScore: scanResult.score,
+      error: scanResult.error || "No se pudo escanear la licencia"
+    };
+  }
+
+  // Check if score meets minimum requirement
+  if (scanResult.score < MINIMUM_VALIDATION_SCORE) {
+    return {
+      success: false,
+      verified: false,
+      confidenceScore: scanResult.score,
+      error: `La calidad del escaneo es muy baja (${Math.round(scanResult.score * 100)}%). Se requiere al menos 60%.`
+    };
+  }
+
+  // Extract name from OCR result
+  let extractedNombre = '';
+  let extractedApellido = '';
+  
+  if (scanResult.holderName) {
+    const nameParts = scanResult.holderName.trim().split(/\s+/);
+    if (nameParts.length >= 2) {
+      // Typically firstName lastName format
+      extractedNombre = nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
+      extractedApellido = nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ');
+    } else if (nameParts.length === 1) {
+      extractedNombre = nameParts[0];
+    }
+  }
+
+  // Name comparison if user name is provided
+  let nameMatch = true;
+  let nameSimilarity = 1;
+  let nameError: string | undefined;
+
+  if (userNombre && userApellido && (extractedNombre || extractedApellido)) {
+    const nameComparison = compareNames(
+      userNombre,
+      userApellido,
+      extractedNombre,
+      extractedApellido
+    );
+    
+    nameMatch = nameComparison.match;
+    nameSimilarity = nameComparison.similarity;
+    
+    if (!nameMatch) {
+      nameError = `El nombre en la licencia "${extractedNombre} ${extractedApellido}" no coincide con el nombre registrado "${userNombre} ${userApellido}"`;
+    }
+  } else if (userNombre && userApellido && !scanResult.holderName) {
+    // Could not extract name from license - still valid but can't verify name match
+    logger.warn("Could not extract name from license for comparison", {
+      hasHolderName: !!scanResult.holderName
+    });
+    // We'll consider this as a match if we can't extract the name, 
+    // since the license was validated with good score
+    nameMatch = true;
+    nameSimilarity = 0;
+  }
+
+  const isVerified = scanResult.score >= MINIMUM_VALIDATION_SCORE && nameMatch;
+
+  return {
+    success: true,
+    licenseNumber: scanResult.licenseNumber,
+    nombre: extractedNombre || undefined,
+    apellido: extractedApellido || undefined,
+    expirationDate: scanResult.expirationDate,
+    licenseClass: scanResult.licenseClass,
+    verified: isVerified,
+    confidenceScore: scanResult.score,
+    nameMatch: nameMatch,
+    nameSimilarity: nameSimilarity,
+    error: isVerified ? undefined : nameError
+  };
+}
+
 // ==================== UNIFIED DOCUMENT VALIDATION ====================
 
 export type ValidationType = 'face' | 'license' | 'cedula';

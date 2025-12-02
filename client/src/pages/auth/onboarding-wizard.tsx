@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { useMutation } from '@tanstack/react-query';
@@ -16,7 +16,7 @@ import { ServiceCategoryMultiSelect } from '@/components/ServiceCategoryMultiSel
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import { 
   Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard,
-  CheckCircle2, ArrowRight, Clock, Upload, Truck
+  CheckCircle2, ArrowRight, Clock, Upload, Truck, Camera, ScanLine, RefreshCcw
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
@@ -67,6 +67,17 @@ export default function OnboardingWizard() {
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
   const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
+  
+  // OCR scanning state for operators
+  const [isScanning, setIsScanning] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cedulaVerified, setCedulaVerified] = useState(false);
+  const [ocrScore, setOcrScore] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -83,6 +94,15 @@ export default function OnboardingWizard() {
       return () => clearTimeout(timer);
     }
   }, [otpTimer]);
+
+  // Reset OCR state when user type changes
+  useEffect(() => {
+    setCedulaVerified(false);
+    setOcrScore(null);
+    setCapturedImage(null);
+    setErrors({});
+    stopOCRCamera();
+  }, [formData.userType]);
 
   useEffect(() => {
     try {
@@ -120,6 +140,148 @@ export default function OnboardingWizard() {
   const updateField = (field: keyof OnboardingData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setErrors(prev => ({ ...prev, [field]: '' }));
+  };
+
+  // OCR Helper functions for operators
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const resizeImage = (base64: string, maxWidth: number = 1000, maxHeight: number = 800): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) { height = (height * maxWidth) / width; width = maxWidth; }
+        if (height > maxHeight) { width = (width * maxHeight) / height; height = maxHeight; }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = base64;
+    });
+  };
+
+  const scanCedulaImage = async (imageBase64: string) => {
+    setIsScanning(true);
+    setErrors({});
+
+    try {
+      const resizedImage = await resizeImage(imageBase64);
+      const response = await fetch('/api/identity/scan-cedula', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          image: resizedImage,
+          nombre: formData.nombre,
+          apellido: formData.apellido
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al escanear la cédula');
+
+      setOcrScore(data.confidenceScore || null);
+      
+      if (data.verified) {
+        updateField('cedula', data.cedula);
+        setCedulaVerified(true);
+        toast({ title: 'Cédula verificada', description: `Verificación exitosa (${Math.round((data.confidenceScore || 0) * 100)}%)` });
+        setCompletedSteps(prev => new Set(prev).add(2));
+        setCurrentStep(3);
+      } else if (data.success && !data.verified) {
+        updateField('cedula', data.cedula || '');
+        setErrors({ cedula: data.error || 'El nombre en la cédula no coincide con el nombre registrado' });
+        toast({ 
+          title: 'Verificación fallida', 
+          description: data.error || 'El nombre no coincide',
+          variant: 'destructive' 
+        });
+      } else {
+        throw new Error(data.error || 'Error al procesar la cédula');
+      }
+    } catch (err: any) {
+      setErrors({ cedula: err.message || 'Error al procesar la imagen' });
+      toast({ title: 'Error de escaneo', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleOCRFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setErrors({ cedula: 'Solo se permiten imágenes' }); return; }
+    if (file.size > 10 * 1024 * 1024) { setErrors({ cedula: 'La imagen es muy grande. Máximo 10MB.' }); return; }
+    try {
+      const base64 = await convertToBase64(file);
+      setCapturedImage(base64);
+      await scanCedulaImage(base64);
+    } catch { setErrors({ cedula: 'Error al procesar la imagen' }); }
+  };
+
+  const startOCRCamera = async () => {
+    try {
+      setShowCamera(true);
+      setErrors({});
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await new Promise<void>((resolve, reject) => {
+          if (!videoRef.current) { reject(new Error('Video not available')); return; }
+          videoRef.current.onloadedmetadata = () => { videoRef.current?.play().then(resolve).catch(reject); };
+          setTimeout(() => reject(new Error('Camera timeout')), 10000);
+        });
+      }
+    } catch {
+      setShowCamera(false);
+      stopOCRCamera();
+      setErrors({ cedula: 'No se pudo acceder a la cámara' });
+    }
+  };
+
+  const stopOCRCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setShowCamera(false);
+  };
+
+  const captureOCRPhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(video, 0, 0);
+    const base64 = canvas.toDataURL('image/jpeg', 0.9);
+    setCapturedImage(base64);
+    stopOCRCamera();
+    await scanCedulaImage(base64);
+  };
+
+  const resetOCRScan = () => {
+    setCapturedImage(null);
+    setErrors({});
+    setCedulaVerified(false);
+    setOcrScore(null);
+    stopOCRCamera();
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const registerMutation = useMutation({
@@ -425,19 +587,111 @@ export default function OnboardingWizard() {
     </div>
   );
 
-  const renderStep2 = () => (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="cedula">Cédula de Identidad</Label>
-        <Input id="cedula" placeholder="000-0000000-0" maxLength={13} value={formData.cedula} onChange={(e) => updateField('cedula', e.target.value.replace(/\D/g, ''))} disabled={verifyCedulaMutation.isPending} data-testid="input-cedula" />
-        {errors.cedula && <p className="text-sm text-destructive">{errors.cedula}</p>}
-        <p className="text-sm text-muted-foreground">Cédula dominicana (11 dígitos)</p>
+  const renderStep2 = () => {
+    // For operators, use OCR scanning with name verification
+    if (formData.userType === 'conductor') {
+      return (
+        <div className="space-y-4">
+          {errors.cedula && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{errors.cedula}</AlertDescription>
+            </Alert>
+          )}
+
+          {cedulaVerified ? (
+            <div className="flex flex-col items-center text-center space-y-4 py-4">
+              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-green-600 dark:text-green-400">Cédula Verificada</h3>
+                <p className="text-sm text-muted-foreground mt-1">Cédula: {formData.cedula}</p>
+                {ocrScore && <p className="text-sm text-muted-foreground">Confianza: {Math.round(ocrScore * 100)}%</p>}
+              </div>
+              <Button variant="outline" size="sm" onClick={resetOCRScan} data-testid="button-rescan-cedula">
+                <RefreshCcw className="w-4 h-4 mr-2" />
+                Escanear otra
+              </Button>
+            </div>
+          ) : showCamera ? (
+            <div className="space-y-4">
+              <div className="relative aspect-[4/3] bg-black rounded-lg overflow-hidden">
+                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="border-2 border-dashed border-white/50 rounded-lg w-[90%] h-[70%] flex items-center justify-center">
+                    <ScanLine className="w-12 h-12 text-white/70 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={captureOCRPhoto} className="flex-1" disabled={isScanning} data-testid="button-capture-cedula">
+                  {isScanning ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</>) : (<><Camera className="w-4 h-4 mr-2" />Capturar</>)}
+                </Button>
+                <Button variant="outline" onClick={stopOCRCamera} data-testid="button-cancel-camera">Cancelar</Button>
+              </div>
+            </div>
+          ) : capturedImage ? (
+            <div className="space-y-4">
+              <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted">
+                <img src={capturedImage} alt="Cédula capturada" className="w-full h-full object-contain" />
+                {isScanning && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                    <div className="text-center">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                      <p className="text-sm">Escaneando documento...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <Button variant="outline" onClick={resetOCRScan} className="w-full" data-testid="button-reset-scan">
+                <RefreshCcw className="w-4 h-4 mr-2" />
+                Tomar otra foto
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-center py-2">
+                <IdCard className="w-12 h-12 mx-auto text-primary mb-2" />
+                <p className="text-sm font-medium">Escanea tu cédula de identidad</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tu nombre debe coincidir con el registrado: <strong>{formData.nombre} {formData.apellido}</strong>
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" onClick={startOCRCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-camera">
+                  <Camera className="w-8 h-8" />
+                  <span className="text-sm">Usar cámara</span>
+                </Button>
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-cedula">
+                  <Upload className="w-8 h-8" />
+                  <span className="text-sm">Subir imagen</span>
+                </Button>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleOCRFileSelect} className="hidden" data-testid="input-file-cedula" />
+              <p className="text-xs text-muted-foreground text-center">Coloca tu cédula sobre una superficie plana y bien iluminada. Se requiere un score de confianza mínimo de 60%.</p>
+            </div>
+          )}
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+      );
+    }
+
+    // For clients, keep the simple text input
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="cedula">Cédula de Identidad</Label>
+          <Input id="cedula" placeholder="000-0000000-0" maxLength={13} value={formData.cedula} onChange={(e) => updateField('cedula', e.target.value.replace(/\D/g, ''))} disabled={verifyCedulaMutation.isPending} data-testid="input-cedula" />
+          {errors.cedula && <p className="text-sm text-destructive">{errors.cedula}</p>}
+          <p className="text-sm text-muted-foreground">Cédula dominicana (11 dígitos)</p>
+        </div>
+        <Button type="button" className="w-full" onClick={() => validateStep2() && verifyCedulaMutation.mutate()} disabled={verifyCedulaMutation.isPending} data-testid="button-verify-cedula">
+          {verifyCedulaMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar Cédula<ArrowRight className="w-4 h-4 ml-2" /></>)}
+        </Button>
       </div>
-      <Button type="button" className="w-full" onClick={() => validateStep2() && verifyCedulaMutation.mutate()} disabled={verifyCedulaMutation.isPending} data-testid="button-verify-cedula">
-        {verifyCedulaMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar Cédula<ArrowRight className="w-4 h-4 ml-2" /></>)}
-      </Button>
-    </div>
-  );
+    );
+  };
 
   const renderStep3 = () => (
     <div className="space-y-4">
@@ -591,7 +845,9 @@ export default function OnboardingWizard() {
   const getStepDescription = () => {
     const descs = [
       'Ingresa tus datos personales',
-      'Valida tu identidad con cédula',
+      formData.userType === 'conductor' 
+        ? 'Escanea tu cédula para verificar que tu nombre coincide'
+        : 'Valida tu identidad con cédula',
       'Verifica tu número de teléfono',
       'Sube tus documentos requeridos',
       'Selecciona los servicios que ofreces',

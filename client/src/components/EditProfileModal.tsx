@@ -22,6 +22,7 @@ interface EditProfileModalProps {
   onOpenChange: (open: boolean) => void;
   isDriver?: boolean;
   currentPhotoUrl?: string | null;
+  cedulaVerificada?: boolean;
   conductorData?: {
     licencia: string;
     placaGrua: string;
@@ -35,6 +36,7 @@ export function EditProfileModal({
   onOpenChange,
   isDriver = false,
   currentPhotoUrl,
+  cedulaVerificada = false,
   conductorData,
 }: EditProfileModalProps) {
   const { user, refreshUser } = useAuth();
@@ -256,6 +258,14 @@ export function EditProfileModal({
           </div>
 
           <div className="space-y-4">
+            {isDriver && cedulaVerificada && (
+              <Alert className="text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Tu nombre no puede ser modificado porque tu cédula ya fue verificada. El nombre debe coincidir con tu documento de identidad.
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="nombre">Nombre</Label>
@@ -264,7 +274,7 @@ export function EditProfileModal({
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   placeholder="Tu nombre"
-                  disabled={isLoading}
+                  disabled={isLoading || (isDriver && cedulaVerificada)}
                   data-testid="input-nombre"
                 />
               </div>
@@ -275,7 +285,7 @@ export function EditProfileModal({
                   value={apellido}
                   onChange={(e) => setApellido(e.target.value)}
                   placeholder="Tu apellido"
-                  disabled={isLoading}
+                  disabled={isLoading || (isDriver && cedulaVerificada)}
                   data-testid="input-apellido"
                 />
               </div>
