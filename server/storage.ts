@@ -148,6 +148,7 @@ export interface IStorage {
   updateDriverAvailability(userId: string, disponible: boolean): Promise<Conductor>;
   updateDriverLocation(userId: string, lat: number, lng: number): Promise<Conductor>;
   getAvailableDrivers(): Promise<Array<Conductor & { user: User }>>;
+  getAvailableDriversForCategory(categoria: string): Promise<Array<Conductor & { user: User; vehiculo: ConductorVehiculo }>>;
   getAllDrivers(): Promise<Array<Conductor & { user: User }>>;
 
   // Conductor Services (Service Categories and Subtypes)
@@ -633,6 +634,33 @@ export class DatabaseStorage implements IStorage {
       },
     });
     return results as any;
+  }
+
+  async getAvailableDriversForCategory(categoria: string): Promise<Array<Conductor & { user: User; vehiculo: ConductorVehiculo }>> {
+    const driversWithVehicles = await db
+      .select({
+        conductor: conductores,
+        user: users,
+        vehiculo: conductorVehiculos,
+      })
+      .from(conductores)
+      .innerJoin(users, eq(conductores.userId, users.id))
+      .innerJoin(conductorVehiculos, and(
+        eq(conductorVehiculos.conductorId, conductores.id),
+        eq(conductorVehiculos.categoria, categoria as any),
+        eq(conductorVehiculos.activo, true)
+      ))
+      .innerJoin(conductorServicios, and(
+        eq(conductorServicios.conductorId, conductores.id),
+        eq(conductorServicios.categoriaServicio, categoria as any)
+      ))
+      .where(eq(conductores.disponible, true));
+
+    return driversWithVehicles.map(({ conductor, user, vehiculo }) => ({
+      ...conductor,
+      user,
+      vehiculo,
+    }));
   }
 
   async getAllDrivers(): Promise<Array<Conductor & { user: User }>> {

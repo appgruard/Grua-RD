@@ -1724,7 +1724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       logService.created(servicio.id, req.user!.id, req.body.origenDireccion || 'N/A', req.body.destinoDireccion || 'N/A');
 
-      const availableDrivers = await storage.getAvailableDrivers();
+      const availableDrivers = await storage.getAvailableDriversForCategory(validatedData.servicioCategoria || '');
       availableDrivers.forEach(async (driver) => {
         const ws = driverSessions.get(driver.userId);
         if (ws && ws.readyState === WebSocket.OPEN) {
