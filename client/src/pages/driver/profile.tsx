@@ -18,8 +18,9 @@ import { EditProfileModal } from '@/components/EditProfileModal';
 import { DocumentExpirationAlerts } from '@/components/DocumentExpirationAlerts';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
+import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import DLocalOperatorBankAccountManager from '@/components/DLocalOperatorBankAccountManager';
-import type { Conductor, Documento } from '@shared/schema';
+import type { Conductor, Documento, ConductorVehiculo } from '@shared/schema';
 
 interface VerifikValidation {
   cedulaVerificada: boolean;
@@ -67,6 +68,8 @@ export default function DriverProfile() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingServices, setEditingServices] = useState(false);
   const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
+  const [editingVehicles, setEditingVehicles] = useState(false);
+  const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const documentsRef = useRef<HTMLDivElement>(null);
 
@@ -87,11 +90,33 @@ export default function DriverProfile() {
     retry: 2,
   });
 
+  const { data: driverVehicles, isLoading: isLoadingVehicles } = useQuery<ConductorVehiculo[]>({
+    queryKey: ['/api/drivers/me/vehiculos'],
+    enabled: !!driverData,
+  });
+
   useEffect(() => {
     if (driverServices?.categorias && !editingServices) {
       setSelectedServices(driverServices.categorias);
     }
   }, [driverServices, editingServices]);
+
+  useEffect(() => {
+    if (driverVehicles && !editingVehicles) {
+      const vehicles: VehicleData[] = driverVehicles.map(v => ({
+        categoria: v.categoria,
+        placa: v.placa,
+        color: v.color,
+        capacidad: v.capacidad || '',
+        marca: v.marca || '',
+        modelo: v.modelo || '',
+        anio: v.anio || '',
+        detalles: v.detalles || '',
+        fotoUrl: v.fotoUrl || undefined,
+      }));
+      setVehicleData(vehicles);
+    }
+  }, [driverVehicles, editingVehicles]);
 
   const saveServicesMutation = useMutation({
     mutationFn: async () => {
@@ -106,6 +131,28 @@ export default function DriverProfile() {
     },
     onError: (error: Error) => {
       toast({ title: 'Error al guardar servicios', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const saveVehiclesMutation = useMutation({
+    mutationFn: async () => {
+      const promises = vehicleData.map(async (vehicle) => {
+        const res = await apiRequest('POST', '/api/drivers/me/vehiculos', vehicle);
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || `Error al guardar vehículo para ${vehicle.categoria}`);
+        }
+        return res.json();
+      });
+      return Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/me/vehiculos'] });
+      toast({ title: 'Vehículos actualizados', description: 'Los datos de tus vehículos han sido guardados' });
+      setEditingVehicles(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error al guardar vehículos', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -590,6 +637,152 @@ export default function DriverProfile() {
                   data-testid="button-add-services"
                 >
                   Agregar Servicios
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-6 mb-4">
+            <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold">Vehículos por Categoría</h3>
+              </div>
+              {!editingVehicles ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingVehicles(true)}
+                  disabled={!driverServices?.categorias || driverServices.categorias.length === 0}
+                  data-testid="button-edit-vehicles"
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditingVehicles(false);
+                      if (driverVehicles) {
+                        const vehicles: VehicleData[] = driverVehicles.map(v => ({
+                          categoria: v.categoria,
+                          placa: v.placa,
+                          color: v.color,
+                          capacidad: v.capacidad || '',
+                          marca: v.marca || '',
+                          modelo: v.modelo || '',
+                          anio: v.anio || '',
+                          detalles: v.detalles || '',
+                          fotoUrl: v.fotoUrl || undefined,
+                        }));
+                        setVehicleData(vehicles);
+                      }
+                    }}
+                    disabled={saveVehiclesMutation.isPending}
+                    data-testid="button-cancel-vehicles"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => saveVehiclesMutation.mutate()}
+                    disabled={saveVehiclesMutation.isPending || vehicleData.length === 0}
+                    data-testid="button-save-vehicles"
+                  >
+                    {saveVehiclesMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                    )}
+                    Guardar
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {isLoadingVehicles ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !driverServices?.categorias || driverServices.categorias.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Truck className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Primero selecciona las categorías de servicio que ofreces.</p>
+              </div>
+            ) : editingVehicles ? (
+              <div className="max-h-[450px] overflow-y-auto pr-1">
+                <VehicleCategoryForm
+                  selectedCategories={driverServices.categorias.map(s => s.categoria)}
+                  vehicles={vehicleData}
+                  onChange={setVehicleData}
+                  disabled={saveVehiclesMutation.isPending}
+                />
+              </div>
+            ) : driverVehicles && driverVehicles.length > 0 ? (
+              <div className="space-y-3">
+                {driverVehicles.map((vehicle) => {
+                  const categoryInfo = SERVICE_CATEGORIES.find(c => c.id === vehicle.categoria);
+                  return (
+                    <div key={vehicle.id} className="p-3 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="default" data-testid={`badge-vehicle-${vehicle.categoria}`}>
+                          {categoryInfo?.label || vehicle.categoria}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Placa:</span>{' '}
+                          <span className="font-medium">{vehicle.placa}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Color:</span>{' '}
+                          <span className="font-medium">{vehicle.color}</span>
+                        </div>
+                        {vehicle.marca && (
+                          <div>
+                            <span className="text-muted-foreground">Marca:</span>{' '}
+                            <span className="font-medium">{vehicle.marca}</span>
+                          </div>
+                        )}
+                        {vehicle.modelo && (
+                          <div>
+                            <span className="text-muted-foreground">Modelo:</span>{' '}
+                            <span className="font-medium">{vehicle.modelo}</span>
+                          </div>
+                        )}
+                        {vehicle.anio && (
+                          <div>
+                            <span className="text-muted-foreground">Año:</span>{' '}
+                            <span className="font-medium">{vehicle.anio}</span>
+                          </div>
+                        )}
+                        {vehicle.capacidad && (
+                          <div>
+                            <span className="text-muted-foreground">Capacidad:</span>{' '}
+                            <span className="font-medium">{vehicle.capacidad}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Truck className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No has configurado vehículos para tus categorías aún.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setEditingVehicles(true)}
+                  data-testid="button-add-vehicles"
+                >
+                  Configurar Vehículos
                 </Button>
               </div>
             )}
