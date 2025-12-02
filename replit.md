@@ -68,6 +68,16 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Code Audits
 
+### December 2025 - Admin Panel Improvements
+**Bug Fixes:**
+- `client/src/pages/admin/analytics.tsx` - Fixed blank screen by adding missing MapPin import
+
+**UI Cleanup:**
+- `client/src/components/layout/AdminLayout.tsx` - Removed Documents and Insurance Verification modules from sidebar (now automated with Verifik). Cleaned unused imports (FolderOpen, Shield).
+
+**Feature Enhancements:**
+- `client/src/pages/admin/monitoring.tsx` - Implemented auto-focus feature that calculates centroid of active operators and adjusts map zoom dynamically based on operator spread.
+
 ### December 2025 - Code Cleanup
 **Files Removed:**
 - `client/src/pages/auth/register.tsx` - Obsolete file replaced by `onboarding-wizard.tsx`
@@ -81,3 +91,4 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - `server/storage.ts` (3,791 lines) - Consider modular split
 - `shared/schema.ts` (1,958 lines) - Consider domain-based organization
 - Enum `servicio_categoria` contains both "camiones_pesados" and "vehiculos_pesados" for backward compatibility
+- `client/src/pages/driver/dashboard.tsx` line 674 - LSP type error with ConfirmDialogProps (pre-existing)
