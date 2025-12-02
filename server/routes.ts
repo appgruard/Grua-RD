@@ -1620,16 +1620,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verified = await isIdentityVerified(req.user!.id);
 
       const user = await storage.getUserById(req.user!.id);
+      
+      const isDriver = user?.userType === 'conductor';
+      const fotoVerificada = user?.fotoVerificada || false;
+      const fotoVerificadaScore = user?.fotoVerificadaScore ? parseFloat(user.fotoVerificadaScore) : null;
 
       res.json({
         cedulaVerificada: user?.cedulaVerificada || false,
         telefonoVerificado: user?.telefonoVerificado || false,
-        fullyVerified: verified,
+        fotoVerificada: fotoVerificada,
+        fotoVerificadaScore: fotoVerificadaScore,
+        fullyVerified: isDriver 
+          ? verified && fotoVerificada 
+          : verified,
         cedula: user?.cedulaVerificada ? user.cedula : null,
-        phone: user?.telefonoVerificado ? user.phone : null
+        phone: user?.telefonoVerificado ? user.phone : null,
+        fotoUrl: user?.fotoUrl || null,
+        userType: user?.userType
       });
     } catch (error: any) {
       logSystem.error('Get identity status error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al obtener estado de verificación" });
+    }
+  });
+
+  app.get("/api/identity/verification-status", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const user = await storage.getUserById(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+
+      const isDriver = user.userType === 'conductor';
+      const cedulaVerificada = user.cedulaVerificada === true;
+      const telefonoVerificado = user.telefonoVerificado === true;
+      const fotoVerificada = user.fotoVerificada === true;
+      const fotoVerificadaScore = user.fotoVerificadaScore ? parseFloat(user.fotoVerificadaScore) : null;
+
+      const steps = [
+        {
+          id: 'cedula',
+          name: 'Verificación de Cédula',
+          description: 'Escanea tu cédula de identidad',
+          completed: cedulaVerificada,
+          required: true
+        },
+        {
+          id: 'phone',
+          name: 'Verificación de Teléfono',
+          description: 'Verifica tu número con código SMS',
+          completed: telefonoVerificado,
+          required: true
+        }
+      ];
+
+      if (isDriver) {
+        steps.push({
+          id: 'photo',
+          name: 'Foto de Perfil Verificada',
+          description: 'Sube una foto clara de tu rostro',
+          completed: fotoVerificada,
+          required: true
+        });
+      }
+
+      const completedSteps = steps.filter(s => s.completed).length;
+      const totalRequiredSteps = steps.filter(s => s.required).length;
+      const progress = Math.round((completedSteps / totalRequiredSteps) * 100);
+      const allCompleted = steps.filter(s => s.required).every(s => s.completed);
+
+      res.json({
+        userType: user.userType,
+        verification: {
+          cedulaVerificada,
+          telefonoVerificado,
+          fotoVerificada,
+          fotoVerificadaScore,
+          cedula: cedulaVerificada ? user.cedula : null,
+          phone: telefonoVerificado ? user.phone : null,
+          fotoUrl: user.fotoUrl || null
+        },
+        steps,
+        progress,
+        allCompleted,
+        canAccessPlatform: isDriver ? allCompleted : (cedulaVerificada && telefonoVerificado)
+      });
+    } catch (error: any) {
+      logSystem.error('Get verification status error', error, { userId: req.user?.id });
       res.status(500).json({ message: "Error al obtener estado de verificación" });
     }
   });
@@ -1695,6 +1776,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           verified: false,
           score: 0,
           error: result.error || "Error al validar la foto"
+        });
+      }
+
+      if (result.isHumanFace && result.score) {
+        await storage.updateUser(req.user!.id, {
+          fotoVerificada: true,
+          fotoVerificadaScore: result.score.toString()
+        });
+        logSystem.info("Profile photo verified and saved", {
+          userId: req.user!.id,
+          score: result.score
         });
       }
 

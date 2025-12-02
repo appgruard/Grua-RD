@@ -125,6 +125,8 @@ export const users = pgTable("users", {
   fotoUrl: text("foto_url"),
   calificacionPromedio: decimal("calificacion_promedio", { precision: 3, scale: 2 }),
   telefonoVerificado: boolean("telefono_verificado").default(false).notNull(),
+  fotoVerificada: boolean("foto_verificada").default(false).notNull(),
+  fotoVerificadaScore: decimal("foto_verificada_score", { precision: 5, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1114,6 +1116,8 @@ export const insertUserSchema = createInsertSchema(users, {
   createdAt: true,
   calificacionPromedio: true,
   telefonoVerificado: true,
+  fotoVerificada: true,
+  fotoVerificadaScore: true,
   estadoCuenta: true,
 });
 

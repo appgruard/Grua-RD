@@ -16,7 +16,8 @@ import { ServiceCategoryMultiSelect } from '@/components/ServiceCategoryMultiSel
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import { 
   Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard,
-  CheckCircle2, ArrowRight, Clock, Upload, Truck, Camera, ScanLine, RefreshCcw
+  CheckCircle2, ArrowRight, Clock, Upload, Truck, Camera, ScanLine, RefreshCcw,
+  UserCircle, XCircle
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
@@ -45,7 +46,7 @@ interface OnboardingData {
 type StepErrors = Record<string, string>;
 
 const WIZARD_STORAGE_KEY = 'gruard_onboarding_wizard_state';
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 
 export default function OnboardingWizard() {
   const [location, setLocation] = useLocation();
@@ -78,6 +79,17 @@ export default function OnboardingWizard() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  
+  // Profile photo verification state for operators
+  const [profilePhotoImage, setProfilePhotoImage] = useState<string | null>(null);
+  const [profilePhotoVerified, setProfilePhotoVerified] = useState(false);
+  const [profilePhotoScore, setProfilePhotoScore] = useState<number | null>(null);
+  const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
+  const [showProfileCamera, setShowProfileCamera] = useState(false);
+  const profileFileInputRef = useRef<HTMLInputElement>(null);
+  const profileVideoRef = useRef<HTMLVideoElement>(null);
+  const profileCanvasRef = useRef<HTMLCanvasElement>(null);
+  const profileStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -408,7 +420,7 @@ export default function OnboardingWizard() {
     onSuccess: () => {
       toast({ title: '¡Documentos subidos!', description: 'Tus documentos han sido guardados' });
       setCompletedSteps(prev => new Set(prev).add(4));
-      setCurrentStep(formData.userType === 'conductor' ? 5 : 7);
+      setCurrentStep(formData.userType === 'conductor' ? 5 : 8);
     },
     onError: (error: any) => {
       setErrors({ documents: error?.message });
@@ -424,8 +436,8 @@ export default function OnboardingWizard() {
     },
     onSuccess: () => {
       toast({ title: '¡Servicios guardados!', description: 'Tus categorías de servicio han sido registradas' });
-      setCompletedSteps(prev => new Set(prev).add(5));
-      setCurrentStep(6);
+      setCompletedSteps(prev => new Set(prev).add(6));
+      setCurrentStep(7);
     },
     onError: (error: any) => {
       setErrors({ services: error?.message });
@@ -447,14 +459,118 @@ export default function OnboardingWizard() {
     },
     onSuccess: () => {
       toast({ title: '¡Vehículos guardados!', description: 'Los datos de tus vehículos han sido registrados' });
-      setCompletedSteps(prev => new Set(prev).add(6));
-      setCurrentStep(7);
+      setCompletedSteps(prev => new Set(prev).add(7));
+      setCurrentStep(8);
     },
     onError: (error: any) => {
       setErrors({ vehicles: error?.message });
       toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
+
+  // Profile photo helper functions
+  const startProfileCamera = async () => {
+    try {
+      setShowProfileCamera(true);
+      setErrors({});
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      profileStreamRef.current = stream;
+      if (profileVideoRef.current) {
+        profileVideoRef.current.srcObject = stream;
+        await new Promise<void>((resolve, reject) => {
+          if (!profileVideoRef.current) { reject(new Error('Video not available')); return; }
+          profileVideoRef.current.onloadedmetadata = () => { profileVideoRef.current?.play().then(resolve).catch(reject); };
+          setTimeout(() => reject(new Error('Camera timeout')), 10000);
+        });
+      }
+    } catch {
+      setShowProfileCamera(false);
+      stopProfileCamera();
+      setErrors({ profilePhoto: 'No se pudo acceder a la cámara' });
+    }
+  };
+
+  const stopProfileCamera = () => {
+    if (profileStreamRef.current) {
+      profileStreamRef.current.getTracks().forEach(track => track.stop());
+      profileStreamRef.current = null;
+    }
+    setShowProfileCamera(false);
+  };
+
+  const validateProfilePhoto = async (imageBase64: string) => {
+    setIsValidatingPhoto(true);
+    setErrors({});
+
+    try {
+      const resizedImage = await resizeImage(imageBase64, 800, 800);
+      const response = await fetch('/api/identity/verify-profile-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ image: resizedImage }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al verificar la foto');
+
+      setProfilePhotoScore(data.score || null);
+      
+      if (data.verified) {
+        setProfilePhotoVerified(true);
+        toast({ title: 'Foto verificada', description: `Verificación exitosa (${Math.round((data.score || 0) * 100)}%)` });
+      } else {
+        setErrors({ profilePhoto: data.error || 'La foto no cumple con los requisitos' });
+        toast({ 
+          title: 'Verificación fallida', 
+          description: data.error || 'La foto no es válida',
+          variant: 'destructive' 
+        });
+      }
+    } catch (err: any) {
+      setErrors({ profilePhoto: err.message || 'Error al procesar la imagen' });
+      toast({ title: 'Error de verificación', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsValidatingPhoto(false);
+    }
+  };
+
+  const captureProfilePhoto = async () => {
+    if (!profileVideoRef.current || !profileCanvasRef.current) return;
+    const video = profileVideoRef.current;
+    const canvas = profileCanvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(video, 0, 0);
+    const base64 = canvas.toDataURL('image/jpeg', 0.9);
+    setProfilePhotoImage(base64);
+    stopProfileCamera();
+    await validateProfilePhoto(base64);
+  };
+
+  const handleProfileFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setErrors({ profilePhoto: 'Solo se permiten imágenes' }); return; }
+    if (file.size > 10 * 1024 * 1024) { setErrors({ profilePhoto: 'La imagen es muy grande. Máximo 10MB.' }); return; }
+    try {
+      const base64 = await convertToBase64(file);
+      setProfilePhotoImage(base64);
+      await validateProfilePhoto(base64);
+    } catch { setErrors({ profilePhoto: 'Error al procesar la imagen' }); }
+  };
+
+  const resetProfilePhoto = () => {
+    setProfilePhotoImage(null);
+    setErrors({});
+    setProfilePhotoVerified(false);
+    setProfilePhotoScore(null);
+    stopProfileCamera();
+    if (profileFileInputRef.current) profileFileInputRef.current.value = '';
+  };
 
   const finalizeProfileMutation = useMutation({
     mutationFn: async () => {
@@ -532,6 +648,15 @@ export default function OnboardingWizard() {
   };
 
   const validateStep5 = (): boolean => {
+    if (!profilePhotoVerified) {
+      setErrors({ profilePhoto: 'Debes verificar tu foto de perfil' });
+      return false;
+    }
+    setErrors({});
+    return true;
+  };
+
+  const validateStep6 = (): boolean => {
     if (selectedServices.length === 0) {
       setErrors({ services: 'Debes seleccionar al menos una categoría de servicio' });
       return false;
@@ -540,7 +665,7 @@ export default function OnboardingWizard() {
     return true;
   };
 
-  const validateStep6 = (): boolean => {
+  const validateStep7 = (): boolean => {
     const newErrors: StepErrors = {};
     const selectedCategories = selectedServices.map(s => s.categoria);
     
@@ -758,6 +883,105 @@ export default function OnboardingWizard() {
 
   const renderStep5 = () => (
     <div className="space-y-4">
+      {errors.profilePhoto && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errors.profilePhoto}</AlertDescription>
+        </Alert>
+      )}
+
+      {profilePhotoVerified ? (
+        <div className="flex flex-col items-center text-center space-y-4 py-4">
+          <div className="relative">
+            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-green-500">
+              {profilePhotoImage && (
+                <img src={profilePhotoImage} alt="Foto de perfil" className="w-full h-full object-cover" />
+              )}
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-white" />
+            </div>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-green-600 dark:text-green-400">Foto Verificada</h3>
+            {profilePhotoScore && <p className="text-sm text-muted-foreground">Confianza: {Math.round(profilePhotoScore * 100)}%</p>}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={resetProfilePhoto} data-testid="button-retake-photo">
+              <RefreshCcw className="w-4 h-4 mr-2" />
+              Tomar otra
+            </Button>
+            <Button size="sm" onClick={() => { setCompletedSteps(prev => new Set(prev).add(5)); setCurrentStep(6); }} data-testid="button-continue-step5">
+              Continuar
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      ) : showProfileCamera ? (
+        <div className="space-y-4">
+          <div className="relative aspect-square max-w-[280px] mx-auto bg-black rounded-full overflow-hidden">
+            <video ref={profileVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-dashed border-white/50 rounded-full w-[80%] h-[80%]" />
+            </div>
+          </div>
+          <p className="text-xs text-center text-muted-foreground">Centra tu rostro en el círculo</p>
+          <div className="flex gap-2">
+            <Button onClick={captureProfilePhoto} className="flex-1" disabled={isValidatingPhoto} data-testid="button-capture-profile">
+              {isValidatingPhoto ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</>) : (<><Camera className="w-4 h-4 mr-2" />Capturar</>)}
+            </Button>
+            <Button variant="outline" onClick={stopProfileCamera} data-testid="button-cancel-profile-camera">Cancelar</Button>
+          </div>
+        </div>
+      ) : profilePhotoImage ? (
+        <div className="space-y-4">
+          <div className="relative aspect-square max-w-[200px] mx-auto rounded-full overflow-hidden bg-muted">
+            <img src={profilePhotoImage} alt="Foto capturada" className="w-full h-full object-cover" />
+            {isValidatingPhoto && (
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                <div className="text-center">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                  <p className="text-sm">Verificando foto...</p>
+                </div>
+              </div>
+            )}
+          </div>
+          {!isValidatingPhoto && !profilePhotoVerified && (
+            <Button variant="outline" onClick={resetProfilePhoto} className="w-full" data-testid="button-reset-profile-photo">
+              <RefreshCcw className="w-4 h-4 mr-2" />
+              Tomar otra foto
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="text-center py-2">
+            <UserCircle className="w-16 h-16 mx-auto text-primary mb-2" />
+            <p className="text-sm font-medium">Sube una foto de tu rostro</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Esta foto se usará como tu foto de perfil verificada
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline" onClick={startProfileCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-profile-camera">
+              <Camera className="w-8 h-8" />
+              <span className="text-sm">Usar cámara</span>
+            </Button>
+            <Button variant="outline" onClick={() => profileFileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-profile-photo">
+              <Upload className="w-8 h-8" />
+              <span className="text-sm">Subir imagen</span>
+            </Button>
+          </div>
+          <input ref={profileFileInputRef} type="file" accept="image/*" onChange={handleProfileFileSelect} className="hidden" data-testid="input-file-profile-photo" />
+          <p className="text-xs text-muted-foreground text-center">Asegúrate de tener buena iluminación y que tu rostro sea claramente visible.</p>
+        </div>
+      )}
+      <canvas ref={profileCanvasRef} className="hidden" />
+    </div>
+  );
+
+  const renderStep6 = () => (
+    <div className="space-y-4">
       {errors.services && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -780,7 +1004,7 @@ export default function OnboardingWizard() {
       <Button 
         type="button" 
         className="w-full" 
-        onClick={() => validateStep5() && saveServicesMutation.mutate()} 
+        onClick={() => validateStep6() && saveServicesMutation.mutate()} 
         disabled={saveServicesMutation.isPending || selectedServices.length === 0} 
         data-testid="button-save-services"
       >
@@ -793,7 +1017,7 @@ export default function OnboardingWizard() {
     </div>
   );
 
-  const renderStep6 = () => (
+  const renderStep7 = () => (
     <div className="space-y-4">
       {errors.vehicles && (
         <Alert variant="destructive">
@@ -828,7 +1052,7 @@ export default function OnboardingWizard() {
       <Button 
         type="button" 
         className="w-full" 
-        onClick={() => validateStep6() && saveVehiclesMutation.mutate()} 
+        onClick={() => validateStep7() && saveVehiclesMutation.mutate()} 
         disabled={saveVehiclesMutation.isPending} 
         data-testid="button-save-vehicles"
       >
@@ -841,7 +1065,7 @@ export default function OnboardingWizard() {
     </div>
   );
 
-  const renderStep7 = () => (
+  const renderStep8 = () => (
     <div className="space-y-4">
       <div className="text-center py-8">
         <CheckCircle2 className="w-16 h-16 mx-auto text-primary mb-4" />
@@ -855,7 +1079,7 @@ export default function OnboardingWizard() {
   );
 
   const getStepTitle = () => {
-    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Teléfono', 'Subir Documentos', 'Servicios Ofrecidos', 'Vehículos por Categoría', 'Confirmación'];
+    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Teléfono', 'Subir Documentos', 'Foto de Perfil', 'Servicios Ofrecidos', 'Vehículos por Categoría', 'Confirmación'];
     return titles[currentStep - 1] || '';
   };
 
@@ -867,6 +1091,7 @@ export default function OnboardingWizard() {
         : 'Valida tu identidad con cédula',
       'Verifica tu número de teléfono',
       'Sube tus documentos requeridos',
+      'Sube una foto de tu rostro para tu perfil verificado',
       'Selecciona los servicios que ofreces',
       'Configura un vehículo para cada categoría',
       'Finaliza tu registro',
@@ -901,6 +1126,7 @@ export default function OnboardingWizard() {
           {currentStep === 5 && renderStep5()}
           {currentStep === 6 && renderStep6()}
           {currentStep === 7 && renderStep7()}
+          {currentStep === 8 && renderStep8()}
           <div className="text-center text-sm text-muted-foreground">
             ¿Ya tienes cuenta?{' '}
             <button onClick={() => setLocation('/login')} className="text-primary hover:underline" data-testid="link-login">

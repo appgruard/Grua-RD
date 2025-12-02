@@ -13,11 +13,11 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { 
   Loader2, IdCard, Phone, CheckCircle2, AlertCircle, 
-  Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck
+  Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, UserCircle
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
-type VerificationStep = 'cedula' | 'phone' | 'complete';
+type VerificationStep = 'cedula' | 'phone' | 'photo' | 'complete';
 
 export default function VerifyPending() {
   const [, setLocation] = useLocation();
@@ -25,9 +25,11 @@ export default function VerifyPending() {
   const { toast } = useToast();
   
   const currentUser = user || pendingVerificationUser;
+  const isDriver = currentUser?.userType === 'conductor';
   const verificationStatus = pendingVerification || {
     cedulaVerificada: currentUser?.cedulaVerificada || false,
     telefonoVerificado: currentUser?.telefonoVerificado || false,
+    fotoVerificada: (currentUser as any)?.fotoVerificada || false,
   };
 
   const [currentStep, setCurrentStep] = useState<VerificationStep>('cedula');
@@ -38,24 +40,69 @@ export default function VerifyPending() {
   const [showCamera, setShowCamera] = useState(false);
   const [cedulaVerified, setCedulaVerified] = useState(verificationStatus.cedulaVerificada);
   const [phoneVerified, setPhoneVerified] = useState(verificationStatus.telefonoVerificado);
+  const [photoVerified, setPhotoVerified] = useState(verificationStatus.fotoVerificada || false);
+  const [profilePhotoImage, setProfilePhotoImage] = useState<string | null>(null);
+  const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
+  const [showProfileCamera, setShowProfileCamera] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  
+  const profileFileInputRef = useRef<HTMLInputElement>(null);
+  const profileVideoRef = useRef<HTMLVideoElement>(null);
+  const profileCanvasRef = useRef<HTMLCanvasElement>(null);
+  const profileStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    if (verificationStatus.cedulaVerificada && verificationStatus.telefonoVerificado) {
-      clearPendingVerification();
-      refreshUser().then(() => {
-        setLocation('/driver');
-      });
-    } else if (verificationStatus.cedulaVerificada) {
-      setCedulaVerified(true);
-      setCurrentStep('phone');
+    const checkVerificationStatus = async () => {
+      try {
+        const res = await fetch('/api/identity/verification-status', {
+          credentials: 'include'
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const { cedulaVerificada, telefonoVerificado, fotoVerificada } = data.verification;
+          
+          setCedulaVerified(cedulaVerificada);
+          setPhoneVerified(telefonoVerificado);
+          setPhotoVerified(fotoVerificada);
+
+          if (isDriver) {
+            if (cedulaVerificada && telefonoVerificado && fotoVerificada) {
+              clearPendingVerification();
+              refreshUser().then(() => {
+                setLocation('/driver');
+              });
+            } else if (cedulaVerificada && telefonoVerificado && !fotoVerificada) {
+              setCurrentStep('photo');
+            } else if (cedulaVerificada && !telefonoVerificado) {
+              setCurrentStep('phone');
+            } else {
+              setCurrentStep('cedula');
+            }
+          } else {
+            if (cedulaVerificada && telefonoVerificado) {
+              clearPendingVerification();
+              refreshUser().then(() => {
+                setLocation('/client');
+              });
+            } else if (cedulaVerificada) {
+              setCurrentStep('phone');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking verification status:', error);
+      }
+    };
+
+    if (currentUser) {
+      checkVerificationStatus();
     }
-  }, [verificationStatus, setLocation, clearPendingVerification, refreshUser]);
+  }, [currentUser, isDriver, setLocation, clearPendingVerification, refreshUser]);
 
   useEffect(() => {
     if (otpTimer > 0) {
@@ -64,7 +111,20 @@ export default function VerifyPending() {
     }
   }, [otpTimer]);
 
-  const progress = cedulaVerified && phoneVerified ? 100 : cedulaVerified ? 50 : 0;
+  const calculateProgress = () => {
+    if (isDriver) {
+      if (cedulaVerified && phoneVerified && photoVerified) return 100;
+      if (cedulaVerified && phoneVerified) return 66;
+      if (cedulaVerified) return 33;
+      return 0;
+    } else {
+      if (cedulaVerified && phoneVerified) return 100;
+      if (cedulaVerified) return 50;
+      return 0;
+    }
+  };
+
+  const progress = calculateProgress();
 
   const convertToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -200,6 +260,108 @@ export default function VerifyPending() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const startProfileCamera = async () => {
+    try {
+      setShowProfileCamera(true);
+      setErrors({});
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      profileStreamRef.current = stream;
+      if (profileVideoRef.current) {
+        profileVideoRef.current.srcObject = stream;
+        await new Promise<void>((resolve, reject) => {
+          if (!profileVideoRef.current) { reject(new Error('Video not available')); return; }
+          profileVideoRef.current.onloadedmetadata = () => { profileVideoRef.current?.play().then(resolve).catch(reject); };
+          setTimeout(() => reject(new Error('Camera timeout')), 10000);
+        });
+      }
+    } catch {
+      setShowProfileCamera(false);
+      stopProfileCamera();
+      setErrors({ profilePhoto: 'No se pudo acceder a la cámara' });
+    }
+  };
+
+  const stopProfileCamera = () => {
+    if (profileStreamRef.current) {
+      profileStreamRef.current.getTracks().forEach(track => track.stop());
+      profileStreamRef.current = null;
+    }
+    setShowProfileCamera(false);
+  };
+
+  const validateProfilePhoto = async (imageBase64: string) => {
+    setIsValidatingPhoto(true);
+    setErrors({});
+
+    try {
+      const resizedImage = await resizeImage(imageBase64, 800, 800);
+      const response = await fetch('/api/identity/verify-profile-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ image: resizedImage }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al verificar la foto');
+
+      if (data.verified) {
+        setPhotoVerified(true);
+        toast({ title: 'Foto verificada', description: `Verificación exitosa (${Math.round((data.score || 0) * 100)}%)` });
+        clearPendingVerification();
+        await refreshUser();
+        setLocation('/driver');
+      } else {
+        setErrors({ profilePhoto: data.error || 'La foto no cumple con los requisitos' });
+        toast({ 
+          title: 'Verificación fallida', 
+          description: data.error || 'La foto no es válida',
+          variant: 'destructive' 
+        });
+      }
+    } catch (err: any) {
+      setErrors({ profilePhoto: err.message || 'Error al procesar la imagen' });
+      toast({ title: 'Error de verificación', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsValidatingPhoto(false);
+    }
+  };
+
+  const captureProfilePhotoFromVideo = async () => {
+    if (!profileVideoRef.current || !profileCanvasRef.current) return;
+    const video = profileVideoRef.current;
+    const canvas = profileCanvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(video, 0, 0);
+    const base64 = canvas.toDataURL('image/jpeg', 0.9);
+    setProfilePhotoImage(base64);
+    stopProfileCamera();
+    await validateProfilePhoto(base64);
+  };
+
+  const handleProfileFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setErrors({ profilePhoto: 'Solo se permiten imágenes' }); return; }
+    if (file.size > 10 * 1024 * 1024) { setErrors({ profilePhoto: 'La imagen es muy grande. Máximo 10MB.' }); return; }
+    try {
+      const base64 = await convertToBase64(file);
+      setProfilePhotoImage(base64);
+      await validateProfilePhoto(base64);
+    } catch { setErrors({ profilePhoto: 'Error al procesar la imagen' }); }
+  };
+
+  const resetProfilePhoto = () => {
+    setProfilePhotoImage(null);
+    setErrors({});
+    stopProfileCamera();
+    if (profileFileInputRef.current) profileFileInputRef.current.value = '';
+  };
+
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/auth/send-otp', {
@@ -237,9 +399,14 @@ export default function VerifyPending() {
     onSuccess: async () => {
       setPhoneVerified(true);
       toast({ title: 'Teléfono verificado', description: 'Tu número de teléfono ha sido verificado' });
-      clearPendingVerification();
-      await refreshUser();
-      setLocation('/driver');
+      
+      if (isDriver) {
+        setCurrentStep('photo');
+      } else {
+        clearPendingVerification();
+        await refreshUser();
+        setLocation('/client');
+      }
     },
     onError: (error: any) => {
       setErrors({ otp: error.message });
@@ -297,7 +464,7 @@ export default function VerifyPending() {
         <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
           <ShieldCheck className="h-4 w-4 text-amber-500" />
           <AlertDescription className="text-amber-700 dark:text-amber-400">
-            Para continuar usando Grúa RD como operador, debes completar la verificación de identidad.
+            Para continuar usando Grúa RD como {isDriver ? 'operador' : 'cliente'}, debes completar la verificación de identidad.
           </AlertDescription>
         </Alert>
 
@@ -475,6 +642,101 @@ export default function VerifyPending() {
               </CardContent>
             )}
           </Card>
+
+          {isDriver && (
+            <Card className={cn(
+              "transition-all",
+              photoVerified ? "border-green-500/50 bg-green-500/5" : 
+              currentStep === 'photo' && cedulaVerified && phoneVerified ? "ring-2 ring-primary" : "opacity-60"
+            )}>
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    photoVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  )}>
+                    {photoVerified ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <UserCircle className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Foto de Perfil Verificada</CardTitle>
+                    <CardDescription>
+                      {photoVerified ? 'Verificado' : 'Sube una foto clara de tu rostro'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              {!photoVerified && currentStep === 'photo' && cedulaVerified && phoneVerified && (
+                <CardContent className="space-y-4">
+                  {errors.profilePhoto && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{errors.profilePhoto}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {showProfileCamera ? (
+                    <div className="space-y-4">
+                      <div className="relative mx-auto w-48 h-48 rounded-full overflow-hidden bg-black">
+                        <video ref={profileVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="border-2 border-dashed border-white/50 rounded-full w-40 h-40" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={captureProfilePhotoFromVideo} className="flex-1" disabled={isValidatingPhoto} data-testid="button-capture-profile">
+                          {isValidatingPhoto ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</> : <><Camera className="w-4 h-4 mr-2" />Capturar</>}
+                        </Button>
+                        <Button variant="outline" onClick={stopProfileCamera} data-testid="button-cancel-profile-camera">Cancelar</Button>
+                      </div>
+                    </div>
+                  ) : profilePhotoImage ? (
+                    <div className="space-y-4">
+                      <div className="relative mx-auto w-48 h-48 rounded-full overflow-hidden bg-muted">
+                        <img src={profilePhotoImage} alt="Foto de perfil" className="w-full h-full object-cover" />
+                        {isValidatingPhoto && (
+                          <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                            <div className="text-center">
+                              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                              <p className="text-sm">Verificando foto...</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <Button variant="outline" onClick={resetProfilePhoto} className="w-full" data-testid="button-reset-profile-photo">
+                        <RefreshCcw className="w-4 h-4 mr-2" />Tomar otra foto
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="mx-auto w-32 h-32 rounded-full bg-muted flex items-center justify-center">
+                        <UserCircle className="w-16 h-16 text-muted-foreground" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Button variant="outline" onClick={startProfileCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-profile-camera">
+                          <Camera className="w-8 h-8" />
+                          <span className="text-sm">Usar cámara</span>
+                        </Button>
+                        <Button variant="outline" onClick={() => profileFileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-profile-file">
+                          <Upload className="w-8 h-8" />
+                          <span className="text-sm">Subir imagen</span>
+                        </Button>
+                      </div>
+                      <input ref={profileFileInputRef} type="file" accept="image/*" onChange={handleProfileFileSelect} className="hidden" data-testid="input-file-profile" />
+                      <p className="text-xs text-center text-muted-foreground">
+                        Asegúrate de que tu rostro sea visible y esté bien iluminado
+                      </p>
+                    </div>
+                  )}
+                  <canvas ref={profileCanvasRef} className="hidden" />
+                </CardContent>
+              )}
+            </Card>
+          )}
         </div>
       </div>
     </div>
