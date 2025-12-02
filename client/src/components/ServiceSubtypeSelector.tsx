@@ -57,15 +57,22 @@ const remolqueEspecializadoSubtypes: SubtypeOption[] = [
   { id: 'vehiculo_electrico', label: 'Vehículo Eléctrico/Híbrido', description: 'EV o híbrido', Icon: Leaf },
 ];
 
-const camionesPesadosSubtypes: SubtypeOption[] = [
-  { id: 'camion_liviano', label: 'Camión Liviano', description: 'Fuso, NPR, Canter', Icon: Truck },
-  { id: 'camion_mediano', label: 'Camión Mediano', description: '10 ruedas', Icon: Truck },
+const vehiculosPesadosSubtypes: SubtypeOption[] = [
+  { id: 'camiones_cisternas', label: 'Camiones Cisternas', description: 'Transporte de líquidos', Icon: Truck },
+  { id: 'de_carga', label: 'De Carga', description: '10 ruedas', Icon: Truck },
   { id: 'patana_cabezote', label: 'Patana / Cabezote', description: 'Trailer o cabezote', Icon: Container },
   { id: 'volteo', label: 'Volteo', description: 'Camión de volteo', Icon: Truck },
   { id: 'transporte_maquinarias', label: 'Transporte Maquinarias', description: 'Maquinaria pesada', Icon: Forklift },
   { id: 'montacargas', label: 'Montacargas', description: 'Forklift / patín', Icon: Forklift },
+];
+
+const maquinariasSubtypes: SubtypeOption[] = [
   { id: 'retroexcavadora', label: 'Retroexcavadora', description: 'Excavadora', Icon: Shovel },
+  { id: 'rodillo', label: 'Rodillo', description: 'Compactador', Icon: Tractor },
+  { id: 'greda', label: 'Greda', description: 'Motoniveladora', Icon: Tractor },
   { id: 'tractor', label: 'Tractor', description: 'Tractor agrícola', Icon: Tractor },
+  { id: 'excavadora', label: 'Excavadora', description: 'Excavadora hidráulica', Icon: Shovel },
+  { id: 'pala_mecanica', label: 'Pala Mecánica', description: 'Cargador frontal', Icon: Forklift },
 ];
 
 const izajeConstruccionSubtypes: SubtypeOption[] = [
@@ -83,7 +90,8 @@ const remolqueRecreativoSubtypes: SubtypeOption[] = [
 const subtypesByCategory: Record<string, SubtypeOption[]> = {
   'auxilio_vial': auxilioVialSubtypes,
   'remolque_especializado': remolqueEspecializadoSubtypes,
-  'camiones_pesados': camionesPesadosSubtypes,
+  'vehiculos_pesados': vehiculosPesadosSubtypes,
+  'maquinarias': maquinariasSubtypes,
   'izaje_construccion': izajeConstruccionSubtypes,
   'remolque_recreativo': remolqueRecreativoSubtypes,
 };

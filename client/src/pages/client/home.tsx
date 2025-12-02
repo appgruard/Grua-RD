@@ -850,7 +850,7 @@ export default function ClientHome() {
                   <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
                     {servicioCategoria === 'auxilio_vial' ? (
                       <Wrench className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                    ) : servicioCategoria === 'camiones_pesados' ? (
+                    ) : servicioCategoria === 'vehiculos_pesados' || servicioCategoria === 'maquinarias' ? (
                       <Truck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                     ) : (
                       <Car className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />

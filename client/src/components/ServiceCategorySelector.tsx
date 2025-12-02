@@ -96,10 +96,16 @@ const serviceCategories = [
     Icon: Sparkles 
   },
   { 
-    id: 'camiones_pesados', 
-    label: 'Camiones Pesados', 
+    id: 'vehiculos_pesados', 
+    label: 'Vehículos Pesados', 
     description: 'Vehículos de carga',
     Icon: Truck 
+  },
+  { 
+    id: 'maquinarias', 
+    label: 'Maquinarias', 
+    description: 'Greda, rodillo, retro y más',
+    Icon: HardHat 
   },
   { 
     id: 'izaje_construccion', 

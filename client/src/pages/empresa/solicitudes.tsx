@@ -50,7 +50,8 @@ const servicioCategories = [
   { value: 'remolque_estandar', label: 'Remolque Estándar' },
   { value: 'auxilio_vial', label: 'Auxilio Vial' },
   { value: 'remolque_especializado', label: 'Remolque Especializado' },
-  { value: 'camiones_pesados', label: 'Camiones Pesados' },
+  { value: 'vehiculos_pesados', label: 'Vehículos Pesados' },
+  { value: 'maquinarias', label: 'Maquinarias' },
   { value: 'izaje_construccion', label: 'Izaje Construcción' },
   { value: 'remolque_recreativo', label: 'Remolque Recreativo' },
 ];

@@ -1,7 +1,8 @@
 import { 
   Truck, 
   Wrench, 
-  Sparkles
+  Sparkles,
+  HardHat
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -114,11 +115,18 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     subtipos: subtypesByCategory['remolque_especializado'] || []
   },
   { 
-    id: 'camiones_pesados', 
-    label: 'Camiones Pesados', 
+    id: 'vehiculos_pesados', 
+    label: 'Vehículos Pesados', 
     description: 'Vehículos de carga',
     Icon: Truck,
-    subtipos: subtypesByCategory['camiones_pesados'] || []
+    subtipos: subtypesByCategory['vehiculos_pesados'] || []
+  },
+  { 
+    id: 'maquinarias', 
+    label: 'Maquinarias', 
+    description: 'Greda, rodillo, retro y más',
+    Icon: HardHat,
+    subtipos: subtypesByCategory['maquinarias'] || []
   },
   { 
     id: 'izaje_construccion', 
