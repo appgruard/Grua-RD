@@ -299,39 +299,136 @@ const handlePhotoUpload = async (file: File) => {
 - ✅ Bloqueo de submit durante validación (previene race condition)
 - ✅ Cuando Verifik no disponible: requiere revisión manual (no auto-aprueba)
 
-### Fase 3: Mejoras UX ⏳ PENDIENTE
-1. Crear endpoint `GET /api/identity/verification-status`
-2. Agregar paso de foto de perfil en onboarding
-3. Mejorar página de resumen de verificación
+### Fase 3: Mejoras UX ✅ COMPLETADA - 2 Dic 2025
 
-## Archivos a Modificar
+**Estado:** Implementado (7/8 subtareas completadas)
+
+**Cambios realizados:**
+
+1. ✅ **Nuevo campo en schema** (`shared/schema.ts`)
+   - Agregado `fotoVerificada: boolean` (default false)
+   - Agregado `fotoVerificadaScore: decimal` (precision 5, scale 2)
+   - Ambos campos omitidos en `insertUserSchema` para evitar asignación manual
+
+2. ✅ **Mejora del endpoint `/api/identity/status`** (`server/routes.ts`)
+   - Ahora incluye `fotoVerificada` y `fotoVerificadaScore`
+   - `fullyVerified` diferencia entre conductores y clientes
+   - Retorna información de URL de foto y tipo de usuario
+
+3. ✅ **Nuevo endpoint `GET /api/identity/verification-status`** (`server/routes.ts`)
+   - Retorna estado detallado de cada paso de verificación
+   - Para conductores: cédula + teléfono + foto de perfil (3 pasos obligatorios)
+   - Para clientes: cédula + teléfono (2 pasos obligatorios)
+   - Incluye progreso en porcentaje y bandera `allCompleted`
+   - Incluye bandera `canAccessPlatform` basada en tipo de usuario
+   - Estructura de pasos reutilizable para futuros desarrollos
+
+4. ✅ **Endpoint `/api/identity/verify-profile-photo` mejorado** (`server/routes.ts`)
+   - Ahora guarda el estado de verificación en la base de datos
+   - Al verificar exitosamente: actualiza `fotoVerificada = true` y guarda score
+   - Nuevos logs informativos cuando la foto es verificada y guardada
+   - Validación de tamaño y formato de base64 (máx 10MB)
+
+5. ✅ **Nuevo paso 5 en onboarding wizard** (`client/src/pages/auth/onboarding-wizard.tsx`)
+   - Total de pasos para conductores: 8 (antes 7)
+   - Total de pasos para clientes: 8 (sin cambio funcional)
+   - Nuevo paso 5: "Foto de Perfil Verificada" (solo para conductores)
+   - Flujo para conductores:
+     1. Crear cuenta
+     2. Verificar cédula (OCR)
+     3. Verificar teléfono (OTP)
+     4. Subir documentos (licencia + seguro)
+     5. **Foto de perfil verificada (NUEVO)**
+     6. Seleccionar servicios
+     7. Configurar vehículos por categoría
+     8. Confirmación final
+   - Funciones helper agregadas:
+     - `startProfileCamera` - inicia cámara frontal
+     - `stopProfileCamera` - detiene cámara
+     - `validateProfilePhoto` - valida con API
+     - `captureProfilePhoto` - captura foto
+     - `handleProfileFileSelect` - maneja subida de archivo
+     - `resetProfilePhoto` - reinicia estado
+   - UI con estados: idle, validating, success, failed
+   - Bloqueo de avance sin foto validada
+   - Integración con `/api/identity/verify-profile-photo`
+
+6. ✅ **Estados de validación de foto en wizard**
+   - Verde/CheckCircle2 cuando validación exitosa + score visible
+   - Rojo/XCircle cuando validación falla + mensaje de error
+   - Amarillo/AlertCircle cuando servicio no disponible
+   - Loading state durante validación (deshabilitado "Continuar")
+   - Opción de reintentar o usar otra foto
+
+**Archivos modificados:**
+- `shared/schema.ts` - Nuevos campos fotoVerificada y fotoVerificadaScore
+- `server/routes.ts` - Mejorado /api/identity/status, nuevo /api/identity/verification-status, mejorado /api/identity/verify-profile-photo
+- `client/src/pages/auth/onboarding-wizard.tsx` - Nuevo paso 5 con validación de foto para conductores
+
+**Mejoras de Seguridad Implementadas:**
+- ✅ Foto de perfil requerida para conductores (step obligatorio)
+- ✅ Validación de rostro humano real en tiempo real durante onboarding
+- ✅ Score de confianza guardado en base de datos para auditoría
+- ✅ Bloqueo de avance sin foto válida (no puede saltarse)
+- ✅ Persistencia de estado en base de datos (no depende de sesión)
+- ✅ Endpoint de estado completo para troubleshooting
+
+### Fase 4: Mejoras UX Adicionales ⏳ PENDIENTE (Futura)
+1. Mejorar página de resumen de verificación (`verify-pending.tsx`) con nueva interfaz tipo tarjetas
+2. Agregar endpoint admin para revisar fotos de perfil sin verificar
+3. Agregar opción para re-verificar foto de perfil en perfil de usuario
+
+## Archivos Modificados (Resumen)
 
 ```
-server/routes.ts                          # ✅ Validaciones en login + sanitización + validación foto
-server/services/verifik-ocr.ts           # ✅ Ya tiene validateProfilePhoto
-client/src/lib/auth.tsx                  # ✅ Proteger rutas para no-verificados
-client/src/App.tsx                       # ✅ Redirigir si falta verificación
-client/src/pages/auth/verify-cedula-pending.tsx  # ✅ Nuevo
-client/src/components/EditProfileModal.tsx       # ✅ Validar foto de perfil
-shared/schema.ts                         # (Fase 3) Agregar fotoVerificada campo
+✅ Completados:
+server/routes.ts                                # Fase 1,2,3: Validaciones login + sanitización + endpoints de verificación
+server/services/verifik-ocr.ts                 # Fase 2: validateProfilePhoto
+client/src/lib/auth.tsx                        # Fase 1: Proteger rutas
+client/src/App.tsx                             # Fase 1: Redirigir si falta verificación
+client/src/pages/auth/verify-pending.tsx       # Fase 1: Nueva página
+client/src/pages/auth/onboarding-wizard.tsx    # Fase 3: Nuevo paso 5 foto de perfil
+client/src/components/EditProfileModal.tsx     # Fase 2: Validar foto de perfil
+shared/schema.ts                               # Fase 3: Campos fotoVerificada + fotoVerificadaScore
+
+⏳ Pendientes para futuras mejoras:
+client/src/pages/auth/verify-pending.tsx       # Mejorar UI con tarjetas (Fase 4)
 ```
 
 ## Testing
 
-1. **Login sin verificación** - Verificar que se rechaza ✅
-2. **Login con verificación completa** - Verificar que permite acceso ✅
-3. **Acceso directo a ruta protegida sin verificación** - Verificar que redirige ✅
-4. **Verificar que passwordHash no está en respuestas API** - ✅
-5. **Foto no válida (meme, foto de pantalla)** - Verificar que rechaza ✅ (Fase 2)
-6. **Foto válida de persona** - Verificar que acepta ✅ (Fase 2)
+**Fase 1 - Crítica:**
+1. ✅ Login sin verificación - Rechazado con 403
+2. ✅ Login con verificación completa - Permite acceso
+3. ✅ Acceso directo a ruta protegida sin verificación - Redirige a verify-pending
+4. ✅ Verificar que passwordHash no está en respuestas API
+
+**Fase 2 - Validación de Foto:**
+5. ✅ Foto no válida (meme, foto de pantalla) - Rechazada
+6. ✅ Foto válida de persona - Aceptada
+
+**Fase 3 - Mejoras UX:**
+7. ✅ Endpoint /api/identity/verification-status retorna estructura correcta
+8. ✅ Nuevo paso 5 en onboarding accesible solo para conductores
+9. ✅ Validación de foto en tiempo real durante onboarding
+10. ✅ Score de confianza guardado en BD
+11. ✅ Bloqueo de avance sin foto validada
 
 ## Impacto de Cambios
 
+**Positivos:**
 - ✅ Seguridad: Garantiza que solo operadores verificados accedan
 - ✅ Seguridad: Previene exposición de datos sensibles en API responses
-- ✅ Compliance: Cumple con requisitos de identidad real
+- ✅ Compliance: Cumple con requisitos de identidad real (cédula + teléfono + foto)
 - ✅ UX: Bloqueos claros pero orientados a ayudar completar verificación
+- ✅ Transparencia: Score de confianza de validación visible para usuarios
+- ✅ Facilidad: Foto de perfil capturada con cámara o subida durante onboarding
+- ✅ Auditabilidad: Estado completo de verificación guardado en BD
+
+**A Considerar:**
 - ⚠️ Disrupción: Operadores existentes no verificados serán bloqueados (necesitarán re-verificarse)
+- ⚠️ Capacidad: Validación de rostro requiere Verifik configurado (tiene fallback a revisión manual)
+- ⚠️ Privacidad: Datos biométricos de rostro procesados por Verifik (cumplir RGPD si aplica)
 
 ## Decisiones de Diseño
 
