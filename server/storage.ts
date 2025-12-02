@@ -5,6 +5,7 @@ import {
   conductores,
   conductorServicios,
   conductorServicioSubtipos,
+  conductorVehiculos,
   servicios,
   tarifas,
   calificaciones,
@@ -44,6 +45,8 @@ import {
   type InsertConductorServicio,
   type ConductorServicioSubtipo,
   type InsertConductorServicioSubtipo,
+  type ConductorVehiculo,
+  type InsertConductorVehiculo,
   type Servicio,
   type InsertServicio,
   type Tarifa,
@@ -155,6 +158,13 @@ export interface IStorage {
   addConductorServicioSubtipo(conductorServicioId: string, subtipoServicio: string): Promise<ConductorServicioSubtipo>;
   removeConductorServicioSubtipo(conductorServicioId: string, subtipoServicio: string): Promise<void>;
 
+  // Conductor Vehicles (one vehicle per category per driver)
+  getConductorVehiculos(conductorId: string): Promise<ConductorVehiculo[]>;
+  getConductorVehiculoByCategoria(conductorId: string, categoria: string): Promise<ConductorVehiculo | undefined>;
+  createConductorVehiculo(vehiculo: InsertConductorVehiculo): Promise<ConductorVehiculo>;
+  updateConductorVehiculo(id: string, data: Partial<ConductorVehiculo>): Promise<ConductorVehiculo>;
+  deleteConductorVehiculo(id: string): Promise<void>;
+  
   // Document Validation (Verifik)
   updateDocumentoVerifikValidation(documentoId: string, data: {
     verifikScanId?: string;
@@ -697,6 +707,50 @@ export class DatabaseStorage implements IStorage {
         eq(conductorServicioSubtipos.subtipoServicio, subtipoServicio as any)
       )
     );
+  }
+
+  // Conductor Vehicles (one vehicle per category per driver)
+  async getConductorVehiculos(conductorId: string): Promise<ConductorVehiculo[]> {
+    return await db.select().from(conductorVehiculos).where(
+      and(
+        eq(conductorVehiculos.conductorId, conductorId),
+        eq(conductorVehiculos.activo, true)
+      )
+    );
+  }
+
+  async getConductorVehiculoByCategoria(conductorId: string, categoria: string): Promise<ConductorVehiculo | undefined> {
+    const [vehiculo] = await db.select().from(conductorVehiculos).where(
+      and(
+        eq(conductorVehiculos.conductorId, conductorId),
+        eq(conductorVehiculos.categoria, categoria as any),
+        eq(conductorVehiculos.activo, true)
+      )
+    );
+    return vehiculo;
+  }
+
+  async createConductorVehiculo(vehiculo: InsertConductorVehiculo): Promise<ConductorVehiculo> {
+    const existingVehiculo = await this.getConductorVehiculoByCategoria(vehiculo.conductorId, vehiculo.categoria);
+    if (existingVehiculo) {
+      return await this.updateConductorVehiculo(existingVehiculo.id, vehiculo);
+    }
+    const [newVehiculo] = await db.insert(conductorVehiculos).values(vehiculo).returning();
+    return newVehiculo;
+  }
+
+  async updateConductorVehiculo(id: string, data: Partial<ConductorVehiculo>): Promise<ConductorVehiculo> {
+    const [updatedVehiculo] = await db.update(conductorVehiculos)
+      .set(data)
+      .where(eq(conductorVehiculos.id, id))
+      .returning();
+    return updatedVehiculo;
+  }
+
+  async deleteConductorVehiculo(id: string): Promise<void> {
+    await db.update(conductorVehiculos)
+      .set({ activo: false })
+      .where(eq(conductorVehiculos.id, id));
   }
 
   // Document Validation (Verifik)

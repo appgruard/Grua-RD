@@ -1899,6 +1899,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all vehicles for the current driver
+  app.get("/api/drivers/me/vehiculos", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const vehiculos = await storage.getConductorVehiculos(conductor.id);
+      res.json(vehiculos);
+    } catch (error: any) {
+      logSystem.error('Get driver vehicles error', error);
+      res.status(500).json({ message: "Failed to get driver vehicles" });
+    }
+  });
+
+  // Get a specific vehicle by category
+  app.get("/api/drivers/me/vehiculos/:categoria", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const { categoria } = req.params;
+      const vehiculo = await storage.getConductorVehiculoByCategoria(conductor.id, categoria);
+      
+      if (!vehiculo) {
+        return res.status(404).json({ message: "Vehículo no encontrado para esta categoría" });
+      }
+
+      res.json(vehiculo);
+    } catch (error: any) {
+      logSystem.error('Get driver vehicle by category error', error);
+      res.status(500).json({ message: "Failed to get driver vehicle" });
+    }
+  });
+
+  // Create or update a vehicle for a category
+  app.post("/api/drivers/me/vehiculos", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const { categoria, placa, color, capacidad, marca, modelo, anio, detalles, fotoUrl } = req.body;
+      
+      if (!categoria || !placa || !color) {
+        return res.status(400).json({ message: "Categoria, placa y color son requeridos" });
+      }
+
+      const vehiculo = await storage.createConductorVehiculo({
+        conductorId: conductor.id,
+        categoria,
+        placa,
+        color,
+        capacidad,
+        marca,
+        modelo,
+        anio,
+        detalles,
+        fotoUrl,
+      });
+
+      logSystem.info('Driver vehicle created/updated', { conductorId: conductor.id, categoria, vehiculoId: vehiculo.id });
+      res.json(vehiculo);
+    } catch (error: any) {
+      logSystem.error('Create driver vehicle error', error);
+      res.status(500).json({ message: "Failed to create driver vehicle" });
+    }
+  });
+
+  // Update a specific vehicle
+  app.patch("/api/drivers/me/vehiculos/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const { id } = req.params;
+      const { placa, color, capacidad, marca, modelo, anio, detalles, fotoUrl } = req.body;
+
+      const vehiculo = await storage.updateConductorVehiculo(id, {
+        placa,
+        color,
+        capacidad,
+        marca,
+        modelo,
+        anio,
+        detalles,
+        fotoUrl,
+      });
+
+      logSystem.info('Driver vehicle updated', { conductorId: conductor.id, vehiculoId: id });
+      res.json(vehiculo);
+    } catch (error: any) {
+      logSystem.error('Update driver vehicle error', error);
+      res.status(500).json({ message: "Failed to update driver vehicle" });
+    }
+  });
+
+  // Delete a vehicle (soft delete)
+  app.delete("/api/drivers/me/vehiculos/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const { id } = req.params;
+      await storage.deleteConductorVehiculo(id);
+
+      logSystem.info('Driver vehicle deleted', { conductorId: conductor.id, vehiculoId: id });
+      res.json({ success: true });
+    } catch (error: any) {
+      logSystem.error('Delete driver vehicle error', error);
+      res.status(500).json({ message: "Failed to delete driver vehicle" });
+    }
+  });
+
   // Validate document with Verifik API (face or license)
   app.post("/api/documents/:id/validate", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
