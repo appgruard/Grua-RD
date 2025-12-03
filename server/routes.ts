@@ -5159,8 +5159,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      const banks = dlocalPaymentService.getDRBanks();
-      res.json({ banks });
+      const banksRecord = dlocalPaymentService.getDRBanks();
+      const banksArray = Object.entries(banksRecord).map(([code, name]) => ({ code, name }));
+      res.json(banksArray);
     } catch (error: any) {
       logSystem.error('Get banks error', error, { userId: req.user!.id });
       res.status(500).json({ message: "Failed to get bank list" });
