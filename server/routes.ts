@@ -2429,14 +2429,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { categoria, placa, color, capacidad, marca, modelo, anio, detalles, fotoUrl } = req.body;
       
-      if (!categoria || !placa || !color) {
-        return res.status(400).json({ message: "Categoria, placa y color son requeridos" });
+      if (!categoria || !placa || !color || !modelo) {
+        return res.status(400).json({ message: "Categoría, placa, color y modelo son requeridos" });
+      }
+
+      const PLACA_DOMINICANA_REGEX = /^[A-Z]{1,2}\d{4,6}$/;
+      const placaNormalizada = placa.toUpperCase().trim();
+      if (!PLACA_DOMINICANA_REGEX.test(placaNormalizada)) {
+        return res.status(400).json({ 
+          message: "Formato de placa inválido. Use formato dominicano (ej: A123456)" 
+        });
       }
 
       const vehiculo = await storage.createConductorVehiculo({
         conductorId: conductor.id,
         categoria,
-        placa,
+        placa: placaNormalizada,
         color,
         capacidad,
         marca,
@@ -2469,8 +2477,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { placa, color, capacidad, marca, modelo, anio, detalles, fotoUrl } = req.body;
 
+      if (!placa || !color || !modelo) {
+        return res.status(400).json({ message: "Placa, color y modelo son requeridos" });
+      }
+
+      const PLACA_DOMINICANA_REGEX = /^[A-Z]{1,2}\d{4,6}$/;
+      const placaNormalizada = placa.toUpperCase().trim();
+      if (!PLACA_DOMINICANA_REGEX.test(placaNormalizada)) {
+        return res.status(400).json({ 
+          message: "Formato de placa inválido. Use formato dominicano (ej: A123456)" 
+        });
+      }
+
       const vehiculo = await storage.updateConductorVehiculo(id, {
-        placa,
+        placa: placaNormalizada,
         color,
         capacidad,
         marca,

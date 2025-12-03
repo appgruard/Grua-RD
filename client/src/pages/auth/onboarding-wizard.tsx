@@ -23,6 +23,8 @@ import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 type UserType = 'cliente' | 'conductor';
 
+const PLACA_DOMINICANA_REGEX = /^[A-Z]{1,2}\d{4,6}$/;
+
 interface ServiceSelection {
   categoria: string;
   subtipos: string[];
@@ -671,8 +673,10 @@ export default function OnboardingWizard() {
     
     for (const categoria of selectedCategories) {
       const vehicle = vehicleData.find(v => v.categoria === categoria);
-      if (!vehicle || !vehicle.placa || !vehicle.color) {
-        newErrors[`vehicle_${categoria}`] = 'Placa y color son requeridos';
+      if (!vehicle || !vehicle.placa || !vehicle.color || !vehicle.modelo) {
+        newErrors[`vehicle_${categoria}`] = 'Placa, color y modelo son requeridos';
+      } else if (!PLACA_DOMINICANA_REGEX.test(vehicle.placa.toUpperCase().trim())) {
+        newErrors[`vehicle_${categoria}`] = 'Formato de placa inválido. Ej: A123456';
       }
     }
     

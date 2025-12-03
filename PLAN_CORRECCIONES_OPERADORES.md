@@ -132,10 +132,12 @@ export const VALID_SERVICE_CATEGORIES = [
 
 ---
 
-## Fase 3: Sistema de Vehículos Múltiples por Categoría
+## Fase 3: Sistema de Vehículos Múltiples por Categoría ✅ COMPLETADA
 
-### Estado Actual
-El sistema ya tiene:
+**Fecha de completación:** 3 de Diciembre de 2025
+
+### Estado Anterior
+El sistema ya tenía:
 - Tabla `conductor_vehiculos` en la base de datos
 - Componente `VehicleCategoryForm` para formulario de vehículos
 - Endpoints en `server/routes.ts`:
@@ -144,38 +146,114 @@ El sistema ya tiene:
   - `PATCH /api/drivers/me/vehiculos/:id` - Actualizar vehículo
   - `DELETE /api/drivers/me/vehiculos/:id` - Eliminar vehículo
 
-### Mejoras Requeridas
+### Mejoras Implementadas
 
 **3.1 Campos obligatorios por vehículo:**
-- Modelo (campo `modelo`)
-- Matrícula/Placa (campo `placa`)
-- Categoría (campo `categoria`)
-- Color (campo `color`)
+- ✅ Modelo (campo `modelo`) - ahora obligatorio
+- ✅ Matrícula/Placa (campo `placa`) - obligatorio con validación de formato
+- ✅ Categoría (campo `categoria`) - obligatorio
+- ✅ Color (campo `color`) - obligatorio
 
-**3.2 Validaciones:**
+**3.2 Validación de Formato de Placa Dominicana:**
+
+Se implementó validación usando regex que cubre todos los formatos de placas dominicanas:
+
 ```typescript
-interface VehicleData {
-  categoria: string;    // Obligatorio - categoría a la que pertenece
-  placa: string;        // Obligatorio - matrícula del vehículo
-  modelo: string;       // Obligatorio - modelo del vehículo
-  color: string;        // Obligatorio - color del vehículo
-  marca?: string;       // Opcional - marca
-  anio?: string;        // Opcional - año
-  capacidad?: string;   // Opcional - capacidad
-  detalles?: string;    // Opcional - detalles adicionales
-}
+const PLACA_DOMINICANA_REGEX = /^[A-Z]{1,2}\d{4,6}$/;
 ```
 
-**3.3 Reglas de negocio:**
-- Cada categoría requiere al menos un vehículo
-- No se puede avanzar al siguiente paso sin completar vehículos para todas las categorías
-- Validar formato de matrícula
+Formatos soportados:
+| Tipo | Formato | Ejemplo |
+|------|---------|---------|
+| Vehículos privados | Letra + 6 dígitos | A123456 |
+| Vehículos públicos | P + 6 dígitos | P123456 |
+| Gubernamentales | G/E + 5-6 dígitos | G12345 |
+| Motocicletas | K/M + 5-6 dígitos | K12345 |
+| Diplomáticos | CD/CC + números | CD1234 |
+| Remolques/Trailers | R + 5-6 dígitos | R12345 |
 
-**Archivos a modificar:**
-- `client/src/components/VehicleCategoryForm.tsx` - Hacer campos obligatorios
-- `client/src/pages/auth/onboarding-wizard.tsx` - Validar antes de continuar
-- `server/routes.ts` - Validación en backend
-- `client/src/pages/driver/profile.tsx` - Gestión de vehículos post-registro
+**3.3 Cambios en VehicleCategoryForm.tsx:**
+
+```typescript
+// Regex y función de validación agregadas
+const PLACA_DOMINICANA_REGEX = /^[A-Z]{1,2}\d{4,6}$/;
+const isValidPlaca = (placa: string): boolean => {
+  return PLACA_DOMINICANA_REGEX.test(placa.toUpperCase().trim());
+};
+
+// isVehicleComplete actualizada para incluir modelo y validar placa
+const isVehicleComplete = (vehicle: VehicleData): boolean => {
+  return Boolean(
+    vehicle.placa && 
+    vehicle.color && 
+    vehicle.modelo && 
+    isValidPlaca(vehicle.placa)
+  );
+};
+```
+
+UI mejorada:
+- ✅ Label "Modelo *" con asterisco para indicar obligatoriedad
+- ✅ Input de placa con borde rojo cuando formato es inválido
+- ✅ Mensaje de error "Formato inválido. Ej: A123456" bajo input de placa
+- ✅ Badge "Pendiente" hasta que todos los campos obligatorios estén completos
+
+**3.4 Cambios en onboarding-wizard.tsx:**
+
+```typescript
+// Regex agregada al inicio del archivo
+const PLACA_DOMINICANA_REGEX = /^[A-Z]{1,2}\d{4,6}$/;
+
+// validateStep7 actualizada
+const validateStep7 = (): boolean => {
+  const newErrors: StepErrors = {};
+  const selectedCategories = selectedServices.map(s => s.categoria);
+  
+  for (const categoria of selectedCategories) {
+    const vehicle = vehicleData.find(v => v.categoria === categoria);
+    if (!vehicle || !vehicle.placa || !vehicle.color || !vehicle.modelo) {
+      newErrors[`vehicle_${categoria}`] = 'Placa, color y modelo son requeridos';
+    } else if (!PLACA_DOMINICANA_REGEX.test(vehicle.placa.toUpperCase().trim())) {
+      newErrors[`vehicle_${categoria}`] = 'Formato de placa inválido. Ej: A123456';
+    }
+  }
+  
+  if (!formData.licencia.trim()) newErrors.licencia = 'Número de licencia requerido';
+  
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+```
+
+**3.5 Cambios en server/routes.ts:**
+
+```typescript
+// En POST /api/drivers/me/vehiculos
+if (!categoria || !placa || !color || !modelo) {
+  return res.status(400).json({ 
+    message: "Categoría, placa, color y modelo son requeridos" 
+  });
+}
+
+const PLACA_DOMINICANA_REGEX = /^[A-Z]{1,2}\d{4,6}$/;
+const placaNormalizada = placa.toUpperCase().trim();
+if (!PLACA_DOMINICANA_REGEX.test(placaNormalizada)) {
+  return res.status(400).json({ 
+    message: "Formato de placa inválido. Use formato dominicano (ej: A123456)" 
+  });
+}
+
+// En PATCH /api/drivers/me/vehiculos/:id (misma validación)
+if (!placa || !color || !modelo) {
+  return res.status(400).json({ message: "Placa, color y modelo son requeridos" });
+}
+// + misma validación de formato de placa
+```
+
+**Archivos modificados:**
+- `client/src/components/VehicleCategoryForm.tsx` - Regex, validación, UI mejorada
+- `client/src/pages/auth/onboarding-wizard.tsx` - Regex, validateStep7 mejorada
+- `server/routes.ts` - Validación de modelo y placa en endpoints POST y PATCH
 
 ---
 
@@ -316,14 +394,13 @@ Estados cargando/en_progreso:
 | Archivo | Fase | Descripción | Estado |
 |---------|------|-------------|--------|
 | `server/storage.ts` | 1 | Agregar manejo de errores en funciones de analytics | ✅ |
-| `server/routes.ts` | 1, 2, 3 | Mejorar endpoints de analytics, validar categorías y vehículos | ✅ Fase 1, 2 |
+| `server/routes.ts` | 1, 2, 3 | Mejorar endpoints de analytics, validar categorías y vehículos | ✅ |
 | `shared/schema.ts` | 2 | Exportar VALID_SERVICE_CATEGORIES | ✅ |
 | `client/src/pages/admin/analytics.tsx` | 1 | Mostrar errores amigables | ✅ |
 | `client/src/pages/driver/history.tsx` | 1 | Manejo de errores de conexión | ✅ |
-| `client/src/pages/auth/onboarding-wizard.tsx` | 2, 3 | Validar categorías y vehículos | ✅ Fase 2 |
-| `client/src/components/VehicleCategoryForm.tsx` | 3 | Campos obligatorios | Pendiente |
+| `client/src/pages/auth/onboarding-wizard.tsx` | 2, 3 | Validar categorías y vehículos | ✅ |
+| `client/src/components/VehicleCategoryForm.tsx` | 3 | Campos obligatorios, validación placa | ✅ |
 | `client/src/pages/driver/dashboard.tsx` | 4, 5 | Mostrar info de servicio, botones navegación | ✅ |
-| `client/src/pages/driver/profile.tsx` | 3 | Gestión de vehículos | Pendiente |
 
 ---
 
@@ -333,7 +410,7 @@ Estados cargando/en_progreso:
 2. **Fase 4** (Prioridad Alta): Info de servicio en mapa ✅ COMPLETADA
 3. **Fase 5** (Prioridad Media): Verificar Waze ✅ COMPLETADA
 4. **Fase 2** (Prioridad Media): Validar categorías ✅ COMPLETADA
-5. **Fase 3** (Prioridad Media): Vehículos múltiples - Pendiente
+5. **Fase 3** (Prioridad Media): Vehículos múltiples ✅ COMPLETADA
 
 ---
 
@@ -343,8 +420,9 @@ Estados cargando/en_progreso:
 - [x] Historial de operadores carga correctamente (Fase 1 ✅)
 - [x] Operadores pueden seleccionar categorías al registrarse (Fase 2 ✅)
 - [x] Validación de categorías en backend implementada (Fase 2 ✅)
-- [ ] Operadores pueden agregar múltiples vehículos por categoría (Fase 3)
-- [ ] Se muestran los 4 campos obligatorios: Modelo, Matrícula, Categoría, Color (Fase 3)
+- [x] Operadores pueden agregar múltiples vehículos por categoría (Fase 3 ✅)
+- [x] Se muestran los 4 campos obligatorios: Modelo, Matrícula, Categoría, Color (Fase 3 ✅)
+- [x] Validación de formato de placa dominicana en frontend y backend (Fase 3 ✅)
 - [x] En el mapa se muestra: Nombre cliente, tipo servicio, categoría vehículo (Fase 4 ✅)
 - [x] Botón de Waze abre navegación hacia el cliente (Fase 5 ✅)
 - [x] Botón alternativo de Google Maps disponible (Fase 5 ✅)

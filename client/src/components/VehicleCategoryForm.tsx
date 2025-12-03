@@ -8,6 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronUp, Car, Check, AlertCircle } from 'lucide-react';
 import { SERVICE_CATEGORIES } from '@/components/ServiceCategoryMultiSelect';
 
+const PLACA_DOMINICANA_REGEX = /^[A-Z]{1,2}\d{4,6}$/;
+
+const isValidPlaca = (placa: string): boolean => {
+  return PLACA_DOMINICANA_REGEX.test(placa.toUpperCase().trim());
+};
+
 export interface VehicleData {
   categoria: string;
   placa: string;
@@ -76,7 +82,12 @@ export function VehicleCategoryForm({
   };
 
   const isVehicleComplete = (vehicle: VehicleData): boolean => {
-    return Boolean(vehicle.placa && vehicle.color);
+    return Boolean(
+      vehicle.placa && 
+      vehicle.color && 
+      vehicle.modelo && 
+      isValidPlaca(vehicle.placa)
+    );
   };
 
   const getCategoryLabel = (categoryId: string): string => {
@@ -156,8 +167,12 @@ export function VehicleCategoryForm({
                       value={vehicle.placa}
                       onChange={(e) => updateVehicle(categoria, 'placa', e.target.value.toUpperCase())}
                       disabled={disabled}
+                      className={vehicle.placa && !isValidPlaca(vehicle.placa) ? 'border-destructive' : ''}
                       data-testid={`input-placa-${categoria}`}
                     />
+                    {vehicle.placa && !isValidPlaca(vehicle.placa) && (
+                      <p className="text-xs text-destructive">Formato inválido. Ej: A123456</p>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -187,7 +202,7 @@ export function VehicleCategoryForm({
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor={`modelo-${categoria}`}>Modelo</Label>
+                    <Label htmlFor={`modelo-${categoria}`}>Modelo *</Label>
                     <Input
                       id={`modelo-${categoria}`}
                       placeholder="F-450"
