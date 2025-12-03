@@ -68,6 +68,14 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Code Audits
 
+### December 2025 - Navigation Buttons Improvement (Fase 5)
+**Driver Dashboard (`client/src/pages/driver/dashboard.tsx`):**
+- Added dual navigation buttons: Waze and Google Maps options
+- Self-descriptive labels: "Origen (Waze)", "Destino (Maps)", etc.
+- Imported `SiGooglemaps` icon from react-icons
+- Added aria-labels for accessibility
+- Added test IDs: `button-waze-origin`, `button-google-origin`, `button-waze-destination`, `button-google-destination`
+
 ### December 2025 - Driver Dashboard Service Info (Fase 4)
 **Driver Dashboard (`client/src/pages/driver/dashboard.tsx`):**
 - Added friendly labels for service categories and vehicle types (serviceCategoryLabels, vehicleTypeLabels)

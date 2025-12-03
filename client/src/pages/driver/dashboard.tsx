@@ -17,10 +17,10 @@ import { ChatBox } from '@/components/chat/ChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLocationTracking } from '@/hooks/useLocation';
 import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert } from 'lucide-react';
-import { SiWaze } from 'react-icons/si';
+import { SiWaze, SiGooglemaps } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
-import { getNavigationUrl } from '@/lib/maps';
+import { generateWazeNavigationUrl, generateGoogleMapsNavigationUrl } from '@/lib/maps';
 import { cn } from '@/lib/utils';
 
 const serviceCategoryLabels: Record<string, string> = {
@@ -503,29 +503,59 @@ export default function DriverDashboard() {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {(activeService.estado === 'aceptado' || activeService.estado === 'conductor_en_sitio') && (() => {
-                    const navUrl = getNavigationUrl(activeService.origenLat, activeService.origenLng);
-                    if (!navUrl) return null;
+                    const lat = typeof activeService.origenLat === 'string' ? parseFloat(activeService.origenLat) : activeService.origenLat;
+                    const lng = typeof activeService.origenLng === 'string' ? parseFloat(activeService.origenLng) : activeService.origenLng;
+                    const wazeUrl = generateWazeNavigationUrl(lat, lng);
+                    const googleUrl = generateGoogleMapsNavigationUrl(lat, lng);
+                    if (!wazeUrl && !googleUrl) return null;
                     return (
-                      <a href={navUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
-                        <Button variant="outline" className="w-full gap-2" data-testid="button-waze-origin">
-                          <SiWaze className="w-4 h-4 text-[#33CCFF]" />
-                          Ir al origen
-                        </Button>
-                      </a>
+                      <>
+                        {wazeUrl && (
+                          <a href={wazeUrl} target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" className="w-full gap-1.5 text-xs h-10" data-testid="button-waze-origin" aria-label="Ir al origen con Waze">
+                              <SiWaze className="w-4 h-4 text-[#33CCFF] flex-shrink-0" />
+                              <span className="truncate">Origen (Waze)</span>
+                            </Button>
+                          </a>
+                        )}
+                        {googleUrl && (
+                          <a href={googleUrl} target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" className="w-full gap-1.5 text-xs h-10" data-testid="button-google-origin" aria-label="Ir al origen con Google Maps">
+                              <SiGooglemaps className="w-4 h-4 text-[#4285F4] flex-shrink-0" />
+                              <span className="truncate">Origen (Maps)</span>
+                            </Button>
+                          </a>
+                        )}
+                      </>
                     );
                   })()}
                   {(activeService.estado === 'cargando' || activeService.estado === 'en_progreso') && (() => {
-                    const navUrl = getNavigationUrl(activeService.destinoLat, activeService.destinoLng);
-                    if (!navUrl) return null;
+                    const lat = typeof activeService.destinoLat === 'string' ? parseFloat(activeService.destinoLat) : activeService.destinoLat;
+                    const lng = typeof activeService.destinoLng === 'string' ? parseFloat(activeService.destinoLng) : activeService.destinoLng;
+                    const wazeUrl = generateWazeNavigationUrl(lat, lng);
+                    const googleUrl = generateGoogleMapsNavigationUrl(lat, lng);
+                    if (!wazeUrl && !googleUrl) return null;
                     return (
-                      <a href={navUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
-                        <Button variant="outline" className="w-full gap-2" data-testid="button-waze-destination">
-                          <SiWaze className="w-4 h-4 text-[#33CCFF]" />
-                          Ir al destino
-                        </Button>
-                      </a>
+                      <>
+                        {wazeUrl && (
+                          <a href={wazeUrl} target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" className="w-full gap-1.5 text-xs h-10" data-testid="button-waze-destination" aria-label="Ir al destino con Waze">
+                              <SiWaze className="w-4 h-4 text-[#33CCFF] flex-shrink-0" />
+                              <span className="truncate">Destino (Waze)</span>
+                            </Button>
+                          </a>
+                        )}
+                        {googleUrl && (
+                          <a href={googleUrl} target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" className="w-full gap-1.5 text-xs h-10" data-testid="button-google-destination" aria-label="Ir al destino con Google Maps">
+                              <SiGooglemaps className="w-4 h-4 text-[#4285F4] flex-shrink-0" />
+                              <span className="truncate">Destino (Maps)</span>
+                            </Button>
+                          </a>
+                        )}
+                      </>
                     );
                   })()}
                 </div>

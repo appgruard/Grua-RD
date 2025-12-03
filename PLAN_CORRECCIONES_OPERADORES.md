@@ -210,40 +210,60 @@ Se agregaron badges informativos en cada tarjeta de solicitud:
 
 ---
 
-## Fase 5: Integración con Waze para Navegación
+## Fase 5: Integración con Waze para Navegación ✅ COMPLETADA
 
-### Estado Actual
-El sistema YA tiene implementada la integración con Waze:
+**Fecha de completación:** 3 de Diciembre de 2025
+
+### Verificación Realizada
+
+**5.1 Funciones de navegación verificadas:**
 
 **Archivo:** `client/src/lib/maps.ts`
-```typescript
-export function generateWazeNavigationUrl(lat, lng): string | null {
-  return `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
-}
+- `generateWazeNavigationUrl(lat, lng)` - Genera URL de Waze con validación de nulos
+- `generateGoogleMapsNavigationUrl(lat, lng)` - Genera URL de Google Maps
 
-export function getNavigationUrl(lat, lng): string | null {
-  // Primero intenta Waze, luego Google Maps como fallback
-  const wazeUrl = generateWazeNavigationUrl(parsedLat, parsedLng);
-  if (wazeUrl) return wazeUrl;
-  return generateGoogleMapsNavigationUrl(parsedLat, parsedLng);
-}
+**5.2 Estados de servicio verificados:**
+- ✅ Estados `aceptado` o `conductor_en_sitio` → Botones de navegación al origen
+- ✅ Estados `cargando` o `en_progreso` → Botones de navegación al destino
+
+### Mejoras Implementadas
+
+**5.3 Botones duales de navegación con labels auto-descriptivos:**
+Se implementaron botones que incluyen tanto el destino como el proveedor para máxima claridad:
+
+```
+Estados aceptado/conductor_en_sitio:
+┌──────────────────┬──────────────────┐
+│ 🔵 Origen (Waze) │ 🔴 Origen (Maps) │
+└──────────────────┴──────────────────┘
+
+Estados cargando/en_progreso:
+┌───────────────────┬───────────────────┐
+│ 🔵 Destino (Waze) │ 🔴 Destino (Maps) │
+└───────────────────┴───────────────────┘
 ```
 
-**En dashboard.tsx (líneas 464-488):**
-- Ya existen botones "Ir al origen" y "Ir al destino" con icono de Waze
-- Los botones abren Waze con las coordenadas del cliente
+**Cambios realizados:**
+- Importado icono `SiGooglemaps` de react-icons
+- Importadas funciones `generateWazeNavigationUrl` y `generateGoogleMapsNavigationUrl`
+- Modificada UI para mostrar dos botones en grid de 2 columnas:
+  - Botón Waze con icono cyan (#33CCFF)
+  - Botón Google Maps con icono azul (#4285F4)
+- Labels auto-descriptivos: "Origen (Waze)", "Destino (Maps)", etc.
+- aria-labels completos para accesibilidad
 
-### Verificaciones Necesarias
+**Accesibilidad:**
+- Cada botón tiene aria-label descriptivo (ej: "Ir al origen con Waze")
+- Labels visibles incluyen tanto destino como proveedor
 
-**5.1 Verificar funcionamiento actual:**
-- Confirmar que el botón de Waze aparece en los estados correctos:
-  - `aceptado` o `conductor_en_sitio` → Mostrar "Ir al origen"
-  - `cargando` o `en_progreso` → Mostrar "Ir al destino"
+**Test IDs agregados:**
+- `button-waze-origin` - Waze hacia el origen
+- `button-google-origin` - Google Maps hacia el origen
+- `button-waze-destination` - Waze hacia el destino
+- `button-google-destination` - Google Maps hacia el destino
 
-**5.2 Mejoras opcionales:**
-- Agregar detección de plataforma (iOS/Android)
-- Si Waze no está instalado, abrir app store para descargarlo
-- Agregar botón alternativo para Google Maps
+**Archivo modificado:**
+- `client/src/pages/driver/dashboard.tsx`
 
 ---
 
@@ -280,7 +300,8 @@ export function getNavigationUrl(lat, lng): string | null {
 - [ ] Operadores pueden agregar múltiples vehículos por categoría (Fase 3)
 - [ ] Se muestran los 4 campos obligatorios: Modelo, Matrícula, Categoría, Color (Fase 3)
 - [x] En el mapa se muestra: Nombre cliente, tipo servicio, categoría vehículo (Fase 4 ✅)
-- [ ] Botón de Waze abre navegación hacia el cliente (Fase 5 - pendiente verificación)
+- [x] Botón de Waze abre navegación hacia el cliente (Fase 5 ✅)
+- [x] Botón alternativo de Google Maps disponible (Fase 5 ✅)
 
 ---
 
