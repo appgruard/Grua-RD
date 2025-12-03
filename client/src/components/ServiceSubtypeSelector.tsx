@@ -22,7 +22,14 @@ import {
   Box,
   Ship,
   Waves,
-  Bike
+  Bike,
+  Star,
+  Crown,
+  Wrench,
+  ArrowDown,
+  XCircle,
+  MapPin,
+  Flame
 } from 'lucide-react';
 
 interface ServiceSubtypeSelectorProps {
@@ -53,8 +60,26 @@ const remolqueEspecializadoSubtypes: SubtypeOption[] = [
   { id: 'vehiculo_sin_llanta', label: 'Vehículo sin Llanta', description: 'Falta una o más llantas', Icon: CircleSlash },
   { id: 'vehiculo_sin_direccion', label: 'Vehículo sin Dirección', description: 'Dirección dañada', Icon: Compass },
   { id: 'vehiculo_chocado', label: 'Vehículo Chocado', description: 'Daños por accidente', Icon: AlertTriangle },
-  { id: 'vehiculo_lujo', label: 'Vehículo de Lujo', description: 'Bajo perfil / premium', Icon: Gem },
   { id: 'vehiculo_electrico', label: 'Vehículo Eléctrico/Híbrido', description: 'EV o híbrido', Icon: Leaf },
+];
+
+const remolquePlataformaSubtypes: SubtypeOption[] = [
+  { id: 'vehiculo_lujo', label: 'Vehículo de Lujo', description: 'BMW, Mercedes, Audi, Lexus', Icon: Gem },
+  { id: 'vehiculo_deportivo', label: 'Vehículo Deportivo', description: 'Porsche, Ferrari, Corvette', Icon: Zap },
+  { id: 'vehiculo_bajo', label: 'Vehículo Muy Bajo', description: 'Lowered, stance', Icon: ArrowDown },
+  { id: 'vehiculo_modificado', label: 'Vehículo Modificado', description: 'Modificaciones aftermarket', Icon: Wrench },
+  { id: 'traslado_especial', label: 'Traslado Especial', description: 'Eventos, exhibiciones', Icon: Star },
+  { id: 'servicio_premium', label: 'Servicio Premium', description: 'Atención VIP, guantes blancos', Icon: Crown },
+];
+
+const remolqueMotocicletasSubtypes: SubtypeOption[] = [
+  { id: 'moto_accidentada', label: 'Moto Accidentada', description: 'Daños por accidente', Icon: AlertTriangle },
+  { id: 'moto_no_prende', label: 'Moto que No Prende', description: 'Problemas mecánicos', Icon: XCircle },
+  { id: 'scooter_pasola', label: 'Scooter / Pasola', description: 'Scooters y pasolas', Icon: Bike },
+  { id: 'delivery_accidentado', label: 'Delivery Accidentado', description: 'Motos de delivery', Icon: Package },
+  { id: 'moto_alto_cilindraje', label: 'Moto Alto Cilindraje', description: 'Harley, BMW, Honda Gold Wing', Icon: Flame },
+  { id: 'traslado_local_moto', label: 'Traslado Local', description: 'Dentro de la ciudad', Icon: MapPin },
+  { id: 'reubicacion_moto', label: 'Reubicación', description: 'Cambio de ubicación', Icon: Move },
 ];
 
 const vehiculosPesadosSubtypes: SubtypeOption[] = [
@@ -90,6 +115,8 @@ const remolqueRecreativoSubtypes: SubtypeOption[] = [
 const subtypesByCategory: Record<string, SubtypeOption[]> = {
   'auxilio_vial': auxilioVialSubtypes,
   'remolque_especializado': remolqueEspecializadoSubtypes,
+  'remolque_plataforma': remolquePlataformaSubtypes,
+  'remolque_motocicletas': remolqueMotocicletasSubtypes,
   'vehiculos_pesados': vehiculosPesadosSubtypes,
   'maquinarias': maquinariasSubtypes,
   'izaje_construccion': izajeConstruccionSubtypes,
