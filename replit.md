@@ -68,6 +68,14 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Code Audits
 
+### December 2025 - Driver Dashboard Service Info (Fase 4)
+**Driver Dashboard (`client/src/pages/driver/dashboard.tsx`):**
+- Added friendly labels for service categories and vehicle types (serviceCategoryLabels, vehicleTypeLabels)
+- Enhanced active service card to display service category and client vehicle type in a 2-column grid
+- Added badges in nearby requests cards showing service category and vehicle type
+- Proper fallback to "No especificado" for null/undefined values
+- Added test IDs: `service-details-info`, `text-service-category`, `text-vehicle-type`, `request-details-{id}`, `badge-service-category-{id}`, `badge-vehicle-type-{id}`
+
 ### December 2025 - Error Handling Improvements (Fase 1)
 **Analytics Admin (`client/src/pages/admin/analytics.tsx`):**
 - Added retry logic (2 retries, 1s delay) to all useQuery hooks
@@ -104,4 +112,4 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - `server/storage.ts` (3,791 lines) - Consider modular split
 - `shared/schema.ts` (1,958 lines) - Consider domain-based organization
 - Enum `servicio_categoria` contains both "camiones_pesados" and "vehiculos_pesados" for backward compatibility
-- `client/src/pages/driver/dashboard.tsx` line 674 - LSP type error with ConfirmDialogProps (pre-existing)
+- `client/src/pages/driver/dashboard.tsx` line 726 - LSP type error with ConfirmDialogProps (pre-existing)
