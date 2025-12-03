@@ -2876,7 +2876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: 'conductor_en_sitio',
       });
 
-      logService.info('Driver arrived at origin', { servicioId: servicio.id });
+      logService.stateChanged(servicio.id, 'aceptado', 'conductor_en_sitio');
 
       await pushService.notifyServiceUpdate(servicio.id, servicio.clienteId, 'El conductor ha llegado al punto de origen');
 
@@ -2897,7 +2897,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: 'cargando',
       });
 
-      logService.info('Driver loading vehicle', { servicioId: servicio.id });
+      logService.stateChanged(servicio.id, 'conductor_en_sitio', 'cargando');
 
       await pushService.notifyServiceUpdate(servicio.id, servicio.clienteId, 'El conductor está cargando tu vehículo');
 
