@@ -30,7 +30,9 @@ const config: CapacitorConfig = {
       'fonts.googleapis.com',
       'fonts.gstatic.com',
       'api.dlocal.com',
-      '*.dlocal.com'
+      '*.dlocal.com',
+      '*.waze.com',
+      'waze.com'
     ]
   },
 
