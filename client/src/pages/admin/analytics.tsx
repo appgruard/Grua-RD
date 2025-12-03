@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { Calendar, Download, Clock, CheckCircle, XCircle, DollarSign, Car, FileText, MapPin } from 'lucide-react';
+import { Calendar, Download, Clock, CheckCircle, XCircle, DollarSign, Car, FileText, MapPin, RefreshCcw, AlertCircle } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -125,43 +125,85 @@ export default function Analytics() {
   const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
   const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
 
-  const { data: revenueData, isLoading: revenueLoading } = useQuery<RevenueData[]>({
+  const queryClient = useQueryClient();
+
+  const { data: revenueData, isLoading: revenueLoading, isError: revenueError, refetch: refetchRevenue } = useQuery<RevenueData[]>({
     queryKey: ['/api/admin/analytics/revenue', { startDate, endDate, period }],
     enabled: !!startDate && !!endDate,
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: servicesData, isLoading: servicesLoading } = useQuery<ServicesData[]>({
+  const { data: servicesData, isLoading: servicesLoading, isError: servicesError, refetch: refetchServices } = useQuery<ServicesData[]>({
     queryKey: ['/api/admin/analytics/services', { startDate, endDate, period }],
     enabled: !!startDate && !!endDate,
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: driverRankings, isLoading: driversLoading } = useQuery<DriverRanking[]>({
+  const { data: driverRankings, isLoading: driversLoading, isError: driversError, refetch: refetchDrivers } = useQuery<DriverRanking[]>({
     queryKey: ['/api/admin/analytics/drivers'],
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: peakHoursData, isLoading: peakHoursLoading } = useQuery<PeakHourData[]>({
+  const { data: peakHoursData, isLoading: peakHoursLoading, isError: peakHoursError, refetch: refetchPeakHours } = useQuery<PeakHourData[]>({
     queryKey: ['/api/admin/analytics/peak-hours'],
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: statusBreakdown, isLoading: statusLoading } = useQuery<StatusBreakdown[]>({
+  const { data: statusBreakdown, isLoading: statusLoading, isError: statusError, refetch: refetchStatus } = useQuery<StatusBreakdown[]>({
     queryKey: ['/api/admin/analytics/status-breakdown', { startDate, endDate }],
     enabled: !!startDate && !!endDate,
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: heatmapData, isLoading: heatmapLoading } = useQuery<HeatmapPoint[]>({
+  const { data: heatmapData, isLoading: heatmapLoading, isError: heatmapError, refetch: refetchHeatmap } = useQuery<HeatmapPoint[]>({
     queryKey: ['/api/admin/analytics/heatmap', { startDate, endDate }],
     enabled: !!startDate && !!endDate,
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: kpiData, isLoading: kpiLoading } = useQuery<KPIData>({
+  const { data: kpiData, isLoading: kpiLoading, isError: kpiError, refetch: refetchKpis } = useQuery<KPIData>({
     queryKey: ['/api/admin/analytics/kpis', { startDate, endDate }],
     enabled: !!startDate && !!endDate,
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: vehicleData, isLoading: vehicleLoading } = useQuery<VehicleDistribution[]>({
+  const { data: vehicleData, isLoading: vehicleLoading, isError: vehicleError, refetch: refetchVehicles } = useQuery<VehicleDistribution[]>({
     queryKey: ['/api/admin/analytics/vehicles', { startDate, endDate }],
     enabled: !!startDate && !!endDate,
+    retry: 2,
+    retryDelay: 1000,
   });
+
+  const hasAnyError = revenueError || servicesError || driversError || peakHoursError || statusError || heatmapError || kpiError || vehicleError;
+
+  const refetchAll = () => {
+    refetchRevenue();
+    refetchServices();
+    refetchDrivers();
+    refetchPeakHours();
+    refetchStatus();
+    refetchHeatmap();
+    refetchKpis();
+    refetchVehicles();
+  };
+
+  const ErrorCard = ({ title, onRetry }: { title: string; onRetry: () => void }) => (
+    <div className="h-80 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+      <AlertCircle className="w-12 h-12 text-destructive" />
+      <p className="text-center">Error al cargar {title}</p>
+      <Button variant="outline" size="sm" onClick={onRetry} data-testid="button-retry">
+        <RefreshCcw className="w-4 h-4 mr-2" />
+        Reintentar
+      </Button>
+    </div>
+  );
 
   const exportToPDF = async () => {
     if (!startDate || !endDate) return;
@@ -271,16 +313,38 @@ export default function Analytics() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold">Analytics y Reportes</h1>
         <div className="flex gap-2">
-          <Button onClick={exportToPDF} disabled={isLoading} variant="outline" data-testid="button-export-pdf">
+          {hasAnyError && (
+            <Button onClick={refetchAll} variant="outline" data-testid="button-retry-all">
+              <RefreshCcw className="w-4 h-4 mr-2" />
+              Reintentar Todo
+            </Button>
+          )}
+          <Button onClick={exportToPDF} disabled={isLoading || hasAnyError} variant="outline" data-testid="button-export-pdf">
             <FileText className="w-4 h-4 mr-2" />
             PDF
           </Button>
-          <Button onClick={exportToCSV} disabled={isLoading} variant="outline" data-testid="button-export-csv">
+          <Button onClick={exportToCSV} disabled={isLoading || hasAnyError} variant="outline" data-testid="button-export-csv">
             <Download className="w-4 h-4 mr-2" />
             CSV
           </Button>
         </div>
       </div>
+
+      {hasAnyError && (
+        <Card className="border-destructive bg-destructive/10" data-testid="card-error-banner">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-destructive">Hubo un problema al cargar algunos datos</p>
+                <p className="text-sm text-muted-foreground">
+                  Algunos graficos pueden no mostrarse correctamente. Por favor, intenta recargar la pagina o usa el boton "Reintentar Todo".
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4">
         <Popover>
@@ -397,7 +461,9 @@ export default function Analytics() {
                 <CardTitle>Ingresos por Periodo</CardTitle>
               </CardHeader>
               <CardContent>
-                {revenueLoading ? (
+                {revenueError ? (
+                  <ErrorCard title="ingresos" onRetry={() => refetchRevenue()} />
+                ) : revenueLoading ? (
                   <div className="h-80 flex items-center justify-center">
                     <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                   </div>
@@ -433,7 +499,9 @@ export default function Analytics() {
                 <CardTitle>Servicios por Periodo</CardTitle>
               </CardHeader>
               <CardContent>
-                {servicesLoading ? (
+                {servicesError ? (
+                  <ErrorCard title="servicios" onRetry={() => refetchServices()} />
+                ) : servicesLoading ? (
                   <div className="h-80 flex items-center justify-center">
                     <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                   </div>
@@ -464,7 +532,9 @@ export default function Analytics() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {vehicleLoading ? (
+                {vehicleError ? (
+                  <ErrorCard title="distribucion de vehiculos" onRetry={() => refetchVehicles()} />
+                ) : vehicleLoading ? (
                   <div className="h-80 flex items-center justify-center">
                     <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                   </div>
@@ -513,7 +583,9 @@ export default function Analytics() {
                 <CardTitle>Horarios Pico</CardTitle>
               </CardHeader>
               <CardContent>
-                {peakHoursLoading ? (
+                {peakHoursError ? (
+                  <ErrorCard title="horarios pico" onRetry={() => refetchPeakHours()} />
+                ) : peakHoursLoading ? (
                   <div className="h-80 flex items-center justify-center">
                     <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                   </div>
@@ -546,7 +618,9 @@ export default function Analytics() {
                 <CardTitle>Estados de Servicios</CardTitle>
               </CardHeader>
               <CardContent>
-                {statusLoading ? (
+                {statusError ? (
+                  <ErrorCard title="estados de servicios" onRetry={() => refetchStatus()} />
+                ) : statusLoading ? (
                   <div className="h-80 flex items-center justify-center">
                     <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                   </div>
@@ -601,7 +675,9 @@ export default function Analytics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {heatmapLoading ? (
+              {heatmapError ? (
+                <ErrorCard title="mapa de calor" onRetry={() => refetchHeatmap()} />
+              ) : heatmapLoading ? (
                 <div className="h-80 flex items-center justify-center">
                   <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                 </div>
@@ -636,7 +712,9 @@ export default function Analytics() {
               <CardTitle>Ranking de Conductores</CardTitle>
             </CardHeader>
             <CardContent>
-              {driversLoading ? (
+              {driversError ? (
+                <ErrorCard title="ranking de conductores" onRetry={() => refetchDrivers()} />
+              ) : driversLoading ? (
                 <div className="h-64 flex items-center justify-center">
                   <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                 </div>

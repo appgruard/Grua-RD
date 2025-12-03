@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Navigation, Calendar, DollarSign, ClipboardList, Download } from 'lucide-react';
+import { MapPin, Navigation, Calendar, DollarSign, ClipboardList, Download, RefreshCcw, AlertCircle } from 'lucide-react';
 import type { ServicioWithDetails } from '@shared/schema';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -14,8 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function DriverHistory() {
   const { toast } = useToast();
-  const { data: services, isLoading } = useQuery<ServicioWithDetails[]>({
+  const { data: services, isLoading, isError, refetch } = useQuery<ServicioWithDetails[]>({
     queryKey: ['/api/services/my-services'],
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const handleDownloadReceipt = async (serviceId: string) => {
@@ -70,17 +72,44 @@ export default function DriverHistory() {
     );
   }
 
-  const statusColors = {
+  if (isError) {
+    return (
+      <div className="flex flex-col h-full w-full overflow-hidden">
+        <div className="px-3 sm:px-4 pt-3 sm:pt-4 pb-3 sm:pb-4 flex-shrink-0">
+          <h1 className="text-xl sm:text-2xl font-bold">Historial de Servicios</h1>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6">
+          <AlertCircle className="w-16 h-16 text-destructive" />
+          <div className="text-center space-y-2">
+            <h2 className="text-lg font-semibold">Error de conexion</h2>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              No se pudo cargar el historial de servicios. Por favor, verifica tu conexion e intenta nuevamente.
+            </p>
+          </div>
+          <Button onClick={() => refetch()} variant="outline" data-testid="button-retry-history">
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
     pendiente: 'secondary',
     aceptado: 'default',
+    conductor_en_sitio: 'default',
+    cargando: 'default',
     en_progreso: 'default',
     completado: 'default',
     cancelado: 'destructive',
-  } as const;
+  };
 
-  const statusLabels = {
+  const statusLabels: Record<string, string> = {
     pendiente: 'Pendiente',
     aceptado: 'Aceptado',
+    conductor_en_sitio: 'En Sitio',
+    cargando: 'Cargando',
     en_progreso: 'En Progreso',
     completado: 'Completado',
     cancelado: 'Cancelado',
