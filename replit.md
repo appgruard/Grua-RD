@@ -66,6 +66,16 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **API URL**: Use `VITE_API_URL` environment variable to configure production server URL for mobile builds
 - **Documentation**: See `DEPLOYMENT_CAPROVER.md` for full deployment guide and `CAPACITOR_BUILD_GUIDE.md` for mobile app builds
 
+## Pending Implementation Plans
+
+### New Service Categories (December 2025)
+- **Document:** `PLAN_NUEVAS_CATEGORIAS_SERVICIO.md`
+- **Status:** Pending implementation
+- **New categories:**
+  - `remolque_plataforma` (Flatbed) - For luxury, sports, and low vehicles
+  - `remolque_motocicletas` (Motorcycles) - For motorcycles, scooters, pasolas
+- **Estimated time:** 10-14 hours
+
 ## Recent Code Audits
 
 ### December 2025 - Navigation Buttons Improvement (Fase 5)
