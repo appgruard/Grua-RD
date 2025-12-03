@@ -33,7 +33,7 @@ export const estadoServicioEnum = pgEnum("estado_servicio", [
 export const metodoPagoEnum = pgEnum("metodo_pago", ["efectivo", "tarjeta", "aseguradora", "empresa"]);
 export const tipoVehiculoEnum = pgEnum("tipo_vehiculo", ["carro", "motor", "jeep", "camion"]);
 
-export const servicioCategoriaEnum = pgEnum("servicio_categoria", [
+export const VALID_SERVICE_CATEGORIES = [
   "remolque_estandar",
   "auxilio_vial",
   "remolque_especializado",
@@ -42,7 +42,9 @@ export const servicioCategoriaEnum = pgEnum("servicio_categoria", [
   "maquinarias",
   "izaje_construccion",
   "remolque_recreativo"
-]);
+] as const;
+
+export const servicioCategoriaEnum = pgEnum("servicio_categoria", [...VALID_SERVICE_CATEGORIES]);
 
 export const servicioSubtipoEnum = pgEnum("servicio_subtipo", [
   "cambio_goma",

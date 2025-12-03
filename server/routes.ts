@@ -13,7 +13,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema, insertCalificacionSchema, insertEmpresaSchema, insertEmpresaEmpleadoSchema, insertEmpresaContratoSchema, insertEmpresaTarifaSchema, insertEmpresaProyectoSchema, insertEmpresaConductorAsignadoSchema, insertServicioProgramadoSchema, insertEmpresaFacturaSchema, insertEmpresaFacturaItemSchema } from "@shared/schema";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema, insertCalificacionSchema, insertEmpresaSchema, insertEmpresaEmpleadoSchema, insertEmpresaContratoSchema, insertEmpresaTarifaSchema, insertEmpresaProyectoSchema, insertEmpresaConductorAsignadoSchema, insertServicioProgramadoSchema, insertEmpresaFacturaSchema, insertEmpresaFacturaItemSchema, VALID_SERVICE_CATEGORIES } from "@shared/schema";
 import type { User, Servicio, Empresa } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
@@ -2326,6 +2326,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!Array.isArray(categorias)) {
         return res.status(400).json({ message: "Categorias must be an array" });
+      }
+
+      if (categorias.length === 0) {
+        return res.status(400).json({ message: "Debes seleccionar al menos una categoría de servicio" });
+      }
+
+      const invalidCategories: string[] = [];
+      const missingCategories: number[] = [];
+      
+      for (let i = 0; i < categorias.length; i++) {
+        const cat = categorias[i];
+        if (!cat.categoria || typeof cat.categoria !== 'string' || cat.categoria.trim() === '') {
+          missingCategories.push(i + 1);
+        } else if (!VALID_SERVICE_CATEGORIES.includes(cat.categoria as typeof VALID_SERVICE_CATEGORIES[number])) {
+          invalidCategories.push(cat.categoria);
+        }
+      }
+
+      if (missingCategories.length > 0) {
+        return res.status(400).json({ 
+          message: `Elementos sin categoría válida en posiciones: ${missingCategories.join(', ')}`,
+          missingCategories 
+        });
+      }
+
+      if (invalidCategories.length > 0) {
+        return res.status(400).json({ 
+          message: `Categorías inválidas: ${invalidCategories.join(', ')}`,
+          invalidCategories 
+        });
       }
 
       await storage.setConductorServicios(conductor.id, categorias);

@@ -56,35 +56,79 @@ Este documento describe el plan por fases para resolver los problemas identifica
 
 ---
 
-## Fase 2: Validación de Selección de Categorías en Registro
+## Fase 2: Validación de Selección de Categorías en Registro ✅ COMPLETADA
 
-### Estado Actual
-El sistema ya tiene implementado:
+**Fecha de completación:** 3 de Diciembre de 2025
+
+### Estado Anterior
+El sistema tenía implementado:
 - Componente `ServiceCategoryMultiSelect` para selección de categorías
 - Paso en el wizard de onboarding para categorías (paso 6)
+- Función `validateStep6()` que verificaba al menos una categoría seleccionada
 
-**Archivos relevantes:**
-- `client/src/pages/auth/onboarding-wizard.tsx`
-- `client/src/components/ServiceCategoryMultiSelect.tsx`
+### Mejoras Implementadas
 
-### Mejoras Requeridas
+**2.1 Validación en Backend (Nuevo):**
 
-**2.1 Validación obligatoria de categorías:**
-- Asegurar que los operadores seleccionen al menos una categoría
-- Mostrar mensaje de error si intentan continuar sin seleccionar
-- Validar que las categorías seleccionadas sean válidas
+Se agregó validación robusta en el endpoint `PUT /api/drivers/me/servicios`:
 
-**2.2 Flujo de registro:**
+```typescript
+// Validar que hay al menos una categoría
+if (categorias.length === 0) {
+  return res.status(400).json({ 
+    message: "Debes seleccionar al menos una categoría de servicio" 
+  });
+}
+
+// Validar que las categorías sean válidas
+const invalidCategories: string[] = [];
+for (const cat of categorias) {
+  if (cat.categoria && !VALID_SERVICE_CATEGORIES.includes(cat.categoria)) {
+    invalidCategories.push(cat.categoria);
+  }
+}
+
+if (invalidCategories.length > 0) {
+  return res.status(400).json({ 
+    message: `Categorías inválidas: ${invalidCategories.join(', ')}`,
+    invalidCategories 
+  });
+}
 ```
-Paso 1: Cuenta (email, password, tipo usuario)
-Paso 2: Verificación de cédula (OCR)
-Paso 3: Verificación de teléfono (OTP)
-Paso 4: Documentos (licencia, seguro)
-Paso 5: Foto de perfil verificada
-Paso 6: Selección de categorías de servicio  <-- Validar aquí
-Paso 7: Datos de vehículos por categoría      <-- Agregar vehículos
-Paso 8: Confirmación final
+
+**2.2 Lista de Categorías Válidas Centralizada:**
+
+Se exportó `VALID_SERVICE_CATEGORIES` desde `shared/schema.ts` para mantener consistencia:
+
+```typescript
+export const VALID_SERVICE_CATEGORIES = [
+  "remolque_estandar",
+  "auxilio_vial",
+  "remolque_especializado",
+  "camiones_pesados",
+  "vehiculos_pesados",
+  "maquinarias",
+  "izaje_construccion",
+  "remolque_recreativo"
+] as const;
 ```
+
+**2.3 Validación Frontend (Ya existente, verificada):**
+
+- `validateStep6()` valida que haya al menos una categoría
+- `ServiceCategoryMultiSelect` solo permite seleccionar de categorías válidas
+- Botón "Continuar" deshabilitado cuando no hay categorías seleccionadas
+- Mensaje de error visual cuando `errors.services` está presente
+
+**Archivos modificados:**
+- `shared/schema.ts` - Exportación de VALID_SERVICE_CATEGORIES
+- `server/routes.ts` - Validación en endpoint PUT /api/drivers/me/servicios
+
+**Test IDs existentes verificados:**
+- `service-category-multi-select` - Contenedor del selector
+- `checkbox-category-{id}` - Checkbox de cada categoría
+- `button-save-services` - Botón para guardar servicios
+- `validation-message` - Mensaje de validación
 
 ---
 
@@ -267,28 +311,29 @@ Estados cargando/en_progreso:
 
 ---
 
-## Resumen de Archivos a Modificar
+## Resumen de Archivos Modificados
 
-| Archivo | Fase | Descripción |
-|---------|------|-------------|
-| `server/storage.ts` | 1 | Agregar manejo de errores en funciones de analytics |
-| `server/routes.ts` | 1, 3 | Mejorar endpoints de analytics, validar vehículos |
-| `client/src/pages/admin/analytics.tsx` | 1 | Mostrar errores amigables |
-| `client/src/pages/driver/history.tsx` | 1 | Manejo de errores de conexión |
-| `client/src/pages/auth/onboarding-wizard.tsx` | 2, 3 | Validar categorías y vehículos |
-| `client/src/components/VehicleCategoryForm.tsx` | 3 | Campos obligatorios |
-| `client/src/pages/driver/dashboard.tsx` | 4 | Mostrar info de servicio |
-| `client/src/pages/driver/profile.tsx` | 3 | Gestión de vehículos |
+| Archivo | Fase | Descripción | Estado |
+|---------|------|-------------|--------|
+| `server/storage.ts` | 1 | Agregar manejo de errores en funciones de analytics | ✅ |
+| `server/routes.ts` | 1, 2, 3 | Mejorar endpoints de analytics, validar categorías y vehículos | ✅ Fase 1, 2 |
+| `shared/schema.ts` | 2 | Exportar VALID_SERVICE_CATEGORIES | ✅ |
+| `client/src/pages/admin/analytics.tsx` | 1 | Mostrar errores amigables | ✅ |
+| `client/src/pages/driver/history.tsx` | 1 | Manejo de errores de conexión | ✅ |
+| `client/src/pages/auth/onboarding-wizard.tsx` | 2, 3 | Validar categorías y vehículos | ✅ Fase 2 |
+| `client/src/components/VehicleCategoryForm.tsx` | 3 | Campos obligatorios | Pendiente |
+| `client/src/pages/driver/dashboard.tsx` | 4, 5 | Mostrar info de servicio, botones navegación | ✅ |
+| `client/src/pages/driver/profile.tsx` | 3 | Gestión de vehículos | Pendiente |
 
 ---
 
 ## Orden de Implementación Recomendado
 
-1. **Fase 1** (Prioridad Alta): Corregir errores de conexión - Impide uso del sistema
-2. **Fase 4** (Prioridad Alta): Info de servicio en mapa - Necesario para operación
-3. **Fase 5** (Prioridad Media): Verificar Waze - Ya implementado, solo validar
-4. **Fase 2** (Prioridad Media): Validar categorías - Mejora de calidad
-5. **Fase 3** (Prioridad Media): Vehículos múltiples - Mejora de funcionalidad
+1. **Fase 1** (Prioridad Alta): Corregir errores de conexión ✅ COMPLETADA
+2. **Fase 4** (Prioridad Alta): Info de servicio en mapa ✅ COMPLETADA
+3. **Fase 5** (Prioridad Media): Verificar Waze ✅ COMPLETADA
+4. **Fase 2** (Prioridad Media): Validar categorías ✅ COMPLETADA
+5. **Fase 3** (Prioridad Media): Vehículos múltiples - Pendiente
 
 ---
 
@@ -296,7 +341,8 @@ Estados cargando/en_progreso:
 
 - [x] Analytics carga sin errores de conexión (Fase 1 ✅)
 - [x] Historial de operadores carga correctamente (Fase 1 ✅)
-- [ ] Operadores pueden seleccionar categorías al registrarse (Fase 2)
+- [x] Operadores pueden seleccionar categorías al registrarse (Fase 2 ✅)
+- [x] Validación de categorías en backend implementada (Fase 2 ✅)
 - [ ] Operadores pueden agregar múltiples vehículos por categoría (Fase 3)
 - [ ] Se muestran los 4 campos obligatorios: Modelo, Matrícula, Categoría, Color (Fase 3)
 - [x] En el mapa se muestra: Nombre cliente, tipo servicio, categoría vehículo (Fase 4 ✅)
