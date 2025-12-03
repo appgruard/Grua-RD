@@ -68,6 +68,19 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Code Audits
 
+### December 2025 - Error Handling Improvements (Fase 1)
+**Analytics Admin (`client/src/pages/admin/analytics.tsx`):**
+- Added retry logic (2 retries, 1s delay) to all useQuery hooks
+- Implemented ErrorCard component with retry buttons for individual charts
+- Added global error banner when connection issues occur
+- Added "Retry All" button to reload all failed queries
+- Export buttons disabled when errors are present
+
+**Driver History (`client/src/pages/driver/history.tsx`):**
+- Added retry logic (2 retries, 1s delay) to services query
+- Implemented full-screen error state with retry button
+- Added missing service states to statusColors/statusLabels maps (`conductor_en_sitio`, `cargando`)
+
 ### December 2025 - Admin Panel Improvements
 **Bug Fixes:**
 - `client/src/pages/admin/analytics.tsx` - Fixed blank screen by adding missing MapPin import
