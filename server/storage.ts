@@ -1688,8 +1688,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // dLocal Payment Methods - Using clientPaymentMethods table from shared schema
-  // Note: The conductorStripeAccounts and paymentMethods tables have been removed
-  // Driver bank accounts are now stored in the conductores table via dLocal fields
+  // Driver bank accounts are stored in the conductores table via dLocal fields
   // Client payment methods use the clientPaymentMethods table
 
   async deletePaymentMethodById(id: string): Promise<void> {

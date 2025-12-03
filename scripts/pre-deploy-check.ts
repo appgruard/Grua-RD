@@ -137,8 +137,8 @@ async function checkDatabaseConnection() {
       'users', 'conductores', 'servicios', 'tarifas', 
       'calificaciones', 'ubicaciones_tracking', 'mensajes_chat',
       'push_subscriptions', 'documentos', 'otp_tokens',
-      'verification_audit', 'conductor_stripe_accounts',
-      'payment_methods', 'service_receipts', 'comisiones'
+      'verification_codes', 'service_receipts', 'comisiones',
+      'client_payment_methods', 'operator_bank_accounts', 'operator_withdrawals'
     ];
     
     const missingTables = expectedTables.filter(t => !tableNames.includes(t));

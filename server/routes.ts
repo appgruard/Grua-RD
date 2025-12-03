@@ -6307,7 +6307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // DLOCAL PAYOUT ACCOUNT ENDPOINTS (Replacing Stripe Connect)
+  // DLOCAL PAYOUT ACCOUNT ENDPOINTS
   // ========================================
   // Note: Driver bank account registration and payout functionality has been moved to:
   // - POST /api/drivers/bank-account - Register bank account
