@@ -70,14 +70,14 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ### New Service Categories (December 2025) - IMPLEMENTED
 - **Document:** `PLAN_NUEVAS_CATEGORIAS_SERVICIO.md`
-- **Status:** ✅ Implemented (December 3, 2025)
-- **Migration file:** `migrations/0007_new_service_categories.sql`
+- **Status:** ✅ Fully implemented (December 3, 2025)
+- **Migration file:** `migrations/0007_new_service_categories.sql` (executed)
 - **New categories:**
   - `remolque_plataforma` (Flatbed) - For luxury, sports, and low vehicles (6 subtypes)
   - `remolque_motocicletas` (Motorcycles) - For motorcycles, scooters, pasolas (7 subtypes)
 - **Frontend components updated:** ServiceCategorySelector, ServiceCategoryMultiSelect, ServiceSubtypeSelector
 - **Pages updated:** driver/dashboard, empresa/solicitudes, empresa/historial
-- **Note:** Database migration required after provisioning PostgreSQL
+- **Database:** Enum values added to servicio_categoria and servicio_subtipo
 
 ## Recent Code Audits
 
