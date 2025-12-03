@@ -941,7 +941,8 @@ Notifica de un cambio en el estado del servicio.
 
 ### Método de Pago
 - `efectivo`: Pago en efectivo al completar
-- `tarjeta`: Pago con tarjeta vía Stripe (requiere configuración)
+- `tarjeta`: Pago con tarjeta vía dLocal (requiere configuración)
+- `aseguradora`: Pago cubierto por aseguradora
 
 ---
 
@@ -976,9 +977,10 @@ Configurar según el dominio de producción.
 ### Variables de Entorno Requeridas
 - `DATABASE_URL`: Connection string de PostgreSQL
 - `SESSION_SECRET`: Secret para sesiones de Express
-- `VITE_GOOGLE_MAPS_API_KEY`: API key de Google Maps
-- `STRIPE_SECRET_KEY`: (Opcional) Secret key de Stripe
-- `VITE_STRIPE_PUBLIC_KEY`: (Opcional) Public key de Stripe
+- `VITE_MAPBOX_ACCESS_TOKEN`: API key de Mapbox
+- `DLOCAL_X_LOGIN`: (Opcional) Login de dLocal
+- `DLOCAL_X_TRANS_KEY`: (Opcional) Trans key de dLocal
+- `DLOCAL_SECRET_KEY`: (Opcional) Secret key de dLocal
 
 ---
 

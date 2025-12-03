@@ -55,42 +55,50 @@ Las siguientes variables son configuradas automáticamente por Replit Database:
 
 ## Variables de Servicios Externos
 
-### 💳 Stripe (Pagos)
+### 💳 dLocal (Pagos)
 
-#### `STRIPE_SECRET_KEY`
+#### `DLOCAL_X_LOGIN`
 - **Tipo**: Secret (Confidencial)
-- **Ambiente**: Shared (con valores diferentes en dev/prod)
-- **Requerido**: ✅ Sí
-- **Descripción**: Clave secreta de Stripe para procesamiento de pagos
-- **Formato**: `sk_test_...` (testing) o `sk_live_...` (production)
-- **Obtención**: https://dashboard.stripe.com/apikeys
-- **Uso**: 
-  - `server/routes.ts` - Procesamiento de pagos
-  - `server/services/stripe-connect.ts` - Stripe Connect
-- **Seguridad**: ⚠️ NUNCA exponer en frontend
-
-#### `VITE_STRIPE_PUBLIC_KEY`
-- **Tipo**: Environment Variable (Público)
 - **Ambiente**: Shared
 - **Requerido**: ✅ Sí
-- **Descripción**: Clave pública de Stripe para Stripe Elements
-- **Formato**: `pk_test_...` (testing) o `pk_live_...` (production)
-- **Obtención**: https://dashboard.stripe.com/apikeys
-- **Uso**:
-  - `client/src/components/PaymentMethodsManager.tsx`
-  - `client/src/components/StripePayment.tsx`
-- **Nota**: Prefijo `VITE_` es necesario para acceso desde frontend
+- **Descripción**: X-Login para autenticación con API de dLocal
+- **Obtención**: https://dashboard.dlocal.com/
+- **Uso**: 
+  - `server/services/dlocal-payment.ts` - Procesamiento de pagos
+- **Seguridad**: ⚠️ NUNCA exponer en frontend
 
-#### `STRIPE_WEBHOOK_SECRET`
+#### `DLOCAL_X_TRANS_KEY`
 - **Tipo**: Secret (Confidencial)
-- **Ambiente**: Production (principalmente)
-- **Requerido**: ✅ Sí (en producción)
-- **Descripción**: Secret para verificar webhooks de Stripe
-- **Formato**: `whsec_...`
-- **Obtención**: https://dashboard.stripe.com/webhooks (después de crear endpoint)
-- **Uso**: `server/routes.ts` - Validación de webhooks
-- **Endpoint webhook**: `/api/stripe-webhook`
-- **Eventos suscritos**: `payment_intent.succeeded`, `account.updated`, `payout.paid`
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: X-Trans-Key para autenticación con API de dLocal
+- **Obtención**: https://dashboard.dlocal.com/
+- **Uso**: 
+  - `server/services/dlocal-payment.ts` - Autenticación de transacciones
+- **Seguridad**: ⚠️ NUNCA exponer en frontend
+
+#### `DLOCAL_SECRET_KEY`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: Clave secreta para firmar peticiones a dLocal
+- **Obtención**: https://dashboard.dlocal.com/
+- **Uso**: 
+  - `server/services/dlocal-payment.ts` - Firma de peticiones
+- **Seguridad**: ⚠️ NUNCA exponer en frontend
+
+#### `DLOCAL_API_KEY` (Opcional)
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ⚠️ Opcional
+- **Descripción**: API Key adicional para algunas operaciones de dLocal
+- **Obtención**: https://dashboard.dlocal.com/
+- **Uso**: 
+  - `server/services/dlocal-payment.ts` - Operaciones adicionales
+
+**Endpoints webhook dLocal:**
+- `/api/dlocal/webhook` - Notificaciones de pagos
+- `/api/dlocal/payout-webhook` - Notificaciones de pagos a operadores
 
 ---
 
@@ -223,7 +231,7 @@ Las siguientes variables son configuradas automáticamente por Replit Database:
 - **Ejemplo**: `https://gruard.com,https://www.gruard.com,https://gruard.replit.app`
 - **Uso**: 
   - `server/index.ts` - Configuración CORS
-  - `server/services/stripe-connect.ts` - Return URLs
+  - `server/services/dlocal-payment.ts` - Return URLs
 - **Default desarrollo**: `http://localhost:5000`
 
 #### `LOG_LEVEL`
@@ -272,9 +280,10 @@ SESSION_SECRET=dev-secret-change-in-production
 MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 
-# Stripe (usar claves de test)
-STRIPE_SECRET_KEY=sk_test_...
-VITE_STRIPE_PUBLIC_KEY=pk_test_...
+# dLocal (usar claves de sandbox)
+DLOCAL_X_LOGIN=sandbox_login
+DLOCAL_X_TRANS_KEY=sandbox_trans_key
+DLOCAL_SECRET_KEY=sandbox_secret
 
 # Web Push (generar con web-push)
 VITE_VAPID_PUBLIC_KEY=BC...
@@ -313,10 +322,10 @@ ALLOWED_ORIGINS=https://gruard.com,https://www.gruard.com
 MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 
-# Stripe (usar claves LIVE)
-STRIPE_SECRET_KEY=sk_live_...
-VITE_STRIPE_PUBLIC_KEY=pk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# dLocal (usar claves de producción)
+DLOCAL_X_LOGIN=production_login
+DLOCAL_X_TRANS_KEY=production_trans_key
+DLOCAL_SECRET_KEY=production_secret
 
 # Twilio (REQUERIDO en producción)
 TWILIO_ACCOUNT_SID=AC...
@@ -336,7 +345,7 @@ LOG_LEVEL=info
 - Session secret único y fuerte
 - CORS estrictamente configurado
 - Rate limiting activo
-- Stripe webhooks configurados
+- dLocal webhooks configurados
 - Twilio account con créditos
 
 ---
@@ -358,8 +367,8 @@ LOG_LEVEL=info
 
 - [ ] `SESSION_SECRET` generado con 32+ caracteres aleatorios
 - [ ] `DATABASE_URL` apunta a base de datos de producción
-- [ ] Stripe keys son claves LIVE (`sk_live_`, `pk_live_`)
-- [ ] `STRIPE_WEBHOOK_SECRET` configurado y endpoint verificado
+- [ ] dLocal keys son claves de producción
+- [ ] dLocal webhooks configurados y endpoints verificados
 - [ ] Twilio configurado con número verificado y créditos
 - [ ] `MAPBOX_ACCESS_TOKEN` y `VITE_MAPBOX_ACCESS_TOKEN` configurados
 - [ ] VAPID keys generadas y guardadas de forma segura
@@ -398,15 +407,15 @@ Respuesta esperada:
 - ❌ Usar valores por defecto en producción
 - ❌ Compartir secrets en canales inseguros
 - ❌ Usar claves de desarrollo en producción
-- ❌ Exponer VAPID private key o Stripe secret key
+- ❌ Exponer VAPID private key o dLocal secret keys
 
 **SIEMPRE:**
 - ✅ Usar Replit Secrets para datos confidenciales
 - ✅ Rotar secrets regularmente
 - ✅ Generar SESSION_SECRET único por ambiente
-- ✅ Configurar restricciones en Google Maps API
+- ✅ Configurar restricciones en Mapbox API
 - ✅ Usar HTTPS en producción
-- ✅ Verificar webhooks de Stripe con signature
+- ✅ Verificar webhooks de dLocal con signature
 
 ---
 
@@ -419,5 +428,5 @@ Si tienes dudas sobre la configuración de variables de entorno:
 
 ---
 
-**Última actualización**: Noviembre 29, 2025  
-**Versión**: 1.1.0 - Migración a Mapbox
+**Última actualización**: Diciembre 3, 2025  
+**Versión**: 1.2.0 - Migración de Stripe a dLocal
