@@ -97,7 +97,13 @@ export default function DriverProfile() {
 
   useEffect(() => {
     if (driverServices?.categorias && !editingServices) {
-      setSelectedServices(driverServices.categorias);
+      const mappedServices: ServiceSelection[] = driverServices.categorias.map((service: any) => ({
+        categoria: service.categoriaServicio || service.categoria,
+        subtipos: (service.subtipos || []).map((s: any) => 
+          typeof s === 'string' ? s : s.subtipoServicio
+        ),
+      }));
+      setSelectedServices(mappedServices);
     }
   }, [driverServices, editingServices]);
 
@@ -564,7 +570,17 @@ export default function DriverProfile() {
                     size="sm"
                     onClick={() => {
                       setEditingServices(false);
-                      setSelectedServices(driverServices?.categorias || []);
+                      if (driverServices?.categorias) {
+                        const mappedServices: ServiceSelection[] = driverServices.categorias.map((service: any) => ({
+                          categoria: service.categoriaServicio || service.categoria,
+                          subtipos: (service.subtipos || []).map((s: any) => 
+                            typeof s === 'string' ? s : s.subtipoServicio
+                          ),
+                        }));
+                        setSelectedServices(mappedServices);
+                      } else {
+                        setSelectedServices([]);
+                      }
                     }}
                     disabled={saveServicesMutation.isPending}
                     data-testid="button-cancel-services"
@@ -603,18 +619,22 @@ export default function DriverProfile() {
               </div>
             ) : driverServices?.categorias && driverServices.categorias.length > 0 ? (
               <div className="space-y-3">
-                {driverServices.categorias.map((service) => {
-                  const categoryInfo = SERVICE_CATEGORIES.find(c => c.id === service.categoria);
+                {driverServices.categorias.map((service: any) => {
+                  const categoriaId = service.categoriaServicio || service.categoria;
+                  const categoryInfo = SERVICE_CATEGORIES.find(c => c.id === categoriaId);
+                  const subtiposArray = (service.subtipos || []).map((s: any) => 
+                    typeof s === 'string' ? s : s.subtipoServicio
+                  );
                   return (
-                    <div key={service.categoria} className="p-3 border rounded-lg">
+                    <div key={categoriaId} className="p-3 border rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="default" data-testid={`badge-service-${service.categoria}`}>
-                          {categoryInfo?.label || service.categoria}
+                        <Badge variant="default" data-testid={`badge-service-${categoriaId}`}>
+                          {categoryInfo?.label || categoriaId}
                         </Badge>
                       </div>
-                      {service.subtipos.length > 0 && (
+                      {subtiposArray.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
-                          {service.subtipos.map((subtipo) => (
+                          {subtiposArray.map((subtipo: string) => (
                             <Badge key={subtipo} variant="secondary" className="text-xs" data-testid={`badge-subtipo-${subtipo}`}>
                               {categoryInfo?.subtipos.find(s => s.id === subtipo)?.label || subtipo}
                             </Badge>
@@ -716,7 +736,7 @@ export default function DriverProfile() {
             ) : editingVehicles ? (
               <div className="max-h-[450px] overflow-y-auto pr-1">
                 <VehicleCategoryForm
-                  selectedCategories={driverServices.categorias.map(s => s.categoria)}
+                  selectedCategories={driverServices.categorias.map((s: any) => s.categoriaServicio || s.categoria)}
                   vehicles={vehicleData}
                   onChange={setVehicleData}
                   disabled={saveVehiclesMutation.isPending}
