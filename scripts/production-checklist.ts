@@ -84,11 +84,10 @@ async function checkEnvironment() {
     }
   }
   
-  // Payment Variables
+  // Payment Variables (dLocal)
   const paymentVars = [
-    { name: 'STRIPE_SECRET_KEY', description: 'Stripe secret key' },
-    { name: 'VITE_STRIPE_PUBLIC_KEY', description: 'Stripe public key' },
-    { name: 'STRIPE_WEBHOOK_SECRET', description: 'Stripe webhook secret' },
+    { name: 'DLOCAL_API_KEY', description: 'dLocal API key' },
+    { name: 'DLOCAL_SECRET_KEY', description: 'dLocal secret key' },
   ];
   
   for (const v of paymentVars) {
@@ -102,16 +101,12 @@ async function checkEnvironment() {
         required: false
       });
     } else {
-      const isLive = value.startsWith('sk_live_') || value.startsWith('pk_live_') || value.startsWith('whsec_');
-      const isTest = value.startsWith('sk_test_') || value.startsWith('pk_test_');
-      const mode = isLive ? 'LIVE' : isTest ? 'TEST' : 'CONFIGURED';
       addCheck({
         category: 'Payments',
         name: v.name,
         status: 'pass',
-        message: `${mode} mode configured`,
-        required: false,
-        details: { mode }
+        message: 'Configured',
+        required: false
       });
     }
   }

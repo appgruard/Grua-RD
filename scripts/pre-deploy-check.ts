@@ -27,8 +27,6 @@ async function checkEnvironmentVariables() {
     'DATABASE_URL',
     'SESSION_SECRET',
     'VITE_GOOGLE_MAPS_API_KEY',
-    'STRIPE_SECRET_KEY',
-    'VITE_STRIPE_PUBLIC_KEY',
     'VITE_VAPID_PUBLIC_KEY',
     'VAPID_PRIVATE_KEY'
   ];
@@ -37,7 +35,8 @@ async function checkEnvironmentVariables() {
     'TWILIO_ACCOUNT_SID',
     'TWILIO_AUTH_TOKEN',
     'TWILIO_PHONE_NUMBER',
-    'STRIPE_WEBHOOK_SECRET',
+    'DLOCAL_API_KEY',
+    'DLOCAL_SECRET_KEY',
     'ALLOWED_ORIGINS'
   ];
 
@@ -172,51 +171,26 @@ async function checkDatabaseConnection() {
   }
 }
 
-async function checkStripeConfiguration() {
-  console.log('\n💳 Checking Stripe Configuration...\n');
+async function checkDLocalConfiguration() {
+  console.log('\n💳 Checking dLocal Configuration...\n');
   
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  const publicKey = process.env.VITE_STRIPE_PUBLIC_KEY;
+  const apiKey = process.env.DLOCAL_API_KEY;
+  const secretKey = process.env.DLOCAL_SECRET_KEY;
   
-  if (!secretKey || !publicKey) {
+  if (!apiKey || !secretKey) {
     addResult({
-      name: 'Stripe Keys',
-      status: 'fail',
-      message: 'Missing Stripe keys'
+      name: 'dLocal Keys',
+      status: 'warn',
+      message: 'dLocal keys not configured (optional for payment processing)'
     });
     return;
   }
   
-  const isTestMode = secretKey.startsWith('sk_test_');
-  const isLiveMode = secretKey.startsWith('sk_live_');
-  
-  if (process.env.NODE_ENV === 'production' && isTestMode) {
-    addResult({
-      name: 'Stripe Mode',
-      status: 'fail',
-      message: 'Using TEST keys in PRODUCTION!'
-    });
-  } else if (isLiveMode) {
-    addResult({
-      name: 'Stripe Mode',
-      status: 'pass',
-      message: 'LIVE mode'
-    });
-  } else if (isTestMode) {
-    addResult({
-      name: 'Stripe Mode',
-      status: 'pass',
-      message: 'TEST mode (OK for development)'
-    });
-  }
-  
-  if (publicKey.startsWith('pk_test_') !== secretKey.startsWith('sk_test_')) {
-    addResult({
-      name: 'Stripe Key Mismatch',
-      status: 'fail',
-      message: 'Public and secret keys do not match (test vs live)'
-    });
-  }
+  addResult({
+    name: 'dLocal Configuration',
+    status: 'pass',
+    message: 'dLocal keys configured'
+  });
 }
 
 async function checkGoogleMapsAPI() {
@@ -369,7 +343,7 @@ async function main() {
   
   await checkEnvironmentVariables();
   await checkDatabaseConnection();
-  await checkStripeConfiguration();
+  await checkDLocalConfiguration();
   await checkGoogleMapsAPI();
   await checkWebPushConfiguration();
   await checkSecuritySettings();

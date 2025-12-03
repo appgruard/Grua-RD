@@ -26,8 +26,6 @@ echo "Required Variables:"
 check_var "DATABASE_URL" true
 check_var "SESSION_SECRET" true
 check_var "VITE_GOOGLE_MAPS_API_KEY" true
-check_var "STRIPE_SECRET_KEY" true
-check_var "VITE_STRIPE_PUBLIC_KEY" true
 check_var "VITE_VAPID_PUBLIC_KEY" true
 check_var "VAPID_PRIVATE_KEY" true
 
@@ -36,7 +34,8 @@ echo "Optional Variables:"
 check_var "TWILIO_ACCOUNT_SID" false
 check_var "TWILIO_AUTH_TOKEN" false
 check_var "TWILIO_PHONE_NUMBER" false
-check_var "STRIPE_WEBHOOK_SECRET" false
+check_var "DLOCAL_API_KEY" false
+check_var "DLOCAL_SECRET_KEY" false
 check_var "ALLOWED_ORIGINS" false
 check_var "NODE_ENV" false
 check_var "PORT" false
