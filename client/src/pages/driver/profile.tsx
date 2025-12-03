@@ -349,45 +349,6 @@ export default function DriverProfile() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const stripeOnboardingMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/drivers/stripe-onboarding', {});
-      return response.json() as Promise<{ accountId: string; onboardingUrl: string }>;
-    },
-    onSuccess: (data) => {
-      window.location.href = data.onboardingUrl;
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error al configurar cuenta de pagos',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const stripeSuccess = urlParams.get('stripe_success');
-    const stripeRefresh = urlParams.get('stripe_refresh');
-
-    if (stripeSuccess === 'true') {
-      toast({
-        title: 'Cuenta configurada',
-        description: 'Tu cuenta de pagos se ha configurado correctamente',
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers/stripe-account-status'] });
-      window.history.replaceState({}, '', '/driver/profile');
-    } else if (stripeRefresh === 'true') {
-      toast({
-        title: 'Configuración pendiente',
-        description: 'Debes completar la configuración de tu cuenta de pagos',
-        variant: 'destructive',
-      });
-      window.history.replaceState({}, '', '/driver/profile');
-    }
-  }, [toast]);
-
   if (!user) return null;
 
   const handleLogout = async () => {

@@ -30,7 +30,7 @@ export interface ReceiptData {
     porcentajeEmpresa: string;
   };
   metodoPago: "efectivo" | "tarjeta";
-  stripePaymentId?: string;
+  transactionId?: string;
 }
 
 export class PDFService {
@@ -317,12 +317,12 @@ export class PDFService {
         currentY
       );
 
-    if (data.metodoPago === "tarjeta" && data.stripePaymentId) {
+    if (data.metodoPago === "tarjeta" && data.transactionId) {
       doc
         .fontSize(9)
         .fillColor(this.SECONDARY_COLOR)
         .font("Helvetica")
-        .text(`ID Transacción: ${data.stripePaymentId}`, 60, currentY + 20);
+        .text(`ID Transacción: ${data.transactionId}`, 60, currentY + 20);
     }
   }
 

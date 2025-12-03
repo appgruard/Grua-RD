@@ -22,7 +22,7 @@ app.use(
           "'unsafe-eval'", 
           "https://maps.googleapis.com",
           "https://maps.gstatic.com",
-          "https://js.stripe.com"
+          "https://api.mapbox.com"
         ],
         styleSrc: [
           "'self'", 
@@ -46,16 +46,14 @@ app.use(
         connectSrc: [
           "'self'", 
           "https://maps.googleapis.com",
-          "https://api.stripe.com",
-          "https://m.stripe.network",
-          "https://hooks.stripe.com",
+          "https://api.mapbox.com",
+          "https://events.mapbox.com",
+          "https://api.dlocal.com",
           "wss:", 
           "ws:"
         ],
         frameSrc: [
-          "'self'", 
-          "https://js.stripe.com",
-          "https://hooks.stripe.com"
+          "'self'"
         ],
         frameAncestors: ["'self'"],
         workerSrc: ["'self'", "blob:"],
