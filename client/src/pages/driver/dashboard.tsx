@@ -23,6 +23,34 @@ import type { Coordinates } from '@/lib/maps';
 import { getNavigationUrl } from '@/lib/maps';
 import { cn } from '@/lib/utils';
 
+const serviceCategoryLabels: Record<string, string> = {
+  remolque_estandar: "Remolque Estándar",
+  auxilio_vial: "Auxilio Vial",
+  remolque_especializado: "Remolque Especializado",
+  camiones_pesados: "Camiones Pesados",
+  vehiculos_pesados: "Vehículos Pesados",
+  maquinarias: "Maquinarias",
+  izaje_construccion: "Izaje y Construcción",
+  remolque_recreativo: "Remolque Recreativo"
+};
+
+const vehicleTypeLabels: Record<string, string> = {
+  carro: "Carro",
+  motor: "Motocicleta",
+  jeep: "Jeep/SUV",
+  camion: "Camión"
+};
+
+const getServiceCategoryLabel = (category: string | null | undefined): string => {
+  if (!category) return "No especificado";
+  return serviceCategoryLabels[category] || category;
+};
+
+const getVehicleTypeLabel = (type: string | null | undefined): string => {
+  if (!type) return "No especificado";
+  return vehicleTypeLabels[type] || type;
+};
+
 export default function DriverDashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
