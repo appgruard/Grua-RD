@@ -35,6 +35,8 @@ export const tipoVehiculoEnum = pgEnum("tipo_vehiculo", ["carro", "motor", "jeep
 
 export const VALID_SERVICE_CATEGORIES = [
   "remolque_estandar",
+  "remolque_motocicletas",
+  "remolque_plataforma",
   "auxilio_vial",
   "remolque_especializado",
   "camiones_pesados",
@@ -47,6 +49,7 @@ export const VALID_SERVICE_CATEGORIES = [
 export const servicioCategoriaEnum = pgEnum("servicio_categoria", [...VALID_SERVICE_CATEGORIES]);
 
 export const servicioSubtipoEnum = pgEnum("servicio_subtipo", [
+  // Auxilio Vial
   "cambio_goma",
   "inflado_neumatico",
   "paso_corriente",
@@ -55,11 +58,27 @@ export const servicioSubtipoEnum = pgEnum("servicio_subtipo", [
   "envio_bateria",
   "diagnostico_obd",
   "extraccion_vehiculo",
+  // Remolque Especializado
   "vehiculo_sin_llanta",
   "vehiculo_sin_direccion",
   "vehiculo_chocado",
-  "vehiculo_lujo",
   "vehiculo_electrico",
+  // Remolque Plataforma / Flatbed
+  "vehiculo_lujo",
+  "vehiculo_deportivo",
+  "vehiculo_bajo",
+  "vehiculo_modificado",
+  "traslado_especial",
+  "servicio_premium",
+  // Remolque Motocicletas
+  "moto_accidentada",
+  "moto_no_prende",
+  "scooter_pasola",
+  "delivery_accidentado",
+  "moto_alto_cilindraje",
+  "traslado_local_moto",
+  "reubicacion_moto",
+  // Vehículos Pesados
   "camion_liviano",
   "camion_mediano",
   "camiones_cisternas",
@@ -68,15 +87,18 @@ export const servicioSubtipoEnum = pgEnum("servicio_subtipo", [
   "volteo",
   "transporte_maquinarias",
   "montacargas",
+  // Maquinarias
   "retroexcavadora",
   "rodillo",
   "greda",
   "excavadora",
   "pala_mecanica",
   "tractor",
+  // Izaje y Construcción
   "izaje_materiales",
   "subida_muebles",
   "transporte_equipos",
+  // Remolque Recreativo
   "remolque_botes",
   "remolque_jetski",
   "remolque_cuatrimoto"
