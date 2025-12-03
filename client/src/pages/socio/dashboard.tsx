@@ -14,7 +14,8 @@ import {
   Percent,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  LogOut
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -68,11 +69,16 @@ interface DashboardData {
 }
 
 export default function SocioDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['/api/socio/dashboard'],
   });
+
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/login';
+  };
 
   const handleDownloadPDF = async (periodo: string) => {
     try {
@@ -173,9 +179,20 @@ export default function SocioDashboard() {
             Bienvenido, {socio.user.nombre}
           </p>
         </div>
-        <Badge variant={socio.activo ? 'default' : 'secondary'} className="w-fit" data-testid="badge-status">
-          {socio.activo ? 'Socio Activo' : 'Socio Inactivo'}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant={socio.activo ? 'default' : 'secondary'} className="w-fit" data-testid="badge-status">
+            {socio.activo ? 'Socio Activo' : 'Socio Inactivo'}
+          </Badge>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleLogout}
+            data-testid="button-logout"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Cerrar Sesión
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
