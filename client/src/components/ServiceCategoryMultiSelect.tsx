@@ -79,6 +79,48 @@ function BoatTrailerIcon({ className }: { className?: string }) {
   );
 }
 
+function FlatbedIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M3 17h18" />
+      <path d="M3 17V9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8" />
+      <path d="M5 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" />
+      <circle cx="6" cy="17" r="2" />
+      <circle cx="18" cy="17" r="2" />
+      <path d="M8 17h8" />
+    </svg>
+  );
+}
+
+function MotorcycleIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="5" cy="17" r="3" />
+      <circle cx="19" cy="17" r="3" />
+      <path d="M5 17h3l3-7h4l2.5 7H19" />
+      <path d="M11 10l1 4" />
+      <path d="M13 7h2l2 3" />
+      <circle cx="14" cy="6" r="1" />
+    </svg>
+  );
+}
+
 export interface ServiceSelection {
   categoria: string;
   subtipos: string[];
@@ -99,6 +141,20 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     description: 'Servicio de grúa estándar',
     Icon: TowTruckIcon,
     subtipos: []
+  },
+  { 
+    id: 'remolque_motocicletas', 
+    label: 'Remolque de Motocicletas', 
+    description: 'Motos, scooters y pasolas',
+    Icon: MotorcycleIcon,
+    subtipos: subtypesByCategory['remolque_motocicletas'] || []
+  },
+  { 
+    id: 'remolque_plataforma', 
+    label: 'Plataforma / Flatbed', 
+    description: 'Vehículos de lujo y bajos',
+    Icon: FlatbedIcon,
+    subtipos: subtypesByCategory['remolque_plataforma'] || []
   },
   { 
     id: 'auxilio_vial', 
