@@ -1,6 +1,3 @@
-// Allow self-signed certificates for external database connections
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
 import { Pool as NeonPool, neonConfig } from '@neondatabase/serverless';
 import { drizzle as drizzleNeon } from 'drizzle-orm/neon-serverless';
 import { Pool as PgPool } from 'pg';
@@ -25,17 +22,11 @@ const fullSchema = { ...schema, ...schemaExtensions };
 // Neon pooler URLs have @xxxx-pooler.us-east-1 patterns
 const isNeonServerless = process.env.DATABASE_URL.includes('@db.') && process.env.DATABASE_URL.includes('neon.tech');
 
-// SSL configuration for self-signed certificates
-const sslConfig = { rejectUnauthorized: false };
-
 // For direct PostgreSQL connections, use pg driver
 // For Neon serverless, use the serverless driver with WebSocket
 export const pool = isNeonServerless
-  ? new NeonPool({ connectionString: process.env.DATABASE_URL, ssl: sslConfig })
-  : new PgPool({ 
-      connectionString: process.env.DATABASE_URL,
-      ssl: sslConfig
-    });
+  ? new NeonPool({ connectionString: process.env.DATABASE_URL })
+  : new PgPool({ connectionString: process.env.DATABASE_URL });
 
 export const db = isNeonServerless
   ? drizzleNeon({ client: pool as NeonPool, schema: fullSchema })
