@@ -469,6 +469,21 @@ export default function DriverDashboard() {
                 </div>
               )}
 
+              <div className="grid grid-cols-2 gap-3" data-testid="service-details-info">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Tipo de Servicio</p>
+                  <p className="text-sm font-semibold" data-testid="text-service-category">
+                    {getServiceCategoryLabel(activeService.servicioCategoria)}
+                  </p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-1">Vehículo Cliente</p>
+                  <p className="text-sm font-semibold" data-testid="text-vehicle-type">
+                    {getVehicleTypeLabel(activeService.tipoVehiculo)}
+                  </p>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
@@ -629,6 +644,15 @@ export default function DriverDashboard() {
                       <p className="text-sm font-medium truncate">{request.origenDireccion}</p>
                       <p className="text-sm text-muted-foreground truncate">{request.destinoDireccion}</p>
                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2" data-testid={`request-details-${request.id}`}>
+                    <Badge variant="secondary" className="text-xs" data-testid={`badge-service-category-${request.id}`}>
+                      {getServiceCategoryLabel(request.servicioCategoria)}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid={`badge-vehicle-type-${request.id}`}>
+                      {getVehicleTypeLabel(request.tipoVehiculo)}
+                    </Badge>
                   </div>
 
                   <div className="flex items-center justify-between py-2 border-t border-border">

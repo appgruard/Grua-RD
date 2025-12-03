@@ -135,46 +135,22 @@ interface VehicleData {
 
 ---
 
-## Fase 4: Información del Servicio en Pantalla de Operadores
+## Fase 4: Información del Servicio en Pantalla de Operadores ✅ COMPLETADA
 
-### Estado Actual
+**Fecha de completación:** 3 de Diciembre de 2025
+
+### Estado Anterior
 En `client/src/pages/driver/dashboard.tsx`:
-- Ya se muestra el mapa con la ubicación del operador
-- Ya se muestra información básica del servicio activo
-- Ya se muestra el nombre del cliente
+- Ya se mostraba el mapa con la ubicación del operador
+- Ya se mostraba información básica del servicio activo
+- Ya se mostraba el nombre del cliente
 
-### Mejoras Requeridas
+### Mejoras Implementadas
 
-**4.1 Información a mostrar cuando llega una solicitud:**
-```
-┌─────────────────────────────────────┐
-│ Nombre del cliente: Juan Pérez      │
-│ Tipo de servicio: Remolque Estándar │
-│ Categoría vehículo: Carro           │
-│ Distancia: 5.2 km                   │
-│ Costo estimado: RD$ 1,500           │
-└─────────────────────────────────────┘
-```
+**4.1 Labels amigables agregados:**
 
-**4.2 Campos a agregar en la UI:**
+Se agregaron objetos de mapeo para mostrar nombres legibles de categorías de servicio y tipos de vehículo:
 
-```typescript
-// En el card de servicio activo
-interface ServiceInfoDisplay {
-  clienteNombre: string;          // Ya existe
-  clienteApellido: string;        // Ya existe
-  tipoServicio: string;           // servicioCategoria del servicio
-  tipoVehiculoCliente: string;    // tipoVehiculo del servicio
-  distancia: number;              // Ya existe
-  costoTotal: number;             // Ya existe
-}
-```
-
-**Archivos a modificar:**
-- `client/src/pages/driver/dashboard.tsx` - Agregar campos en UI
-- Mostrar `servicioCategoria` y `tipoVehiculo` del servicio
-
-**4.3 Labels amigables para categorías:**
 ```typescript
 const serviceCategoryLabels = {
   remolque_estandar: "Remolque Estándar",
@@ -194,6 +170,43 @@ const vehicleTypeLabels = {
   camion: "Camión"
 };
 ```
+
+**4.2 UI del servicio activo mejorada:**
+
+Se agregó una nueva sección en el card del servicio activo que muestra:
+- Tipo de Servicio (usando `servicioCategoria`)
+- Vehículo del Cliente (usando `tipoVehiculo`)
+
+Información mostrada:
+```
+┌─────────────────────────────────────┐
+│ Cliente: [Nombre Apellido]          │
+├───────────────┬─────────────────────┤
+│ Tipo Servicio │ Vehículo Cliente    │
+│ Remolque Est. │ Carro               │
+├───────────────┴─────────────────────┤
+│ Origen → Destino                    │
+├─────────────────────────────────────┤
+│ Distancia: 5.2 km | Ganancia: $1500 │
+└─────────────────────────────────────┘
+```
+
+**4.3 UI de solicitudes cercanas mejorada:**
+
+Se agregaron badges informativos en cada tarjeta de solicitud:
+- Badge de categoría de servicio (variant="secondary")
+- Badge de tipo de vehículo (variant="outline")
+
+**Archivo modificado:**
+- `client/src/pages/driver/dashboard.tsx`
+
+**Test IDs agregados:**
+- `service-details-info` - Contenedor de detalles del servicio
+- `text-service-category` - Texto de categoría de servicio
+- `text-vehicle-type` - Texto de tipo de vehículo
+- `request-details-{id}` - Detalles de cada solicitud
+- `badge-service-category-{id}` - Badge de categoría por solicitud
+- `badge-vehicle-type-{id}` - Badge de tipo de vehículo por solicitud
 
 ---
 
@@ -261,13 +274,13 @@ export function getNavigationUrl(lat, lng): string | null {
 
 ## Criterios de Éxito
 
-- [ ] Analytics carga sin errores de conexión
-- [ ] Historial de operadores carga correctamente
-- [ ] Operadores pueden seleccionar categorías al registrarse
-- [ ] Operadores pueden agregar múltiples vehículos por categoría
-- [ ] Se muestran los 4 campos obligatorios: Modelo, Matrícula, Categoría, Color
-- [ ] En el mapa se muestra: Nombre cliente, tipo servicio, categoría vehículo
-- [ ] Botón de Waze abre navegación hacia el cliente
+- [x] Analytics carga sin errores de conexión (Fase 1 ✅)
+- [x] Historial de operadores carga correctamente (Fase 1 ✅)
+- [ ] Operadores pueden seleccionar categorías al registrarse (Fase 2)
+- [ ] Operadores pueden agregar múltiples vehículos por categoría (Fase 3)
+- [ ] Se muestran los 4 campos obligatorios: Modelo, Matrícula, Categoría, Color (Fase 3)
+- [x] En el mapa se muestra: Nombre cliente, tipo servicio, categoría vehículo (Fase 4 ✅)
+- [ ] Botón de Waze abre navegación hacia el cliente (Fase 5 - pendiente verificación)
 
 ---
 
