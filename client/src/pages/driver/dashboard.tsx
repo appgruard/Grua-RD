@@ -25,6 +25,8 @@ import { cn } from '@/lib/utils';
 
 const serviceCategoryLabels: Record<string, string> = {
   remolque_estandar: "Remolque Estándar",
+  remolque_motocicletas: "Remolque de Motocicletas",
+  remolque_plataforma: "Plataforma / Flatbed",
   auxilio_vial: "Auxilio Vial",
   remolque_especializado: "Remolque Especializado",
   camiones_pesados: "Camiones Pesados",

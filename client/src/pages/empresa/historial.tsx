@@ -36,6 +36,8 @@ interface ServicioHistory {
 const servicioCategories = [
   { value: 'all', label: 'Todos los tipos' },
   { value: 'remolque_estandar', label: 'Remolque Estándar' },
+  { value: 'remolque_motocicletas', label: 'Remolque de Motocicletas' },
+  { value: 'remolque_plataforma', label: 'Plataforma / Flatbed' },
   { value: 'auxilio_vial', label: 'Auxilio Vial' },
   { value: 'remolque_especializado', label: 'Remolque Especializado' },
   { value: 'vehiculos_pesados', label: 'Vehículos Pesados' },
