@@ -2093,6 +2093,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return categoria === 'auxilio_vial' && subtipo && ONSITE_SUBTYPES.includes(subtipo);
       };
 
+      const isExtractionService = (categoria: string) => {
+        return categoria === 'extraccion';
+      };
+
       const validationSchema = insertServicioSchema.extend({
         clienteId: z.string().optional(),
       }).refine((data) => {
@@ -2104,7 +2108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Nombre de aseguradora y número de póliza son requeridos cuando el método de pago es aseguradora",
       }).refine((data) => {
         const isOnsite = isOnsiteService(data.servicioCategoria || '', data.servicioSubtipo || undefined);
-        if (isOnsite) {
+        const isExtraction = isExtractionService(data.servicioCategoria || '');
+        if (isOnsite || isExtraction) {
           return true;
         }
         const originLat = parseFloat(data.origenLat as string);

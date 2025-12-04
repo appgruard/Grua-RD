@@ -126,7 +126,7 @@ export default function ClientHome() {
       queryClient.invalidateQueries({ queryKey: ['/api/services/my-services'] });
       toast({
         title: 'Solicitud enviada',
-        description: 'Esperando que un conductor acepte',
+        description: 'Esperando que un operador acepte',
       });
       setLocation(`/client/tracking/${service.id}`);
     },
@@ -596,7 +596,7 @@ export default function ClientHome() {
       <div 
         className={cn(
           "bg-background border-t border-border transition-all duration-300 flex flex-col",
-          showExpandedCard ? "h-[55vh] md:h-[50vh]" : "h-14"
+          showExpandedCard ? "min-h-[45vh] max-h-[70vh] h-auto" : "h-14"
         )}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
@@ -699,7 +699,7 @@ export default function ClientHome() {
                   <Alert className="bg-amber-500/10 border-amber-500/30">
                     <AlertTriangle className="h-4 w-4 text-amber-500" />
                     <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
-                      Este servicio requiere evaluacion. Un conductor revisara tu caso y propondra un precio antes de aceptar.
+                      Este servicio requiere evaluacion. Un operador revisara tu caso y propondra un precio antes de aceptar.
                     </AlertDescription>
                   </Alert>
 
@@ -723,7 +723,7 @@ export default function ClientHome() {
                   <Alert className="bg-blue-500/10 border-blue-500/30">
                     <Info className="h-4 w-4 text-blue-500" />
                     <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
-                      Podras enviar fotos y videos despues de crear la solicitud para que el conductor evalue mejor.
+                      Podras enviar fotos y videos despues de crear la solicitud para que el operador evalue mejor.
                     </AlertDescription>
                   </Alert>
                 </div>
@@ -771,7 +771,7 @@ export default function ClientHome() {
                     <Alert className="bg-amber-500/10 border-amber-500/30">
                       <AlertTriangle className="h-4 w-4 text-amber-500" />
                       <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
-                        Solo necesitamos la ubicacion del vehiculo. El precio se negociara con el conductor.
+                        Solo necesitamos la ubicacion del vehiculo. El precio se negociara con el operador.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -962,7 +962,7 @@ export default function ClientHome() {
 
           {step === 'confirm' && (
             <div className="flex flex-col h-full">
-              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
+              <div className="flex items-center gap-2 px-3 sm:px-4 pb-2 flex-shrink-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -972,47 +972,47 @@ export default function ClientHome() {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <div>
-                  <h3 className="text-lg font-bold">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-bold truncate">
                     {isExtractionService() ? 'Confirmar Evaluacion' : 'Confirmar Solicitud'}
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">
                     {isExtractionService() ? 'Revisa los detalles antes de enviar' : 'Revisa los detalles de tu servicio'}
                   </p>
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 min-h-0 px-4">
-                <div className="space-y-3 pb-2">
+              <ScrollArea className="flex-1 min-h-0 px-3 sm:px-4">
+                <div className="space-y-2 sm:space-y-3 pb-2">
                   {isExtractionService() && (
-                    <Alert className="bg-amber-500/10 border-amber-500/30">
+                    <Alert className="bg-amber-500/10 border-amber-500/30 py-2">
                       <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
-                        El conductor evaluara la situacion y te propondra un precio. Podras aceptar o rechazar su oferta.
+                      <AlertDescription className="text-amber-600 dark:text-amber-400 text-xs sm:text-sm">
+                        El operador evaluara la situacion y te propondra un precio. Podras aceptar o rechazar su oferta.
                       </AlertDescription>
                     </Alert>
                   )}
 
-                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 bg-muted rounded-lg">
                     {servicioCategoria === 'auxilio_vial' ? (
-                      <Wrench className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <Wrench className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
                     ) : servicioCategoria === 'extraccion' ? (
-                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                     ) : servicioCategoria === 'vehiculos_pesados' || servicioCategoria === 'maquinarias' ? (
-                      <Truck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
                     ) : (
-                      <Car className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <Car className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground">Servicio</p>
-                      <p className="font-semibold">{getCategoryLabel(servicioCategoria)}</p>
+                      <p className="text-sm sm:text-base font-semibold truncate">{getCategoryLabel(servicioCategoria)}</p>
                       {servicioSubtipo && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate">
                           {getSubtypeLabel(servicioCategoria, servicioSubtipo)}
                         </p>
                       )}
                       {tipoVehiculo && (
-                        <p className="text-sm text-muted-foreground capitalize">
+                        <p className="text-xs sm:text-sm text-muted-foreground capitalize truncate">
                           Vehiculo: {tipoVehiculo}
                         </p>
                       )}
@@ -1020,52 +1020,52 @@ export default function ClientHome() {
                   </div>
 
                   {isExtractionService() && descripcionSituacion && (
-                    <div className="p-3 bg-muted rounded-lg">
+                    <div className="p-2 sm:p-3 bg-muted rounded-lg">
                       <p className="text-xs text-muted-foreground mb-1">Descripcion de la situacion</p>
-                      <p className="text-sm">{descripcionSituacion}</p>
+                      <p className="text-xs sm:text-sm line-clamp-3">{descripcionSituacion}</p>
                     </div>
                   )}
 
-                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 bg-muted rounded-lg">
                     {(requiresTransport() && !isExtractionService()) ? (
                       <>
                         <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                          <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                          <div className="w-0.5 h-8 bg-border" />
-                          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                          <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green-500" />
+                          <div className="w-0.5 h-6 sm:h-8 bg-border" />
+                          <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500" />
                         </div>
-                        <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
                           <div>
                             <p className="text-xs text-muted-foreground">Origen</p>
-                            <p className="text-sm font-medium truncate">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
+                            <p className="text-xs sm:text-sm font-medium line-clamp-2 break-words">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Destino</p>
-                            <p className="text-sm font-medium truncate">{destinoDireccion || `${destination?.lat.toFixed(4)}, ${destination?.lng.toFixed(4)}`}</p>
+                            <p className="text-xs sm:text-sm font-medium line-clamp-2 break-words">{destinoDireccion || `${destination?.lat.toFixed(4)}, ${destination?.lng.toFixed(4)}`}</p>
                           </div>
                         </div>
                       </>
                     ) : (
                       <>
-                        <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0 mt-1" />
+                        <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green-500 flex-shrink-0 mt-1" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-muted-foreground">Ubicacion del vehiculo</p>
-                          <p className="text-sm font-medium truncate">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
+                          <p className="text-xs sm:text-sm font-medium line-clamp-2 break-words">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
                         </div>
                       </>
                     )}
                   </div>
 
                   {!isExtractionService() && (
-                    <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                      <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 bg-muted rounded-lg">
+                      <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground">Metodo de Pago</p>
-                        <p className="font-semibold capitalize">{metodoPago}</p>
+                        <p className="text-sm sm:text-base font-semibold capitalize">{metodoPago}</p>
                         {metodoPago === 'aseguradora' && (
-                          <div className="mt-1 text-sm text-muted-foreground">
-                            <p>{aseguradoraNombre}</p>
-                            <p>Poliza: {aseguradoraPoliza}</p>
+                          <div className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                            <p className="truncate">{aseguradoraNombre}</p>
+                            <p className="truncate">Poliza: {aseguradoraPoliza}</p>
                           </div>
                         )}
                       </div>
@@ -1073,31 +1073,31 @@ export default function ClientHome() {
                   )}
 
                   {isExtractionService() ? (
-                    <div className="text-center p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                    <div className="text-center p-3 sm:p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
                       <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Precio</p>
-                      <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                      <p className="text-lg sm:text-xl font-bold text-amber-600 dark:text-amber-400">
                         Por definir
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        El conductor propondra un monto tras evaluar
+                        El operador propondra un monto tras evaluar
                       </p>
                     </div>
                   ) : (
-                    <div className={requiresTransport() ? "grid grid-cols-2 gap-3" : ""}>
+                    <div className={requiresTransport() ? "grid grid-cols-2 gap-2 sm:gap-3" : ""}>
                       {requiresTransport() && (
-                        <div className="text-center p-3 bg-muted rounded-lg">
+                        <div className="text-center p-2 sm:p-3 bg-muted rounded-lg">
                           <p className="text-xs text-muted-foreground mb-1">Distancia</p>
-                          <p className="text-xl font-bold" data-testid="text-distance">
+                          <p className="text-lg sm:text-xl font-bold" data-testid="text-distance">
                             {distance?.toFixed(1)} km
                           </p>
                         </div>
                       )}
-                      <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
+                      <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg border border-primary/20">
                         <p className="text-xs text-muted-foreground mb-1">Costo Total</p>
                         {calculatePricingMutation.isPending ? (
-                          <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
+                          <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 mx-auto animate-spin text-primary" />
                         ) : (
-                          <p className="text-xl font-bold text-primary" data-testid="text-cost">
+                          <p className="text-lg sm:text-xl font-bold text-primary" data-testid="text-cost">
                             RD$ {cost?.toFixed(2)}
                           </p>
                         )}
@@ -1107,26 +1107,26 @@ export default function ClientHome() {
                 </div>
               </ScrollArea>
 
-              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+              <div className="px-3 sm:px-4 pt-2 sm:pt-3 pb-2 flex-shrink-0 bg-background">
                 <Button
                   onClick={handleConfirmRequest}
                   disabled={!origin || createServiceMutation.isPending}
-                  className="w-full h-14 text-base font-semibold"
+                  className="w-full h-12 sm:h-14 text-sm sm:text-base font-semibold"
                   data-testid="button-confirm"
                 >
                   {createServiceMutation.isPending ? (
                     <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      {isExtractionService() ? 'Enviando solicitud...' : 'Enviando solicitud...'}
+                      <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
+                      Enviando solicitud...
                     </>
                   ) : isExtractionService() ? (
                     <>
-                      <AlertTriangle className="w-5 h-5 mr-2" />
+                      <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                       Solicitar Evaluacion
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="w-5 h-5 mr-2" />
+                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                       Confirmar Solicitud
                     </>
                   )}

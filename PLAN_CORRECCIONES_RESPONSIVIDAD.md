@@ -2,8 +2,8 @@
 
 ## Resumen de Problemas Identificados
 
-1. **Pantalla "Confirmar Solicitud" (después de método de pago)** - Responsividad móvil
-2. **Error al solicitar servicio de extracción** - Error funcional
+1. **Pantalla "Confirmar Solicitud" (después de método de pago)** - Responsividad móvil ✅ COMPLETADO
+2. **Error al solicitar servicio de extracción** - Error funcional ✅ COMPLETADO
 3. **Pantalla "Confirmar Evaluación"** - Responsividad móvil  
 4. **Pantalla inicio de operadores** - Responsividad tarjetas de estado
 5. **Estados en app cliente** - Mensajes cuando el operador marca estados
@@ -11,50 +11,45 @@
 
 ---
 
-## Tarea 1: Corregir Responsividad en "Confirmar Solicitud"
+## Tarea 1: Corregir Responsividad en "Confirmar Solicitud" ✅ COMPLETADO
 
-**Archivo:** `client/src/pages/client/home.tsx` (líneas 963-1136)
+**Archivo:** `client/src/pages/client/home.tsx`
 
-**Problemas identificados:**
-- La tarjeta de confirmación con altura `h-[55vh]` puede cortar contenido en móviles pequeños
-- Los elementos de información (servicio, ubicación, pago, precio) usan padding/margin fijos que pueden ser muy grandes para móviles
-- El grid de distancia/costo (`grid grid-cols-2`) no se adapta a pantallas muy pequeñas
-- Los textos largos (direcciones) pueden desbordarse
-
-**Solución propuesta:**
-1. Cambiar altura del panel de `h-[55vh]` a `min-h-[50vh] max-h-[70vh]` para flexibilidad
-2. Reducir padding en móviles: `p-3 sm:p-4` en las tarjetas de información
-3. Cambiar grid a `grid grid-cols-1 sm:grid-cols-2` para apilar en móviles pequeños
-4. Añadir `break-words` y `text-sm` en direcciones largas
-5. Reducir tamaño de iconos en móviles: `w-4 h-4 sm:w-5 sm:h-5`
+**Cambios realizados:**
+1. Cambiado altura del panel de `h-[55vh] md:h-[50vh]` a `min-h-[45vh] max-h-[70vh] h-auto` para flexibilidad
+2. Reducido padding en móviles: `px-3 sm:px-4` en lugar de `px-4`
+3. Reducido espaciado: `space-y-2 sm:space-y-3` en lugar de `space-y-3`
+4. Cambiado texto a `text-xs sm:text-sm` y `text-sm sm:text-base` para mejor legibilidad
+5. Reducido tamaño de iconos en móviles: `w-4 h-4 sm:w-5 sm:h-5`
+6. Añadido `line-clamp-2 break-words` en direcciones largas en lugar de `truncate`
+7. Reducido altura de botón principal: `h-12 sm:h-14`
+8. Añadido `truncate` en títulos del header para evitar overflow
+9. También se cambió "conductor" a "operador" en mensajes de extracción
 
 ---
 
-## Tarea 2: Diagnosticar y Corregir Error de Servicio de Extracción
+## Tarea 2: Diagnosticar y Corregir Error de Servicio de Extracción ✅ COMPLETADO
 
-**Archivos involucrados:**
-- `client/src/pages/client/home.tsx` (función `handleConfirmRequest`, líneas 409-501)
-- `server/routes.ts` (endpoint `/api/services/request`, línea 2076+)
+**Archivo:** `server/routes.ts` (líneas 2095-2131)
 
-**Análisis necesario:**
-1. Revisar validación de campos requeridos para extracción
-2. Verificar que `descripcionSituacion` se esté enviando correctamente
-3. Revisar el endpoint del servidor para validación de servicios de extracción
-4. Verificar que `requiereNegociacion` y `estadoNegociacion` se están configurando correctamente
+**Problema identificado:**
+La validación del servidor solo exceptuaba servicios "onsite" de la validación de destino diferente al origen. Los servicios de extracción también usan el mismo origen y destino, pero no estaban siendo exceptuados.
 
-**Posibles causas del error:**
-- Campo `descripcionSituacion` no se está incluyendo en el payload
-- Validación del servidor puede estar rechazando campos opcionales
-- El campo `destinoDireccion` puede estar vacío cuando debería tomar el valor de `origenDireccion`
+**Solución aplicada:**
+1. Añadida función `isExtractionService()` en el servidor
+2. Modificada la validación para exceptuar tanto servicios onsite como servicios de extracción:
+   ```javascript
+   const isExtraction = isExtractionService(data.servicioCategoria || '');
+   if (isOnsite || isExtraction) {
+     return true;
+   }
+   ```
 
-**Solución propuesta:**
-1. Añadir logs para debug en el frontend
-2. Verificar la validación del endpoint en servidor
-3. Asegurar que todos los campos requeridos para extracción se envían correctamente
+**Resultado:** Los servicios de extracción ahora se pueden crear correctamente sin el error "Servicios de transporte requieren un destino diferente al origen".
 
 ---
 
-## Tarea 3: Corregir Responsividad en "Confirmar Evaluación"
+## Tarea 3: Corregir Responsividad en "Confirmar Evaluación" (PENDIENTE)
 
 **Archivo:** `client/src/pages/driver/extraction-evaluation.tsx` (337 líneas)
 
@@ -73,7 +68,7 @@
 
 ---
 
-## Tarea 4: Corregir Responsividad en Dashboard de Operadores
+## Tarea 4: Corregir Responsividad en Dashboard de Operadores (PENDIENTE)
 
 **Archivo:** `client/src/pages/driver/dashboard.tsx` (883 líneas)
 
@@ -92,7 +87,7 @@
 
 ---
 
-## Tarea 5: Corregir Mensajes de Estado en App Cliente
+## Tarea 5: Corregir Mensajes de Estado en App Cliente (PENDIENTE)
 
 **Archivo:** `client/src/pages/client/tracking.tsx`
 
@@ -109,38 +104,35 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
 
 ---
 
-## Tarea 6: Cambiar Terminología "Conductor" → "Operador"
+## Tarea 6: Cambiar Terminología "Conductor" → "Operador" (PARCIALMENTE COMPLETADO)
 
-**Archivos a modificar:**
+### Archivos modificados:
 
-### Archivos del Cliente (mayor prioridad):
+1. **`client/src/pages/client/home.tsx`** ✅ COMPLETADO
+   - Línea 132: `'Esperando que un operador acepte'`
+   - Línea 705: `'Un operador revisará tu caso'`
+   - Línea 729: `'para que el operador evalúe'`
+   - Línea 777: `'se negociará con el operador'`
+   - Línea 994: `'El operador evaluará'`
+   - Línea 1085: `'El operador propondrá'`
 
-1. **`client/src/pages/client/tracking.tsx`**
+### Archivos pendientes:
+
+2. **`client/src/pages/client/tracking.tsx`**
    - statusLabels: "Buscando conductor", "Conductor en camino", "Conductor en el punto"
    - Título del Drawer de chat
    - Fallback del nombre del conductor
    - Marker title
 
-2. **`client/src/pages/client/history.tsx`**
+3. **`client/src/pages/client/history.tsx`**
    - Línea 89: `'Conductor en sitio'`
    - Línea 163-167: Referencias a conductor
-
-3. **`client/src/pages/client/home.tsx`**
-   - Línea 129: `'Esperando que un conductor acepte'`
-   - Línea 702: `'Un conductor revisará tu caso'`
-   - Línea 726: `'para que el conductor evalúe'`
-   - Línea 774: `'se negociará con el conductor'`
-   - Línea 991: `'El conductor evaluará'`
-   - Línea 1082: `'El conductor propondrá'`
 
 4. **`client/src/pages/empresa/solicitudes.tsx`**
    - Línea 547: `'Conductor en camino'`
 
 5. **`client/src/components/chat/NegotiationChatBox.tsx`**
    - Referencias al conductor en mensajes
-
-6. **`client/src/pages/auth/onboarding-wizard.tsx`**
-   - Línea 701: `<SelectItem value="conductor">Operador</SelectItem>` (ya está correcto)
 
 ### Notas importantes:
 - NO cambiar valores internos como `userType: 'conductor'` o rutas `/driver`
@@ -149,36 +141,40 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
 
 ---
 
-## Orden de Ejecución Recomendado
-
-1. **Tarea 2** (Error de extracción) - Crítico para funcionalidad
-2. **Tarea 1** (Confirmar solicitud) - Alta visibilidad para clientes
-3. **Tarea 5** (Mensajes de estado) - Corrección de terminología prioritaria
-4. **Tarea 6** (Terminología general) - Consistencia de marca
-5. **Tarea 3** (Confirmar evaluación) - Afecta a operadores
-6. **Tarea 4** (Dashboard operadores) - Afecta a operadores
-
----
-
 ## Archivos Afectados (Resumen)
 
-| Archivo | Tareas |
-|---------|--------|
-| `client/src/pages/client/home.tsx` | 1, 2, 6 |
-| `client/src/pages/client/tracking.tsx` | 5, 6 |
-| `client/src/pages/client/history.tsx` | 6 |
-| `client/src/pages/driver/dashboard.tsx` | 4 |
-| `client/src/pages/driver/extraction-evaluation.tsx` | 3 |
-| `client/src/pages/empresa/solicitudes.tsx` | 6 |
-| `server/routes.ts` | 2 |
+| Archivo | Tareas | Estado |
+|---------|--------|--------|
+| `client/src/pages/client/home.tsx` | 1, 6 | ✅ Completado |
+| `server/routes.ts` | 2 | ✅ Completado |
+| `client/src/pages/client/tracking.tsx` | 5, 6 | Pendiente |
+| `client/src/pages/client/history.tsx` | 6 | Pendiente |
+| `client/src/pages/driver/dashboard.tsx` | 4 | Pendiente |
+| `client/src/pages/driver/extraction-evaluation.tsx` | 3 | Pendiente |
+| `client/src/pages/empresa/solicitudes.tsx` | 6 | Pendiente |
 
 ---
 
 ## Criterios de Éxito
 
-- [ ] Pantalla de confirmar solicitud se ve correctamente en iPhone SE (375px)
-- [ ] Servicio de extracción se crea correctamente sin errores
+- [x] Pantalla de confirmar solicitud se ve correctamente en iPhone SE (375px)
+- [x] Servicio de extracción se crea correctamente sin errores
 - [ ] Pantalla de confirmar evaluación es usable en móviles
 - [ ] Tarjetas de estado en dashboard de operadores no se cortan
 - [ ] Todos los textos visibles dicen "Operador" en lugar de "Conductor"
 - [ ] Estados en tracking del cliente muestran "Operador"
+
+---
+
+## Historial de Cambios
+
+### 2025-12-04
+- **Tarea 1 completada:** Mejorada responsividad de pantalla "Confirmar Solicitud"
+  - Ajustada altura del panel para mejor flexibilidad
+  - Reducido padding/espaciado para móviles pequeños
+  - Mejorado truncamiento de textos largos
+  - Reducido tamaño de iconos y botones
+- **Tarea 2 completada:** Corregido error de servicios de extracción
+  - Añadida función `isExtractionService()` en servidor
+  - Modificada validación para exceptuar servicios de extracción
+- **Tarea 6 parcial:** Cambiada terminología a "Operador" en home.tsx
