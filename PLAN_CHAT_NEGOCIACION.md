@@ -345,23 +345,112 @@ GET /api/drivers/available-requests ✅
 
 ---
 
-## Fase 7: Testing y QA
+## Fase 7: Testing y QA ✅ COMPLETADA (4 Dic 2025)
 
-### 7.1 Tests Unitarios
-- Detector de montos
-- Priorización de servicios
-- Validación de estados de negociación
+### 7.1 Tests Unitarios ✅
+**Archivos creados:**
 
-### 7.2 Tests de Integración
-- Flujo completo de negociación
-- WebSocket de negociación
-- Subida de archivos
+**`test/chat-amount-detector.test.ts`** ✅
+- ✅ Detección de formato RD$ (con/sin espacio, con decimales)
+- ✅ Detección de formato $ simple
+- ✅ Detección de "X pesos" 
+- ✅ Detección de lenguaje natural ("el costo es", "serían", "te cobro", etc.)
+- ✅ Validación de límites (mínimo 500, máximo 500,000)
+- ✅ Función `isAmountMessage()` 
+- ✅ Función `extractAllAmounts()` con ordenamiento
+- ✅ Función `formatAmount()` con formato dominicano
+- ✅ Función `isValidNegotiationAmount()`
+- ✅ Casos edge (vacío, sin montos, múltiples montos)
 
-### 7.3 Tests E2E
-- Cliente solicita extracción
-- Operador evalúa y propone monto
-- Cliente acepta/rechaza
-- Servicio continúa o cancela
+**`test/service-priority.test.ts`** ✅
+- ✅ Priorización por categoría (extracción = alta, especializado = media)
+- ✅ Priorización por subtipo (accidente, volcado = alta)
+- ✅ Priorización por tiempo de espera (30+ min = alta, 15-30 = media)
+- ✅ Bonus de prioridad para servicios con negociación
+- ✅ Ordenamiento por score descendente
+- ✅ Generación de display IDs (EXT-001, REM-002, etc.)
+- ✅ Funciones `getPriorityColor()` y `getPriorityLabel()`
+- ✅ Funciones `filterByPriority()` y `getServicesSummary()`
+
+**`test/negotiation-states.test.ts`** ✅
+- ✅ Validación de 7 estados de negociación
+- ✅ Validación de 8 tipos de mensaje de chat
+- ✅ Validación de 5 subtipos de extracción
+- ✅ Máquina de estados: transiciones válidas e inválidas
+- ✅ Permisos por actor (conductor vs cliente)
+- ✅ Cálculo de siguiente estado
+- ✅ Detección de requerimiento de negociación
+- ✅ Estados terminales (aceptado, rechazado, cancelado)
+- ✅ Disponibilidad de acciones por estado
+- ✅ Flujos completos (happy path, rechazo, actualizaciones)
+
+### 7.2 Tests de Integración ✅
+**Archivo:** `test/negotiation-flow.test.ts`
+
+**Escenarios implementados:**
+- ✅ Escenario 1: Flujo completo de servicio de extracción
+  - Cliente crea solicitud → Aparece en lista → Operador acepta
+  - Evaluación → Propuesta → Confirmación → Aceptación
+- ✅ Escenario 2: Flujo de rechazo
+  - Propuesta → Confirmación → Rechazo → Servicio disponible nuevamente
+- ✅ Escenario 3: Upload de media en chat
+  - Subida de fotos y videos como evidencia
+- ✅ Escenario 4: Actualización de monto antes de confirmar
+  - Múltiples actualizaciones permitidas antes de confirmar
+- ✅ Escenario 5: Notificaciones WebSocket
+  - amount_proposed, amount_confirmed, amount_accepted, amount_rejected
+- ✅ Escenario 6: Push notifications
+  - Notificaciones para cada cambio de estado
+- ✅ Escenario 7: Validación de montos
+  - Mínimo, máximo, no numéricos
+- ✅ Escenario 8: Transiciones de estado de servicio
+- ✅ Escenario 9: Todos los subtipos de extracción
+- ✅ Escenario 10: Todos los tipos de mensaje de chat
+
+### 7.3 Tests E2E ✅
+**Archivo:** `e2e/07-negotiation-extraction.spec.ts`
+
+**Tests implementados:**
+- ✅ Client Extraction Request
+  - Categoría de extracción visible
+  - Subtipos de extracción disponibles
+  - Campo de descripción obligatorio
+  - Indicador de negociación
+- ✅ Driver Available Requests
+  - Lista de servicios disponibles
+  - Badge de negociación para extracciones
+  - Navegación a página de evaluación
+- ✅ Extraction Evaluation Page
+  - Detalles del servicio
+  - Descripción de la situación
+  - Input de monto con validación
+  - Validación de mínimo/máximo
+- ✅ Negotiation Chat
+  - Interfaz de chat visible
+  - Campo de mensaje
+  - Botones de upload de media
+  - Badge de estado de negociación
+- ✅ Amount Proposal Card
+  - Card de propuesta para operador
+  - Campo de notas de evaluación
+  - Botón de confirmar
+- ✅ Client Response Card
+  - Card de respuesta para cliente
+  - Monto propuesto visible
+  - Botones aceptar/rechazar
+- ✅ Tracking Page with Negotiation
+  - Badge de estado visible
+  - Card de servicio de extracción
+  - Botón para abrir chat
+- ✅ Service Priority Display
+  - Badge de prioridad
+  - ID de servicio con formato correcto
+- ✅ Rejection Confirmation
+  - Diálogo de confirmación
+  - Opción de cancelar rechazo
+- ✅ Accessibility
+  - Labels accesibles en formularios
+  - Navegación por teclado
 
 ---
 
@@ -421,6 +510,11 @@ client/src/components/chat/AmountResponseCard.tsx
 client/src/components/chat/EvidenceUploader.tsx
 client/src/pages/driver/extraction-evaluation.tsx
 migrations/XXXX_chat_negociacion.sql
+test/chat-amount-detector.test.ts
+test/service-priority.test.ts
+test/negotiation-states.test.ts
+test/negotiation-flow.test.ts
+e2e/07-negotiation-extraction.spec.ts
 ```
 
 ### Archivos a Modificar
@@ -450,4 +544,4 @@ client/src/App.tsx (nueva ruta)
 ---
 
 *Documento creado: Diciembre 2025*
-*Última actualización: 4 Diciembre 2025 - Fases 5 y 6 completadas*
+*Última actualización: 4 Diciembre 2025 - Fase 7 (Testing y QA) completada - PLAN FINALIZADO*

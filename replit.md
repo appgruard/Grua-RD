@@ -58,3 +58,13 @@ The system leverages PostgreSQL with Drizzle ORM. WebSocket communication uses s
 - **Resend**: Email service for transactional emails and notifications (via Replit Connector).
 - **Verifik**: OCR scanning and Dominican government database verification for cédula validation.
 - **Capacitor**: For native mobile app functionalities and plugins (e.g., Camera, Filesystem, Geolocation, Push Notifications, Network, App).
+- **Jest**: Unit and integration testing framework with ts-jest for TypeScript support.
+- **Playwright**: E2E testing for browser-based testing.
+
+## Testing Infrastructure
+The project includes a comprehensive testing setup:
+- **Unit Tests** (`test/`): Jest-based tests for services like chat-amount-detector and service-priority
+- **Integration Tests** (`test/`): Scenario-based tests for negotiation flows
+- **E2E Tests** (`e2e/`): Playwright tests for full user journey testing
+- **Configuration**: `jest.config.cjs` for Jest, `playwright.config.ts` for Playwright
+- **Run tests**: `npx jest --config=jest.config.cjs` for unit/integration, `npx playwright test` for E2E
