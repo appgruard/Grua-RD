@@ -164,82 +164,79 @@ GET /api/drivers/available-requests ✅
 
 ---
 
-## Fase 3: Frontend - Componentes de Chat
+## Fase 3: Frontend - Componentes de Chat ✅ COMPLETADA (4 Dic 2025)
 
-### 3.1 Chat Normal (Existente - Mejorar)
+### 3.1 Chat Normal (Existente - Mejorado) ✅
 **Archivo:** `client/src/components/chat/ChatBox.tsx`
 
-**Mejoras:**
-- Mantener funcionalidad actual
-- Añadir indicador de "escribiendo..."
-- Mejorar visualización de mensajes leídos/no leídos
-- Añadir soporte para mensajes de sistema
+**Mejoras implementadas:**
+- ✅ Mantiene funcionalidad actual de chat básico
+- ✅ Indicador de "escribiendo..." con animación de puntos
+- ✅ Visualización de mensajes leídos/no leídos con íconos Check/CheckCheck
+- ✅ Badge contador de mensajes no leídos
+- ✅ Soporte para mensajes de sistema (centrados con estilo distintivo)
+- ✅ Soporte para mensajes de tipo monto (propuesto, confirmado, aceptado, rechazado)
+- ✅ Soporte para mensajes con archivos adjuntos (imagen/video)
+- ✅ Indicador de conexión WebSocket (punto verde/rojo)
+- ✅ Componente MessageBubble modular para diferentes tipos de mensaje
 
-### 3.2 Chat de Negociación
+### 3.2 Chat de Negociación ✅
 **Archivo:** `client/src/components/chat/NegotiationChatBox.tsx`
 
-**Funcionalidades:**
-- Heredar base del ChatBox normal
-- Añadir botón para subir fotos/videos
-- Vista previa de archivos adjuntos
-- Detección de monto en tiempo de escritura (para el chofer)
-- Modal de confirmación cuando se detecta monto
-- Mensajes especiales para montos (con diseño destacado)
-- Botones de aceptar/rechazar para el cliente
-- Indicador de estado de negociación
+**Funcionalidades implementadas:**
+- ✅ Integración con componentes ChatBox mejorado
+- ✅ Sistema de tabs (Chat / Cotización) para organizar la interfaz
+- ✅ Botones para subir fotos/videos integrados en el footer
+- ✅ Vista previa de archivos adjuntos en mensajes
+- ✅ Mensajes especiales para montos con diseño destacado y colores semánticos
+- ✅ Integración con AmountProposalCard (para conductor)
+- ✅ Integración con AmountResponseCard (para cliente)
+- ✅ Badge de estado de negociación en header
+- ✅ Mensajes rápidos específicos para negociación
+- ✅ Indicador de escritura en tiempo real
+- ✅ Manejo de eventos WebSocket para actualizaciones en tiempo real
 
-### 3.3 Componente de Propuesta de Monto (Chofer)
+### 3.3 Componente de Propuesta de Monto (Chofer) ✅
 **Archivo:** `client/src/components/chat/AmountProposalCard.tsx`
 
-**Diseño:**
-```
-┌─────────────────────────────────────┐
-│  💰 Propuesta de Monto              │
-│                                     │
-│  Basado en la evaluación:           │
-│  • Complejidad: Alta                │
-│  • Situación: Vehículo en zanja     │
-│                                     │
-│  ┌─────────────────────────────┐    │
-│  │  RD$ 5,500.00               │    │
-│  └─────────────────────────────┘    │
-│                                     │
-│  [ Editar ] [ Confirmar y Enviar ]  │
-└─────────────────────────────────────┘
-```
+**Funcionalidades implementadas:**
+- ✅ Input de monto con formato RD$ y validación (min 500, max 500,000)
+- ✅ Campo de notas de evaluación
+- ✅ Visualización de descripción del cliente
+- ✅ Badge de tipo de extracción
+- ✅ Estados: pendiente_evaluacion, propuesto, confirmado, aceptado, rechazado
+- ✅ Botón "Editar" para modificar propuesta antes de confirmar
+- ✅ Botón "Enviar Propuesta" / "Confirmar Cotización"
+- ✅ Estados visuales para aceptado (verde) y rechazado (rojo)
+- ✅ Integración con API de negociación
 
-### 3.4 Componente de Respuesta de Monto (Cliente)
+### 3.4 Componente de Respuesta de Monto (Cliente) ✅
 **Archivo:** `client/src/components/chat/AmountResponseCard.tsx`
 
-**Diseño:**
-```
-┌─────────────────────────────────────┐
-│  📋 Cotización del Servicio         │
-│                                     │
-│  El operador ha evaluado tu         │
-│  situación y propone:               │
-│                                     │
-│  ┌─────────────────────────────┐    │
-│  │  RD$ 5,500.00               │    │
-│  └─────────────────────────────┘    │
-│                                     │
-│  Notas: Vehículo en zanja profunda, │
-│  requiere equipo especial.          │
-│                                     │
-│  [ Rechazar ] [ Aceptar Monto ]     │
-└─────────────────────────────────────┘
-```
+**Funcionalidades implementadas:**
+- ✅ Vista de monto propuesto con diseño destacado
+- ✅ Notas del operador visibles
+- ✅ Estados: pendiente_evaluacion, propuesto, confirmado, aceptado, rechazado
+- ✅ Botones "Aceptar" / "Rechazar" (solo en estado confirmado)
+- ✅ Dialog de confirmación antes de rechazar
+- ✅ Estados visuales según el progreso de negociación
+- ✅ Mensaje de advertencia sobre implicaciones de aceptar
+- ✅ Integración con API de negociación
 
-### 3.5 Componente de Upload de Evidencia
+### 3.5 Componente de Upload de Evidencia ✅
 **Archivo:** `client/src/components/chat/EvidenceUploader.tsx`
 
-**Funcionalidades:**
-- Captura de foto desde cámara
-- Selección de galería
-- Captura de video corto
-- Vista previa antes de enviar
-- Barra de progreso de subida
-- Compresión automática de imágenes
+**Funcionalidades implementadas:**
+- ✅ Captura de foto desde cámara (input capture="environment")
+- ✅ Selección de galería
+- ✅ Captura de video
+- ✅ Vista previa antes de enviar (imagen y video)
+- ✅ Barra de progreso de subida
+- ✅ Validación de tipos de archivo (JPEG, PNG, GIF, WebP, MP4, MOV, WebM)
+- ✅ Límite de tamaño 10MB con mensaje de error
+- ✅ Modo compacto para integrar en el footer del chat
+- ✅ Modo completo para sección dedicada
+- ✅ Botón para eliminar selección antes de enviar
 
 ---
 

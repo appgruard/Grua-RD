@@ -8,38 +8,46 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Send, Image as ImageIcon, Video, DollarSign, CheckCircle, XCircle, Info, Check, CheckCheck } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Send, MessageSquare, DollarSign, Camera, Image as ImageIcon, Video, CheckCircle, XCircle, Info, Check, CheckCheck } from 'lucide-react';
 import { format } from 'date-fns';
-import type { MensajeChat, User } from '@shared/schema';
+import type { MensajeChat, User, Servicio } from '@shared/schema';
+import { EvidenceUploader } from './EvidenceUploader';
+import { AmountProposalCard } from './AmountProposalCard';
+import { AmountResponseCard } from './AmountResponseCard';
 
 interface MensajeChatConRemitente extends MensajeChat {
   remitente?: User;
 }
 
-interface ChatBoxProps {
+interface NegotiationChatBoxProps {
   servicioId: string;
+  servicio: Servicio & { conductor?: User };
   currentUserId: string;
   currentUserNombre: string;
   currentUserApellido: string;
-  otherUserName?: string;
   userType: 'cliente' | 'conductor';
-  showQuickMessages?: boolean;
 }
 
-const QUICK_MESSAGES_CLIENTE = [
-  "¿Cuánto falta para que llegues?",
-  "¿Dónde estás?",
-  "Necesito más tiempo",
-  "Gracias"
+const QUICK_MESSAGES_NEGOCIACION_CLIENTE = [
+  "Puedo enviarte fotos",
+  "El vehiculo esta atascado",
+  "Es urgente",
+  "Cual seria el costo aproximado?"
 ];
 
-const QUICK_MESSAGES_CONDUCTOR = [
-  "Voy en camino, llego en 5 minutos",
-  "Estoy cerca",
-  "He llegado al punto",
-  "Necesito que salgas del vehículo",
-  "Todo listo, nos vamos"
+const QUICK_MESSAGES_NEGOCIACION_CONDUCTOR = [
+  "Necesito ver fotos del vehiculo",
+  "Cual es el acceso al lugar?",
+  "Voy a evaluar la situacion",
+  "Te envio mi propuesta"
 ];
+
+function formatAmount(amount: string | number | null | undefined): string {
+  if (amount === null || amount === undefined) return 'RD$ 0.00';
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  return `RD$ ${num.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 function sanitizeTestId(text: string): string {
   return text
@@ -48,12 +56,6 @@ function sanitizeTestId(text: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[¿?¡!,]/g, '')
     .replace(/\s+/g, '-');
-}
-
-function formatAmount(amount: string | number | null | undefined): string {
-  if (amount === null || amount === undefined) return 'RD$ 0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return `RD$ ${num.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function getMessageTypeIcon(tipo: string | null | undefined) {
@@ -79,7 +81,7 @@ function getMessageTypeIcon(tipo: string | null | undefined) {
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-2 px-3 py-2" data-testid="typing-indicator">
+    <div className="flex items-center gap-2 px-3 py-2" data-testid="negotiation-typing-indicator">
       <div className="flex gap-1">
         <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
         <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -106,7 +108,7 @@ function MessageBubble({ msg, isOwn, getInitials }: MessageBubbleProps) {
 
   if (isSystemMessage) {
     return (
-      <div className="flex justify-center my-2" data-testid={`message-${msg.id}`}>
+      <div className="flex justify-center my-2" data-testid={`negotiation-message-${msg.id}`}>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-full">
           <Info className="h-3 w-3 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">{msg.contenido}</span>
@@ -117,7 +119,7 @@ function MessageBubble({ msg, isOwn, getInitials }: MessageBubbleProps) {
 
   if (isAmountMessage) {
     return (
-      <div className="flex justify-center my-3" data-testid={`message-${msg.id}`}>
+      <div className="flex justify-center my-3" data-testid={`negotiation-message-${msg.id}`}>
         <div className={`w-full max-w-[85%] rounded-lg border p-3 ${
           tipoMensaje === 'monto_aceptado' ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800' :
           tipoMensaje === 'monto_rechazado' ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800' :
@@ -151,7 +153,7 @@ function MessageBubble({ msg, isOwn, getInitials }: MessageBubbleProps) {
   return (
     <div
       className={`flex items-start gap-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
-      data-testid={`message-${msg.id}`}
+      data-testid={`negotiation-message-${msg.id}`}
     >
       <Avatar className="w-8 h-8">
         <AvatarFallback className={isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted'}>
@@ -174,15 +176,16 @@ function MessageBubble({ msg, isOwn, getInitials }: MessageBubbleProps) {
                 <img 
                   src={msg.urlArchivo} 
                   alt={msg.nombreArchivo || 'Imagen'} 
-                  className="max-w-full rounded-md max-h-48 object-cover"
-                  data-testid={`image-${msg.id}`}
+                  className="max-w-full rounded-md max-h-48 object-cover cursor-pointer"
+                  onClick={() => window.open(msg.urlArchivo!, '_blank')}
+                  data-testid={`negotiation-image-${msg.id}`}
                 />
               ) : (
                 <video 
                   src={msg.urlArchivo} 
                   controls 
                   className="max-w-full rounded-md max-h-48"
-                  data-testid={`video-${msg.id}`}
+                  data-testid={`negotiation-video-${msg.id}`}
                 />
               )}
               {msg.nombreArchivo && (
@@ -201,9 +204,9 @@ function MessageBubble({ msg, isOwn, getInitials }: MessageBubbleProps) {
           {isOwn && (
             <span className="text-muted-foreground">
               {msg.leido ? (
-                <CheckCheck className="h-3 w-3 text-accent" data-testid={`read-indicator-${msg.id}`} />
+                <CheckCheck className="h-3 w-3 text-accent" />
               ) : (
-                <Check className="h-3 w-3" data-testid={`sent-indicator-${msg.id}`} />
+                <Check className="h-3 w-3" />
               )}
             </span>
           )}
@@ -213,20 +216,25 @@ function MessageBubble({ msg, isOwn, getInitials }: MessageBubbleProps) {
   );
 }
 
-export function ChatBox({ 
-  servicioId, 
-  currentUserId, 
-  currentUserNombre, 
+export function NegotiationChatBox({
+  servicioId,
+  servicio,
+  currentUserId,
+  currentUserNombre,
   currentUserApellido,
-  otherUserName = 'Conductor',
   userType,
-  showQuickMessages = true
-}: ChatBoxProps) {
+}: NegotiationChatBoxProps) {
   const [mensaje, setMensaje] = useState('');
   const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('chat');
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const lastTypingSentRef = useRef<number>(0);
+
+  const estadoNegociacion = servicio.estadoNegociacion || 'no_aplica';
+  const otherUserName = userType === 'cliente' 
+    ? (servicio.conductor ? `${servicio.conductor.nombre} ${servicio.conductor.apellido}` : 'Operador')
+    : 'Cliente';
 
   const { data: mensajes = [], isLoading } = useQuery<MensajeChatConRemitente[]>({
     queryKey: ['/api/chat', servicioId],
@@ -235,8 +243,13 @@ export function ChatBox({
 
   const { send, connectionId, isConnected } = useWebSocket(
     (message) => {
-      if (message.type === 'new_chat_message') {
+      if (message.type === 'new_chat_message' || 
+          message.type === 'amount_proposed' || 
+          message.type === 'amount_confirmed' ||
+          message.type === 'amount_accepted' ||
+          message.type === 'amount_rejected') {
         queryClient.invalidateQueries({ queryKey: ['/api/chat', servicioId] });
+        queryClient.invalidateQueries({ queryKey: ['/api/services', servicioId] });
         setIsOtherTyping(false);
       }
       if (message.type === 'typing' && message.payload?.userId !== currentUserId) {
@@ -321,7 +334,6 @@ export function ChatBox({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!mensaje.trim()) return;
-
     sendMutation.mutate(mensaje.trim());
   };
 
@@ -335,86 +347,170 @@ export function ChatBox({
   };
 
   const unreadCount = mensajes.filter(m => !m.leido && m.remitenteId !== currentUserId).length;
+  const quickMessages = userType === 'conductor' ? QUICK_MESSAGES_NEGOCIACION_CONDUCTOR : QUICK_MESSAGES_NEGOCIACION_CLIENTE;
+
+  const getStatusBadge = () => {
+    switch (estadoNegociacion) {
+      case 'pendiente_evaluacion':
+        return <Badge variant="secondary">Evaluando</Badge>;
+      case 'propuesto':
+        return <Badge variant="outline">Monto Propuesto</Badge>;
+      case 'confirmado':
+        return <Badge variant="default">Esperando Respuesta</Badge>;
+      case 'aceptado':
+        return <Badge className="bg-green-600">Aceptado</Badge>;
+      case 'rechazado':
+        return <Badge variant="destructive">Rechazado</Badge>;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <Card className="flex flex-col h-full">
-      <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-lg">Chat con {otherUserName}</CardTitle>
-        <div className="flex items-center gap-2">
-          {unreadCount > 0 && (
-            <Badge variant="destructive" className="text-xs" data-testid="unread-badge">
-              {unreadCount} nuevos
-            </Badge>
-          )}
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} 
-               title={isConnected ? 'Conectado' : 'Desconectado'}
-               data-testid="connection-indicator" />
+    <Card className="flex flex-col h-full" data-testid="negotiation-chat-box">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg">Negociacion - {otherUserName}</CardTitle>
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} 
+                 title={isConnected ? 'Conectado' : 'Desconectado'}
+                 data-testid="negotiation-connection-indicator" />
+          </div>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="text-xs" data-testid="negotiation-unread-badge">
+                {unreadCount}
+              </Badge>
+            )}
+            {getStatusBadge()}
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 overflow-hidden p-0">
-        <ScrollArea className="h-full px-4" ref={scrollRef}>
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground" data-testid="loading-chat">
-              Cargando mensajes...
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+        <div className="px-4">
+          <TabsList className="w-full">
+            <TabsTrigger value="chat" className="flex-1 gap-2" data-testid="tab-chat">
+              <MessageSquare className="h-4 w-4" />
+              Chat
+            </TabsTrigger>
+            <TabsTrigger value="cotizacion" className="flex-1 gap-2" data-testid="tab-cotizacion">
+              <DollarSign className="h-4 w-4" />
+              Cotizacion
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="chat" className="flex-1 flex flex-col overflow-hidden mt-0 pt-2">
+          <CardContent className="flex-1 overflow-hidden p-0">
+            <ScrollArea className="h-full px-4" ref={scrollRef}>
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground" data-testid="loading-negotiation-chat">
+                  Cargando mensajes...
+                </div>
+              ) : mensajes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2" data-testid="empty-negotiation-chat">
+                  <MessageSquare className="h-8 w-8" />
+                  <p>Inicia la conversacion para coordinar el servicio</p>
+                </div>
+              ) : (
+                <div className="space-y-4 py-4">
+                  {mensajes.map((msg) => {
+                    const isOwn = msg.remitenteId === currentUserId;
+                    return (
+                      <MessageBubble 
+                        key={msg.id} 
+                        msg={msg} 
+                        isOwn={isOwn} 
+                        getInitials={getInitials} 
+                      />
+                    );
+                  })}
+                  {isOtherTyping && <TypingIndicator />}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+          <CardFooter className="pt-3 flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2 w-full">
+              {quickMessages.map((quickMsg) => (
+                <Button
+                  key={quickMsg}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMensaje(quickMsg)}
+                  disabled={sendMutation.isPending}
+                  data-testid={`button-quick-negotiation-${sanitizeTestId(quickMsg)}`}
+                >
+                  {quickMsg}
+                </Button>
+              ))}
             </div>
-          ) : mensajes.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground" data-testid="empty-chat">
-              No hay mensajes aun. Inicia la conversacion!
-            </div>
-          ) : (
-            <div className="space-y-4 py-4">
-              {mensajes.map((msg) => {
-                const isOwn = msg.remitenteId === currentUserId;
-                return (
-                  <MessageBubble 
-                    key={msg.id} 
-                    msg={msg} 
-                    isOwn={isOwn} 
-                    getInitials={getInitials} 
-                  />
-                );
-              })}
-              {isOtherTyping && <TypingIndicator />}
-            </div>
-          )}
-        </ScrollArea>
-      </CardContent>
-      <CardFooter className="pt-3 flex flex-col gap-2">
-        {showQuickMessages && (
-          <div className="flex flex-wrap gap-2 w-full">
-            {(userType === 'conductor' ? QUICK_MESSAGES_CONDUCTOR : QUICK_MESSAGES_CLIENTE).map((quickMsg) => (
-              <Button
-                key={quickMsg}
-                variant="outline"
-                size="sm"
-                onClick={() => setMensaje(quickMsg)}
+            
+            <div className="flex w-full gap-2 items-end">
+              <EvidenceUploader 
+                servicioId={servicioId} 
+                compact 
                 disabled={sendMutation.isPending}
-                data-testid={`button-quick-${sanitizeTestId(quickMsg)}`}
-              >
-                {quickMsg}
-              </Button>
-            ))}
+              />
+              <form onSubmit={handleSubmit} className="flex flex-1 gap-2">
+                <Input
+                  value={mensaje}
+                  onChange={handleInputChange}
+                  placeholder="Escribe un mensaje..."
+                  disabled={sendMutation.isPending}
+                  data-testid="input-negotiation-message"
+                  className="flex-1"
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!mensaje.trim() || sendMutation.isPending}
+                  data-testid="button-send-negotiation-message"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+          </CardFooter>
+        </TabsContent>
+
+        <TabsContent value="cotizacion" className="flex-1 overflow-auto mt-0 p-4">
+          {userType === 'conductor' ? (
+            <AmountProposalCard
+              servicioId={servicioId}
+              estadoNegociacion={estadoNegociacion}
+              montoActual={servicio.montoNegociado}
+              notasExtraccion={servicio.notasExtraccion}
+              descripcionSituacion={servicio.descripcionSituacion}
+              categoriaServicio={servicio.servicioCategoria || undefined}
+              subtipoServicio={servicio.servicioSubtipo}
+              onProposed={() => setActiveTab('chat')}
+              onConfirmed={() => {}}
+            />
+          ) : (
+            <AmountResponseCard
+              servicioId={servicioId}
+              estadoNegociacion={estadoNegociacion}
+              montoNegociado={servicio.montoNegociado}
+              notasExtraccion={servicio.notasExtraccion}
+              descripcionSituacion={servicio.descripcionSituacion}
+              conductorNombre={servicio.conductor ? `${servicio.conductor.nombre} ${servicio.conductor.apellido}` : undefined}
+              categoriaServicio={servicio.servicioCategoria || undefined}
+              subtipoServicio={servicio.servicioSubtipo}
+              onAccepted={() => {}}
+              onRejected={() => {}}
+            />
+          )}
+          
+          <div className="mt-4">
+            <EvidenceUploader 
+              servicioId={servicioId}
+              disabled={false}
+            />
           </div>
-        )}
-        <form onSubmit={handleSubmit} className="flex w-full gap-2">
-          <Input
-            value={mensaje}
-            onChange={handleInputChange}
-            placeholder="Escribe un mensaje..."
-            disabled={sendMutation.isPending}
-            data-testid="input-message"
-            className="flex-1"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!mensaje.trim() || sendMutation.isPending}
-            data-testid="button-send-message"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </CardFooter>
+        </TabsContent>
+      </Tabs>
     </Card>
   );
 }
