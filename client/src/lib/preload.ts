@@ -78,6 +78,8 @@ export function preloadDriverModules() {
 export function prefetchDriverData() {
   const driverEndpoints = [
     '/api/drivers/init',
+    '/api/drivers/me/full',
+    '/api/services/my-services',
   ];
 
   driverEndpoints.forEach((endpoint) => {
@@ -85,7 +87,7 @@ export function prefetchDriverData() {
       prefetchedData.add(endpoint);
       queryClient.prefetchQuery({
         queryKey: [endpoint],
-        staleTime: 1000 * 30,
+        staleTime: 1000 * 60,
       }).catch(() => {});
     }
   });
