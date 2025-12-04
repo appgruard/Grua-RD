@@ -68,3 +68,15 @@ The project includes a comprehensive testing setup:
 - **E2E Tests** (`e2e/`): Playwright tests for full user journey testing
 - **Configuration**: `jest.config.cjs` for Jest, `playwright.config.ts` for Playwright
 - **Run tests**: `npx jest --config=jest.config.cjs` for unit/integration, `npx playwright test` for E2E
+
+## Recent Changes
+
+### 2025-12-04: Responsiveness Improvements
+- **Driver Extraction Evaluation Screen** (`driver/extraction-evaluation.tsx`): Improved mobile responsiveness with adaptive map height, reduced padding, responsive text sizes, and better form spacing for small screens.
+- **Driver Dashboard** (`driver/dashboard.tsx`): Fixed mobile layout with adaptive panel heights, responsive grid layouts, compact navigation buttons, and optimized text/badge sizes for small screens.
+- **Bug Fix**: Corrected ConfirmDialog component props in dashboard (confirmText→confirmLabel, isLoading→loading).
+- **Documentation**: Updated `PLAN_CORRECCIONES_RESPONSIVIDAD.md` with detailed change logs.
+
+### Pending Tasks
+- Task 5: Update status messages in client tracking screen (change "Conductor" to "Operador")
+- Task 6: Complete terminology changes across remaining files (tracking.tsx, history.tsx, solicitudes.tsx)

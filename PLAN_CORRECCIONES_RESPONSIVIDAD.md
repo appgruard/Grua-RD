@@ -216,3 +216,6 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
   - Botones de navegación más compactos
   - Cards de solicitudes con padding reducido
   - Textos y badges optimizados para pantallas pequeñas
+- **Bug fix adicional:** Corregido ConfirmDialog en dashboard.tsx
+  - Cambiado `confirmText` → `confirmLabel` (prop correcta del componente)
+  - Cambiado `isLoading` → `loading` (prop correcta del componente)
