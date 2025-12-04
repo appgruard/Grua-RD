@@ -45,6 +45,7 @@ const AdminAseguradoras = lazy(() => import('@/pages/admin/aseguradoras'));
 const AdminTickets = lazy(() => import('@/pages/admin/tickets'));
 const AdminSocios = lazy(() => import('@/pages/admin/socios'));
 const AdminEmpresas = lazy(() => import('@/pages/admin/empresas'));
+const AdminWallets = lazy(() => import('@/pages/admin/wallets'));
 
 const SocioDashboard = lazy(() => import('@/pages/socio/dashboard'));
 
@@ -305,6 +306,13 @@ function Router() {
         <ProtectedRoute allowedTypes={['admin']}>
           <AdminLayout>
             <AdminEmpresas />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/wallets">
+        <ProtectedRoute allowedTypes={['admin']}>
+          <AdminLayout>
+            <AdminWallets />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, Mail, Phone, Star, Truck, LogOut, FileText, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar, Pencil, Camera, Loader2, Wrench, Shield, ShieldCheck, ShieldX, ShieldAlert, Edit3, Save, X } from 'lucide-react';
+import { User, Mail, Phone, Star, LogOut, FileText, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar, Pencil, Camera, Loader2, Wrench, Shield, ShieldCheck, ShieldX, ShieldAlert, Edit3, Save, X, Truck } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -482,34 +482,6 @@ export default function DriverProfile() {
       {driverData && (
         <>
           <WalletSection />
-
-          <Card className="p-6 mb-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Truck className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-semibold">Información de la Grúa</h3>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm text-muted-foreground">Licencia</p>
-                <p className="font-medium" data-testid="text-licencia">{driverData.licencia}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Placa</p>
-                <p className="font-medium" data-testid="text-placa">{driverData.placaGrua}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Marca</p>
-                  <p className="font-medium" data-testid="text-marca">{driverData.marcaGrua}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Modelo</p>
-                  <p className="font-medium" data-testid="text-modelo">{driverData.modeloGrua}</p>
-                </div>
-              </div>
-            </div>
-          </Card>
 
           <Card className="p-6 mb-4">
             <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">

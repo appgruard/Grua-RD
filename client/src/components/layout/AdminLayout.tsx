@@ -13,6 +13,7 @@ import {
   Building2,
   MessageCircle,
   Handshake,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ const menuItems = [
   { path: '/admin/analytics', icon: BarChart3, label: 'Analytics', testId: 'nav-analytics' },
   { path: '/admin/users', icon: Users, label: 'Usuarios', testId: 'nav-users' },
   { path: '/admin/drivers', icon: Truck, label: 'Conductores', testId: 'nav-drivers' },
+  { path: '/admin/wallets', icon: Wallet, label: 'Billeteras', testId: 'nav-wallets' },
   { path: '/admin/services', icon: FileText, label: 'Servicios', testId: 'nav-services' },
   { path: '/admin/pricing', icon: DollarSign, label: 'Tarifas', testId: 'nav-pricing' },
   { path: '/admin/monitoring', icon: Map, label: 'Monitoreo', testId: 'nav-monitoring' },

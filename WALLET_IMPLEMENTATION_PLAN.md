@@ -391,7 +391,7 @@ Al completar servicio:
 
 ---
 
-## FASE 6: Panel de Administración (Opcional)
+## FASE 6: Panel de Administración
 
 ### 6.1 Funcionalidades Admin
 
@@ -402,9 +402,31 @@ Al completar servicio:
 - Reportes de comisiones recaudadas
 
 ### Entregables Fase 6:
-- [ ] Página de administración de billeteras
-- [ ] Reportes y estadísticas
-- [ ] Funciones de ajuste manual
+- [x] Página de administración de billeteras *(Completado: 2024-12-04)*
+- [x] Reportes y estadísticas *(Completado: 2024-12-04)*
+- [x] Funciones de ajuste manual *(Completado: 2024-12-04)*
+
+**Página creada: `/admin/wallets`**
+
+Funcionalidades implementadas:
+- **Dashboard de estadísticas**: Muestra total de operadores, balance total, deuda total, operadores con deuda, y operadores bloqueados
+- **Tabla de billeteras**: Lista todas las billeteras con nombre, email, balance, deuda y estado
+- **Filtros**: Por estado (todos, con deuda, bloqueados, sin deuda) y búsqueda por nombre/email
+- **Vista de detalles**: Drawer con información detallada de billetera, deudas pendientes y transacciones recientes
+- **Ajustes manuales**: Permite agregar/restar balance o deuda con razón obligatoria (registra auditoría)
+- **Desbloqueo**: Botón para desbloquear servicios en efectivo de operadores bloqueados
+
+**Archivos modificados:**
+- `client/src/pages/admin/wallets.tsx` - Nueva página de administración de billeteras
+- `client/src/components/layout/AdminLayout.tsx` - Añadido enlace "Billeteras" en menú lateral
+- `client/src/App.tsx` - Nueva ruta `/admin/wallets`
+
+**Endpoints utilizados:**
+- `GET /api/admin/wallets-stats` - Estadísticas generales
+- `GET /api/admin/wallets` - Lista de billeteras
+- `GET /api/admin/wallets/:conductorId` - Detalles de billetera
+- `POST /api/admin/wallets/:walletId/adjust` - Realizar ajuste
+- `POST /api/admin/wallets/:walletId/unblock` - Desbloquear servicios
 
 ---
 
@@ -466,6 +488,7 @@ Para implementar el pago directo con tarjeta, se requiere:
 - [x] **Fase 3: API Endpoints** - 6 endpoints implementados con validación completa
 - [x] **Fase 4: Interfaz de Usuario** - Dashboard de billetera para operadores
 - [x] **Fase 5: Notificaciones y Alertas** - Sistema completo de notificaciones y alertas en UI
+- [x] **Fase 6: Panel de Administración** - Página de gestión de billeteras para administradores
 
 ### Validaciones Implementadas:
 1. **Proceso de pago de servicio:**
