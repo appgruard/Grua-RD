@@ -81,7 +81,7 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ### Negotiation Chat System (December 2025) - IN PROGRESS
 - **Document:** `PLAN_CHAT_NEGOCIACION.md`
-- **Status:** 🔄 Phase 1 (Schema) + Phase 2 (Backend) completed (December 4, 2025)
+- **Status:** 🔄 Phase 1-3 completed (December 4, 2025)
 - **Migration file:** `migrations/0008_negotiation_chat_system.sql` (executed via db:push)
 - **Purpose:** Dual chat system for Grúa RD tow truck platform
   - Normal chat for standard services (when driver accepts service)
@@ -106,7 +106,13 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
   - `GET /api/drivers/available-requests` - List available service requests
 - **Push notifications added:** Amount proposed, confirmed, accepted, rejected notifications
 - **WebSocket messages:** amount_proposed, amount_confirmed, amount_accepted, amount_rejected
-- **Remaining phases:** Chat Components (3), Pages/Flows (4), Notifications (5), Minor Changes (6), Testing (7)
+- **Frontend components created (Phase 3):**
+  - `ChatBox.tsx` - Enhanced with typing indicator, read status, system messages, media/amount message types
+  - `NegotiationChatBox.tsx` - Full negotiation chat with tabs (Chat/Cotización), integrates all components
+  - `AmountProposalCard.tsx` - Driver proposes amounts with validation (min 500, max 500,000 RD$)
+  - `AmountResponseCard.tsx` - Client accepts/rejects amounts with confirmation dialogs
+  - `EvidenceUploader.tsx` - Upload photos/videos as evidence with camera capture and preview
+- **Remaining phases:** Pages/Flows (4), Notifications (5), Minor Changes (6), Testing (7)
 
 ## Recent Code Audits
 
