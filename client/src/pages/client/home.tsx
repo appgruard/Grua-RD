@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'wouter';
-import { MapboxMap } from '@/components/maps/MapboxMap';
+import { MapboxMapWithFastLoad } from '@/components/maps/LazyMapboxMap';
 import { AddressSearchInput } from '@/components/maps/AddressSearchInput';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -620,7 +620,7 @@ export default function ClientHome() {
       )}
 
       <div className="flex-1 relative min-h-0 z-0">
-        <MapboxMap
+        <MapboxMapWithFastLoad
           center={mapCenter}
           markers={markers}
           className="absolute inset-0 z-0"

@@ -12,6 +12,8 @@ interface LocationData {
 interface UseDriverLocationOptions {
   intervalMs?: number;
   enableHighAccuracy?: boolean;
+  minMovementThreshold?: number;
+  serviceLocationRadius?: number;
 }
 
 interface UseDriverLocationReturn {
@@ -50,9 +52,16 @@ export function useDriverLocation(
   conductorId: string | null,
   targetLocation: { lat: number; lng: number } | null,
   sendMessage: (message: { type: string; payload: any }) => void,
-  options: UseDriverLocationOptions = {}
+  options: UseDriverLocationOptions = {},
+  serviceStatus?: string | null,
+  serviceOrigin?: { lat: number; lng: number } | null
 ): UseDriverLocationReturn {
-  const { intervalMs = 3000, enableHighAccuracy = true } = options;
+  const { 
+    intervalMs = 5000, 
+    enableHighAccuracy = true,
+    minMovementThreshold = 30,
+    serviceLocationRadius = 60
+  } = options;
   
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
   const [isTracking, setIsTracking] = useState(false);
@@ -61,7 +70,9 @@ export function useDriverLocation(
   
   const watchIdRef = useRef<number | null>(null);
   const lastSentRef = useRef<number>(0);
+  const lastSentPositionRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastPositionRef = useRef<{ lat: number; lng: number; timestamp: number } | null>(null);
+  const previousStatusRef = useRef<string | null>(null);
 
   const calculateSpeed = useCallback((
     newLat: number,
@@ -83,15 +94,60 @@ export function useDriverLocation(
     return (distance / timeDiff) * 3.6;
   }, []);
 
+  const shouldSendUpdate = useCallback((
+    newLat: number,
+    newLng: number,
+    forceUpdate: boolean = false
+  ): boolean => {
+    if (forceUpdate) return true;
+    if (!lastSentPositionRef.current) return true;
+    
+    const distanceFromLastSent = calculateDistance(
+      lastSentPositionRef.current.lat,
+      lastSentPositionRef.current.lng,
+      newLat,
+      newLng
+    );
+
+    if (serviceStatus === 'conductor_en_sitio' || serviceStatus === 'cargando') {
+      if (serviceOrigin) {
+        const distanceFromServiceOrigin = calculateDistance(
+          serviceOrigin.lat,
+          serviceOrigin.lng,
+          newLat,
+          newLng
+        );
+        
+        if (distanceFromServiceOrigin > serviceLocationRadius) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    return distanceFromLastSent >= minMovementThreshold;
+  }, [serviceStatus, serviceOrigin, minMovementThreshold, serviceLocationRadius]);
+
   const sendLocationUpdate = useCallback((position: GeolocationPosition) => {
     if (!serviceId || !conductorId) return;
     
-    const now = Date.now();
-    if (now - lastSentRef.current < intervalMs) return;
-    
     const coords = position.coords;
-    let speed = coords.speed ? coords.speed * 3.6 : null;
+    const now = Date.now();
     
+    const statusChanged = previousStatusRef.current !== serviceStatus;
+    const isStartingToDestination = statusChanged && 
+      (previousStatusRef.current === 'cargando' && serviceStatus === 'en_progreso');
+    
+    previousStatusRef.current = serviceStatus || null;
+    
+    const timeSinceLastSent = now - lastSentRef.current;
+    const shouldSend = shouldSendUpdate(
+      coords.latitude, 
+      coords.longitude, 
+      isStartingToDestination || timeSinceLastSent > 60000
+    );
+    
+    let speed = coords.speed ? coords.speed * 3.6 : null;
     if (speed === null) {
       speed = calculateSpeed(coords.latitude, coords.longitude, position.timestamp);
     }
@@ -106,6 +162,11 @@ export function useDriverLocation(
     };
     
     setCurrentLocation(locationData);
+    lastPositionRef.current = {
+      lat: coords.latitude,
+      lng: coords.longitude,
+      timestamp: position.timestamp
+    };
     
     if (targetLocation) {
       const distance = calculateDistance(
@@ -116,6 +177,8 @@ export function useDriverLocation(
       );
       setDistanceToTarget(distance);
     }
+    
+    if (!shouldSend && timeSinceLastSent < intervalMs) return;
     
     sendMessage({
       type: 'update_location',
@@ -131,12 +194,11 @@ export function useDriverLocation(
     });
     
     lastSentRef.current = now;
-    lastPositionRef.current = {
+    lastSentPositionRef.current = {
       lat: coords.latitude,
-      lng: coords.longitude,
-      timestamp: position.timestamp
+      lng: coords.longitude
     };
-  }, [serviceId, conductorId, targetLocation, sendMessage, intervalMs, calculateSpeed]);
+  }, [serviceId, conductorId, targetLocation, sendMessage, intervalMs, calculateSpeed, shouldSendUpdate, serviceStatus]);
 
   const handleError = useCallback((err: GeolocationPositionError) => {
     let errorMessage = 'Error al obtener ubicación';
@@ -169,8 +231,8 @@ export function useDriverLocation(
       handleError,
       {
         enableHighAccuracy,
-        timeout: 10000,
-        maximumAge: 0
+        timeout: 15000,
+        maximumAge: 5000
       }
     );
   }, [sendLocationUpdate, handleError, enableHighAccuracy]);

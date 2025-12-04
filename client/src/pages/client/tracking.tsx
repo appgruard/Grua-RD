@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRoute } from 'wouter';
-import { MapboxMap } from '@/components/maps/MapboxMap';
+import { MapboxMapWithFastLoad } from '@/components/maps/LazyMapboxMap';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -139,11 +139,11 @@ export default function ClientTracking() {
   const origin = { lat: parseFloat(service.origenLat as string), lng: parseFloat(service.origenLng as string) };
   const destination = { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) };
 
-  const markers = [
+  const markers = useMemo(() => [
     { position: origin, title: 'Origen', color: '#22c55e', type: 'origin' as const },
     { position: destination, title: 'Destino', color: '#ef4444', type: 'destination' as const },
     driverLocation && { position: driverLocation, title: 'Operador', color: '#3b82f6', type: 'driver' as const },
-  ].filter(Boolean) as any[];
+  ].filter(Boolean) as any[], [origin.lat, origin.lng, destination.lat, destination.lng, driverLocation]);
 
   const statusColors = {
     pendiente: 'secondary',
@@ -191,7 +191,7 @@ export default function ClientTracking() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="relative h-[40%] min-h-[180px] flex-shrink-0">
-        <MapboxMap
+        <MapboxMapWithFastLoad
           center={driverLocation || origin}
           markers={markers}
           className="absolute inset-0"

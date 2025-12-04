@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { LocationService, LocationData, isCapacitor, isWeb, TrackingOptions } from '@/lib/capacitor';
 import type { Coordinates } from '@/lib/maps';
+import { calculateDistance } from './useDriverLocation';
 
 interface UseLocationOptions {
   enableTracking?: boolean;
@@ -23,8 +24,8 @@ interface UseLocationReturn {
 export function useLocation(options: UseLocationOptions = {}): UseLocationReturn {
   const {
     enableTracking = false,
-    trackingInterval = 5000,
-    minDistance = 10,
+    trackingInterval = 8000,
+    minDistance = 25,
   } = options;
 
   const [location, setLocation] = useState<Coordinates | null>(null);
@@ -33,14 +34,36 @@ export function useLocation(options: UseLocationOptions = {}): UseLocationReturn
   const [isTracking, setIsTracking] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const callbackRef = useRef<((location: LocationData) => void) | null>(null);
+  const lastLocationRef = useRef<Coordinates | null>(null);
+  const lastUpdateTimeRef = useRef<number>(0);
 
   const handleLocationUpdate = useCallback((locationData: LocationData) => {
-    setLocation({
+    const newLocation = {
       lat: locationData.latitude,
       lng: locationData.longitude,
-    });
+    };
+    
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+    
+    if (lastLocationRef.current && timeSinceLastUpdate < 60000) {
+      const distance = calculateDistance(
+        lastLocationRef.current.lat,
+        lastLocationRef.current.lng,
+        newLocation.lat,
+        newLocation.lng
+      );
+      
+      if (distance < minDistance && timeSinceLastUpdate < trackingInterval) {
+        return;
+      }
+    }
+    
+    lastLocationRef.current = newLocation;
+    lastUpdateTimeRef.current = now;
+    setLocation(newLocation);
     setError(null);
-  }, []);
+  }, [minDistance, trackingInterval]);
 
   const checkAndRequestPermissions = useCallback(async (): Promise<boolean> => {
     try {
@@ -178,6 +201,11 @@ export function useLocationTracking(
   const callbackRef = useRef<((location: LocationData) => void) | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const onLocationUpdateRef = useRef(onLocationUpdate);
+  const lastLocationRef = useRef<Coordinates | null>(null);
+  const lastUpdateTimeRef = useRef<number>(0);
+
+  const minDistance = options?.minDistance ?? 25;
+  const interval = options?.interval ?? 8000;
 
   useEffect(() => {
     onLocationUpdateRef.current = onLocationUpdate;
@@ -197,11 +225,34 @@ export function useLocationTracking(
       return;
     }
 
+    const shouldUpdate = (newLat: number, newLng: number): boolean => {
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+      
+      if (!lastLocationRef.current) return true;
+      if (timeSinceLastUpdate > 60000) return true;
+      
+      const distance = calculateDistance(
+        lastLocationRef.current.lat,
+        lastLocationRef.current.lng,
+        newLat,
+        newLng
+      );
+      
+      return distance >= minDistance || timeSinceLastUpdate >= interval;
+    };
+
     const callback = (locationData: LocationData) => {
-      onLocationUpdateRef.current({
+      const newLocation = {
         lat: locationData.latitude,
         lng: locationData.longitude,
-      });
+      };
+      
+      if (shouldUpdate(newLocation.lat, newLocation.lng)) {
+        lastLocationRef.current = newLocation;
+        lastUpdateTimeRef.current = Date.now();
+        onLocationUpdateRef.current(newLocation);
+      }
     };
 
     callbackRef.current = callback;
@@ -216,7 +267,10 @@ export function useLocationTracking(
           }
         }
 
-        await LocationService.startTracking(callback, options);
+        await LocationService.startTracking(callback, { 
+          interval: interval,
+          minDistance: minDistance 
+        });
         setIsTracking(true);
         setError(null);
         return true;
@@ -235,16 +289,22 @@ export function useLocationTracking(
       try {
         watchIdRef.current = navigator.geolocation.watchPosition(
           (position) => {
-            onLocationUpdateRef.current({
+            const newLocation = {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
-            });
+            };
+            
+            if (shouldUpdate(newLocation.lat, newLocation.lng)) {
+              lastLocationRef.current = newLocation;
+              lastUpdateTimeRef.current = Date.now();
+              onLocationUpdateRef.current(newLocation);
+            }
           },
           (geoError) => {
             console.error('Browser geolocation error:', geoError);
             setError('Error de ubicación: ' + geoError.message);
           },
-          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+          { enableHighAccuracy: true, maximumAge: 8000, timeout: 15000 }
         );
         setIsTracking(true);
         setError(null);
@@ -280,7 +340,7 @@ export function useLocationTracking(
       }
       setIsTracking(false);
     };
-  }, [enabled, options?.interval, options?.minDistance]);
+  }, [enabled, interval, minDistance]);
 
   return { isTracking, error };
 }

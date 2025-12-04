@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import Map, { Marker, GeolocateControl, Source, Layer } from 'react-map-gl/mapbox';
 import type { MapRef, MapMouseEvent } from 'react-map-gl/mapbox';
 import { Loader2, MapPin, Truck, Car, Flag, Wrench } from 'lucide-react';
@@ -33,6 +33,8 @@ interface MapboxMapProps {
 }
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+
+const MAP_STYLE_LIGHT = 'mapbox://styles/mapbox/streets-v12';
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {

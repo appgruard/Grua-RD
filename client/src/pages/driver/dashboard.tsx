@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
-import { MapboxMap } from '@/components/maps/MapboxMap';
+import { MapboxMapWithFastLoad } from '@/components/maps/LazyMapboxMap';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -402,11 +402,70 @@ export default function DriverDashboard() {
     }
   }, [driverData?.id]);
 
+  const trackingOptions = useMemo(() => ({
+    interval: activeService ? 8000 : 15000,
+    minDistance: activeService ? 30 : 50
+  }), [!!activeService]);
+
   useLocationTracking(
     handleLocationUpdate,
     driverData?.disponible || false,
-    { interval: 5000, minDistance: 10 }
+    trackingOptions
   );
+
+  const mapMarkers = useMemo(() => {
+    const markers: Array<{
+      position: Coordinates;
+      title: string;
+      color: string;
+      type: 'origin' | 'destination' | 'driver' | 'service' | 'default';
+    }> = [];
+
+    if (activeService) {
+      markers.push({
+        position: currentLocation,
+        title: 'Tu ubicacion',
+        color: '#3b82f6',
+        type: 'driver' as const,
+      });
+
+      markers.push({
+        position: {
+          lat: parseFloat(activeService.origenLat as string),
+          lng: parseFloat(activeService.origenLng as string),
+        },
+        title: 'Origen del cliente',
+        color: '#22c55e',
+        type: 'origin' as const,
+      });
+
+      if (activeService.estado === 'cargando' || activeService.estado === 'en_progreso') {
+        markers.push({
+          position: {
+            lat: parseFloat(activeService.destinoLat as string),
+            lng: parseFloat(activeService.destinoLng as string),
+          },
+          title: 'Destino',
+          color: '#ef4444',
+          type: 'destination' as const,
+        });
+      }
+    } else if (nearbyRequests) {
+      nearbyRequests.forEach(req => {
+        markers.push({
+          position: {
+            lat: parseFloat(req.origenLat as string),
+            lng: parseFloat(req.origenLng as string),
+          },
+          title: 'Solicitud de servicio',
+          color: '#F5A623',
+          type: 'service' as const,
+        });
+      });
+    }
+
+    return markers;
+  }, [activeService, nearbyRequests, currentLocation]);
 
   const getStatusBadgeVariant = (estado: string) => {
     switch (estado) {
@@ -455,61 +514,9 @@ export default function DriverDashboard() {
       <WalletAlertBanner className="z-20" />
       
       <div className="flex-1 relative min-h-0">
-        <MapboxMap
+        <MapboxMapWithFastLoad
           center={currentLocation}
-          markers={(() => {
-            const markers: Array<{
-              position: Coordinates;
-              title: string;
-              color: string;
-              type: 'origin' | 'destination' | 'driver' | 'service' | 'default';
-            }> = [];
-
-            if (activeService) {
-              markers.push({
-                position: currentLocation,
-                title: 'Tu ubicacion',
-                color: '#3b82f6',
-                type: 'driver' as const,
-              });
-
-              markers.push({
-                position: {
-                  lat: parseFloat(activeService.origenLat as string),
-                  lng: parseFloat(activeService.origenLng as string),
-                },
-                title: 'Origen del cliente',
-                color: '#22c55e',
-                type: 'origin' as const,
-              });
-
-              if (activeService.estado === 'cargando' || activeService.estado === 'en_progreso') {
-                markers.push({
-                  position: {
-                    lat: parseFloat(activeService.destinoLat as string),
-                    lng: parseFloat(activeService.destinoLng as string),
-                  },
-                  title: 'Destino',
-                  color: '#ef4444',
-                  type: 'destination' as const,
-                });
-              }
-            } else if (nearbyRequests) {
-              nearbyRequests.forEach(req => {
-                markers.push({
-                  position: {
-                    lat: parseFloat(req.origenLat as string),
-                    lng: parseFloat(req.origenLng as string),
-                  },
-                  title: 'Solicitud de servicio',
-                  color: '#F5A623',
-                  type: 'service' as const,
-                });
-              });
-            }
-
-            return markers;
-          })()}
+          markers={mapMarkers}
           className="absolute inset-0"
           routeGeometry={routeGeometry}
         />
