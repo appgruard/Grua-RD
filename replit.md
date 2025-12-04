@@ -60,3 +60,21 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Capacitor**: For native mobile app functionalities and plugins.
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
+
+## Recent Changes (December 2024)
+
+### Extraction Service Flow Improvements
+- Modified extraction-evaluation.tsx to require operators to review chat/evidence before entering proposed amounts
+- Added two-step flow: Step 1 (Evaluate Situation via Chat) must be completed before Step 2 (Propose Price)
+- State tracking with `hasViewedChat` ensures operators cannot skip evaluation step
+
+### Service Rejection System
+- Added `dismissed_services` database table with unique constraint on (conductor_id, servicio_id)
+- New API endpoint: POST `/api/services/:id/dismiss` for drivers to reject services
+- Dismissed services are filtered out from nearby-requests list
+- Added frontend mutation and onClick handler to "Rechazar" button in driver dashboard
+
+### Service Category Filtering
+- Updated `/api/drivers/nearby-requests` endpoint to filter by driver's service categories and vehicle capabilities
+- Drivers only see services matching their registered categories AND having appropriate vehicles
+- Services with null category default to 'remolque_estandar' for backwards compatibility
