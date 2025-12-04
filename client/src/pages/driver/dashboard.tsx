@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { MapboxMap } from '@/components/maps/MapboxMap';
@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -22,8 +23,9 @@ import { WalletAlertBanner, CashServiceConfirmationModal, useWalletStatus } from
 import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { SiWaze, SiGooglemaps } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
-import type { Coordinates } from '@/lib/maps';
+import type { Coordinates, RouteGeometry } from '@/lib/maps';
 import { generateWazeNavigationUrl, generateGoogleMapsNavigationUrl } from '@/lib/maps';
+import { getDirections } from '@/lib/mapbox-directions';
 import { cn } from '@/lib/utils';
 
 const serviceCategoryLabels: Record<string, string> = {
@@ -75,28 +77,35 @@ export default function DriverDashboard() {
     serviceId: string | null;
     serviceAmount: number;
   }>({ open: false, serviceId: null, serviceAmount: 0 });
+  const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
+  const [locationReady, setLocationReady] = useState(false);
+  const lastRouteCalcRef = useRef<number>(0);
   
   const walletStatus = useWalletStatus();
 
-  const { data: driverData } = useQuery<Conductor>({
+  const { data: driverData, isLoading: isLoadingDriver } = useQuery<Conductor>({
     queryKey: ['/api/drivers/me'],
+    staleTime: 1000 * 60 * 2,
   });
 
   const { data: driverDocuments } = useQuery<Documento[]>({
     queryKey: ['/api/documents/my-documents'],
     enabled: !!driverData?.id,
+    staleTime: 1000 * 60 * 5,
   });
 
   const { data: nearbyRequests } = useQuery<Servicio[]>({
     queryKey: ['/api/drivers/nearby-requests'],
     enabled: driverData?.disponible || false,
     refetchInterval: 5000,
+    staleTime: 1000 * 3,
   });
 
-  const { data: activeService } = useQuery<ServicioWithDetails | null>({
+  const { data: activeService, isLoading: isLoadingActiveService } = useQuery<ServicioWithDetails | null>({
     queryKey: ['/api/drivers/active-service'],
     enabled: !!driverData,
     refetchInterval: 10000,
+    staleTime: 1000 * 5,
   });
 
   const { send, connectionId } = useWebSocket(
@@ -136,6 +145,50 @@ export default function DriverDashboard() {
       });
     }
   }, [activeService, driverData?.id, currentLocation, send]);
+
+  useEffect(() => {
+    if (!activeService || !locationReady) {
+      setRouteGeometry(null);
+      return;
+    }
+
+    const calculateRoute = async () => {
+      const now = Date.now();
+      if (now - lastRouteCalcRef.current < 30000 && routeGeometry) {
+        return;
+      }
+      lastRouteCalcRef.current = now;
+
+      const isGoingToOrigin = activeService.estado === 'aceptado' || activeService.estado === 'conductor_en_sitio';
+      const isGoingToDestination = activeService.estado === 'cargando' || activeService.estado === 'en_progreso';
+
+      if (!isGoingToOrigin && !isGoingToDestination) {
+        setRouteGeometry(null);
+        return;
+      }
+
+      const target = isGoingToOrigin
+        ? {
+            lat: parseFloat(activeService.origenLat as string),
+            lng: parseFloat(activeService.origenLng as string),
+          }
+        : {
+            lat: parseFloat(activeService.destinoLat as string),
+            lng: parseFloat(activeService.destinoLng as string),
+          };
+
+      try {
+        const result = await getDirections(currentLocation, target);
+        if (result.geometry) {
+          setRouteGeometry(result.geometry as RouteGeometry);
+        }
+      } catch (error) {
+        console.error('Error calculating route:', error);
+      }
+    };
+
+    calculateRoute();
+  }, [activeService?.id, activeService?.estado, currentLocation, locationReady]);
 
   const toggleAvailability = useMutation({
     mutationFn: async (disponible: boolean) => {
@@ -343,6 +396,7 @@ export default function DriverDashboard() {
 
   const handleLocationUpdate = useCallback((location: Coordinates) => {
     setCurrentLocation(location);
+    setLocationReady(true);
     apiRequest('PUT', '/api/drivers/location', location);
   }, []);
 
@@ -376,6 +430,32 @@ export default function DriverDashboard() {
 
   const needsVerification = user && (!user.cedulaVerificada || !user.telefonoVerificado);
 
+  if (isLoadingDriver) {
+    return (
+      <div className="flex flex-col h-full relative overflow-hidden">
+        <div className="flex-1 relative min-h-0 bg-muted animate-pulse" />
+        <div className="absolute top-3 left-3 right-3 z-10">
+          <Card className="p-3 bg-background/95 backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+              <Skeleton className="h-6 w-10 rounded-full" />
+            </div>
+          </Card>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border p-4 space-y-3">
+          <Skeleton className="h-4 w-48" />
+          <div className="space-y-2">
+            <Skeleton className="h-20 w-full rounded-lg" />
+            <Skeleton className="h-20 w-full rounded-lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
       {needsVerification && (
@@ -401,16 +481,61 @@ export default function DriverDashboard() {
       <div className="flex-1 relative min-h-0">
         <MapboxMap
           center={currentLocation}
-          markers={nearbyRequests?.map(req => ({
-            position: {
-              lat: parseFloat(req.origenLat as string),
-              lng: parseFloat(req.origenLng as string),
-            },
-            title: 'Solicitud de servicio',
-            color: '#F5A623',
-            type: 'service' as const,
-          })) || []}
+          markers={(() => {
+            const markers: Array<{
+              position: Coordinates;
+              title: string;
+              color: string;
+              type: 'origin' | 'destination' | 'driver' | 'service' | 'default';
+            }> = [];
+
+            if (activeService) {
+              markers.push({
+                position: currentLocation,
+                title: 'Tu ubicacion',
+                color: '#3b82f6',
+                type: 'driver' as const,
+              });
+
+              markers.push({
+                position: {
+                  lat: parseFloat(activeService.origenLat as string),
+                  lng: parseFloat(activeService.origenLng as string),
+                },
+                title: 'Origen del cliente',
+                color: '#22c55e',
+                type: 'origin' as const,
+              });
+
+              if (activeService.estado === 'cargando' || activeService.estado === 'en_progreso') {
+                markers.push({
+                  position: {
+                    lat: parseFloat(activeService.destinoLat as string),
+                    lng: parseFloat(activeService.destinoLng as string),
+                  },
+                  title: 'Destino',
+                  color: '#ef4444',
+                  type: 'destination' as const,
+                });
+              }
+            } else if (nearbyRequests) {
+              nearbyRequests.forEach(req => {
+                markers.push({
+                  position: {
+                    lat: parseFloat(req.origenLat as string),
+                    lng: parseFloat(req.origenLng as string),
+                  },
+                  title: 'Solicitud de servicio',
+                  color: '#F5A623',
+                  type: 'service' as const,
+                });
+              });
+            }
+
+            return markers;
+          })()}
           className="absolute inset-0"
+          routeGeometry={routeGeometry}
         />
       </div>
 

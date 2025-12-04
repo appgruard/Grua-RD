@@ -4,10 +4,11 @@ import { MapboxMap } from '@/components/maps/MapboxMap';
 import { AddressSearchInput } from '@/components/maps/AddressSearchInput';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { calculateRoute, type Coordinates, type RouteGeometry } from '@/lib/maps';
-import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck, AlertTriangle, Info } from 'lucide-react';
+import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck, AlertTriangle, Info, Clock, Navigation } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -21,6 +22,7 @@ import { PaymentMethodSelector } from '@/components/PaymentMethodSelector';
 import { InsuranceForm } from '@/components/InsuranceForm';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import type { Servicio } from '@shared/schema';
 
 type Step = 'serviceCategory' | 'serviceSubtype' | 'extractionDescription' | 'location' | 'vehicleType' | 'payment' | 'confirm';
 
@@ -76,6 +78,32 @@ export default function ClientHome() {
   }>({
     queryKey: ['/api/client/insurance/status'],
   });
+
+  const { data: myServices } = useQuery<Servicio[]>({
+    queryKey: ['/api/services/my-services'],
+    staleTime: 1000 * 10,
+    refetchInterval: 10000,
+  });
+
+  const activeService = myServices?.find(
+    (service) => 
+      service.estado === 'pendiente' || 
+      service.estado === 'aceptado' || 
+      service.estado === 'conductor_en_sitio' ||
+      service.estado === 'cargando' ||
+      service.estado === 'en_progreso'
+  );
+
+  const getActiveServiceStatusLabel = (estado: string): string => {
+    switch (estado) {
+      case 'pendiente': return 'Buscando operador...';
+      case 'aceptado': return 'Operador en camino';
+      case 'conductor_en_sitio': return 'Operador en el punto';
+      case 'cargando': return 'Cargando vehiculo';
+      case 'en_progreso': return 'En ruta al destino';
+      default: return 'En progreso';
+    }
+  };
 
   const DEFAULT_PRECIO_BASE = 150;
   const DEFAULT_TARIFA_POR_KM = 20;
@@ -556,6 +584,41 @@ export default function ClientHome() {
 
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
+      {activeService && (
+        <div className="absolute top-0 left-0 right-0 z-30 p-3 safe-area-inset-top">
+          <Card 
+            className="p-3 bg-primary/95 backdrop-blur-sm cursor-pointer hover-elevate"
+            onClick={() => setLocation(`/client/tracking/${activeService.id}`)}
+            data-testid="card-active-service"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white/20">
+                  {activeService.estado === 'pendiente' ? (
+                    <Clock className="w-5 h-5 text-white animate-pulse" />
+                  ) : (
+                    <Navigation className="w-5 h-5 text-white" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">
+                    Servicio activo
+                  </p>
+                  <p className="text-xs text-white/80 truncate">
+                    {getActiveServiceStatusLabel(activeService.estado)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs bg-white/20 border-white/30 text-white">
+                  Ver
+                </Badge>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div className="flex-1 relative min-h-0 z-0">
         <MapboxMap
           center={mapCenter}
@@ -565,7 +628,7 @@ export default function ClientHome() {
           focusOnOrigin={!!origin && !destination}
         />
         
-        {(origin || destination) && (
+        {(origin || destination) && !activeService && (
           <div className="absolute top-3 left-3 right-3 z-10">
             <Card className="p-3 bg-background/95 backdrop-blur-sm">
               <div className="flex items-center gap-3">
