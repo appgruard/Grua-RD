@@ -294,13 +294,11 @@ export function NegotiationChatBox({
 
   const sendMutation = useMutation({
     mutationFn: async (contenido: string) => {
-      return apiRequest<MensajeChat>('/api/chat/send', {
-        method: 'POST',
-        body: JSON.stringify({
-          servicioId,
-          contenido,
-        }),
+      const response = await apiRequest('POST', '/api/chat/send', {
+        servicioId,
+        contenido,
       });
+      return response.json() as Promise<MensajeChat>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/chat', servicioId] });
@@ -310,9 +308,7 @@ export function NegotiationChatBox({
 
   const markReadMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/chat/${servicioId}/mark-read`, {
-        method: 'POST',
-      });
+      return apiRequest('POST', `/api/chat/${servicioId}/mark-read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/chat', servicioId] });
