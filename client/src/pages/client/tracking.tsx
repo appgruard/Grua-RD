@@ -189,17 +189,16 @@ export default function ClientTracking() {
   const driverName = service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Operador';
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 relative min-h-0">
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="relative h-[45%] min-h-[200px] flex-shrink-0">
         <MapboxMap
           center={driverLocation || origin}
           markers={markers}
           className="absolute inset-0"
           routeGeometry={routeGeometry}
         />
-      </div>
-
-      <div className="absolute top-4 left-4 right-4 z-10 space-y-2">
+        
+        <div className="absolute top-3 left-3 right-3 z-10 space-y-2">
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -294,10 +293,11 @@ export default function ClientTracking() {
             </AlertDescription>
           </Alert>
         )}
+        </div>
       </div>
 
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
       {service.conductor && (
-        <div className="absolute bottom-4 left-4 right-4 z-10">
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <Avatar className="w-12 h-12">
@@ -384,8 +384,8 @@ export default function ClientTracking() {
               </div>
             )}
           </Card>
-        </div>
       )}
+      </div>
 
       <Drawer open={chatOpen} onOpenChange={setChatOpen}>
         <DrawerContent className="h-[80vh]">
