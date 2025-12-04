@@ -190,7 +190,7 @@ export default function ClientTracking() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="relative h-[45%] min-h-[200px] flex-shrink-0">
+      <div className="relative h-[40%] min-h-[180px] flex-shrink-0">
         <MapboxMap
           center={driverLocation || origin}
           markers={markers}
@@ -296,7 +296,7 @@ export default function ClientTracking() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto px-3 pt-3 pb-6 space-y-3">
       {service.conductor && (
           <Card className="p-4">
             <div className="flex items-center gap-3">
