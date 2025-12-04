@@ -3261,6 +3261,251 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Negotiation Chat System Endpoints
+  app.get("/api/drivers/available-requests", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    if (req.user!.userType !== 'conductor' && req.user!.userType !== 'admin') {
+      return res.status(403).json({ message: "Solo conductores pueden ver solicitudes disponibles" });
+    }
+
+    try {
+      const availableServices = await storage.getAvailableServicesForDrivers();
+      res.json(availableServices);
+    } catch (error: any) {
+      logSystem.error('Get available requests error', error);
+      res.status(500).json({ message: "Failed to get available requests" });
+    }
+  });
+
+  app.post("/api/services/:id/propose-amount", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Solo conductores pueden proponer montos" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+      const { monto, notas } = req.body;
+
+      if (!monto || typeof monto !== 'number' || monto < 500 || monto > 500000) {
+        return res.status(400).json({ message: "El monto debe ser un número entre RD$500 y RD$500,000" });
+      }
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Perfil de conductor no encontrado" });
+      }
+
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (!servicio.requiereNegociacion) {
+        return res.status(400).json({ message: "Este servicio no requiere negociación" });
+      }
+
+      const updated = await storage.proposeNegotiationAmount(servicioId, req.user!.id, monto, notas);
+
+      const mensaje = await storage.createMensajeChatWithMedia({
+        servicioId,
+        remitenteId: req.user!.id,
+        contenido: `Propuesta de monto: RD$ ${monto.toLocaleString('es-DO', { minimumFractionDigits: 2 })}${notas ? `\n\nNotas: ${notas}` : ''}`,
+        tipoMensaje: 'monto_propuesto',
+        montoAsociado: monto.toString(),
+      });
+
+      await pushService.notifyNegotiationAmountProposed(servicio.clienteId, monto);
+
+      if (serviceSessions.has(servicioId)) {
+        const broadcast = JSON.stringify({
+          type: 'amount_proposed',
+          payload: { servicio: updated, mensaje },
+        });
+        serviceSessions.get(servicioId)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Propose amount error', error);
+      res.status(500).json({ message: "Error al proponer monto" });
+    }
+  });
+
+  app.post("/api/services/:id/confirm-amount", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Solo conductores pueden confirmar montos" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "No autorizado para este servicio" });
+      }
+
+      if (servicio.estadoNegociacion !== 'propuesto') {
+        return res.status(400).json({ message: "El servicio no tiene un monto propuesto" });
+      }
+
+      const updated = await storage.confirmNegotiationAmount(servicioId, req.user!.id);
+
+      const mensaje = await storage.createMensajeChatWithMedia({
+        servicioId,
+        remitenteId: req.user!.id,
+        contenido: `Monto confirmado: RD$ ${updated.montoNegociado ? parseFloat(updated.montoNegociado).toLocaleString('es-DO', { minimumFractionDigits: 2 }) : '0.00'}`,
+        tipoMensaje: 'monto_confirmado',
+        montoAsociado: updated.montoNegociado || undefined,
+      });
+
+      await pushService.notifyNegotiationAmountConfirmed(servicio.clienteId, parseFloat(updated.montoNegociado || '0'));
+
+      if (serviceSessions.has(servicioId)) {
+        const broadcast = JSON.stringify({
+          type: 'amount_confirmed',
+          payload: { servicio: updated, mensaje },
+        });
+        serviceSessions.get(servicioId)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Confirm amount error', error);
+      res.status(500).json({ message: "Error al confirmar monto" });
+    }
+  });
+
+  app.post("/api/services/:id/accept-amount", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.clienteId !== req.user!.id) {
+        return res.status(403).json({ message: "Solo el cliente puede aceptar el monto" });
+      }
+
+      if (servicio.estadoNegociacion !== 'confirmado') {
+        return res.status(400).json({ message: "El monto debe estar confirmado para ser aceptado" });
+      }
+
+      const updated = await storage.acceptNegotiationAmount(servicioId, req.user!.id);
+
+      const mensaje = await storage.createMensajeChatWithMedia({
+        servicioId,
+        remitenteId: req.user!.id,
+        contenido: `Monto aceptado: RD$ ${updated.costoTotal ? parseFloat(updated.costoTotal).toLocaleString('es-DO', { minimumFractionDigits: 2 }) : '0.00'}`,
+        tipoMensaje: 'monto_aceptado',
+        montoAsociado: updated.costoTotal || undefined,
+      });
+
+      if (servicio.conductorId) {
+        await pushService.notifyNegotiationAmountAccepted(servicio.conductorId, parseFloat(updated.costoTotal || '0'));
+      }
+
+      if (serviceSessions.has(servicioId)) {
+        const broadcast = JSON.stringify({
+          type: 'amount_accepted',
+          payload: { servicio: updated, mensaje },
+        });
+        serviceSessions.get(servicioId)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Accept amount error', error);
+      res.status(500).json({ message: "Error al aceptar monto" });
+    }
+  });
+
+  app.post("/api/services/:id/reject-amount", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.clienteId !== req.user!.id) {
+        return res.status(403).json({ message: "Solo el cliente puede rechazar el monto" });
+      }
+
+      if (servicio.estadoNegociacion !== 'confirmado' && servicio.estadoNegociacion !== 'propuesto') {
+        return res.status(400).json({ message: "No hay monto pendiente para rechazar" });
+      }
+
+      const conductorIdAnterior = servicio.conductorId;
+      const updated = await storage.rejectNegotiationAmount(servicioId, req.user!.id);
+
+      const mensaje = await storage.createMensajeChatWithMedia({
+        servicioId,
+        remitenteId: req.user!.id,
+        contenido: 'El cliente ha rechazado el monto propuesto. El servicio está disponible nuevamente.',
+        tipoMensaje: 'monto_rechazado',
+      });
+
+      if (conductorIdAnterior) {
+        await pushService.notifyNegotiationAmountRejected(conductorIdAnterior);
+      }
+
+      if (serviceSessions.has(servicioId)) {
+        const broadcast = JSON.stringify({
+          type: 'amount_rejected',
+          payload: { servicio: updated, mensaje },
+        });
+        serviceSessions.get(servicioId)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Reject amount error', error);
+      res.status(500).json({ message: "Error al rechazar monto" });
+    }
+  });
+
   app.post("/api/push/subscribe", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authorized" });
@@ -4198,6 +4443,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cb(new Error('Formato de archivo no permitido'));
       }
     },
+  });
+
+  // Chat media upload for negotiation
+  const chatUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB for chat media
+    },
+    fileFilter: (_req, file, cb) => {
+      const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'video/quicktime', 'video/webm'];
+      if (allowedMimes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Formato de archivo no permitido. Solo imágenes y videos.'));
+      }
+    },
+  });
+
+  app.post("/api/chat/send-media", chatUpload.single('file'), async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { servicioId, contenido, tipoMensaje } = req.body;
+      
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Service not found" });
+      }
+
+      if (servicio.clienteId !== req.user!.id && servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to send messages in this service" });
+      }
+
+      let urlArchivo: string | undefined;
+      let nombreArchivo: string | undefined;
+      let detectedTipoMensaje = tipoMensaje || 'texto';
+
+      if (req.file) {
+        const fileName = `chat/${servicioId}/${Date.now()}-${req.file.originalname}`;
+        urlArchivo = await uploadDocument({
+          buffer: req.file.buffer,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          userId: req.user!.id,
+          documentType: 'chat_media',
+        });
+        nombreArchivo = req.file.originalname;
+        
+        if (req.file.mimetype.startsWith('video/')) {
+          detectedTipoMensaje = 'video';
+        } else if (req.file.mimetype.startsWith('image/')) {
+          detectedTipoMensaje = 'imagen';
+        }
+      }
+
+      const mensaje = await storage.createMensajeChatWithMedia({
+        servicioId,
+        remitenteId: req.user!.id,
+        contenido: contenido || '',
+        tipoMensaje: detectedTipoMensaje,
+        urlArchivo,
+        nombreArchivo,
+      });
+
+      const recipientId = servicio.clienteId === req.user!.id ? servicio.conductorId! : servicio.clienteId;
+      const senderName = `${req.user!.nombre} ${req.user!.apellido}`;
+      await pushService.notifyNewMessage(recipientId, senderName, nombreArchivo ? `📎 ${nombreArchivo}` : contenido);
+
+      if (serviceSessions.has(servicioId)) {
+        const broadcast = JSON.stringify({
+          type: 'new_chat_message',
+          payload: mensaje,
+        });
+        serviceSessions.get(servicioId)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
+
+      res.json(mensaje);
+    } catch (error: any) {
+      logSystem.error('Send media message error', error);
+      res.status(500).json({ message: "Failed to send media message" });
+    }
   });
 
   // Upload document (driver only)

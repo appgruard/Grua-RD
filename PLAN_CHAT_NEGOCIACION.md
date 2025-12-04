@@ -67,92 +67,100 @@ urlArchivo: text       // Para mensajes con archivos adjuntos (fotos/videos)
 
 ---
 
-## Fase 2: Backend - API y Lógica de Negocio
+## Fase 2: Backend - API y Lógica de Negocio ✅ COMPLETADA (4 Dic 2025)
 
-### 2.1 Nuevos Endpoints para Chat de Negociación
+### 2.1 Nuevos Endpoints para Chat de Negociación ✅
 **Archivo:** `server/routes.ts`
 
-**Endpoints a crear:**
+**Endpoints implementados:**
 
 ```
-POST /api/chat/send-media
+POST /api/chat/send-media ✅
 - Subir foto/video como evidencia
+- Usa multer con límite de 10MB
+- Detecta automáticamente tipo de mensaje (imagen/video)
 - Retorna URL del archivo
 
-POST /api/services/:id/propose-amount
+POST /api/services/:id/propose-amount ✅
 - Chofer propone un monto
 - Body: { monto: number, notas: string }
 - Crea mensaje de tipo 'monto_propuesto'
 - Actualiza estadoNegociacion a 'propuesto'
+- Envía notificación push al cliente
 
-POST /api/services/:id/confirm-amount
+POST /api/services/:id/confirm-amount ✅
 - Chofer confirma que el monto es final
-- Cambia tipo de mensaje a 'monto_confirmado'
+- Cambia estadoNegociacion a 'confirmado'
 - Envía notificación al cliente
 
-POST /api/services/:id/accept-amount
+POST /api/services/:id/accept-amount ✅
 - Cliente acepta el monto negociado
 - Actualiza estadoNegociacion a 'aceptado'
 - Actualiza costoTotal con montoNegociado
 - Cambia estado del servicio a 'aceptado'
 
-POST /api/services/:id/reject-amount
+POST /api/services/:id/reject-amount ✅
 - Cliente rechaza el monto
-- Puede solicitar nueva propuesta o cancelar
+- Limpia conductorId y montoNegociado
 - Actualiza estadoNegociacion a 'rechazado'
+- Servicio queda disponible nuevamente
 
-GET /api/drivers/available-requests
-- Lista de servicios solicitados sin asignar
-- Ordenados por prioridad (urgencia, distancia, tiempo)
-- Incluye identificadores únicos
+GET /api/drivers/available-requests ✅
+- Lista de servicios pendientes sin conductor asignado
+- Ordenados por fecha de creación (descendente)
 ```
 
-### 2.2 Detección Automática de Montos
+### 2.2 Detección Automática de Montos ✅
 **Archivo:** `server/services/chat-amount-detector.ts`
 
-**Lógica de detección:**
-```typescript
-// Patrones a detectar en mensajes del chofer:
-// - "RD$X,XXX" o "RD$ X,XXX"
-// - "$X,XXX"
-// - "X,XXX pesos"
-// - "el costo es X,XXX"
-// - "serían X,XXX"
-// - Números con formato de dinero (>= 500)
+**Implementado:**
+- ✅ Patrones múltiples para detectar montos en español dominicano
+- ✅ Soporte para formatos: "RD$X,XXX", "$X,XXX", "X,XXX pesos", "el costo es X,XXX", etc.
+- ✅ Límites de monto: mínimo RD$500, máximo RD$500,000
+- ✅ Funciones: `detectAmount()`, `isAmountMessage()`, `extractAllAmounts()`, `formatAmount()`
 
-function detectAmount(message: string): number | null
-function isAmountMessage(message: string): boolean
-```
-
-### 2.3 Sistema de Priorización de Servicios
+### 2.3 Sistema de Priorización de Servicios ✅
 **Archivo:** `server/services/service-priority.ts`
 
-**Criterios de prioridad:**
-1. **Alta prioridad (rojo):**
-   - Servicios de extracción urgente
-   - Accidentes
-   - Tiempo de espera > 30 minutos
+**Implementado:**
+- ✅ Sistema de puntuación basado en categoría, subtipo y tiempo de espera
+- ✅ Tres niveles de prioridad: alta (rojo), media (naranja), baja (verde)
+- ✅ Generación de IDs visuales por categoría (EXT-001, REM-002, etc.)
+- ✅ Funciones: `prioritizeServices()`, `getPriorityColor()`, `getPriorityLabel()`
 
-2. **Media prioridad (naranja):**
-   - Servicios normales > 15 minutos de espera
-   - Categorías especializadas
+### 2.4 WebSocket para Negociación en Tiempo Real ✅
+**Archivo:** `server/routes.ts` (integrado en la función registerRoutes)
 
-3. **Baja prioridad (verde):**
-   - Servicios recién creados
-   - Servicios estándar
-
-### 2.4 WebSocket para Negociación en Tiempo Real
-**Archivo:** `server/websocket.ts`
-
-**Nuevos tipos de mensaje:**
+**Tipos de mensaje WebSocket implementados:**
 ```typescript
-'amount_proposed'      // Chofer propuso monto
-'amount_confirmed'     // Chofer confirmó monto final
-'amount_accepted'      // Cliente aceptó
-'amount_rejected'      // Cliente rechazó
-'negotiation_update'   // Actualización general de negociación
-'new_available_request' // Nuevo servicio disponible para operadores
+'amount_proposed'      // ✅ Chofer propuso monto
+'amount_confirmed'     // ✅ Chofer confirmó monto final
+'amount_accepted'      // ✅ Cliente aceptó
+'amount_rejected'      // ✅ Cliente rechazó
+'new_chat_message'     // ✅ Mensaje con media/archivo
 ```
+
+### 2.5 Notificaciones Push de Negociación ✅
+**Archivo:** `server/push-service.ts`
+
+**Nuevas notificaciones implementadas:**
+- ✅ `notifyNegotiationAmountProposed()` - Al cliente cuando operador propone monto
+- ✅ `notifyNegotiationAmountConfirmed()` - Al cliente cuando operador confirma monto
+- ✅ `notifyNegotiationAmountAccepted()` - Al conductor cuando cliente acepta
+- ✅ `notifyNegotiationAmountRejected()` - Al conductor cuando cliente rechaza
+- ✅ `notifyNewExtractionRequest()` - A conductores para nuevas solicitudes de extracción
+
+### 2.6 Métodos de Storage ✅
+**Archivo:** `server/storage.ts`
+
+**Nuevos métodos implementados:**
+- ✅ `getAvailableServicesForDrivers()` - Obtener servicios pendientes sin conductor
+- ✅ `proposeNegotiationAmount()` - Proponer monto de negociación
+- ✅ `confirmNegotiationAmount()` - Confirmar monto propuesto
+- ✅ `acceptNegotiationAmount()` - Cliente acepta el monto
+- ✅ `rejectNegotiationAmount()` - Cliente rechaza el monto
+- ✅ `createMensajeChatWithMedia()` - Crear mensaje con archivos adjuntos
+- ✅ `getServiciosByNegociacionEstado()` - Filtrar por estado de negociación
 
 ---
 

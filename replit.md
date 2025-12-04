@@ -81,8 +81,8 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ### Negotiation Chat System (December 2025) - IN PROGRESS
 - **Document:** `PLAN_CHAT_NEGOCIACION.md`
-- **Status:** 🔄 Phase 1 (Schema) completed (December 4, 2025)
-- **Migration file:** `migrations/0008_negotiation_chat_system.sql` (pending execution)
+- **Status:** 🔄 Phase 1 (Schema) + Phase 2 (Backend) completed (December 4, 2025)
+- **Migration file:** `migrations/0008_negotiation_chat_system.sql` (executed via db:push)
 - **Purpose:** Dual chat system for Grúa RD tow truck platform
   - Normal chat for standard services (when driver accepts service)
   - Negotiation chat for extraction services with price proposal/acceptance flow
@@ -94,7 +94,19 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Schema changes:**
   - `servicios` table: Added `requiere_negociacion`, `estado_negociacion`, `monto_negociado`, `notas_extraccion`, `descripcion_situacion`
   - `mensajes_chat` table: Added `tipo_mensaje`, `monto_asociado`, `url_archivo`, `nombre_archivo`
-- **Remaining phases:** Backend API (2), Chat Components (3), Pages/Flows (4), Notifications (5), Minor Changes (6), Testing (7)
+- **Backend services created:**
+  - `server/services/chat-amount-detector.ts` - Amount detection in chat messages
+  - `server/services/service-priority.ts` - Service prioritization system
+- **New API endpoints:**
+  - `POST /api/chat/send-media` - Send media messages (images/videos)
+  - `POST /api/services/:id/propose-amount` - Driver proposes amount
+  - `POST /api/services/:id/confirm-amount` - Driver confirms amount
+  - `POST /api/services/:id/accept-amount` - Client accepts amount
+  - `POST /api/services/:id/reject-amount` - Client rejects amount
+  - `GET /api/drivers/available-requests` - List available service requests
+- **Push notifications added:** Amount proposed, confirmed, accepted, rejected notifications
+- **WebSocket messages:** amount_proposed, amount_confirmed, amount_accepted, amount_rejected
+- **Remaining phases:** Chat Components (3), Pages/Flows (4), Notifications (5), Minor Changes (6), Testing (7)
 
 ## Recent Code Audits
 

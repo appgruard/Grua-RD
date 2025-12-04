@@ -131,6 +131,51 @@ export class PushNotificationService {
       tag: `service-${servicioId}`,
     });
   }
+
+  async notifyNegotiationAmountProposed(clienteId: string, monto: number): Promise<void> {
+    await this.sendToUser(clienteId, {
+      title: 'Nueva cotización recibida',
+      body: `El operador ha propuesto RD$ ${monto.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`,
+      data: { type: 'negotiation_proposed', monto },
+      tag: 'negotiation',
+    });
+  }
+
+  async notifyNegotiationAmountConfirmed(clienteId: string, monto: number): Promise<void> {
+    await this.sendToUser(clienteId, {
+      title: 'Cotización confirmada',
+      body: `El operador ha confirmado el monto de RD$ ${monto.toLocaleString('es-DO', { minimumFractionDigits: 2 })}. Por favor responde.`,
+      data: { type: 'negotiation_confirmed', monto },
+      tag: 'negotiation',
+    });
+  }
+
+  async notifyNegotiationAmountAccepted(conductorId: string, monto: number): Promise<void> {
+    await this.sendToUser(conductorId, {
+      title: 'Cotización aceptada',
+      body: `El cliente ha aceptado tu cotización de RD$ ${monto.toLocaleString('es-DO', { minimumFractionDigits: 2 })}`,
+      data: { type: 'negotiation_accepted', monto },
+      tag: 'negotiation',
+    });
+  }
+
+  async notifyNegotiationAmountRejected(conductorId: string): Promise<void> {
+    await this.sendToUser(conductorId, {
+      title: 'Cotización rechazada',
+      body: 'El cliente ha rechazado tu cotización. El servicio está disponible nuevamente.',
+      data: { type: 'negotiation_rejected' },
+      tag: 'negotiation',
+    });
+  }
+
+  async notifyNewExtractionRequest(conductorId: string, origenDireccion: string): Promise<void> {
+    await this.sendToUser(conductorId, {
+      title: 'Nueva solicitud de extracción',
+      body: `Solicitud de extracción desde ${origenDireccion}. Requiere evaluación.`,
+      data: { type: 'new_extraction_request' },
+      tag: 'extraction-requests',
+    });
+  }
 }
 
 export const pushService = new PushNotificationService();

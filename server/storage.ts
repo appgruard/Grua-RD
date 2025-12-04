@@ -545,6 +545,15 @@ export interface IStorage {
     conductoresAsignados: number;
   }>;
   getEmpresaServiciosHistory(empresaId: string, limit?: number): Promise<ServicioProgramadoWithDetails[]>;
+
+  // Negotiation Chat System
+  getAvailableServicesForDrivers(): Promise<Servicio[]>;
+  proposeNegotiationAmount(servicioId: string, conductorId: string, monto: number, notas?: string): Promise<Servicio>;
+  confirmNegotiationAmount(servicioId: string, conductorId: string): Promise<Servicio>;
+  acceptNegotiationAmount(servicioId: string, clienteId: string): Promise<Servicio>;
+  rejectNegotiationAmount(servicioId: string, clienteId: string): Promise<Servicio>;
+  createMensajeChatWithMedia(mensaje: InsertMensajeChat & { tipoMensaje?: string; montoAsociado?: string; urlArchivo?: string; nombreArchivo?: string }): Promise<MensajeChat>;
+  getServiciosByNegociacionEstado(estado: string): Promise<Servicio[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1029,6 +1038,100 @@ export class DatabaseStorage implements IStorage {
           sql`${mensajesChat.remitenteId} != ${userId}`
         )
       );
+  }
+
+  // Negotiation Chat System
+  async getAvailableServicesForDrivers(): Promise<Servicio[]> {
+    return db
+      .select()
+      .from(servicios)
+      .where(
+        and(
+          eq(servicios.estado, 'pendiente'),
+          isNull(servicios.conductorId)
+        )
+      )
+      .orderBy(desc(servicios.createdAt));
+  }
+
+  async proposeNegotiationAmount(servicioId: string, conductorId: string, monto: number, notas?: string): Promise<Servicio> {
+    const [servicio] = await db
+      .update(servicios)
+      .set({
+        estadoNegociacion: 'propuesto',
+        montoNegociado: monto.toString(),
+        notasExtraccion: notas || null,
+        conductorId: conductorId,
+      })
+      .where(eq(servicios.id, servicioId))
+      .returning();
+    return servicio;
+  }
+
+  async confirmNegotiationAmount(servicioId: string, conductorId: string): Promise<Servicio> {
+    const servicio = await this.getServicioById(servicioId);
+    if (!servicio || servicio.conductorId !== conductorId) {
+      throw new Error('Servicio no encontrado o no autorizado');
+    }
+
+    const [updated] = await db
+      .update(servicios)
+      .set({
+        estadoNegociacion: 'confirmado',
+      })
+      .where(eq(servicios.id, servicioId))
+      .returning();
+    return updated;
+  }
+
+  async acceptNegotiationAmount(servicioId: string, clienteId: string): Promise<Servicio> {
+    const servicio = await this.getServicioById(servicioId);
+    if (!servicio || servicio.clienteId !== clienteId) {
+      throw new Error('Servicio no encontrado o no autorizado');
+    }
+
+    const [updated] = await db
+      .update(servicios)
+      .set({
+        estadoNegociacion: 'aceptado',
+        estado: 'aceptado',
+        costoTotal: servicio.montoNegociado || servicio.costoTotal,
+        aceptadoAt: new Date(),
+      })
+      .where(eq(servicios.id, servicioId))
+      .returning();
+    return updated;
+  }
+
+  async rejectNegotiationAmount(servicioId: string, clienteId: string): Promise<Servicio> {
+    const servicio = await this.getServicioById(servicioId);
+    if (!servicio || servicio.clienteId !== clienteId) {
+      throw new Error('Servicio no encontrado o no autorizado');
+    }
+
+    const [updated] = await db
+      .update(servicios)
+      .set({
+        estadoNegociacion: 'rechazado',
+        conductorId: null,
+        montoNegociado: null,
+      })
+      .where(eq(servicios.id, servicioId))
+      .returning();
+    return updated;
+  }
+
+  async createMensajeChatWithMedia(insertMensaje: InsertMensajeChat & { tipoMensaje?: string; montoAsociado?: string; urlArchivo?: string; nombreArchivo?: string }): Promise<MensajeChat> {
+    const [mensaje] = await db.insert(mensajesChat).values(insertMensaje as any).returning();
+    return mensaje;
+  }
+
+  async getServiciosByNegociacionEstado(estado: string): Promise<Servicio[]> {
+    return db
+      .select()
+      .from(servicios)
+      .where(eq(servicios.estadoNegociacion, estado as any))
+      .orderBy(desc(servicios.createdAt));
   }
 
   // Push Subscriptions
