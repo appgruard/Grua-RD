@@ -430,32 +430,6 @@ export default function DriverDashboard() {
 
   const needsVerification = user && (!user.cedulaVerificada || !user.telefonoVerificado);
 
-  if (isLoadingDriver) {
-    return (
-      <div className="flex flex-col h-full relative overflow-hidden">
-        <div className="flex-1 relative min-h-0 bg-muted animate-pulse" />
-        <div className="absolute top-3 left-3 right-3 z-10">
-          <Card className="p-3 bg-background/95 backdrop-blur-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-5 w-32" />
-              </div>
-              <Skeleton className="h-6 w-10 rounded-full" />
-            </div>
-          </Card>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border p-4 space-y-3">
-          <Skeleton className="h-4 w-48" />
-          <div className="space-y-2">
-            <Skeleton className="h-20 w-full rounded-lg" />
-            <Skeleton className="h-20 w-full rounded-lg" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
       {needsVerification && (
@@ -542,42 +516,54 @@ export default function DriverDashboard() {
       <div className="absolute top-3 left-3 right-3 z-10">
         <Card className="p-3 bg-background/95 backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "w-2 h-2 rounded-full flex-shrink-0",
-                  driverData?.disponible ? "bg-green-500" : "bg-muted-foreground"
-                )} />
-                <Label htmlFor="availability" className="text-base font-semibold truncate">
-                  {driverData?.disponible ? 'Disponible' : 'No disponible'}
-                </Label>
-              </div>
-              {driverDocuments && (() => {
-                const { complete, missing } = checkDocumentsComplete();
-                return (
-                  <div className="mt-1">
-                    {complete ? (
-                      <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-documents-complete">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Documentos OK
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive" className="gap-1 text-xs" data-testid="badge-documents-pending">
-                        <AlertCircle className="w-3 h-3" />
-                        {missing} pendiente{missing !== 1 ? 's' : ''}
-                      </Badge>
-                    )}
+            {isLoadingDriver ? (
+              <>
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-5 w-32" />
+                </div>
+                <Skeleton className="h-6 w-10 rounded-full" />
+              </>
+            ) : (
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "w-2 h-2 rounded-full flex-shrink-0",
+                      driverData?.disponible ? "bg-green-500" : "bg-muted-foreground"
+                    )} />
+                    <Label htmlFor="availability" className="text-base font-semibold truncate">
+                      {driverData?.disponible ? 'Disponible' : 'No disponible'}
+                    </Label>
                   </div>
-                );
-              })()}
-            </div>
-            <Switch
-              id="availability"
-              checked={driverData?.disponible || false}
-              onCheckedChange={(checked) => toggleAvailability.mutate(checked)}
-              disabled={toggleAvailability.isPending}
-              data-testid="switch-availability"
-            />
+                  {driverDocuments && (() => {
+                    const { complete, missing } = checkDocumentsComplete();
+                    return (
+                      <div className="mt-1">
+                        {complete ? (
+                          <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-documents-complete">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Documentos OK
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="gap-1 text-xs" data-testid="badge-documents-pending">
+                            <AlertCircle className="w-3 h-3" />
+                            {missing} pendiente{missing !== 1 ? 's' : ''}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+                <Switch
+                  id="availability"
+                  checked={driverData?.disponible || false}
+                  onCheckedChange={(checked) => toggleAvailability.mutate(checked)}
+                  disabled={toggleAvailability.isPending}
+                  data-testid="switch-availability"
+                />
+              </>
+            )}
           </div>
         </Card>
       </div>

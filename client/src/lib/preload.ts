@@ -76,10 +76,8 @@ export function preloadDriverModules() {
 
 export function prefetchUserData() {
   const endpoints = [
-    '/api/services/my-services',
     '/api/auth/me',
     '/api/drivers/me',
-    '/api/drivers/me/full',
   ];
 
   endpoints.forEach((endpoint) => {
