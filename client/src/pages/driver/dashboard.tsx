@@ -277,6 +277,28 @@ export default function DriverDashboard() {
     },
   });
 
+  const dismissService = useMutation({
+    mutationFn: async (serviceId: string) => {
+      const res = await apiRequest('POST', `/api/services/${serviceId}/dismiss`, {});
+      if (!res.ok) throw new Error('Failed to dismiss service');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/nearby-requests'] });
+      toast({
+        title: 'Servicio rechazado',
+        description: 'No verás este servicio nuevamente',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo rechazar el servicio',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const arrivedService = useMutation({
     mutationFn: async (serviceId: string) => {
       const res = await apiRequest('POST', `/api/services/${serviceId}/arrived`, {
@@ -945,8 +967,10 @@ export default function DriverDashboard() {
                       variant="outline"
                       className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
                       data-testid={`button-reject-${request.id}`}
+                      onClick={() => dismissService.mutate(request.id)}
+                      disabled={dismissService.isPending}
                     >
-                      Rechazar
+                      {dismissService.isPending ? 'Rechazando...' : 'Rechazar'}
                     </Button>
                     {request.requiereNegociacion ? (
                       <Button

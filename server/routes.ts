@@ -2806,11 +2806,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
       const requests = await storage.getPendingServicios();
-      res.json(requests);
+      
+      const conductorServicios = await storage.getConductorServicios(conductor.id);
+      const driverCategories = conductorServicios.map(s => s.categoriaServicio);
+      
+      const conductorVehiculos = await storage.getConductorVehiculos(conductor.id);
+      const vehicleCategories = conductorVehiculos.filter(v => v.activo).map(v => v.categoria);
+      
+      const dismissedServiceIds = await storage.getDismissedServiceIds(conductor.id);
+      
+      const filteredRequests = requests.filter(request => {
+        if (dismissedServiceIds.includes(request.id)) {
+          return false;
+        }
+        
+        const serviceCategory = request.servicioCategoria;
+        
+        if (!serviceCategory) {
+          if (driverCategories.includes('remolque_estandar') && vehicleCategories.includes('remolque_estandar')) {
+            return true;
+          }
+          return false;
+        }
+        
+        if (!driverCategories.includes(serviceCategory)) {
+          return false;
+        }
+        
+        if (!vehicleCategories.includes(serviceCategory)) {
+          return false;
+        }
+        
+        return true;
+      });
+      
+      res.json(filteredRequests);
     } catch (error: any) {
       logSystem.error('Get nearby requests error', error);
       res.status(500).json({ message: "Failed to get requests" });
+    }
+  });
+
+  app.post("/api/services/:id/dismiss", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const serviceId = req.params.id;
+      
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+      
+      const servicio = await storage.getServicioById(serviceId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+      
+      if (servicio.estado !== 'pendiente') {
+        return res.status(400).json({ message: "Solo se pueden rechazar servicios pendientes" });
+      }
+      
+      await storage.dismissService(conductor.id, serviceId);
+      
+      res.json({ success: true, message: "Servicio rechazado" });
+    } catch (error: any) {
+      logSystem.error('Dismiss service error', error);
+      res.status(500).json({ message: "Error al rechazar servicio" });
     }
   });
 

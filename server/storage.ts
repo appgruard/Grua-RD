@@ -6,6 +6,7 @@ import {
   conductorServicios,
   conductorServicioSubtipos,
   conductorVehiculos,
+  dismissedServices,
   servicios,
   tarifas,
   calificaciones,
@@ -201,6 +202,10 @@ export interface IStorage {
   getAllServicios(): Promise<ServicioWithDetails[]>;
   updateServicio(id: string, data: Partial<Servicio>): Promise<Servicio>;
   acceptServicio(id: string, conductorId: string, vehiculoId?: string): Promise<Servicio>;
+
+  // Dismissed Services (services rejected by drivers)
+  dismissService(conductorId: string, servicioId: string): Promise<void>;
+  getDismissedServiceIds(conductorId: string): Promise<string[]>;
 
   // Tarifas
   createTarifa(tarifa: InsertTarifa): Promise<Tarifa>;
@@ -979,6 +984,34 @@ export class DatabaseStorage implements IStorage {
       .where(eq(servicios.id, id))
       .returning();
     return servicio;
+  }
+
+  // Dismissed Services
+  async dismissService(conductorId: string, servicioId: string): Promise<void> {
+    const existing = await db
+      .select()
+      .from(dismissedServices)
+      .where(and(
+        eq(dismissedServices.conductorId, conductorId),
+        eq(dismissedServices.servicioId, servicioId)
+      ))
+      .limit(1);
+    
+    if (existing.length === 0) {
+      await db.insert(dismissedServices).values({
+        conductorId,
+        servicioId,
+      });
+    }
+  }
+
+  async getDismissedServiceIds(conductorId: string): Promise<string[]> {
+    const dismissed = await db
+      .select({ servicioId: dismissedServices.servicioId })
+      .from(dismissedServices)
+      .where(eq(dismissedServices.conductorId, conductorId));
+    
+    return dismissed.map(d => d.servicioId);
   }
 
   // Tarifas

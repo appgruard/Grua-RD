@@ -275,6 +275,16 @@ export const servicios = pgTable("servicios", {
   canceladoAt: timestamp("cancelado_at"),
 });
 
+// Dismissed Services Table (services rejected by drivers)
+export const dismissedServices = pgTable("dismissed_services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
+  servicioId: varchar("servicio_id").notNull().references(() => servicios.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueConductorServicio: sql`CONSTRAINT unique_conductor_servicio UNIQUE (conductor_id, servicio_id)`,
+}));
+
 // Tarifas (Pricing) Table
 export const tarifas = pgTable("tarifas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

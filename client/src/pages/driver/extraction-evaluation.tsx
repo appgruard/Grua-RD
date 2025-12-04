@@ -12,8 +12,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { NegotiationChatBox } from '@/components/chat/NegotiationChatBox';
 import { MapboxMap } from '@/components/maps/MapboxMap';
-import { ArrowLeft, MapPin, AlertTriangle, Car, DollarSign, Loader2, MessageCircle, Camera, Send } from 'lucide-react';
-import type { ServicioWithDetails, Conductor } from '@shared/schema';
+import { ArrowLeft, MapPin, AlertTriangle, Car, DollarSign, Loader2, MessageCircle, Camera, Send, Image as ImageIcon, Eye } from 'lucide-react';
+import type { ServicioWithDetails, Conductor, MensajeChat } from '@shared/schema';
 import { cn } from '@/lib/utils';
 
 const extractionSubtypeLabels: Record<string, string> = {
@@ -73,6 +73,7 @@ export default function ExtractionEvaluation() {
 
   const [showChat, setShowChat] = useState(false);
   const [proposedAmount, setProposedAmount] = useState('');
+  const [hasViewedChat, setHasViewedChat] = useState(false);
 
   const { data: driverData } = useQuery<Conductor>({
     queryKey: ['/api/drivers/me'],
@@ -83,6 +84,18 @@ export default function ExtractionEvaluation() {
     enabled: !!serviceId,
     refetchInterval: 5000,
   });
+
+  const { data: chatMessages = [] } = useQuery<MensajeChat[]>({
+    queryKey: ['/api/chat', serviceId],
+    enabled: !!serviceId,
+  });
+
+  const hasEvidence = chatMessages.some(msg => 
+    msg.tipoMensaje === 'imagen' || msg.tipoMensaje === 'video'
+  );
+  const evidenceCount = chatMessages.filter(msg => 
+    msg.tipoMensaje === 'imagen' || msg.tipoMensaje === 'video'
+  ).length;
 
   const acceptAndPropose = useMutation({
     mutationFn: async () => {
@@ -243,42 +256,102 @@ export default function ExtractionEvaluation() {
             )}
 
             {service.estadoNegociacion === 'pendiente_evaluacion' && !service.conductorId && (
-              <Card className="p-3 sm:p-4">
-                <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-primary flex-shrink-0" />
-                  Proponer Precio
-                </h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                  Evalua la situacion y proporciona un precio justo para el servicio de extraccion.
-                </p>
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="amount" className="text-xs sm:text-sm">Monto propuesto (RD$)</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      placeholder="Ej: 5000"
-                      value={proposedAmount}
-                      onChange={(e) => setProposedAmount(e.target.value)}
-                      className="text-base sm:text-lg"
-                      data-testid="input-proposed-amount"
-                    />
-                  </div>
-                  <Button
-                    className="w-full h-11 sm:h-12 text-sm sm:text-base"
-                    onClick={() => acceptAndPropose.mutate()}
-                    disabled={!proposedAmount || acceptAndPropose.isPending}
-                    data-testid="button-accept-and-propose"
-                  >
-                    {acceptAndPropose.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4 mr-2" />
-                    )}
-                    Aceptar y Enviar Propuesta
-                  </Button>
-                </div>
-              </Card>
+              <>
+                {hasEvidence && (
+                  <Card className="p-3 sm:p-4 bg-blue-500/5 border-blue-500/30">
+                    <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2 text-blue-600">
+                      <ImageIcon className="w-4 h-4 flex-shrink-0" />
+                      Evidencia Disponible
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3">
+                      El cliente ha enviado {evidenceCount} {evidenceCount === 1 ? 'archivo' : 'archivos'} de evidencia. Revisa las fotos/videos en el chat para evaluar la situacion.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 border-blue-500/50 text-blue-600 hover:bg-blue-500/10"
+                      onClick={() => {
+                        setShowChat(true);
+                        setHasViewedChat(true);
+                      }}
+                      data-testid="button-view-evidence"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Ver Evidencia en Chat
+                    </Button>
+                  </Card>
+                )}
+
+                {!hasViewedChat ? (
+                  <Card className="p-3 sm:p-4 border-primary/30">
+                    <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                      Paso 1: Evaluar Situacion
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                      Antes de proponer un monto, debes comunicarte con el cliente para entender mejor la situacion. Usa el chat para solicitar fotos, videos o mas detalles.
+                    </p>
+                    <Button
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base"
+                      onClick={() => {
+                        setShowChat(true);
+                        setHasViewedChat(true);
+                      }}
+                      data-testid="button-start-evaluation"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Iniciar Evaluacion con Cliente
+                    </Button>
+                  </Card>
+                ) : (
+                  <Card className="p-3 sm:p-4">
+                    <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-primary flex-shrink-0" />
+                      Paso 2: Proponer Precio
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                      Basado en tu evaluacion, proporciona un precio justo para el servicio de extraccion.
+                    </p>
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="amount" className="text-xs sm:text-sm">Monto propuesto (RD$)</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          placeholder="Ej: 5000"
+                          value={proposedAmount}
+                          onChange={(e) => setProposedAmount(e.target.value)}
+                          className="text-base sm:text-lg"
+                          data-testid="input-proposed-amount"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setShowChat(true)}
+                          data-testid="button-back-to-chat"
+                        >
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          Volver al Chat
+                        </Button>
+                        <Button
+                          className="flex-1 h-11 sm:h-12 text-sm sm:text-base"
+                          onClick={() => acceptAndPropose.mutate()}
+                          disabled={!proposedAmount || acceptAndPropose.isPending}
+                          data-testid="button-accept-and-propose"
+                        >
+                          {acceptAndPropose.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4 mr-2" />
+                          )}
+                          Enviar Propuesta
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+              </>
             )}
 
             {service.montoNegociado && (
