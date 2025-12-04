@@ -240,73 +240,67 @@ GET /api/drivers/available-requests ✅
 
 ---
 
-## Fase 4: Frontend - Páginas y Flujos
+## Fase 4: Frontend - Páginas y Flujos ✅ COMPLETADA (4 Dic 2025)
 
-### 4.1 Flujo de Solicitud de Extracción (Cliente)
+### 4.1 Flujo de Solicitud de Extracción (Cliente) ✅
 **Archivo:** `client/src/pages/client/home.tsx`
 
-**Cambios:**
-- Añadir categoría "Extracción" al selector
-- Cuando se selecciona extracción:
-  - Mostrar mensaje: "Este servicio requiere evaluación"
-  - Indicar que el precio se definirá tras evaluar
-  - Solicitar descripción inicial de la situación
-  - Permitir subir foto/video inicial (opcional)
+**Implementado:**
+- ✅ Categoría "Extracción" disponible en ServiceCategorySelector
+- ✅ Subtipos de extracción en ServiceSubtypeSelector:
+  - zanja, lodo, volcado, accidente, dificil
+- ✅ Al seleccionar extracción:
+  - Flujo especial sin paso de precios
+  - Descripción de la situación obligatoria
+  - Mensaje indicando que se requiere evaluación
+  - Flag requiereNegociacion = true automático
+  - estadoNegociacion = 'pendiente_evaluacion' automático
 
-### 4.2 Lista de Servicios Disponibles (Operador)
+### 4.2 Lista de Servicios Disponibles (Operador) ✅
 **Archivo:** `client/src/pages/driver/dashboard.tsx`
 
-**Nuevo componente bajo el mapa:**
-```
-┌─────────────────────────────────────┐
-│ 📋 Servicios Disponibles (3)        │
-├─────────────────────────────────────┤
-│ 🔴 #EXT-001 | Extracción            │
-│    📍 Av. 27 de Febrero             │
-│    ⏱️ Hace 25 min | 🚗 Toyota Camry │
-│    [ Ver Detalles ] [ Tomar ]       │
-├─────────────────────────────────────┤
-│ 🟠 #REM-045 | Remolque Estándar     │
-│    📍 C/ El Conde                   │
-│    ⏱️ Hace 12 min | 🚗 Honda Civic  │
-│    [ Ver Detalles ] [ Tomar ]       │
-├─────────────────────────────────────┤
-│ 🟢 #AUX-023 | Auxilio Vial          │
-│    📍 Av. Lincoln                   │
-│    ⏱️ Hace 2 min | 🏍️ Pasola       │
-│    [ Ver Detalles ] [ Tomar ]       │
-└─────────────────────────────────────┘
-```
+**Implementado:**
+- ✅ Lista scrollable de solicitudes cercanas bajo el mapa
+- ✅ Para servicios de extracción:
+  - Badge "Requiere Negociación" en color ámbar
+  - Muestra descripción de la situación (truncada)
+  - Precio muestra "Por negociar" en lugar de monto fijo
+  - Botón "Ver y Evaluar" (navega a extraction-evaluation)
+- ✅ Para servicios normales:
+  - Muestra precio calculado
+  - Botón "Aceptar" directo
+- ✅ Drawer de chat usa NegotiationChatBox para servicios de negociación
+- ✅ Card de servicio activo muestra info de extracción y monto negociado
 
-**Funcionalidades:**
-- Lista scrollable debajo del mapa
-- Ordenamiento por prioridad (color-coded)
-- ID único visible (formato: CAT-XXX)
-- Información clave: ubicación, tiempo, tipo vehículo
-- Botón "Tomar" para servicios normales
-- Botón "Ver y Evaluar" para servicios de extracción
-
-### 4.3 Página de Evaluación de Extracción (Operador)
+### 4.3 Página de Evaluación de Extracción (Operador) ✅
 **Archivo:** `client/src/pages/driver/extraction-evaluation.tsx`
 
-**Flujo:**
-1. Ver fotos/videos enviados por cliente
-2. Chat para solicitar más información
-3. Enviar propias fotos de evaluación
-4. Ingresar monto propuesto
-5. Añadir notas de la situación
-6. Confirmar y enviar cotización
-7. Esperar respuesta del cliente
+**Implementado:**
+- ✅ Vista de mapa con ubicación del vehículo
+- ✅ Card con ubicación y dirección
+- ✅ Card con tipo de vehículo y subtipo de extracción
+- ✅ Card destacado con descripción de la situación (fondo ámbar)
+- ✅ Card de cliente con nombre
+- ✅ Input de monto propuesto con validación
+- ✅ Botón "Aceptar y Enviar Propuesta" que:
+  - Acepta el servicio
+  - Envía propuesta de monto
+  - Redirige al dashboard
+- ✅ Vista de monto acordado (cuando existe)
+- ✅ Botón para abrir chat de negociación
+- ✅ NegotiationChatBox integrado
+- ✅ Ruta: `/driver/extraction-evaluation/:id`
 
-### 4.4 Página de Seguimiento con Negociación (Cliente)
+### 4.4 Página de Seguimiento con Negociación (Cliente) ✅
 **Archivo:** `client/src/pages/client/tracking.tsx`
 
-**Cambios para servicios de extracción:**
-- Mostrar estado de negociación
-- Integrar chat de negociación
-- Mostrar cotización recibida
-- Botones para aceptar/rechazar
-- Actualizar tracking cuando se acepte
+**Implementado:**
+- ✅ Detección automática de servicios de negociación
+- ✅ Badge de estado de negociación con colores semánticos
+- ✅ Muestra monto negociado cuando está disponible
+- ✅ Card especial para servicios de extracción (fondo ámbar)
+- ✅ Drawer usa NegotiationChatBox para servicios de negociación
+- ✅ Título del drawer cambia según tipo de servicio
 
 ---
 

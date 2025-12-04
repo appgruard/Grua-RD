@@ -764,18 +764,28 @@ export default function DriverDashboard() {
                     >
                       Rechazar
                     </Button>
-                    <Button
-                      className="flex-1 h-10"
-                      onClick={() => acceptService.mutate(request.id)}
-                      disabled={acceptService.isPending}
-                      data-testid={`button-accept-${request.id}`}
-                    >
-                      {acceptService.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        'Aceptar'
-                      )}
-                    </Button>
+                    {request.requiereNegociacion ? (
+                      <Button
+                        className="flex-1 h-10 bg-amber-600 hover:bg-amber-700"
+                        onClick={() => setLocation(`/driver/extraction-evaluation/${request.id}`)}
+                        data-testid={`button-evaluate-${request.id}`}
+                      >
+                        Ver y Evaluar
+                      </Button>
+                    ) : (
+                      <Button
+                        className="flex-1 h-10"
+                        onClick={() => acceptService.mutate(request.id)}
+                        disabled={acceptService.isPending}
+                        data-testid={`button-accept-${request.id}`}
+                      >
+                        {acceptService.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Aceptar'
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>
