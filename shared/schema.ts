@@ -1938,6 +1938,99 @@ export type EmpresaContratoWithDetails = EmpresaContrato & {
 
 // ==================== END TYPES: EMPRESAS / CONTRATOS EMPRESARIALES ====================
 
+// ==================== OPERATOR WALLET SYSTEM ====================
+
+// Enum for wallet transaction types
+export const tipoTransaccionBilleteraEnum = pgEnum("tipo_transaccion_billetera", [
+  "cash_commission",      // Comisión generada por pago en efectivo (deuda)
+  "card_payment",         // Pago del cliente con tarjeta (ganancia)
+  "debt_payment",         // Pago automático de deuda desde servicio con tarjeta
+  "direct_payment",       // Pago directo de deuda con tarjeta del operador
+  "withdrawal",           // Retiro de fondos
+  "adjustment"            // Ajuste manual por admin
+]);
+
+// Enum for debt status
+export const estadoDeudaEnum = pgEnum("estado_deuda", [
+  "pending",              // Deuda pendiente de pago
+  "partial",              // Parcialmente pagada
+  "paid",                 // Completamente pagada
+  "overdue"               // Vencida (pasaron 15 días)
+]);
+
+// Operator Wallets Table
+export const operatorWallets = pgTable("operator_wallets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorId: varchar("conductor_id").notNull().unique().references(() => conductores.id, { onDelete: "cascade" }),
+  balance: decimal("balance", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  totalDebt: decimal("total_debt", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  cashServicesBlocked: boolean("cash_services_blocked").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Wallet Transactions Table
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  walletId: varchar("wallet_id").notNull().references(() => operatorWallets.id, { onDelete: "cascade" }),
+  servicioId: varchar("servicio_id").references(() => servicios.id, { onDelete: "set null" }),
+  type: tipoTransaccionBilleteraEnum("type").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }),
+  paymentIntentId: text("payment_intent_id"),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Operator Debts Table
+export const operatorDebts = pgTable("operator_debts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  walletId: varchar("wallet_id").notNull().references(() => operatorWallets.id, { onDelete: "cascade" }),
+  servicioId: varchar("servicio_id").references(() => servicios.id, { onDelete: "set null" }),
+  originalAmount: decimal("original_amount", { precision: 12, scale: 2 }).notNull(),
+  remainingAmount: decimal("remaining_amount", { precision: 12, scale: 2 }).notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  status: estadoDeudaEnum("status").default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  paidAt: timestamp("paid_at"),
+});
+
+// Operator Wallet Relations
+export const operatorWalletsRelations = relations(operatorWallets, ({ one, many }) => ({
+  conductor: one(conductores, {
+    fields: [operatorWallets.conductorId],
+    references: [conductores.id],
+  }),
+  transactions: many(walletTransactions),
+  debts: many(operatorDebts),
+}));
+
+// Wallet Transactions Relations
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  wallet: one(operatorWallets, {
+    fields: [walletTransactions.walletId],
+    references: [operatorWallets.id],
+  }),
+  servicio: one(servicios, {
+    fields: [walletTransactions.servicioId],
+    references: [servicios.id],
+  }),
+}));
+
+// Operator Debts Relations
+export const operatorDebtsRelations = relations(operatorDebts, ({ one }) => ({
+  wallet: one(operatorWallets, {
+    fields: [operatorDebts.walletId],
+    references: [operatorWallets.id],
+  }),
+  servicio: one(servicios, {
+    fields: [operatorDebts.servicioId],
+    references: [servicios.id],
+  }),
+}));
+
+// ==================== END OPERATOR WALLET SYSTEM ====================
+
 // ==================== TICKET SYSTEM ====================
 
 // Ticket Enums
