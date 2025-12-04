@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRoute } from 'wouter';
 import { MapboxMap } from '@/components/maps/MapboxMap';
 import { Card } from '@/components/ui/card';
@@ -7,25 +7,47 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign, Navigation, Clock } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from '@/lib/auth';
 import { ChatBox } from '@/components/chat/ChatBox';
 import { NegotiationChatBox } from '@/components/chat/NegotiationChatBox';
 import { RatingModal, StarRating } from '@/components/RatingModal';
 import { PaymentConfirmationModal } from '@/components/PaymentConfirmationModal';
+import { getDirections, formatDuration, formatDistance, formatETATime, calculateETATime } from '@/lib/mapbox-directions';
 import type { ServicioWithDetails, Calificacion } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
+
+interface DriverLocationUpdate {
+  lat: number;
+  lng: number;
+  speed: number;
+  heading: number;
+  timestamp: number;
+  driverStatus: string;
+  statusMessage: string;
+  distanceRemaining: number;
+}
 
 export default function ClientTracking() {
   const [, params] = useRoute('/client/tracking/:id');
   const serviceId = params?.id;
+  const queryClient = useQueryClient();
   const [driverLocation, setDriverLocation] = useState<Coordinates | null>(null);
+  const [driverInfo, setDriverInfo] = useState<{
+    speed: number;
+    statusMessage: string;
+    distanceRemaining: number;
+    lastUpdate: number;
+  } | null>(null);
+  const [eta, setEta] = useState<{ minutes: number; arrivalTime: Date } | null>(null);
+  const [routeGeometry, setRouteGeometry] = useState<GeoJSON.LineString | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [paymentConfirmationOpen, setPaymentConfirmationOpen] = useState(false);
   const [hasShownCompletionFlow, setHasShownCompletionFlow] = useState(false);
+  const lastRouteCalcRef = useRef<number>(0);
   const { user } = useAuth();
 
   const { data: service, isLoading } = useQuery<ServicioWithDetails>({
@@ -53,12 +75,39 @@ export default function ClientTracking() {
 
   const { send } = useWebSocket((message) => {
     if (message.type === 'driver_location_update' && message.payload.servicioId === serviceId) {
+      const payload = message.payload as DriverLocationUpdate;
       setDriverLocation({
-        lat: parseFloat(message.payload.lat),
-        lng: parseFloat(message.payload.lng),
+        lat: payload.lat,
+        lng: payload.lng,
       });
+      setDriverInfo({
+        speed: payload.speed,
+        statusMessage: payload.statusMessage,
+        distanceRemaining: payload.distanceRemaining,
+        lastUpdate: payload.timestamp || Date.now(),
+      });
+      
+      const now = Date.now();
+      if (now - lastRouteCalcRef.current > 30000 && service) {
+        lastRouteCalcRef.current = now;
+        const target = service.estado === 'en_progreso' 
+          ? { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) }
+          : { lat: parseFloat(service.origenLat as string), lng: parseFloat(service.origenLng as string) };
+        
+        getDirections({ lat: payload.lat, lng: payload.lng }, target).then(result => {
+          if (result.geometry) {
+            setRouteGeometry(result.geometry);
+          }
+          const etaMinutes = Math.ceil(result.duration / 60);
+          setEta({
+            minutes: etaMinutes,
+            arrivalTime: calculateETATime(result.duration)
+          });
+        }).catch(console.error);
+      }
     }
     if (message.type === 'service_status_change' && message.payload.id === serviceId) {
+      queryClient.invalidateQueries({ queryKey: ['/api/services', serviceId] });
       if (message.payload.estado === 'completado' && !hasShownCompletionFlow && isRatingFetched && existingRating === null) {
         setHasShownCompletionFlow(true);
         showCompletionFlow();
@@ -146,6 +195,7 @@ export default function ClientTracking() {
           center={driverLocation || origin}
           markers={markers}
           className="absolute inset-0"
+          routeGeometry={routeGeometry}
         />
       </div>
 
@@ -197,6 +247,35 @@ export default function ClientTracking() {
             )}
           </div>
         </Card>
+
+        {driverInfo && ['aceptado', 'conductor_en_sitio', 'cargando', 'en_progreso'].includes(service.estado) && (
+          <Card className="p-4" data-testid="card-driver-status">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10">
+                <Truck className="w-6 h-6 text-primary animate-pulse" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-lg" data-testid="text-driver-status">
+                  {driverInfo.statusMessage}
+                </p>
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  {eta && (
+                    <span className="flex items-center gap-1" data-testid="text-eta">
+                      <Clock className="w-4 h-4" />
+                      Llega en ~{eta.minutes} min ({formatETATime(eta.arrivalTime)})
+                    </span>
+                  )}
+                  {driverInfo.distanceRemaining > 0 && (
+                    <span className="flex items-center gap-1" data-testid="text-distance">
+                      <Navigation className="w-4 h-4" />
+                      {formatDistance(driverInfo.distanceRemaining)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {isNegotiationService && service.estado === 'pendiente' && (
           <Alert className="bg-amber-500/10 border-amber-500/30">

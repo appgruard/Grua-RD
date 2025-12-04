@@ -267,6 +267,8 @@ export const servicios = pgTable("servicios", {
   descripcionSituacion: text("descripcion_situacion"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   aceptadoAt: timestamp("aceptado_at"),
+  conductorEnSitioAt: timestamp("conductor_en_sitio_at"),
+  cargandoAt: timestamp("cargando_at"),
   iniciadoAt: timestamp("iniciado_at"),
   completadoAt: timestamp("completado_at"),
   canceladoAt: timestamp("cancelado_at"),

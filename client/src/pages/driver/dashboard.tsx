@@ -17,6 +17,7 @@ import { ChatBox } from '@/components/chat/ChatBox';
 import { NegotiationChatBox } from '@/components/chat/NegotiationChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLocationTracking } from '@/hooks/useLocation';
+import { calculateDistance } from '@/hooks/useDriverLocation';
 import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { SiWaze, SiGooglemaps } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
@@ -204,8 +205,16 @@ export default function DriverDashboard() {
 
   const arrivedService = useMutation({
     mutationFn: async (serviceId: string) => {
-      const res = await apiRequest('POST', `/api/services/${serviceId}/arrived`, {});
-      if (!res.ok) throw new Error('Failed to update service');
+      const res = await apiRequest('POST', `/api/services/${serviceId}/arrived`, {
+        lat: currentLocation.lat,
+        lng: currentLocation.lng
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const error = new Error(errorData.message || 'Failed to update service') as Error & { response?: any };
+        error.response = errorData;
+        throw error;
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -215,12 +224,21 @@ export default function DriverDashboard() {
         description: 'El cliente ha sido notificado',
       });
     },
-    onError: () => {
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar el estado',
-        variant: 'destructive',
-      });
+    onError: (error: any) => {
+      const errorResponse = error?.response;
+      if (errorResponse?.distancia) {
+        toast({
+          title: 'Demasiado lejos',
+          description: `Debes estar a menos de ${errorResponse.required}m del punto de recogida. Distancia actual: ${errorResponse.distancia}m`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: errorResponse?.message || 'No se pudo actualizar el estado',
+          variant: 'destructive',
+        });
+      }
     },
   });
 
@@ -611,21 +629,44 @@ export default function DriverDashboard() {
                 </div>
               </div>
 
-              {activeService.estado === 'aceptado' && (
-                <Button 
-                  className="w-full h-12" 
-                  onClick={() => arrivedService.mutate(activeService.id)}
-                  disabled={arrivedService.isPending}
-                  data-testid="button-arrived"
-                >
-                  {arrivedService.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <MapPin className="w-4 h-4 mr-2" />
-                  )}
-                  He Llegado al Punto
-                </Button>
-              )}
+              {activeService.estado === 'aceptado' && (() => {
+                const origenLat = typeof activeService.origenLat === 'string' ? parseFloat(activeService.origenLat) : activeService.origenLat;
+                const origenLng = typeof activeService.origenLng === 'string' ? parseFloat(activeService.origenLng) : activeService.origenLng;
+                const distanceToPickup = calculateDistance(
+                  currentLocation.lat,
+                  currentLocation.lng,
+                  origenLat,
+                  origenLng
+                );
+                const isWithinRange = distanceToPickup <= 60;
+                const distanceText = distanceToPickup < 1000 
+                  ? `${Math.round(distanceToPickup)}m` 
+                  : `${(distanceToPickup / 1000).toFixed(1)}km`;
+                
+                return (
+                  <div className="space-y-2">
+                    {!isWithinRange && (
+                      <div className="text-center text-sm text-muted-foreground">
+                        <Navigation className="w-4 h-4 inline mr-1" />
+                        Distancia al punto: <span className="font-medium">{distanceText}</span>
+                      </div>
+                    )}
+                    <Button 
+                      className="w-full h-12" 
+                      onClick={() => arrivedService.mutate(activeService.id)}
+                      disabled={arrivedService.isPending || !isWithinRange}
+                      data-testid="button-arrived"
+                    >
+                      {arrivedService.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <MapPin className="w-4 h-4 mr-2" />
+                      )}
+                      {isWithinRange ? 'He Llegado al Punto' : `Acércate al punto (${distanceText})`}
+                    </Button>
+                  </div>
+                );
+              })()}
 
               {activeService.estado === 'conductor_en_sitio' && (
                 <Button 

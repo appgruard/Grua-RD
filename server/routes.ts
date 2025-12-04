@@ -22,6 +22,8 @@ import { pdfService } from "./services/pdf-service";
 import { insuranceValidationService, getSupportedInsurers, InsurerCode } from "./services/insurance";
 import { documentValidationService } from "./services/document-validation";
 import { initServiceAutoCancellation, SERVICE_TIMEOUT_MINUTES } from "./services/service-auto-cancel";
+import { calculateHaversineDistance, GEOFENCE_RADIUS_METERS, type Coordinates } from "./utils/geo";
+import { calculateDriverStatus } from "./utils/driver-status";
 
 // Zod validation schemas for aseguradora/admin endpoints
 const updateAseguradoraPerfilSchema = z.object({
@@ -593,7 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             break;
 
           case 'update_location':
-            const { servicioId, conductorId, lat, lng } = message.payload;
+            const { servicioId, conductorId, lat, lng, speed, heading, accuracy } = message.payload;
             
             await storage.createUbicacionTracking({
               servicioId,
@@ -603,9 +605,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
 
             if (serviceSessions.has(servicioId)) {
+              const servicio = await storage.getServicioById(servicioId);
+              let driverStatusInfo = { status: 'en_camino', message: 'En servicio', distanceToTarget: 0 };
+              
+              if (servicio) {
+                const driverLocation: Coordinates = { lat: Number(lat), lng: Number(lng) };
+                driverStatusInfo = calculateDriverStatus(driverLocation, {
+                  origenLat: Number(servicio.origenLat),
+                  origenLng: Number(servicio.origenLng),
+                  destinoLat: Number(servicio.destinoLat),
+                  destinoLng: Number(servicio.destinoLng),
+                  estado: servicio.estado
+                }, speed || 0);
+              }
+
               const broadcast = JSON.stringify({
                 type: 'driver_location_update',
-                payload: { servicioId, lat, lng },
+                payload: {
+                  servicioId,
+                  lat,
+                  lng,
+                  speed: speed || 0,
+                  heading: heading || 0,
+                  accuracy: accuracy || 0,
+                  timestamp: Date.now(),
+                  driverStatus: driverStatusInfo.status,
+                  statusMessage: driverStatusInfo.message,
+                  distanceRemaining: Math.round(driverStatusInfo.distanceToTarget)
+                },
               });
               serviceSessions.get(servicioId)!.forEach((client) => {
                 if (client.readyState === WebSocket.OPEN) {
@@ -2867,17 +2894,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const arrivedSchema = z.object({
+    lat: z.number().finite().min(-90).max(90),
+    lng: z.number().finite().min(-180).max(180),
+  });
+
   app.post("/api/services/:id/arrived", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
       return res.status(401).json({ message: "Not authorized" });
     }
 
     try {
+      const parseResult = arrivedSchema.safeParse(req.body);
+      
+      if (!parseResult.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Coordenadas de ubicación inválidas. Se requieren lat y lng válidos.",
+          errors: parseResult.error.issues
+        });
+      }
+
+      const { lat, lng } = parseResult.data;
+      const existingServicio = await storage.getServicioById(req.params.id);
+      
+      if (!existingServicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      const driverLocation: Coordinates = { lat, lng };
+      const pickupLocation: Coordinates = {
+        lat: Number(existingServicio.origenLat),
+        lng: Number(existingServicio.origenLng)
+      };
+      
+      const distance = calculateHaversineDistance(driverLocation, pickupLocation);
+      
+      if (distance > GEOFENCE_RADIUS_METERS) {
+        return res.status(400).json({
+          success: false,
+          message: `Debes estar a menos de ${GEOFENCE_RADIUS_METERS} metros del punto de recogida`,
+          distancia: Math.round(distance),
+          required: GEOFENCE_RADIUS_METERS
+        });
+      }
+
       const servicio = await storage.updateServicio(req.params.id, {
         estado: 'conductor_en_sitio',
+        conductorEnSitioAt: new Date(),
       });
 
       logService.stateChanged(servicio.id, 'aceptado', 'conductor_en_sitio');
+
+      if (serviceSessions.has(servicio.id)) {
+        const broadcast = JSON.stringify({
+          type: 'service_status_change',
+          payload: servicio,
+        });
+        serviceSessions.get(servicio.id)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
 
       await pushService.notifyServiceUpdate(servicio.id, servicio.clienteId, 'El conductor ha llegado al punto de origen');
 
@@ -2896,9 +2975,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const servicio = await storage.updateServicio(req.params.id, {
         estado: 'cargando',
+        cargandoAt: new Date(),
       });
 
       logService.stateChanged(servicio.id, 'conductor_en_sitio', 'cargando');
+
+      if (serviceSessions.has(servicio.id)) {
+        const broadcast = JSON.stringify({
+          type: 'service_status_change',
+          payload: servicio,
+        });
+        serviceSessions.get(servicio.id)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
 
       await pushService.notifyServiceUpdate(servicio.id, servicio.clienteId, 'El conductor está cargando tu vehículo');
 
@@ -2921,6 +3013,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       logService.started(servicio.id);
+
+      if (serviceSessions.has(servicio.id)) {
+        const broadcast = JSON.stringify({
+          type: 'service_status_change',
+          payload: servicio,
+        });
+        serviceSessions.get(servicio.id)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
 
       await pushService.notifyServiceStarted(servicio.id, servicio.clienteId);
 
@@ -2947,6 +3051,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       logService.completed(servicio.id, duration);
+
+      if (serviceSessions.has(servicio.id)) {
+        const broadcast = JSON.stringify({
+          type: 'service_status_change',
+          payload: servicio,
+        });
+        serviceSessions.get(servicio.id)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
 
       await pushService.notifyServiceCompleted(servicio.id, servicio.clienteId);
 
