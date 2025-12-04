@@ -544,7 +544,7 @@ export default function EmpresaSolicitudes() {
                     </div>
                     <Badge variant="default" className="w-full justify-center">
                       <Truck className="h-3 w-3 mr-1" />
-                      Conductor en camino
+                      Operador en camino
                     </Badge>
                   </CardContent>
                 </Card>

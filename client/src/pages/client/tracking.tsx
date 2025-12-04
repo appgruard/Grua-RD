@@ -142,7 +142,7 @@ export default function ClientTracking() {
   const markers = [
     { position: origin, title: 'Origen', color: '#22c55e', type: 'origin' as const },
     { position: destination, title: 'Destino', color: '#ef4444', type: 'destination' as const },
-    driverLocation && { position: driverLocation, title: 'Conductor', color: '#3b82f6', type: 'driver' as const },
+    driverLocation && { position: driverLocation, title: 'Operador', color: '#3b82f6', type: 'driver' as const },
   ].filter(Boolean) as any[];
 
   const statusColors = {
@@ -156,9 +156,9 @@ export default function ClientTracking() {
   } as const;
 
   const statusLabels = {
-    pendiente: 'Buscando conductor...',
-    aceptado: 'Conductor en camino',
-    conductor_en_sitio: 'Conductor en el punto',
+    pendiente: 'Buscando operador...',
+    aceptado: 'Operador en camino',
+    conductor_en_sitio: 'Operador en el punto',
     cargando: 'Cargando vehiculo',
     en_progreso: 'En ruta al destino',
     completado: 'Servicio completado',
@@ -186,7 +186,7 @@ export default function ClientTracking() {
   const isNegotiationService = service.requiereNegociacion;
   const showNegotiationStatus = isNegotiationService && service.estadoNegociacion && service.estadoNegociacion !== 'no_aplica';
 
-  const driverName = service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Conductor';
+  const driverName = service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Operador';
 
   return (
     <div className="flex flex-col h-full">
@@ -281,7 +281,7 @@ export default function ClientTracking() {
           <Alert className="bg-amber-500/10 border-amber-500/30">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
-              Esperando que un conductor evalue la situacion y proponga un precio.
+              Esperando que un operador evalue la situacion y proponga un precio.
             </AlertDescription>
           </Alert>
         )}
@@ -290,7 +290,7 @@ export default function ClientTracking() {
           <Alert className="bg-blue-500/10 border-blue-500/30">
             <DollarSign className="h-4 w-4 text-blue-500" />
             <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
-              El conductor ha propuesto un precio. Abre el chat para ver y responder.
+              El operador ha propuesto un precio. Abre el chat para ver y responder.
             </AlertDescription>
           </Alert>
         )}
@@ -391,7 +391,7 @@ export default function ClientTracking() {
         <DrawerContent className="h-[80vh]">
           <DrawerHeader>
             <DrawerTitle>
-              {isNegotiationService ? 'Negociacion con el Conductor' : 'Chat con el Conductor'}
+              {isNegotiationService ? 'Negociacion con el Operador' : 'Chat con el Operador'}
             </DrawerTitle>
           </DrawerHeader>
           <div className="flex-1 overflow-hidden px-4 pb-4">

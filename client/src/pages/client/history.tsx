@@ -86,7 +86,7 @@ export default function ClientHistory() {
   const statusLabels = {
     pendiente: 'Pendiente',
     aceptado: 'Aceptado',
-    conductor_en_sitio: 'Conductor en sitio',
+    conductor_en_sitio: 'Operador en sitio',
     cargando: 'Cargando',
     en_progreso: 'En Progreso',
     completado: 'Completado',
@@ -163,7 +163,7 @@ export default function ClientHistory() {
               {service.conductor && (
                 <div className="mt-3 pt-3 border-t border-border">
                   <p className="text-xs sm:text-sm text-muted-foreground break-words">
-                    Conductor: <span className="font-medium text-foreground">
+                    Operador: <span className="font-medium text-foreground">
                       {service.conductor.nombre} {service.conductor.apellido}
                     </span>
                   </p>

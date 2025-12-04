@@ -113,24 +113,23 @@ La validación del servidor solo exceptuaba servicios "onsite" de la validación
 
 ---
 
-## Tarea 5: Corregir Mensajes de Estado en App Cliente (PENDIENTE)
+## Tarea 5: Corregir Mensajes de Estado en App Cliente ✅ COMPLETADO
 
 **Archivo:** `client/src/pages/client/tracking.tsx`
 
-**Problema:**
-Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestran "Conductor" en lugar de "Operador".
-
-**Líneas a modificar:**
-- Línea 145: `title: 'Conductor'` → `title: 'Operador'`
-- Línea 159: `'Buscando conductor...'` → `'Buscando operador...'`
-- Línea 160: `'Conductor en camino'` → `'Operador en camino'`
-- Línea 161: `'Conductor en el punto'` → `'Operador en el punto'`
-- Línea 189: fallback `'Conductor'` → `'Operador'`
-- Línea 394: Título del chat
+**Cambios realizados:**
+- Marker title: `'Conductor'` → `'Operador'`
+- statusLabels pendiente: `'Buscando conductor...'` → `'Buscando operador...'`
+- statusLabels aceptado: `'Conductor en camino'` → `'Operador en camino'`
+- statusLabels conductor_en_sitio: `'Conductor en el punto'` → `'Operador en el punto'`
+- Fallback driverName: `'Conductor'` → `'Operador'`
+- Alert pendiente: `'un conductor evalue'` → `'un operador evalue'`
+- Alert propuesto: `'El conductor ha propuesto'` → `'El operador ha propuesto'`
+- DrawerTitle: `'con el Conductor'` → `'con el Operador'`
 
 ---
 
-## Tarea 6: Cambiar Terminología "Conductor" → "Operador" (PARCIALMENTE COMPLETADO)
+## Tarea 6: Cambiar Terminología "Conductor" → "Operador" ✅ COMPLETADO
 
 ### Archivos modificados:
 
@@ -142,28 +141,30 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
    - Línea 994: `'El operador evaluará'`
    - Línea 1085: `'El operador propondrá'`
 
-### Archivos pendientes:
+2. **`client/src/pages/client/tracking.tsx`** ✅ COMPLETADO
+   - statusLabels: "Buscando operador", "Operador en camino", "Operador en el punto"
+   - Título del Drawer de chat: "con el Operador"
+   - Fallback del nombre: "Operador"
+   - Marker title: "Operador"
+   - Alertas de negociación actualizadas
 
-2. **`client/src/pages/client/tracking.tsx`**
-   - statusLabels: "Buscando conductor", "Conductor en camino", "Conductor en el punto"
-   - Título del Drawer de chat
-   - Fallback del nombre del conductor
-   - Marker title
+3. **`client/src/pages/client/history.tsx`** ✅ COMPLETADO
+   - statusLabels conductor_en_sitio: `'Operador en sitio'`
+   - Label del conductor: `'Operador:'`
 
-3. **`client/src/pages/client/history.tsx`**
-   - Línea 89: `'Conductor en sitio'`
-   - Línea 163-167: Referencias a conductor
+4. **`client/src/pages/empresa/solicitudes.tsx`** ✅ COMPLETADO
+   - Badge en progreso: `'Operador en camino'`
 
-4. **`client/src/pages/empresa/solicitudes.tsx`**
-   - Línea 547: `'Conductor en camino'`
+5. **`client/src/components/chat/NegotiationChatBox.tsx`** ✅ YA CORRECTO
+   - El fallback ya usaba "Operador" en línea 236
 
-5. **`client/src/components/chat/NegotiationChatBox.tsx`**
-   - Referencias al conductor en mensajes
+6. **`client/src/components/chat/ChatBox.tsx`** ✅ COMPLETADO
+   - Default otherUserName: `'Conductor'` → `'Operador'`
 
 ### Notas importantes:
-- NO cambiar valores internos como `userType: 'conductor'` o rutas `/driver`
-- Solo cambiar textos visibles al usuario (UI labels)
-- Mantener consistencia en género: "el operador", "un operador"
+- NO se cambiaron valores internos como `userType: 'conductor'` o rutas `/driver`
+- Solo se cambiaron textos visibles al usuario (UI labels)
+- Se mantuvo consistencia en género: "el operador", "un operador"
 
 ---
 
@@ -175,9 +176,9 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
 | `server/routes.ts` | 2 | ✅ Completado |
 | `client/src/pages/driver/extraction-evaluation.tsx` | 3 | ✅ Completado |
 | `client/src/pages/driver/dashboard.tsx` | 4 | ✅ Completado |
-| `client/src/pages/client/tracking.tsx` | 5, 6 | Pendiente |
-| `client/src/pages/client/history.tsx` | 6 | Pendiente |
-| `client/src/pages/empresa/solicitudes.tsx` | 6 | Pendiente |
+| `client/src/pages/client/tracking.tsx` | 5, 6 | ✅ Completado |
+| `client/src/pages/client/history.tsx` | 6 | ✅ Completado |
+| `client/src/pages/empresa/solicitudes.tsx` | 6 | ✅ Completado |
 
 ---
 
@@ -187,8 +188,8 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
 - [x] Servicio de extracción se crea correctamente sin errores
 - [x] Pantalla de confirmar evaluación es usable en móviles
 - [x] Tarjetas de estado en dashboard de operadores no se cortan
-- [ ] Todos los textos visibles dicen "Operador" en lugar de "Conductor"
-- [ ] Estados en tracking del cliente muestran "Operador"
+- [x] Todos los textos visibles dicen "Operador" en lugar de "Conductor"
+- [x] Estados en tracking del cliente muestran "Operador"
 
 ---
 
@@ -219,3 +220,17 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
 - **Bug fix adicional:** Corregido ConfirmDialog en dashboard.tsx
   - Cambiado `confirmText` → `confirmLabel` (prop correcta del componente)
   - Cambiado `isLoading` → `loading` (prop correcta del componente)
+- **Tarea 5 completada:** Corregidos mensajes de estado en tracking.tsx
+  - statusLabels actualizados: "Buscando operador", "Operador en camino", "Operador en el punto"
+  - Marker title cambiado a "Operador"
+  - Fallback driverName cambiado a "Operador"
+  - Alertas de negociación actualizadas con "operador"
+  - Título del drawer de chat actualizado
+- **Tarea 6 completada:** Terminología "Conductor" → "Operador" en todos los archivos
+  - tracking.tsx: statusLabels, marker, drawer title, alertas
+  - history.tsx: statusLabels, label "Operador:"
+  - empresa/solicitudes.tsx: Badge "Operador en camino"
+  - NegotiationChatBox.tsx: Ya usaba "Operador" correctamente
+  - ChatBox.tsx: Default otherUserName cambiado a "Operador"
+
+### PLAN COMPLETADO ✅

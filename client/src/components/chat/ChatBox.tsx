@@ -218,7 +218,7 @@ export function ChatBox({
   currentUserId, 
   currentUserNombre, 
   currentUserApellido,
-  otherUserName = 'Conductor',
+  otherUserName = 'Operador',
   userType,
   showQuickMessages = true
 }: ChatBoxProps) {
