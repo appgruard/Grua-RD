@@ -62,9 +62,21 @@ El sistema de billetera permitirá a los operadores:
 - Agregar campo `commission_processed`: boolean
 
 ### Entregables Fase 1:
-- [ ] Schema de Drizzle actualizado en `shared/schema.ts`
-- [ ] Migraciones de base de datos
-- [ ] Tipos e interfaces TypeScript
+- [x] Schema de Drizzle actualizado en `shared/schema.ts` *(Completado: 2024-12-04)*
+- [x] Migraciones de base de datos *(Completado: db:push ejecutado exitosamente)*
+- [x] Tipos e interfaces TypeScript *(Completado: Insert schemas, select schemas y types)*
+
+**Tablas creadas:**
+- `operator_wallets` - Billetera del operador con balance y deuda total
+- `wallet_transactions` - Historial de transacciones
+- `operator_debts` - Registro de deudas individuales por servicio
+
+**Enums creados:**
+- `tipo_transaccion_billetera`: cash_commission, card_payment, debt_payment, direct_payment, withdrawal, adjustment
+- `estado_deuda`: pending, partial, paid, overdue
+
+**Campo agregado a servicios:**
+- `commission_processed`: boolean para evitar procesamiento duplicado de comisiones
 
 ---
 
