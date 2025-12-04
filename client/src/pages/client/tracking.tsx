@@ -128,6 +128,25 @@ export default function ClientTracking() {
     }
   }, [service?.estado, hasShownCompletionFlow, existingRating, isRatingFetched, service?.metodoPago]);
 
+  const origin = useMemo(() => {
+    if (!service) return { lat: 0, lng: 0 };
+    return { lat: parseFloat(service.origenLat as string), lng: parseFloat(service.origenLng as string) };
+  }, [service?.origenLat, service?.origenLng]);
+
+  const destination = useMemo(() => {
+    if (!service) return { lat: 0, lng: 0 };
+    return { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) };
+  }, [service?.destinoLat, service?.destinoLng]);
+
+  const markers = useMemo(() => {
+    if (!service) return [];
+    return [
+      { position: origin, title: 'Origen', color: '#22c55e', type: 'origin' as const },
+      { position: destination, title: 'Destino', color: '#ef4444', type: 'destination' as const },
+      driverLocation && { position: driverLocation, title: 'Operador', color: '#3b82f6', type: 'driver' as const },
+    ].filter(Boolean) as any[];
+  }, [origin, destination, driverLocation, service]);
+
   if (isLoading || !service) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -135,15 +154,6 @@ export default function ClientTracking() {
       </div>
     );
   }
-
-  const origin = { lat: parseFloat(service.origenLat as string), lng: parseFloat(service.origenLng as string) };
-  const destination = { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) };
-
-  const markers = useMemo(() => [
-    { position: origin, title: 'Origen', color: '#22c55e', type: 'origin' as const },
-    { position: destination, title: 'Destino', color: '#ef4444', type: 'destination' as const },
-    driverLocation && { position: driverLocation, title: 'Operador', color: '#3b82f6', type: 'driver' as const },
-  ].filter(Boolean) as any[], [origin.lat, origin.lng, destination.lat, destination.lng, driverLocation]);
 
   const statusColors = {
     pendiente: 'secondary',
