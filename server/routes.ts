@@ -2751,7 +2751,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const services = await storage.getServiciosByConductorId(req.user!.id);
-      const activeService = services.find(s => s.estado === 'aceptado' || s.estado === 'en_progreso');
+      const activeStates = ['aceptado', 'conductor_en_sitio', 'cargando', 'en_progreso'];
+      const activeService = services.find(s => activeStates.includes(s.estado));
       res.json(activeService || null);
     } catch (error: any) {
       logSystem.error('Get active service error', error);
