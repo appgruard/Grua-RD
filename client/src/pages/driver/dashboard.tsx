@@ -397,8 +397,10 @@ export default function DriverDashboard() {
   const handleLocationUpdate = useCallback((location: Coordinates) => {
     setCurrentLocation(location);
     setLocationReady(true);
-    apiRequest('PUT', '/api/drivers/location', location);
-  }, []);
+    if (driverData?.id) {
+      apiRequest('PUT', '/api/drivers/location', location);
+    }
+  }, [driverData?.id]);
 
   useLocationTracking(
     handleLocationUpdate,

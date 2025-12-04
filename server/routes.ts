@@ -2237,17 +2237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         services = [];
       }
 
-      const servicesWithRatings = await Promise.all(
-        services.map(async (service) => {
-          if (service.estado === 'completado') {
-            const calificaciones = await storage.getCalificacionesByServicioId(service.id);
-            return { ...service, calificacion: calificaciones[0] || null };
-          }
-          return { ...service, calificacion: null };
-        })
-      );
-
-      res.json(servicesWithRatings);
+      res.json(services);
     } catch (error: any) {
       logSystem.error('Get my services error', error);
       res.status(500).json({ message: "Failed to get services" });
