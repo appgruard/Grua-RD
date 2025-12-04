@@ -183,8 +183,8 @@ export default function ExtractionEvaluation() {
 
       <div className="flex-1 overflow-y-auto">
         {!showChat ? (
-          <div className="p-4 space-y-4">
-            <div className="h-40 rounded-lg overflow-hidden">
+          <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+            <div className="h-32 sm:h-40 rounded-lg overflow-hidden">
               <MapboxMap
                 center={{ lat: originLat, lng: originLng }}
                 zoom={15}
@@ -198,74 +198,74 @@ export default function ExtractionEvaluation() {
               />
             </div>
 
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-primary" />
+            <Card className="p-3 sm:p-4">
+              <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
                 Ubicacion
               </h3>
-              <p className="text-sm text-muted-foreground">{service.origenDireccion}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{service.origenDireccion}</p>
             </Card>
 
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <Car className="w-4 h-4 text-primary" />
+            <Card className="p-3 sm:p-4">
+              <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2">
+                <Car className="w-4 h-4 text-primary flex-shrink-0" />
                 Vehiculo del Cliente
               </h3>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                <Badge variant="secondary" className="text-xs">
                   {getVehicleTypeLabel(service.tipoVehiculo)}
                 </Badge>
                 {service.servicioSubtipo && (
-                  <Badge variant="outline" className="text-amber-600 border-amber-500">
+                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-500">
                     {getExtractionSubtypeLabel(service.servicioSubtipo)}
                   </Badge>
                 )}
               </div>
             </Card>
 
-            <Card className="p-4 bg-amber-500/5 border-amber-500/30">
-              <h3 className="font-semibold mb-3 flex items-center gap-2 text-amber-600">
-                <AlertTriangle className="w-4 h-4" />
+            <Card className="p-3 sm:p-4 bg-amber-500/5 border-amber-500/30">
+              <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2 text-amber-600">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 Descripcion de la Situacion
               </h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+              <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap">
                 {service.descripcionSituacion || 'El cliente no proporciono una descripcion detallada.'}
               </p>
             </Card>
 
             {service.cliente && (
-              <Card className="p-4">
-                <h3 className="font-semibold mb-3">Cliente</h3>
-                <p className="text-sm">
+              <Card className="p-3 sm:p-4">
+                <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3">Cliente</h3>
+                <p className="text-xs sm:text-sm">
                   {service.cliente.nombre} {service.cliente.apellido}
                 </p>
               </Card>
             )}
 
             {service.estadoNegociacion === 'pendiente_evaluacion' && !service.conductorId && (
-              <Card className="p-4">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-primary" />
+              <Card className="p-3 sm:p-4">
+                <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-primary flex-shrink-0" />
                   Proponer Precio
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                   Evalua la situacion y proporciona un precio justo para el servicio de extraccion.
                 </p>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Monto propuesto (RD$)</Label>
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="amount" className="text-xs sm:text-sm">Monto propuesto (RD$)</Label>
                     <Input
                       id="amount"
                       type="number"
                       placeholder="Ej: 5000"
                       value={proposedAmount}
                       onChange={(e) => setProposedAmount(e.target.value)}
-                      className="text-lg"
+                      className="text-base sm:text-lg"
                       data-testid="input-proposed-amount"
                     />
                   </div>
                   <Button
-                    className="w-full"
+                    className="w-full h-11 sm:h-12 text-sm sm:text-base"
                     onClick={() => acceptAndPropose.mutate()}
                     disabled={!proposedAmount || acceptAndPropose.isPending}
                     data-testid="button-accept-and-propose"
@@ -282,12 +282,12 @@ export default function ExtractionEvaluation() {
             )}
 
             {service.montoNegociado && (
-              <Card className="p-4 bg-green-500/10 border-green-500/30">
-                <h3 className="font-semibold mb-2 text-green-600 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
+              <Card className="p-3 sm:p-4 bg-green-500/10 border-green-500/30">
+                <h3 className="font-semibold text-sm sm:text-base mb-1 sm:mb-2 text-green-600 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 flex-shrink-0" />
                   Monto Acordado
                 </h3>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-xl sm:text-2xl font-bold text-green-600">
                   RD$ {parseFloat(service.montoNegociado as string).toFixed(2)}
                 </p>
               </Card>

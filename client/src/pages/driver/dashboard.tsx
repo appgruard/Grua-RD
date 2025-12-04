@@ -451,7 +451,7 @@ export default function DriverDashboard() {
         <div 
           className={cn(
             "bg-background border-t border-border transition-all duration-300 safe-area-inset-bottom",
-            showExpandedCard ? "max-h-[65vh]" : "max-h-14"
+            showExpandedCard ? "max-h-[55vh] sm:max-h-[65vh]" : "max-h-14"
           )}
         >
           <button 
@@ -468,15 +468,15 @@ export default function DriverDashboard() {
           </button>
 
           <div className={cn(
-            "overflow-y-auto transition-all duration-300 px-4 pb-4",
-            showExpandedCard ? "max-h-[calc(65vh-56px)]" : "max-h-0 overflow-hidden"
+            "overflow-y-auto transition-all duration-300 px-3 sm:px-4 pb-4",
+            showExpandedCard ? "max-h-[calc(55vh-56px)] sm:max-h-[calc(65vh-56px)]" : "max-h-0 overflow-hidden"
           )}>
             <div className="space-y-4">
               {activeService.cliente && (
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center justify-between gap-2 p-2.5 sm:p-3 bg-muted rounded-lg">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-muted-foreground">Cliente</p>
-                    <p className="font-semibold truncate">
+                    <p className="font-semibold text-sm sm:text-base truncate">
                       {activeService.cliente.nombre} {activeService.cliente.apellido}
                     </p>
                   </div>
@@ -491,41 +491,41 @@ export default function DriverDashboard() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3" data-testid="service-details-info">
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Tipo de Servicio</p>
-                  <p className="text-sm font-semibold" data-testid="text-service-category">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3" data-testid="service-details-info">
+                <div className="p-2.5 sm:p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-0.5 sm:mb-1">Tipo de Servicio</p>
+                  <p className="text-xs sm:text-sm font-semibold" data-testid="text-service-category">
                     {getServiceCategoryLabel(activeService.servicioCategoria)}
                   </p>
                 </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Vehículo Cliente</p>
-                  <p className="text-sm font-semibold" data-testid="text-vehicle-type">
+                <div className="p-2.5 sm:p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-0.5 sm:mb-1">Vehículo Cliente</p>
+                  <p className="text-xs sm:text-sm font-semibold" data-testid="text-vehicle-type">
                     {getVehicleTypeLabel(activeService.tipoVehiculo)}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex items-start gap-2 sm:gap-3 p-2.5 sm:p-3 bg-muted rounded-lg">
                   <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                    <div className="w-0.5 h-8 bg-border" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green-500" />
+                    <div className="w-0.5 h-6 sm:h-8 bg-border" />
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500" />
                   </div>
-                  <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
                     <div>
                       <p className="text-xs text-muted-foreground">Origen</p>
-                      <p className="text-sm font-medium">{activeService.origenDireccion}</p>
+                      <p className="text-xs sm:text-sm font-medium line-clamp-1">{activeService.origenDireccion}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Destino</p>
-                      <p className="text-sm font-medium">{activeService.destinoDireccion}</p>
+                      <p className="text-xs sm:text-sm font-medium line-clamp-1">{activeService.destinoDireccion}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                   {(activeService.estado === 'aceptado' || activeService.estado === 'conductor_en_sitio') && (() => {
                     const lat = typeof activeService.origenLat === 'string' ? parseFloat(activeService.origenLat) : activeService.origenLat;
                     const lng = typeof activeService.origenLng === 'string' ? parseFloat(activeService.origenLng) : activeService.origenLng;
@@ -536,17 +536,17 @@ export default function DriverDashboard() {
                       <>
                         {wazeUrl && (
                           <a href={wazeUrl} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" className="w-full gap-1.5 text-xs h-10" data-testid="button-waze-origin" aria-label="Ir al origen con Waze">
-                              <SiWaze className="w-4 h-4 text-[#33CCFF] flex-shrink-0" />
-                              <span className="truncate">Origen (Waze)</span>
+                            <Button variant="outline" className="w-full gap-1 sm:gap-1.5 text-xs h-9 sm:h-10" data-testid="button-waze-origin" aria-label="Ir al origen con Waze">
+                              <SiWaze className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#33CCFF] flex-shrink-0" />
+                              <span className="truncate">Waze</span>
                             </Button>
                           </a>
                         )}
                         {googleUrl && (
                           <a href={googleUrl} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" className="w-full gap-1.5 text-xs h-10" data-testid="button-google-origin" aria-label="Ir al origen con Google Maps">
-                              <SiGooglemaps className="w-4 h-4 text-[#4285F4] flex-shrink-0" />
-                              <span className="truncate">Origen (Maps)</span>
+                            <Button variant="outline" className="w-full gap-1 sm:gap-1.5 text-xs h-9 sm:h-10" data-testid="button-google-origin" aria-label="Ir al origen con Google Maps">
+                              <SiGooglemaps className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#4285F4] flex-shrink-0" />
+                              <span className="truncate">Maps</span>
                             </Button>
                           </a>
                         )}
@@ -563,17 +563,17 @@ export default function DriverDashboard() {
                       <>
                         {wazeUrl && (
                           <a href={wazeUrl} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" className="w-full gap-1.5 text-xs h-10" data-testid="button-waze-destination" aria-label="Ir al destino con Waze">
-                              <SiWaze className="w-4 h-4 text-[#33CCFF] flex-shrink-0" />
-                              <span className="truncate">Destino (Waze)</span>
+                            <Button variant="outline" className="w-full gap-1 sm:gap-1.5 text-xs h-9 sm:h-10" data-testid="button-waze-destination" aria-label="Ir al destino con Waze">
+                              <SiWaze className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#33CCFF] flex-shrink-0" />
+                              <span className="truncate">Waze</span>
                             </Button>
                           </a>
                         )}
                         {googleUrl && (
                           <a href={googleUrl} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" className="w-full gap-1.5 text-xs h-10" data-testid="button-google-destination" aria-label="Ir al destino con Google Maps">
-                              <SiGooglemaps className="w-4 h-4 text-[#4285F4] flex-shrink-0" />
-                              <span className="truncate">Destino (Maps)</span>
+                            <Button variant="outline" className="w-full gap-1 sm:gap-1.5 text-xs h-9 sm:h-10" data-testid="button-google-destination" aria-label="Ir al destino con Google Maps">
+                              <SiGooglemaps className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#4285F4] flex-shrink-0" />
+                              <span className="truncate">Maps</span>
                             </Button>
                           </a>
                         )}
@@ -584,45 +584,45 @@ export default function DriverDashboard() {
               </div>
 
               {activeService.requiereNegociacion && (
-                <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span className="text-sm font-medium text-amber-600">Servicio de Extraccion</span>
+                <div className="p-2.5 sm:p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+                    <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-amber-600">Servicio de Extraccion</span>
                   </div>
                   {activeService.descripcionSituacion && (
-                    <p className="text-xs text-muted-foreground">{activeService.descripcionSituacion}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{activeService.descripcionSituacion}</p>
                   )}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 {!activeService.requiereNegociacion && (
-                  <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">Distancia</p>
-                    <p className="text-lg font-bold">
+                  <div className="text-center p-2.5 sm:p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-0.5 sm:mb-1">Distancia</p>
+                    <p className="text-base sm:text-lg font-bold">
                       {parseFloat(activeService.distanciaKm as string).toFixed(1)} km
                     </p>
                   </div>
                 )}
                 <div className={cn(
-                  "text-center p-3 rounded-lg border",
+                  "text-center p-2.5 sm:p-3 rounded-lg border",
                   activeService.requiereNegociacion 
                     ? "bg-amber-500/10 border-amber-500/20 col-span-2"
                     : "bg-primary/10 border-primary/20"
                 )}>
-                  <p className="text-xs text-muted-foreground mb-1">
+                  <p className="text-xs text-muted-foreground mb-0.5 sm:mb-1">
                     {activeService.requiereNegociacion ? 'Monto Negociado' : 'Ganancia'}
                   </p>
                   {activeService.requiereNegociacion ? (
                     activeService.montoNegociado ? (
-                      <p className="text-lg font-bold text-amber-600">
+                      <p className="text-base sm:text-lg font-bold text-amber-600">
                         RD$ {parseFloat(activeService.montoNegociado as string).toFixed(2)}
                       </p>
                     ) : (
-                      <p className="text-lg font-bold text-amber-600">Por definir</p>
+                      <p className="text-base sm:text-lg font-bold text-amber-600">Por definir</p>
                     )
                   ) : (
-                    <p className="text-lg font-bold text-primary">
+                    <p className="text-base sm:text-lg font-bold text-primary">
                       RD$ {parseFloat(activeService.costoTotal as string).toFixed(2)}
                     </p>
                   )}
@@ -644,15 +644,15 @@ export default function DriverDashboard() {
                   : `${(distanceToPickup / 1000).toFixed(1)}km`;
                 
                 return (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {!isWithinRange && (
-                      <div className="text-center text-sm text-muted-foreground">
-                        <Navigation className="w-4 h-4 inline mr-1" />
+                      <div className="text-center text-xs sm:text-sm text-muted-foreground">
+                        <Navigation className="w-3.5 h-3.5 sm:w-4 sm:h-4 inline mr-1" />
                         Distancia al punto: <span className="font-medium">{distanceText}</span>
                       </div>
                     )}
                     <Button 
-                      className="w-full h-12" 
+                      className="w-full h-11 sm:h-12 text-sm sm:text-base" 
                       onClick={() => arrivedService.mutate(activeService.id)}
                       disabled={arrivedService.isPending || !isWithinRange}
                       data-testid="button-arrived"
@@ -662,7 +662,7 @@ export default function DriverDashboard() {
                       ) : (
                         <MapPin className="w-4 h-4 mr-2" />
                       )}
-                      {isWithinRange ? 'He Llegado al Punto' : `Acércate al punto (${distanceText})`}
+                      {isWithinRange ? 'He Llegado al Punto' : `Acércate (${distanceText})`}
                     </Button>
                   </div>
                 );
@@ -670,7 +670,7 @@ export default function DriverDashboard() {
 
               {activeService.estado === 'conductor_en_sitio' && (
                 <Button 
-                  className="w-full h-12" 
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base" 
                   onClick={() => loadingService.mutate(activeService.id)}
                   disabled={loadingService.isPending}
                   data-testid="button-loading"
@@ -686,7 +686,7 @@ export default function DriverDashboard() {
 
               {activeService.estado === 'cargando' && (
                 <Button 
-                  className="w-full h-12" 
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base" 
                   onClick={() => startService.mutate(activeService.id)}
                   disabled={startService.isPending}
                   data-testid="button-start-service"
@@ -702,7 +702,7 @@ export default function DriverDashboard() {
 
               {activeService.estado === 'en_progreso' && (
                 <Button 
-                  className="w-full h-12" 
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base" 
                   onClick={() => setConfirmDialog({ open: true, action: 'complete', serviceId: activeService.id })}
                   data-testid="button-complete-service"
                 >
@@ -719,40 +719,40 @@ export default function DriverDashboard() {
         <div 
           className={cn(
             "bg-background border-t border-border transition-all duration-300 safe-area-inset-bottom",
-            showExpandedCard ? "max-h-[60vh]" : "max-h-14"
+            showExpandedCard ? "max-h-[50vh] sm:max-h-[60vh]" : "max-h-14"
           )}
         >
           <button 
-            className="w-full flex items-center justify-between px-4 py-2 text-muted-foreground"
+            className="w-full flex items-center justify-between px-3 sm:px-4 py-2 text-muted-foreground"
             onClick={() => setShowExpandedCard(!showExpandedCard)}
             data-testid="button-toggle-requests"
           >
-            <span className="text-sm font-semibold">
+            <span className="text-xs sm:text-sm font-semibold">
               {nearbyRequests.length} solicitud{nearbyRequests.length !== 1 ? 'es' : ''} cercana{nearbyRequests.length !== 1 ? 's' : ''}
             </span>
             {showExpandedCard ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
 
           <div className={cn(
-            "overflow-y-auto transition-all duration-300 px-4 pb-4 space-y-3",
-            showExpandedCard ? "max-h-[calc(60vh-56px)]" : "max-h-0 overflow-hidden"
+            "overflow-y-auto transition-all duration-300 px-3 sm:px-4 pb-4 space-y-2 sm:space-y-3",
+            showExpandedCard ? "max-h-[calc(50vh-56px)] sm:max-h-[calc(60vh-56px)]" : "max-h-0 overflow-hidden"
           )}>
             {nearbyRequests.map((request) => (
-              <Card key={request.id} className="p-4" data-testid={`request-${request.id}`}>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
+              <Card key={request.id} className="p-3 sm:p-4" data-testid={`request-${request.id}`}>
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="flex items-start gap-2 sm:gap-3">
                     <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                      <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                      <div className="w-0.5 h-8 bg-border" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                      <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green-500" />
+                      <div className="w-0.5 h-6 sm:h-8 bg-border" />
+                      <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500" />
                     </div>
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <p className="text-sm font-medium truncate">{request.origenDireccion}</p>
-                      <p className="text-sm text-muted-foreground truncate">{request.destinoDireccion}</p>
+                    <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
+                      <p className="text-xs sm:text-sm font-medium line-clamp-1">{request.origenDireccion}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">{request.destinoDireccion}</p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2" data-testid={`request-details-${request.id}`}>
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2" data-testid={`request-details-${request.id}`}>
                     <Badge variant="secondary" className="text-xs" data-testid={`badge-service-category-${request.id}`}>
                       {getServiceCategoryLabel(request.servicioCategoria)}
                     </Badge>
@@ -762,52 +762,52 @@ export default function DriverDashboard() {
                     {request.requiereNegociacion && (
                       <Badge variant="outline" className="text-xs gap-1 text-amber-600 border-amber-500" data-testid={`badge-negotiation-${request.id}`}>
                         <AlertTriangle className="w-3 h-3" />
-                        Requiere Negociacion
+                        Negociacion
                       </Badge>
                     )}
                   </div>
 
                   {request.requiereNegociacion && request.descripcionSituacion && (
-                    <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/30">
-                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">Situacion:</p>
+                    <div className="p-1.5 sm:p-2 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-0.5 sm:mb-1">Situacion:</p>
                       <p className="text-xs text-muted-foreground line-clamp-2">{request.descripcionSituacion}</p>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between py-2 border-t border-border">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-primary" />
+                  <div className="flex items-center justify-between py-1.5 sm:py-2 border-t border-border">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
                       {request.requiereNegociacion ? (
-                        <span className="font-bold text-amber-600">
+                        <span className="text-sm sm:text-base font-bold text-amber-600">
                           Por negociar
                         </span>
                       ) : (
-                        <span className="font-bold text-primary">
+                        <span className="text-sm sm:text-base font-bold text-primary">
                           RD$ {parseFloat(request.costoTotal as string).toFixed(2)}
                         </span>
                       )}
                     </div>
                     {!request.requiereNegociacion && (
-                      <div className="flex items-center gap-2">
-                        <Car className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <Car className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
+                        <span className="text-xs sm:text-sm text-muted-foreground">
                           {parseFloat(request.distanciaKm as string).toFixed(1)} km
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 sm:gap-2">
                     <Button
                       variant="outline"
-                      className="flex-1 h-10"
+                      className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
                       data-testid={`button-reject-${request.id}`}
                     >
                       Rechazar
                     </Button>
                     {request.requiereNegociacion ? (
                       <Button
-                        className="flex-1 h-10 bg-amber-600 hover:bg-amber-700"
+                        className="flex-1 h-9 sm:h-10 text-xs sm:text-sm bg-amber-600 hover:bg-amber-700"
                         onClick={() => setLocation(`/driver/extraction-evaluation/${request.id}`)}
                         data-testid={`button-evaluate-${request.id}`}
                       >
@@ -815,7 +815,7 @@ export default function DriverDashboard() {
                       </Button>
                     ) : (
                       <Button
-                        className="flex-1 h-10"
+                        className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
                         onClick={() => acceptService.mutate(request.id)}
                         disabled={acceptService.isPending}
                         data-testid={`button-accept-${request.id}`}
@@ -873,9 +873,9 @@ export default function DriverDashboard() {
         onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}
         title="Completar Servicio"
         description="¿Estás seguro de que deseas marcar este servicio como completado? Esta acción no se puede deshacer."
-        confirmText="Completar"
+        confirmLabel="Completar"
         onConfirm={handleConfirmAction}
-        isLoading={completeService.isPending}
+        loading={completeService.isPending}
       />
     </div>
   );

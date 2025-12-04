@@ -4,8 +4,8 @@
 
 1. **Pantalla "Confirmar Solicitud" (después de método de pago)** - Responsividad móvil ✅ COMPLETADO
 2. **Error al solicitar servicio de extracción** - Error funcional ✅ COMPLETADO
-3. **Pantalla "Confirmar Evaluación"** - Responsividad móvil  
-4. **Pantalla inicio de operadores** - Responsividad tarjetas de estado
+3. **Pantalla "Confirmar Evaluación"** - Responsividad móvil ✅ COMPLETADO
+4. **Pantalla inicio de operadores** - Responsividad tarjetas de estado ✅ COMPLETADO
 5. **Estados en app cliente** - Mensajes cuando el operador marca estados
 6. **Terminología** - Cambiar "Conductor" por "Operador"
 
@@ -49,9 +49,9 @@ La validación del servidor solo exceptuaba servicios "onsite" de la validación
 
 ---
 
-## Tarea 3: Corregir Responsividad en "Confirmar Evaluación" (PENDIENTE)
+## Tarea 3: Corregir Responsividad en "Confirmar Evaluación" ✅ COMPLETADO
 
-**Archivo:** `client/src/pages/driver/extraction-evaluation.tsx` (337 líneas)
+**Archivo:** `client/src/pages/driver/extraction-evaluation.tsx`
 
 **Problemas identificados:**
 - Las Cards con `p-4` pueden ser muy espaciadas en móviles
@@ -59,31 +59,57 @@ La validación del servidor solo exceptuaba servicios "onsite" de la validación
 - El input de monto propuesto y botón pueden estar muy apretados
 - Los badges pueden desbordarse en pantallas pequeñas
 
-**Solución propuesta:**
-1. Cambiar padding de Cards: `p-3 sm:p-4`
-2. Hacer el mapa responsive: `h-32 sm:h-40`
-3. Mejorar espaciado del formulario de propuesta
-4. Añadir `flex-wrap` en contenedores de badges
-5. Reducir tamaño de textos en móviles
+**Cambios realizados:**
+1. Cambiado padding de Cards: `p-3 sm:p-4` en todas las Cards
+2. Mapa responsive: `h-32 sm:h-40` para mejor visualización en móviles
+3. Contenedor principal: `p-3 sm:p-4 space-y-3 sm:space-y-4`
+4. Títulos de Cards: `text-sm sm:text-base` para textos responsivos
+5. Reducido tamaño de textos descriptivos: `text-xs sm:text-sm`
+6. Badges con `text-xs` y gap reducido: `gap-1.5 sm:gap-2`
+7. Botón de propuesta: `h-11 sm:h-12 text-sm sm:text-base`
+8. Espaciado del formulario: `space-y-3 sm:space-y-4`
+9. Label del monto: `text-xs sm:text-sm`
+10. Iconos con `flex-shrink-0` para evitar compresión
+11. Direcciones con `line-clamp-2` para mejor legibilidad
 
 ---
 
-## Tarea 4: Corregir Responsividad en Dashboard de Operadores (PENDIENTE)
+## Tarea 4: Corregir Responsividad en Dashboard de Operadores ✅ COMPLETADO
 
-**Archivo:** `client/src/pages/driver/dashboard.tsx` (883 líneas)
+**Archivo:** `client/src/pages/driver/dashboard.tsx`
 
 **Problemas identificados:**
-- El grid de información `grid grid-cols-2` (línea 494) no se adapta a móviles muy pequeños
+- El grid de información `grid grid-cols-2` no se adapta a móviles muy pequeños
 - Las tarjetas de solicitudes cercanas tienen padding excesivo
 - Los botones de navegación (Waze/Google Maps) pueden cortarse
 - El panel inferior con altura `max-h-[65vh]` puede ser problemático
 
-**Solución propuesta:**
-1. Cambiar grid de detalles de servicio: `grid grid-cols-1 xs:grid-cols-2`
-2. Reducir padding en Cards: `p-3 sm:p-4`
-3. Mejorar botones de navegación con `text-xs` y mejor truncamiento
-4. Ajustar alturas del panel inferior para móviles
-5. Hacer badges con `flex-wrap` y tamaño reducido
+**Cambios realizados:**
+
+### Panel de Servicio Activo:
+1. Panel inferior: `max-h-[55vh] sm:max-h-[65vh]` para móviles pequeños
+2. Contenedor scrollable: `px-3 sm:px-4` y cálculo de altura ajustado
+3. Grid de detalles de servicio: `grid-cols-1 sm:grid-cols-2` para móviles
+4. Padding en elementos: `p-2.5 sm:p-3` para mejor ajuste
+5. Textos responsivos: `text-xs sm:text-sm` en información
+6. Indicadores origen/destino: tamaño reducido `w-2 h-2 sm:w-2.5 sm:h-2.5`
+7. Direcciones con `line-clamp-1` para evitar overflow
+8. Botones de navegación: `h-9 sm:h-10` y texto acortado ("Waze", "Maps")
+9. Iconos de navegación: `w-3.5 h-3.5 sm:w-4 sm:h-4`
+10. Botones de acción: `h-11 sm:h-12 text-sm sm:text-base`
+11. Sección de extracción: padding y tamaños reducidos
+
+### Panel de Solicitudes Cercanas:
+1. Panel: `max-h-[50vh] sm:max-h-[60vh]` para móviles
+2. Header: `px-3 sm:px-4` y texto `text-xs sm:text-sm`
+3. Cards de solicitudes: `p-3 sm:p-4`
+4. Espaciado entre Cards: `space-y-2 sm:space-y-3`
+5. Direcciones: `text-xs sm:text-sm` con `line-clamp-1`
+6. Badges gap: `gap-1.5 sm:gap-2`
+7. Texto "Requiere Negociacion" → "Negociacion" (más corto)
+8. Descripción situación: padding `p-1.5 sm:p-2`
+9. Precios y distancia: iconos y texto reducidos
+10. Botones Aceptar/Rechazar: `h-9 sm:h-10 text-xs sm:text-sm`
 
 ---
 
@@ -147,10 +173,10 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
 |---------|--------|--------|
 | `client/src/pages/client/home.tsx` | 1, 6 | ✅ Completado |
 | `server/routes.ts` | 2 | ✅ Completado |
+| `client/src/pages/driver/extraction-evaluation.tsx` | 3 | ✅ Completado |
+| `client/src/pages/driver/dashboard.tsx` | 4 | ✅ Completado |
 | `client/src/pages/client/tracking.tsx` | 5, 6 | Pendiente |
 | `client/src/pages/client/history.tsx` | 6 | Pendiente |
-| `client/src/pages/driver/dashboard.tsx` | 4 | Pendiente |
-| `client/src/pages/driver/extraction-evaluation.tsx` | 3 | Pendiente |
 | `client/src/pages/empresa/solicitudes.tsx` | 6 | Pendiente |
 
 ---
@@ -159,8 +185,8 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
 
 - [x] Pantalla de confirmar solicitud se ve correctamente en iPhone SE (375px)
 - [x] Servicio de extracción se crea correctamente sin errores
-- [ ] Pantalla de confirmar evaluación es usable en móviles
-- [ ] Tarjetas de estado en dashboard de operadores no se cortan
+- [x] Pantalla de confirmar evaluación es usable en móviles
+- [x] Tarjetas de estado en dashboard de operadores no se cortan
 - [ ] Todos los textos visibles dicen "Operador" en lugar de "Conductor"
 - [ ] Estados en tracking del cliente muestran "Operador"
 
@@ -178,3 +204,15 @@ Cuando el operador marca "Cargando" o "Conductor en sitio", los mensajes muestra
   - Añadida función `isExtractionService()` en servidor
   - Modificada validación para exceptuar servicios de extracción
 - **Tarea 6 parcial:** Cambiada terminología a "Operador" en home.tsx
+- **Tarea 3 completada:** Mejorada responsividad en pantalla "Confirmar Evaluación"
+  - Mapa responsivo: h-32 sm:h-40
+  - Cards con padding reducido: p-3 sm:p-4
+  - Textos responsivos en títulos y descripciones
+  - Botón de propuesta con altura ajustada
+  - Espaciado mejorado para formularios en móviles
+- **Tarea 4 completada:** Mejorada responsividad en Dashboard de Operadores
+  - Panel inferior con altura reducida para móviles: max-h-[55vh] sm:max-h-[65vh]
+  - Grid de detalles de servicio adaptativo: grid-cols-1 sm:grid-cols-2
+  - Botones de navegación más compactos
+  - Cards de solicitudes con padding reducido
+  - Textos y badges optimizados para pantallas pequeñas
