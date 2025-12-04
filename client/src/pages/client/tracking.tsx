@@ -231,20 +231,29 @@ export default function ClientTracking() {
             </div>
             {service.conductor && service.estado !== 'completado' && service.estado !== 'cancelado' && (
               <div className="flex gap-2">
-                <Button 
-                  size="icon" 
-                  variant="outline" 
-                  data-testid="button-call"
-                  onClick={() => {
-                    const phoneNumber = service.conductor?.phone;
-                    if (phoneNumber) {
-                      window.location.href = `tel:${phoneNumber}`;
-                    }
-                  }}
-                  disabled={!service.conductor?.phone}
-                >
-                  <Phone className="w-4 h-4" />
-                </Button>
+                {service.conductor.phone ? (
+                  <a 
+                    href={`tel:${service.conductor.phone}`}
+                    data-testid="button-call"
+                  >
+                    <Button 
+                      size="icon" 
+                      variant="outline"
+                      type="button"
+                    >
+                      <Phone className="w-4 h-4" />
+                    </Button>
+                  </a>
+                ) : (
+                  <Button 
+                    size="icon" 
+                    variant="outline"
+                    disabled
+                    data-testid="button-call"
+                  >
+                    <Phone className="w-4 h-4" />
+                  </Button>
+                )}
                 <Button 
                   size="icon" 
                   variant="outline" 
