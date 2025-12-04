@@ -18,6 +18,7 @@ import { NegotiationChatBox } from '@/components/chat/NegotiationChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLocationTracking } from '@/hooks/useLocation';
 import { calculateDistance } from '@/hooks/useDriverLocation';
+import { WalletAlertBanner, CashServiceConfirmationModal, useWalletStatus } from '@/components/wallet';
 import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { SiWaze, SiGooglemaps } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
@@ -69,6 +70,13 @@ export default function DriverDashboard() {
     action: 'complete' | 'start' | null;
     serviceId: string | null;
   }>({ open: false, action: null, serviceId: null });
+  const [cashConfirmation, setCashConfirmation] = useState<{
+    open: boolean;
+    serviceId: string | null;
+    serviceAmount: number;
+  }>({ open: false, serviceId: null, serviceAmount: 0 });
+  
+  const walletStatus = useWalletStatus();
 
   const { data: driverData } = useQuery<Conductor>({
     queryKey: ['/api/drivers/me'],
@@ -387,6 +395,8 @@ export default function DriverDashboard() {
           </AlertDescription>
         </Alert>
       )}
+
+      <WalletAlertBanner className="z-20" />
       
       <div className="flex-1 relative min-h-0">
         <MapboxMap
@@ -816,8 +826,18 @@ export default function DriverDashboard() {
                     ) : (
                       <Button
                         className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
-                        onClick={() => acceptService.mutate(request.id)}
-                        disabled={acceptService.isPending}
+                        onClick={() => {
+                          if (walletStatus.hasDebt || walletStatus.isBlocked) {
+                            setCashConfirmation({
+                              open: true,
+                              serviceId: request.id,
+                              serviceAmount: parseFloat(request.costoTotal as string) || 0,
+                            });
+                          } else {
+                            acceptService.mutate(request.id);
+                          }
+                        }}
+                        disabled={acceptService.isPending || cashConfirmation.open}
                         data-testid={`button-accept-${request.id}`}
                       >
                         {acceptService.isPending ? (
@@ -876,6 +896,23 @@ export default function DriverDashboard() {
         confirmLabel="Completar"
         onConfirm={handleConfirmAction}
         loading={completeService.isPending}
+      />
+
+      <CashServiceConfirmationModal
+        open={cashConfirmation.open}
+        onOpenChange={(open) => setCashConfirmation({ ...cashConfirmation, open })}
+        onConfirm={() => {
+          if (cashConfirmation.serviceId) {
+            acceptService.mutate(cashConfirmation.serviceId);
+            setCashConfirmation({ open: false, serviceId: null, serviceAmount: 0 });
+          }
+        }}
+        onPayDebt={() => {
+          setCashConfirmation({ open: false, serviceId: null, serviceAmount: 0 });
+          setLocation('/driver/profile');
+        }}
+        isLoading={acceptService.isPending}
+        serviceAmount={cashConfirmation.serviceAmount}
       />
     </div>
   );

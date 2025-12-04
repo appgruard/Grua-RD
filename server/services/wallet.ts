@@ -721,7 +721,12 @@ export class WalletService {
     body: string
   ): Promise<void> {
     try {
-      await pushService.sendToUser(userId, title, body);
+      await pushService.sendToUser(userId, {
+        title,
+        body,
+        data: { type: 'wallet_notification' },
+        tag: 'wallet',
+      });
     } catch (error) {
       logSystem.error('Failed to send wallet notification', { userId, error });
     }

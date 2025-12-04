@@ -71,6 +71,23 @@ The project includes a comprehensive testing setup:
 
 ## Recent Changes
 
+### 2025-12-04: Operator Wallet System - Phase 5 (Notifications and Alerts) COMPLETE
+- **Wallet Alert Components Created** (`client/src/components/wallet/`):
+  - `WalletAlertBanner.tsx` - Persistent banner showing wallet alerts (blocked, overdue, near-due)
+  - `CashServiceConfirmationModal.tsx` - Modal for confirming service acceptance when operator has debt
+  - `useWalletStatus` hook - Hook for checking wallet status and alerts
+- **MobileLayout Updated** (`client/src/components/layout/MobileLayout.tsx`):
+  - Added wallet notification indicator on Profile tab for drivers
+  - Red dot for blocked/overdue debt, amber dot for near-due debt
+  - Uses `useWalletStatus` hook to detect alert states
+- **Driver Dashboard Integration** (`client/src/pages/driver/dashboard.tsx`):
+  - WalletAlertBanner displayed at top of dashboard when alerts exist
+  - CashServiceConfirmationModal shown when accepting services with pending debt
+  - Automatic block when operator has overdue debt (can't accept cash services)
+- **Push Notifications** (already in WalletService from Phases 1-3):
+  - Fixed signature for `pushService.sendToUser` to use object payload
+  - Notifications for: new debt, 3-day warning, 1-day warning, blocked, unblocked, payment received
+
 ### 2025-12-04: Operator Wallet System - Phase 4 (User Interface) COMPLETE
 - **Wallet UI Components Created** (`client/src/components/wallet/`):
   - `WalletSection.tsx` - Main component with balance/debt cards and dynamic status alerts
@@ -136,7 +153,6 @@ The project includes a comprehensive testing setup:
 - **Documentation**: Updated `PLAN_CORRECCIONES_RESPONSIVIDAD.md` with detailed change logs.
 
 ### Pending Tasks
-- **Wallet System Phase 5**: Add notifications and alerts for debt reminders
 - **Wallet System Phase 6**: Admin panel for wallet management (optional)
 - Task 5: Update status messages in client tracking screen (change "Conductor" to "Operador")
 - Task 6: Complete terminology changes across remaining files (tracking.tsx, history.tsx, solicitudes.tsx)

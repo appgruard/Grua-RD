@@ -1,8 +1,9 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Home, History, User, Phone, TrendingUp } from 'lucide-react';
+import { Home, History, User, Phone, TrendingUp, Wallet } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
+import { useWalletStatus } from '@/components/wallet';
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -25,6 +26,9 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
     enabled: userType === 'cliente' || userType === 'conductor',
   });
 
+  const walletStatus = useWalletStatus();
+  const hasWalletAlert = userType === 'conductor' && walletStatus.hasAlert;
+
   const activeServices = myServices.filter(s => 
     ['pendiente', 'aceptado', 'en_progreso', 'en_camino'].includes(s.estado)
   );
@@ -42,6 +46,15 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
 
   const homeBadgeType = getHomeBadgeType();
 
+  const getProfileBadgeType = (): 'wallet-blocked' | 'wallet-warning' | null => {
+    if (!hasWalletAlert) return null;
+    if (walletStatus.isBlocked || walletStatus.hasOverdue) return 'wallet-blocked';
+    if (walletStatus.hasNearDue) return 'wallet-warning';
+    return null;
+  };
+
+  const profileBadgeType = getProfileBadgeType();
+
   const clientTabs = [
     { path: '/client', icon: Home, label: 'Inicio', testId: 'tab-home', badgeType: homeBadgeType },
     { path: '/client/history', icon: History, label: 'Historial', testId: 'tab-history', badgeType: null },
@@ -52,7 +65,7 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
   const driverTabs = [
     { path: '/driver', icon: Home, label: 'Inicio', testId: 'tab-home', badgeType: homeBadgeType },
     { path: '/driver/history', icon: History, label: 'Historial', testId: 'tab-history', badgeType: null },
-    { path: '/driver/profile', icon: User, label: 'Perfil', testId: 'tab-profile', badgeType: null },
+    { path: '/driver/profile', icon: User, label: 'Perfil', testId: 'tab-profile', badgeType: profileBadgeType },
   ];
 
   const socioTabs = [
@@ -72,7 +85,16 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
           const Icon = tab.icon;
           const isActive = location === tab.path || location.startsWith(tab.path + '/');
           const showBadge = tab.badgeType && !isActive;
-          const badgeColor = tab.badgeType === 'negotiation' ? 'bg-amber-500' : 'bg-primary';
+          const getBadgeColor = () => {
+            switch (tab.badgeType) {
+              case 'negotiation': return 'bg-amber-500';
+              case 'wallet-blocked': return 'bg-destructive';
+              case 'wallet-warning': return 'bg-amber-500';
+              case 'active': return 'bg-primary';
+              default: return 'bg-primary';
+            }
+          };
+          const badgeColor = getBadgeColor();
           
           return (
             <Link key={tab.path} href={tab.path}>
@@ -93,7 +115,12 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
                         "absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full animate-pulse",
                         badgeColor
                       )}
-                      data-testid={tab.badgeType === 'negotiation' ? 'tab-home-negotiation-dot' : `${tab.testId}-notification-dot`}
+                      data-testid={
+                        tab.badgeType === 'negotiation' ? 'tab-home-negotiation-dot' 
+                        : tab.badgeType === 'wallet-blocked' ? 'tab-profile-wallet-blocked-dot'
+                        : tab.badgeType === 'wallet-warning' ? 'tab-profile-wallet-warning-dot'
+                        : `${tab.testId}-notification-dot`
+                      }
                     />
                   )}
                 </div>

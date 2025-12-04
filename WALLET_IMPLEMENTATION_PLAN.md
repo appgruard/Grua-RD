@@ -366,9 +366,28 @@ Al completar servicio:
 - Indicador visual en el ícono de billetera cuando hay alertas
 
 ### Entregables Fase 5:
-- [ ] Sistema de notificaciones push para operadores
-- [ ] Componentes de alertas en la UI
-- [ ] Integración con el flujo de aceptación de servicios
+- [x] Sistema de notificaciones push para operadores *(Completado: 2024-12-04)*
+- [x] Componentes de alertas en la UI *(Completado: 2024-12-04)*
+- [x] Integración con el flujo de aceptación de servicios *(Completado: 2024-12-04)*
+
+**Notificaciones Push Implementadas:**
+- Nueva deuda registrada al completar servicio en efectivo
+- Aviso 3 días antes del vencimiento de deuda
+- Aviso 1 día antes del vencimiento de deuda
+- Servicios bloqueados por deuda vencida
+- Deuda saldada / Pago recibido
+- Servicios reactivados
+
+**Componentes de Alertas Creados:**
+- `WalletAlertBanner.tsx` - Banner persistente que muestra alertas de billetera (bloqueado, vencido, próximo a vencer)
+- `CashServiceConfirmationModal.tsx` - Modal de confirmación al aceptar servicios cuando hay deuda pendiente
+- `useWalletStatus` hook - Para consultar estado de billetera y alertas
+
+**Integración en Flujos:**
+- Banner de alerta visible en el dashboard del operador
+- Indicador de notificación en pestaña "Perfil" de navegación móvil (punto rojo/ámbar)
+- Modal de confirmación antes de aceptar servicios cuando hay deuda
+- Bloqueo automático de aceptación de servicios en efectivo cuando hay deuda vencida
 
 ---
 
@@ -446,6 +465,7 @@ Para implementar el pago directo con tarjeta, se requiere:
 - [x] **Fase 2: Lógica de Negocio** - WalletService con todas las funciones principales
 - [x] **Fase 3: API Endpoints** - 6 endpoints implementados con validación completa
 - [x] **Fase 4: Interfaz de Usuario** - Dashboard de billetera para operadores
+- [x] **Fase 5: Notificaciones y Alertas** - Sistema completo de notificaciones y alertas en UI
 
 ### Validaciones Implementadas:
 1. **Proceso de pago de servicio:**
@@ -508,8 +528,7 @@ if (paymentIntent.amount !== Math.round(amount * 100)) {
 ## Próximos Pasos
 
 ### Implementación pendiente:
-1. **Fase 5: Sistema de Notificaciones** - Alertas de deuda próxima a vencer
-2. **Fase 6: Panel de Administración** - Vista de todas las billeteras
+1. **Fase 6: Panel de Administración (Opcional)** - Vista de todas las billeteras para administradores
 
 ### Antes de producción:
 1. Configurar integración completa con Stripe (Stripe Elements para PayDebtModal)
@@ -522,3 +541,9 @@ if (paymentIntent.amount !== Math.round(amount * 100)) {
 - `WalletTransactionHistory.tsx` - Historial completo en drawer
 - `DebtDetailModal.tsx` - Detalles de deudas con progreso de pago
 - `PayDebtModal.tsx` - Flujo de pago con pasos (monto → procesando → éxito/error)
+
+### Componentes UI Completados (Fase 5):
+- `WalletAlertBanner.tsx` - Banner persistente para alertas de billetera en el dashboard
+- `CashServiceConfirmationModal.tsx` - Modal de confirmación para aceptar servicios con deuda
+- `useWalletStatus` hook - Hook para consultar estado de billetera y alertas
+- Indicador de notificación en navegación móvil (perfil) con punto de alerta
