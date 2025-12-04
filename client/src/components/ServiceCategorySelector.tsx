@@ -208,7 +208,7 @@ const serviceCategories = [
 
 export function ServiceCategorySelector({ value, onChange }: ServiceCategorySelectorProps) {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-2 gap-3 w-full overflow-hidden">
       {serviceCategories.map(({ id, label, description, Icon }) => {
         const isSelected = value === id;
         return (
@@ -217,20 +217,20 @@ export function ServiceCategorySelector({ value, onChange }: ServiceCategorySele
             type="button"
             data-testid={`service-category-${id}`}
             onClick={() => onChange(id)}
-            className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 ${
+            className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 min-w-0 overflow-hidden ${
               isSelected
                 ? 'border-primary bg-primary/5 shadow-md'
                 : 'border-border bg-card hover-elevate'
             }`}
           >
             {isSelected && (
-              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center z-10">
                 <svg className="w-3 h-3 text-primary-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
             )}
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
               isSelected ? 'bg-primary/10' : 'bg-muted'
             }`}>
               <Icon
@@ -239,15 +239,15 @@ export function ServiceCategorySelector({ value, onChange }: ServiceCategorySele
                 }`}
               />
             </div>
-            <div className="text-center">
+            <div className="text-center w-full min-w-0 overflow-hidden">
               <span
-                className={`text-sm font-semibold transition-colors block ${
+                className={`text-sm font-semibold transition-colors block truncate ${
                   isSelected ? 'text-primary' : 'text-foreground'
                 }`}
               >
                 {label}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground block truncate">
                 {description}
               </span>
             </div>

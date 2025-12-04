@@ -140,8 +140,8 @@ export function ServiceSubtypeSelector({ category, value, onChange }: ServiceSub
   }
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-2">
+    <div className="space-y-3 w-full overflow-hidden">
+      <div className="grid grid-cols-1 gap-2 w-full">
         {subtypes.map(({ id, label, description, Icon }) => {
           const isSelected = value === id;
           return (
@@ -150,7 +150,7 @@ export function ServiceSubtypeSelector({ category, value, onChange }: ServiceSub
               type="button"
               data-testid={`service-subtype-${id}`}
               onClick={() => onChange(isSelected ? null : id)}
-              className={`relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 text-left ${
+              className={`relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 text-left w-full min-w-0 overflow-hidden ${
                 isSelected
                   ? 'border-primary bg-primary/5'
                   : 'border-border bg-card hover-elevate'
@@ -165,9 +165,9 @@ export function ServiceSubtypeSelector({ category, value, onChange }: ServiceSub
                   }`}
                 />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <span
-                  className={`text-sm font-semibold transition-colors block ${
+                  className={`text-sm font-semibold transition-colors block truncate ${
                     isSelected ? 'text-primary' : 'text-foreground'
                   }`}
                 >

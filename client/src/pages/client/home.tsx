@@ -631,8 +631,8 @@ export default function ClientHome() {
                 <p className="text-sm text-muted-foreground">Selecciona el tipo de asistencia</p>
               </div>
 
-              <ScrollArea className="flex-1 min-h-0 px-4">
-                <div className="pb-2">
+              <ScrollArea className="flex-1 min-h-0 px-4 overflow-x-hidden">
+                <div className="pb-2 w-full overflow-hidden">
                   <ServiceCategorySelector 
                     value={servicioCategoria} 
                     onChange={handleCategoryChange} 
@@ -670,12 +670,14 @@ export default function ClientHome() {
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 min-h-0 px-4">
-                <ServiceSubtypeSelector 
-                  category={servicioCategoria}
-                  value={servicioSubtipo} 
-                  onChange={handleSubtypeChange} 
-                />
+              <ScrollArea className="flex-1 min-h-0 px-4 overflow-x-hidden">
+                <div className="pb-2 w-full overflow-hidden">
+                  <ServiceSubtypeSelector 
+                    category={servicioCategoria}
+                    value={servicioSubtipo} 
+                    onChange={handleSubtypeChange} 
+                  />
+                </div>
               </ScrollArea>
 
               <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
