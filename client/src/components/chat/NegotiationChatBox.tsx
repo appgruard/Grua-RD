@@ -16,6 +16,33 @@ import { EvidenceUploader } from './EvidenceUploader';
 import { AmountProposalCard } from './AmountProposalCard';
 import { AmountResponseCard } from './AmountResponseCard';
 
+function playNotificationSound() {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    gainNode.gain.value = 0.3;
+    
+    oscillator.start();
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    oscillator.stop(audioContext.currentTime + 0.2);
+  } catch (e) {
+    console.log('Audio notification not available');
+  }
+}
+
+function vibrate() {
+  if ('vibrate' in navigator) {
+    navigator.vibrate([100, 50, 100]);
+  }
+}
+
 interface MensajeChatConRemitente extends MensajeChat {
   remitente?: User;
 }
@@ -238,7 +265,7 @@ export function NegotiationChatBox({
 
   const { data: mensajes = [], isLoading } = useQuery<MensajeChatConRemitente[]>({
     queryKey: ['/api/chat', servicioId],
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   });
 
   const { send, connectionId, isConnected } = useWebSocket(
@@ -251,6 +278,11 @@ export function NegotiationChatBox({
         queryClient.invalidateQueries({ queryKey: ['/api/chat', servicioId] });
         queryClient.invalidateQueries({ queryKey: ['/api/services', servicioId] });
         setIsOtherTyping(false);
+        
+        if (message.payload?.remitenteId !== currentUserId) {
+          playNotificationSound();
+          vibrate();
+        }
       }
       if (message.type === 'typing' && message.payload?.userId !== currentUserId) {
         setIsOtherTyping(true);
