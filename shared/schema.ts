@@ -1196,12 +1196,16 @@ export const insertConductorSchema = createInsertSchema(conductores, {
 export const insertConductorServicioSchema = createInsertSchema(conductorServicios, {
   categoriaServicio: z.enum([
     "remolque_estandar",
+    "remolque_motocicletas",
+    "remolque_plataforma",
     "auxilio_vial",
     "remolque_especializado",
+    "camiones_pesados",
     "vehiculos_pesados",
     "maquinarias",
     "izaje_construccion",
-    "remolque_recreativo"
+    "remolque_recreativo",
+    "extraccion"
   ]),
 }).omit({
   id: true,
@@ -1223,6 +1227,20 @@ export const insertConductorServicioSubtipoSchema = createInsertSchema(conductor
     "vehiculo_chocado",
     "vehiculo_lujo",
     "vehiculo_electrico",
+    "vehiculo_deportivo",
+    "vehiculo_bajo",
+    "vehiculo_modificado",
+    "traslado_especial",
+    "servicio_premium",
+    "moto_accidentada",
+    "moto_no_prende",
+    "scooter_pasola",
+    "delivery_accidentado",
+    "moto_alto_cilindraje",
+    "traslado_local_moto",
+    "reubicacion_moto",
+    "camion_liviano",
+    "camion_mediano",
     "camiones_cisternas",
     "de_carga",
     "patana_cabezote",
@@ -1240,7 +1258,12 @@ export const insertConductorServicioSubtipoSchema = createInsertSchema(conductor
     "transporte_equipos",
     "remolque_botes",
     "remolque_jetski",
-    "remolque_cuatrimoto"
+    "remolque_cuatrimoto",
+    "extraccion_zanja",
+    "extraccion_lodo",
+    "extraccion_volcado",
+    "extraccion_accidente",
+    "extraccion_dificil"
   ]),
 }).omit({
   id: true,
@@ -1250,12 +1273,16 @@ export const insertConductorServicioSubtipoSchema = createInsertSchema(conductor
 export const insertConductorVehiculoSchema = createInsertSchema(conductorVehiculos, {
   categoria: z.enum([
     "remolque_estandar",
+    "remolque_motocicletas",
+    "remolque_plataforma",
     "auxilio_vial",
     "remolque_especializado",
+    "camiones_pesados",
     "vehiculos_pesados",
     "maquinarias",
     "izaje_construccion",
-    "remolque_recreativo"
+    "remolque_recreativo",
+    "extraccion"
   ]),
   placa: z.string().min(1, "Placa es requerida"),
   color: z.string().min(1, "Color es requerido"),
@@ -1277,12 +1304,16 @@ export const insertServicioSchema = createInsertSchema(servicios, {
   tipoVehiculo: z.enum(["carro", "motor", "jeep", "camion"]).optional(),
   servicioCategoria: z.enum([
     "remolque_estandar",
+    "remolque_motocicletas",
+    "remolque_plataforma",
     "auxilio_vial",
     "remolque_especializado",
+    "camiones_pesados",
     "vehiculos_pesados",
     "maquinarias",
     "izaje_construccion",
-    "remolque_recreativo"
+    "remolque_recreativo",
+    "extraccion"
   ]).optional(),
   servicioSubtipo: z.enum([
     "cambio_goma",
@@ -1298,6 +1329,20 @@ export const insertServicioSchema = createInsertSchema(servicios, {
     "vehiculo_chocado",
     "vehiculo_lujo",
     "vehiculo_electrico",
+    "vehiculo_deportivo",
+    "vehiculo_bajo",
+    "vehiculo_modificado",
+    "traslado_especial",
+    "servicio_premium",
+    "moto_accidentada",
+    "moto_no_prende",
+    "scooter_pasola",
+    "delivery_accidentado",
+    "moto_alto_cilindraje",
+    "traslado_local_moto",
+    "reubicacion_moto",
+    "camion_liviano",
+    "camion_mediano",
     "camiones_cisternas",
     "de_carga",
     "patana_cabezote",
@@ -1315,11 +1360,29 @@ export const insertServicioSchema = createInsertSchema(servicios, {
     "transporte_equipos",
     "remolque_botes",
     "remolque_jetski",
-    "remolque_cuatrimoto"
+    "remolque_cuatrimoto",
+    "extraccion_zanja",
+    "extraccion_lodo",
+    "extraccion_volcado",
+    "extraccion_accidente",
+    "extraccion_dificil"
   ]).optional(),
   aseguradoraNombre: z.string().optional(),
   aseguradoraPoliza: z.string().optional(),
   aseguradoraEstado: z.enum(["pendiente", "aprobado", "rechazado"]).optional(),
+  requiereNegociacion: z.boolean().optional(),
+  estadoNegociacion: z.enum([
+    "no_aplica",
+    "pendiente_evaluacion",
+    "propuesto",
+    "confirmado",
+    "aceptado",
+    "rechazado",
+    "cancelado"
+  ]).optional(),
+  montoNegociado: z.string().optional(),
+  notasExtraccion: z.string().optional(),
+  descripcionSituacion: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,
@@ -1352,6 +1415,19 @@ export const insertUbicacionTrackingSchema = createInsertSchema(ubicacionesTrack
 
 export const insertMensajeChatSchema = createInsertSchema(mensajesChat, {
   contenido: z.string().min(1).max(1000),
+  tipoMensaje: z.enum([
+    "texto",
+    "imagen",
+    "video",
+    "monto_propuesto",
+    "monto_confirmado",
+    "monto_aceptado",
+    "monto_rechazado",
+    "sistema"
+  ]).optional(),
+  montoAsociado: z.string().optional(),
+  urlArchivo: z.string().optional(),
+  nombreArchivo: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,
