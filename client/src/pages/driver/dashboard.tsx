@@ -14,9 +14,10 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/lib/websocket';
 import { ChatBox } from '@/components/chat/ChatBox';
+import { NegotiationChatBox } from '@/components/chat/NegotiationChatBox';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLocationTracking } from '@/hooks/useLocation';
-import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert } from 'lucide-react';
+import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { SiWaze, SiGooglemaps } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
@@ -24,15 +25,16 @@ import { generateWazeNavigationUrl, generateGoogleMapsNavigationUrl } from '@/li
 import { cn } from '@/lib/utils';
 
 const serviceCategoryLabels: Record<string, string> = {
-  remolque_estandar: "Remolque Estándar",
+  remolque_estandar: "Remolque Estandar",
   remolque_motocicletas: "Remolque de Motocicletas",
   remolque_plataforma: "Plataforma / Flatbed",
   auxilio_vial: "Auxilio Vial",
+  extraccion: "Extraccion",
   remolque_especializado: "Remolque Especializado",
   camiones_pesados: "Camiones Pesados",
-  vehiculos_pesados: "Vehículos Pesados",
+  vehiculos_pesados: "Vehiculos Pesados",
   maquinarias: "Maquinarias",
-  izaje_construccion: "Izaje y Construcción",
+  izaje_construccion: "Izaje y Construccion",
   remolque_recreativo: "Remolque Recreativo"
 };
 
@@ -563,18 +565,49 @@ export default function DriverDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Distancia</p>
-                  <p className="text-lg font-bold">
-                    {parseFloat(activeService.distanciaKm as string).toFixed(1)} km
-                  </p>
+              {activeService.requiereNegociacion && (
+                <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span className="text-sm font-medium text-amber-600">Servicio de Extraccion</span>
+                  </div>
+                  {activeService.descripcionSituacion && (
+                    <p className="text-xs text-muted-foreground">{activeService.descripcionSituacion}</p>
+                  )}
                 </div>
-                <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
-                  <p className="text-xs text-muted-foreground mb-1">Ganancia</p>
-                  <p className="text-lg font-bold text-primary">
-                    RD$ {parseFloat(activeService.costoTotal as string).toFixed(2)}
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                {!activeService.requiereNegociacion && (
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Distancia</p>
+                    <p className="text-lg font-bold">
+                      {parseFloat(activeService.distanciaKm as string).toFixed(1)} km
+                    </p>
+                  </div>
+                )}
+                <div className={cn(
+                  "text-center p-3 rounded-lg border",
+                  activeService.requiereNegociacion 
+                    ? "bg-amber-500/10 border-amber-500/20 col-span-2"
+                    : "bg-primary/10 border-primary/20"
+                )}>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {activeService.requiereNegociacion ? 'Monto Negociado' : 'Ganancia'}
                   </p>
+                  {activeService.requiereNegociacion ? (
+                    activeService.montoNegociado ? (
+                      <p className="text-lg font-bold text-amber-600">
+                        RD$ {parseFloat(activeService.montoNegociado as string).toFixed(2)}
+                      </p>
+                    ) : (
+                      <p className="text-lg font-bold text-amber-600">Por definir</p>
+                    )
+                  ) : (
+                    <p className="text-lg font-bold text-primary">
+                      RD$ {parseFloat(activeService.costoTotal as string).toFixed(2)}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -685,21 +718,42 @@ export default function DriverDashboard() {
                     <Badge variant="outline" className="text-xs" data-testid={`badge-vehicle-type-${request.id}`}>
                       {getVehicleTypeLabel(request.tipoVehiculo)}
                     </Badge>
+                    {request.requiereNegociacion && (
+                      <Badge variant="outline" className="text-xs gap-1 text-amber-600 border-amber-500" data-testid={`badge-negotiation-${request.id}`}>
+                        <AlertTriangle className="w-3 h-3" />
+                        Requiere Negociacion
+                      </Badge>
+                    )}
                   </div>
+
+                  {request.requiereNegociacion && request.descripcionSituacion && (
+                    <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">Situacion:</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{request.descripcionSituacion}</p>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between py-2 border-t border-border">
                     <div className="flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-primary" />
-                      <span className="font-bold text-primary">
-                        RD$ {parseFloat(request.costoTotal as string).toFixed(2)}
-                      </span>
+                      {request.requiereNegociacion ? (
+                        <span className="font-bold text-amber-600">
+                          Por negociar
+                        </span>
+                      ) : (
+                        <span className="font-bold text-primary">
+                          RD$ {parseFloat(request.costoTotal as string).toFixed(2)}
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Car className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        {parseFloat(request.distanciaKm as string).toFixed(1)} km
-                      </span>
-                    </div>
+                    {!request.requiereNegociacion && (
+                      <div className="flex items-center gap-2">
+                        <Car className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {parseFloat(request.distanciaKm as string).toFixed(1)} km
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2">
@@ -733,18 +787,31 @@ export default function DriverDashboard() {
       <Drawer open={chatOpen} onOpenChange={setChatOpen}>
         <DrawerContent className="h-[80vh]">
           <DrawerHeader>
-            <DrawerTitle>Chat con el Cliente</DrawerTitle>
+            <DrawerTitle>
+              {activeService?.requiereNegociacion ? 'Negociacion con el Cliente' : 'Chat con el Cliente'}
+            </DrawerTitle>
           </DrawerHeader>
           <div className="flex-1 overflow-hidden px-4 pb-4">
             {user && activeService && (
-              <ChatBox
-                servicioId={activeService.id}
-                currentUserId={user.id}
-                currentUserNombre={user.nombre}
-                currentUserApellido={user.apellido}
-                otherUserName={activeService.cliente ? `${activeService.cliente.nombre} ${activeService.cliente.apellido}` : 'Cliente'}
-                userType="conductor"
-              />
+              activeService.requiereNegociacion ? (
+                <NegotiationChatBox
+                  servicioId={activeService.id}
+                  servicio={activeService}
+                  currentUserId={user.id}
+                  currentUserNombre={user.nombre}
+                  currentUserApellido={user.apellido}
+                  userType="conductor"
+                />
+              ) : (
+                <ChatBox
+                  servicioId={activeService.id}
+                  currentUserId={user.id}
+                  currentUserNombre={user.nombre}
+                  currentUserApellido={user.apellido}
+                  otherUserName={activeService.cliente ? `${activeService.cliente.nombre} ${activeService.cliente.apellido}` : 'Cliente'}
+                  userType="conductor"
+                />
+              )
             )}
           </div>
         </DrawerContent>

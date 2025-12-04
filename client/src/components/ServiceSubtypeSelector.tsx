@@ -108,8 +108,16 @@ const izajeConstruccionSubtypes: SubtypeOption[] = [
 
 const remolqueRecreativoSubtypes: SubtypeOption[] = [
   { id: 'remolque_botes', label: 'Remolque de Botes', description: 'Lanchas y botes', Icon: Ship },
-  { id: 'remolque_jetski', label: 'Remolque de Jetski', description: 'Moto acuática', Icon: Waves },
+  { id: 'remolque_jetski', label: 'Remolque de Jetski', description: 'Moto acuatica', Icon: Waves },
   { id: 'remolque_cuatrimoto', label: 'Remolque Cuatrimoto', description: 'ATV o side-by-side', Icon: Bike },
+];
+
+const extraccionSubtypes: SubtypeOption[] = [
+  { id: 'extraccion_zanja', label: 'Vehiculo en Zanja', description: 'Caido en cuneta o zanja', Icon: ArrowDown },
+  { id: 'extraccion_lodo', label: 'Atascado en Lodo', description: 'Atrapado en lodo o arena', Icon: Waves },
+  { id: 'extraccion_volcado', label: 'Vehiculo Volcado', description: 'Volcado de lado o techo', Icon: AlertTriangle },
+  { id: 'extraccion_accidente', label: 'Accidente Vehicular', description: 'Extraccion por accidente', Icon: AlertTriangle },
+  { id: 'extraccion_dificil', label: 'Situacion Compleja', description: 'Dificil acceso o terreno', Icon: MapPin },
 ];
 
 const subtypesByCategory: Record<string, SubtypeOption[]> = {
@@ -121,6 +129,7 @@ const subtypesByCategory: Record<string, SubtypeOption[]> = {
   'maquinarias': maquinariasSubtypes,
   'izaje_construccion': izajeConstruccionSubtypes,
   'remolque_recreativo': remolqueRecreativoSubtypes,
+  'extraccion': extraccionSubtypes,
 };
 
 export function ServiceSubtypeSelector({ category, value, onChange }: ServiceSubtypeSelectorProps) {

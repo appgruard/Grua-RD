@@ -7,7 +7,10 @@ import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { calculateRoute, type Coordinates, type RouteGeometry } from '@/lib/maps';
-import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck } from 'lucide-react';
+import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck, AlertTriangle, Info } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { VehicleTypeSelector } from '@/components/VehicleTypeSelector';
@@ -18,7 +21,7 @@ import { InsuranceForm } from '@/components/InsuranceForm';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
-type Step = 'serviceCategory' | 'serviceSubtype' | 'location' | 'vehicleType' | 'payment' | 'confirm';
+type Step = 'serviceCategory' | 'serviceSubtype' | 'extractionDescription' | 'location' | 'vehicleType' | 'payment' | 'confirm';
 
 const ONSITE_SUBTYPES = [
   'cambio_goma',
@@ -59,6 +62,7 @@ export default function ClientHome() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [aseguradoraNombre, setAseguradoraNombre] = useState<string>('');
   const [aseguradoraPoliza, setAseguradoraPoliza] = useState<string>('');
+  const [descripcionSituacion, setDescripcionSituacion] = useState<string>('');
   const [isCalculating, setIsCalculating] = useState(false);
   const [showExpandedCard, setShowExpandedCard] = useState(true);
   const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
@@ -82,6 +86,14 @@ export default function ClientHome() {
 
   const requiresTransport = (): boolean => {
     return !isOnsiteService();
+  };
+
+  const isExtractionService = (): boolean => {
+    return servicioCategoria === 'extraccion';
+  };
+
+  const requiresNegotiation = (): boolean => {
+    return servicioCategoria === 'extraccion';
   };
 
   const calculatePricingMutation = useMutation({
@@ -244,7 +256,7 @@ export default function ClientHome() {
     if (step === 'serviceCategory') {
       if (!servicioCategoria) {
         toast({
-          title: 'Seleccione categoría',
+          title: 'Seleccione categoria',
           description: 'Debe seleccionar un tipo de servicio',
           variant: 'destructive',
         });
@@ -259,7 +271,21 @@ export default function ClientHome() {
       if (!servicioSubtipo) {
         toast({
           title: 'Seleccione tipo de servicio',
-          description: 'Debe seleccionar el tipo específico de servicio que necesita',
+          description: 'Debe seleccionar el tipo especifico de servicio que necesita',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (isExtractionService()) {
+        setStep('extractionDescription');
+      } else {
+        setStep('location');
+      }
+    } else if (step === 'extractionDescription') {
+      if (!descripcionSituacion.trim() || descripcionSituacion.trim().length < 10) {
+        toast({
+          title: 'Descripcion requerida',
+          description: 'Por favor describe la situacion del vehiculo (minimo 10 caracteres)',
           variant: 'destructive',
         });
         return;
@@ -323,8 +349,12 @@ export default function ClientHome() {
   const handlePrevStep = () => {
     if (step === 'serviceSubtype') {
       setStep('serviceCategory');
+    } else if (step === 'extractionDescription') {
+      setStep('serviceSubtype');
     } else if (step === 'location') {
-      if (requiresSubtype(servicioCategoria)) {
+      if (isExtractionService()) {
+        setStep('extractionDescription');
+      } else if (requiresSubtype(servicioCategoria)) {
         setStep('serviceSubtype');
       } else {
         setStep('serviceCategory');
@@ -338,7 +368,11 @@ export default function ClientHome() {
         setStep('location');
       }
     } else if (step === 'confirm') {
-      setStep('payment');
+      if (isExtractionService()) {
+        setStep('location');
+      } else {
+        setStep('payment');
+      }
     }
   };
 
@@ -376,15 +410,16 @@ export default function ClientHome() {
     if (!origin || !servicioCategoria) {
       toast({
         title: 'Datos incompletos',
-        description: 'Falta información requerida para crear la solicitud',
+        description: 'Falta informacion requerida para crear la solicitud',
         variant: 'destructive',
       });
       return;
     }
     
     const isOnsite = isOnsiteService();
+    const isExtraction = isExtractionService();
     
-    if (!isOnsite && !destination) {
+    if (!isOnsite && !isExtraction && !destination) {
       toast({
         title: 'Destino requerido',
         description: 'Para servicios de remolque debe seleccionar un destino',
@@ -393,16 +428,16 @@ export default function ClientHome() {
       return;
     }
     
-    if (!isOnsite && (cost === null || distance === null || distance <= 0)) {
+    if (!isOnsite && !isExtraction && (cost === null || distance === null || distance <= 0)) {
       toast({
-        title: 'Error de cálculo',
+        title: 'Error de calculo',
         description: 'No se ha calculado la ruta y costo del servicio. Por favor seleccione las ubicaciones nuevamente.',
         variant: 'destructive',
       });
       return;
     }
     
-    if (!isOnsite && (distanceRef.current === null || distanceRef.current <= 0)) {
+    if (!isOnsite && !isExtraction && (distanceRef.current === null || distanceRef.current <= 0)) {
       toast({
         title: 'Ruta no calculada',
         description: 'Debe calcular la ruta antes de confirmar. Por favor verifique las ubicaciones.',
@@ -410,13 +445,22 @@ export default function ClientHome() {
       });
       return;
     }
-    
-    const finalDestination = isOnsite ? origin : destination!;
-    const finalDestinoDireccion = isOnsite ? origenDireccion : destinoDireccion;
 
-    const currentDistance = isOnsite ? 0 : (distanceRef.current || distance || 0);
+    if (isExtraction && (!descripcionSituacion || descripcionSituacion.trim().length < 10)) {
+      toast({
+        title: 'Descripcion requerida',
+        description: 'Por favor describe la situacion del vehiculo',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const finalDestination = (isOnsite || isExtraction) ? origin : destination!;
+    const finalDestinoDireccion = (isOnsite || isExtraction) ? origenDireccion : destinoDireccion;
+
+    const currentDistance = (isOnsite || isExtraction) ? 0 : (distanceRef.current || distance || 0);
     const DEFAULT_MIN_COST = 150;
-    const finalCost = cost || (isOnsite ? (ONSITE_SERVICE_PRICES[servicioSubtipo || ''] || DEFAULT_MIN_COST) : DEFAULT_MIN_COST);
+    const finalCost = isExtraction ? 0 : (cost || (isOnsite ? (ONSITE_SERVICE_PRICES[servicioSubtipo || ''] || DEFAULT_MIN_COST) : DEFAULT_MIN_COST));
 
     const serviceData: any = {
       origenLat: origin.lat.toString(),
@@ -427,7 +471,7 @@ export default function ClientHome() {
       destinoDireccion: finalDestinoDireccion || `${finalDestination.lat}, ${finalDestination.lng}`,
       distanciaKm: currentDistance.toFixed(2),
       costoTotal: finalCost.toFixed(2),
-      metodoPago,
+      metodoPago: isExtraction ? 'efectivo' : metodoPago,
       servicioCategoria,
     };
 
@@ -439,13 +483,19 @@ export default function ClientHome() {
       serviceData.tipoVehiculo = tipoVehiculo;
     }
 
-    if (metodoPago === 'aseguradora') {
+    if (metodoPago === 'aseguradora' && !isExtraction) {
       serviceData.aseguradoraNombre = aseguradoraNombre;
       serviceData.aseguradoraPoliza = aseguradoraPoliza;
     }
 
-    if (metodoPago === 'tarjeta' && selectedCardId) {
+    if (metodoPago === 'tarjeta' && selectedCardId && !isExtraction) {
       serviceData.paymentMethodId = selectedCardId;
+    }
+
+    if (isExtraction) {
+      serviceData.requiereNegociacion = true;
+      serviceData.estadoNegociacion = 'pendiente_evaluacion';
+      serviceData.descripcionSituacion = descripcionSituacion.trim();
     }
 
     createServiceMutation.mutate(serviceData);
@@ -467,6 +517,7 @@ export default function ClientHome() {
     setSelectedCardId(null);
     setAseguradoraNombre('');
     setAseguradoraPoliza('');
+    setDescripcionSituacion('');
     setStep('serviceCategory');
   };
 
@@ -626,6 +677,71 @@ export default function ClientHome() {
             </div>
           )}
 
+          {step === 'extractionDescription' && (
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePrevStep}
+                  data-testid="button-back"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h3 className="text-lg font-bold">Describe la situacion</h3>
+                  <p className="text-sm text-muted-foreground">El precio se definira tras evaluar</p>
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <div className="space-y-4 pb-2">
+                  <Alert className="bg-amber-500/10 border-amber-500/30">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
+                      Este servicio requiere evaluacion. Un conductor revisara tu caso y propondra un precio antes de aceptar.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="descripcion-situacion" className="text-sm font-medium">
+                      Describe la situacion del vehiculo
+                    </Label>
+                    <Textarea
+                      id="descripcion-situacion"
+                      placeholder="Ejemplo: Mi carro cayo en una zanja en la carretera, esta inclinado hacia el lado derecho. Es un SUV mediano..."
+                      value={descripcionSituacion}
+                      onChange={(e) => setDescripcionSituacion(e.target.value)}
+                      className="min-h-[120px] resize-none"
+                      data-testid="input-extraction-description"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Incluye detalles como: tipo de vehiculo, como quedo atrapado, acceso al lugar, etc.
+                    </p>
+                  </div>
+
+                  <Alert className="bg-blue-500/10 border-blue-500/30">
+                    <Info className="h-4 w-4 text-blue-500" />
+                    <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
+                      Podras enviar fotos y videos despues de crear la solicitud para que el conductor evalue mejor.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </ScrollArea>
+
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
+                <Button
+                  onClick={handleNextStep}
+                  disabled={!descripcionSituacion.trim() || descripcionSituacion.trim().length < 10}
+                  className="w-full h-12 text-base"
+                  data-testid="button-next"
+                >
+                  Continuar
+                </Button>
+              </div>
+            </div>
+          )}
+
           {step === 'location' && (
             <div className="flex flex-col h-full">
               <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
@@ -639,21 +755,30 @@ export default function ClientHome() {
                 </Button>
                 <div>
                   <h3 className="text-lg font-bold">
-                    {requiresTransport() ? '¿A dónde vamos?' : '¿Dónde te encuentras?'}
+                    {(requiresTransport() && !isExtractionService()) ? '¿A donde vamos?' : '¿Donde te encuentras?'}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {requiresTransport() 
+                    {(requiresTransport() && !isExtractionService())
                       ? 'Ingresa las direcciones de recogida y entrega' 
-                      : 'Ingresa la ubicación donde necesitas el servicio'}
+                      : 'Ingresa la ubicacion donde necesitas el servicio'}
                   </p>
                 </div>
               </div>
 
               <ScrollArea className="flex-1 min-h-0 px-4">
                 <div className="space-y-4 pb-2">
+                  {isExtractionService() && (
+                    <Alert className="bg-amber-500/10 border-amber-500/30">
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
+                        Solo necesitamos la ubicacion del vehiculo. El precio se negociara con el conductor.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <AddressSearchInput
-                    label={requiresTransport() ? "Recoger en" : "Ubicación del servicio"}
-                    placeholder={requiresTransport() ? "¿Dónde está tu vehículo?" : "¿Dónde necesitas el servicio?"}
+                    label={(requiresTransport() && !isExtractionService()) ? "Recoger en" : "Ubicacion del vehiculo"}
+                    placeholder={(requiresTransport() && !isExtractionService()) ? "¿Donde esta tu vehiculo?" : "¿Donde esta tu vehiculo?"}
                     value={origenDireccion}
                     coordinates={origin}
                     onAddressChange={handleOriginChange}
@@ -668,10 +793,10 @@ export default function ClientHome() {
                     autoFocus
                   />
 
-                  {requiresTransport() && (
+                  {requiresTransport() && !isExtractionService() && (
                     <AddressSearchInput
                       label="Llevar a"
-                      placeholder="¿A dónde lo llevamos?"
+                      placeholder="¿A donde lo llevamos?"
                       value={destinoDireccion}
                       coordinates={destination}
                       onAddressChange={handleDestinationChange}
@@ -686,14 +811,14 @@ export default function ClientHome() {
                     />
                   )}
 
-                  {isCalculating && (
+                  {isCalculating && !isExtractionService() && (
                     <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span className="text-sm">Calculando ruta...</span>
                     </div>
                   )}
 
-                  {cost !== null && !isCalculating && (
+                  {cost !== null && !isCalculating && !isExtractionService() && (
                     <Card className="p-4 bg-muted/50">
                       <div className="flex items-center justify-between gap-2">
                         {requiresTransport() && distance !== null ? (
@@ -719,16 +844,24 @@ export default function ClientHome() {
 
               <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
                 <Button
-                  onClick={handleNextStep}
-                  disabled={!origin || (requiresTransport() && !destination) || isCalculating}
+                  onClick={() => {
+                    if (isExtractionService()) {
+                      setStep('confirm');
+                    } else {
+                      handleNextStep();
+                    }
+                  }}
+                  disabled={!origin || (requiresTransport() && !isExtractionService() && !destination) || (isCalculating && !isExtractionService())}
                   className="w-full h-12 text-base"
                   data-testid="button-next"
                 >
-                  {isCalculating ? (
+                  {isCalculating && !isExtractionService() ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Calculando...
                     </>
+                  ) : isExtractionService() ? (
+                    'Solicitar Evaluacion'
                   ) : (
                     'Continuar'
                   )}
@@ -840,16 +973,31 @@ export default function ClientHome() {
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h3 className="text-lg font-bold">Confirmar Solicitud</h3>
-                  <p className="text-sm text-muted-foreground">Revisa los detalles de tu servicio</p>
+                  <h3 className="text-lg font-bold">
+                    {isExtractionService() ? 'Confirmar Evaluacion' : 'Confirmar Solicitud'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {isExtractionService() ? 'Revisa los detalles antes de enviar' : 'Revisa los detalles de tu servicio'}
+                  </p>
                 </div>
               </div>
 
               <ScrollArea className="flex-1 min-h-0 px-4">
                 <div className="space-y-3 pb-2">
+                  {isExtractionService() && (
+                    <Alert className="bg-amber-500/10 border-amber-500/30">
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
+                        El conductor evaluara la situacion y te propondra un precio. Podras aceptar o rechazar su oferta.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
                     {servicioCategoria === 'auxilio_vial' ? (
                       <Wrench className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    ) : servicioCategoria === 'extraccion' ? (
+                      <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                     ) : servicioCategoria === 'vehiculos_pesados' || servicioCategoria === 'maquinarias' ? (
                       <Truck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                     ) : (
@@ -865,14 +1013,21 @@ export default function ClientHome() {
                       )}
                       {tipoVehiculo && (
                         <p className="text-sm text-muted-foreground capitalize">
-                          Vehículo: {tipoVehiculo}
+                          Vehiculo: {tipoVehiculo}
                         </p>
                       )}
                     </div>
                   </div>
 
+                  {isExtractionService() && descripcionSituacion && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Descripcion de la situacion</p>
+                      <p className="text-sm">{descripcionSituacion}</p>
+                    </div>
+                  )}
+
                   <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                    {requiresTransport() ? (
+                    {(requiresTransport() && !isExtractionService()) ? (
                       <>
                         <div className="flex flex-col items-center gap-1 flex-shrink-0">
                           <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
@@ -894,47 +1049,61 @@ export default function ClientHome() {
                       <>
                         <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0 mt-1" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground">Ubicación del servicio</p>
+                          <p className="text-xs text-muted-foreground">Ubicacion del vehiculo</p>
                           <p className="text-sm font-medium truncate">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
                         </div>
                       </>
                     )}
                   </div>
 
-                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                    <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Método de Pago</p>
-                      <p className="font-semibold capitalize">{metodoPago}</p>
-                      {metodoPago === 'aseguradora' && (
-                        <div className="mt-1 text-sm text-muted-foreground">
-                          <p>{aseguradoraNombre}</p>
-                          <p>Póliza: {aseguradoraPoliza}</p>
+                  {!isExtractionService() && (
+                    <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                      <MapPin className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Metodo de Pago</p>
+                        <p className="font-semibold capitalize">{metodoPago}</p>
+                        {metodoPago === 'aseguradora' && (
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            <p>{aseguradoraNombre}</p>
+                            <p>Poliza: {aseguradoraPoliza}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {isExtractionService() ? (
+                    <div className="text-center p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Precio</p>
+                      <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                        Por definir
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        El conductor propondra un monto tras evaluar
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={requiresTransport() ? "grid grid-cols-2 gap-3" : ""}>
+                      {requiresTransport() && (
+                        <div className="text-center p-3 bg-muted rounded-lg">
+                          <p className="text-xs text-muted-foreground mb-1">Distancia</p>
+                          <p className="text-xl font-bold" data-testid="text-distance">
+                            {distance?.toFixed(1)} km
+                          </p>
                         </div>
                       )}
-                    </div>
-                  </div>
-
-                  <div className={requiresTransport() ? "grid grid-cols-2 gap-3" : ""}>
-                    {requiresTransport() && (
-                      <div className="text-center p-3 bg-muted rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Distancia</p>
-                        <p className="text-xl font-bold" data-testid="text-distance">
-                          {distance?.toFixed(1)} km
-                        </p>
+                      <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
+                        <p className="text-xs text-muted-foreground mb-1">Costo Total</p>
+                        {calculatePricingMutation.isPending ? (
+                          <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
+                        ) : (
+                          <p className="text-xl font-bold text-primary" data-testid="text-cost">
+                            RD$ {cost?.toFixed(2)}
+                          </p>
+                        )}
                       </div>
-                    )}
-                    <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
-                      <p className="text-xs text-muted-foreground mb-1">Costo Total</p>
-                      {calculatePricingMutation.isPending ? (
-                        <Loader2 className="w-6 h-6 mx-auto animate-spin text-primary" />
-                      ) : (
-                        <p className="text-xl font-bold text-primary" data-testid="text-cost">
-                          RD$ {cost?.toFixed(2)}
-                        </p>
-                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
               </ScrollArea>
 
@@ -948,7 +1117,12 @@ export default function ClientHome() {
                   {createServiceMutation.isPending ? (
                     <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Enviando solicitud...
+                      {isExtractionService() ? 'Enviando solicitud...' : 'Enviando solicitud...'}
+                    </>
+                  ) : isExtractionService() ? (
+                    <>
+                      <AlertTriangle className="w-5 h-5 mr-2" />
+                      Solicitar Evaluacion
                     </>
                   ) : (
                     <>

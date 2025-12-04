@@ -6,11 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
-import { Phone, MessageCircle, Loader2, Star, Truck, Car } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from '@/lib/auth';
 import { ChatBox } from '@/components/chat/ChatBox';
+import { NegotiationChatBox } from '@/components/chat/NegotiationChatBox';
 import { RatingModal, StarRating } from '@/components/RatingModal';
 import { PaymentConfirmationModal } from '@/components/PaymentConfirmationModal';
 import type { ServicioWithDetails, Calificacion } from '@shared/schema';
@@ -114,6 +116,27 @@ export default function ClientTracking() {
     cancelado: 'Servicio cancelado',
   };
 
+  const negotiationStatusLabels: Record<string, string> = {
+    no_aplica: '',
+    pendiente_evaluacion: 'Esperando evaluacion',
+    propuesto: 'Precio propuesto',
+    confirmado: 'Precio confirmado',
+    aceptado: 'Precio aceptado',
+    rechazado: 'Precio rechazado',
+  };
+
+  const negotiationStatusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    no_aplica: 'secondary',
+    pendiente_evaluacion: 'secondary',
+    propuesto: 'outline',
+    confirmado: 'outline',
+    aceptado: 'default',
+    rechazado: 'destructive',
+  };
+
+  const isNegotiationService = service.requiereNegociacion;
+  const showNegotiationStatus = isNegotiationService && service.estadoNegociacion && service.estadoNegociacion !== 'no_aplica';
+
   const driverName = service.conductor ? `${service.conductor.nombre} ${service.conductor.apellido}` : 'Conductor';
 
   return (
@@ -126,14 +149,26 @@ export default function ClientTracking() {
         />
       </div>
 
-      <div className="absolute top-4 left-4 right-4 z-10">
+      <div className="absolute top-4 left-4 right-4 z-10 space-y-2">
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
             <div>
               <h3 className="font-semibold mb-1">Estado del Servicio</h3>
-              <Badge variant={statusColors[service.estado]} data-testid="badge-status">
-                {statusLabels[service.estado]}
-              </Badge>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant={statusColors[service.estado]} data-testid="badge-status">
+                  {statusLabels[service.estado]}
+                </Badge>
+                {showNegotiationStatus && (
+                  <Badge 
+                    variant={negotiationStatusColors[service.estadoNegociacion || 'no_aplica']}
+                    className="gap-1"
+                    data-testid="badge-negotiation-status"
+                  >
+                    <DollarSign className="w-3 h-3" />
+                    {negotiationStatusLabels[service.estadoNegociacion || 'no_aplica']}
+                  </Badge>
+                )}
+              </div>
             </div>
             {service.conductor && service.estado !== 'completado' && service.estado !== 'cancelado' && (
               <div className="flex gap-2">
@@ -162,6 +197,24 @@ export default function ClientTracking() {
             )}
           </div>
         </Card>
+
+        {isNegotiationService && service.estado === 'pendiente' && (
+          <Alert className="bg-amber-500/10 border-amber-500/30">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
+              Esperando que un conductor evalue la situacion y proponga un precio.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isNegotiationService && service.estadoNegociacion === 'propuesto' && (
+          <Alert className="bg-blue-500/10 border-blue-500/30">
+            <DollarSign className="h-4 w-4 text-blue-500" />
+            <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
+              El conductor ha propuesto un precio. Abre el chat para ver y responder.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       {service.conductor && (
@@ -186,10 +239,24 @@ export default function ClientTracking() {
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total</p>
-                <p className="text-xl font-bold" data-testid="text-total">
-                  RD$ {parseFloat(service.costoTotal as string).toFixed(2)}
+                <p className="text-sm text-muted-foreground">
+                  {isNegotiationService && service.estadoNegociacion !== 'aceptado' ? 'Precio' : 'Total'}
                 </p>
+                {isNegotiationService && service.estadoNegociacion !== 'aceptado' ? (
+                  service.montoNegociado ? (
+                    <p className="text-xl font-bold text-amber-600" data-testid="text-total">
+                      RD$ {parseFloat(service.montoNegociado as string).toFixed(2)}
+                    </p>
+                  ) : (
+                    <p className="text-lg font-bold text-amber-600" data-testid="text-total">
+                      Por definir
+                    </p>
+                  )
+                ) : (
+                  <p className="text-xl font-bold" data-testid="text-total">
+                    RD$ {parseFloat(service.montoNegociado as string || service.costoTotal as string).toFixed(2)}
+                  </p>
+                )}
               </div>
             </div>
             
@@ -244,18 +311,31 @@ export default function ClientTracking() {
       <Drawer open={chatOpen} onOpenChange={setChatOpen}>
         <DrawerContent className="h-[80vh]">
           <DrawerHeader>
-            <DrawerTitle>Chat con el Conductor</DrawerTitle>
+            <DrawerTitle>
+              {isNegotiationService ? 'Negociacion con el Conductor' : 'Chat con el Conductor'}
+            </DrawerTitle>
           </DrawerHeader>
           <div className="flex-1 overflow-hidden px-4 pb-4">
             {user && service && (
-              <ChatBox
-                servicioId={serviceId!}
-                currentUserId={user.id}
-                currentUserNombre={user.nombre}
-                currentUserApellido={user.apellido}
-                otherUserName={driverName}
-                userType="cliente"
-              />
+              isNegotiationService ? (
+                <NegotiationChatBox
+                  servicioId={serviceId!}
+                  servicio={service}
+                  currentUserId={user.id}
+                  currentUserNombre={user.nombre}
+                  currentUserApellido={user.apellido}
+                  userType="cliente"
+                />
+              ) : (
+                <ChatBox
+                  servicioId={serviceId!}
+                  currentUserId={user.id}
+                  currentUserNombre={user.nombre}
+                  currentUserApellido={user.apellido}
+                  otherUserName={driverName}
+                  userType="cliente"
+                />
+              )
             )}
           </div>
         </DrawerContent>

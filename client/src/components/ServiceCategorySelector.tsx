@@ -76,6 +76,30 @@ function BoatTrailerIcon({ className }: { className?: string }) {
   );
 }
 
+function ExtractionIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 2v6" />
+      <path d="M12 8l-3 3" />
+      <path d="M12 8l3 3" />
+      <path d="M5 12h14" />
+      <path d="M4 16c0 2 2 4 4 4h8c2 0 4-2 4-4" />
+      <path d="M6 16v-2" />
+      <path d="M18 16v-2" />
+      <circle cx="8" cy="20" r="1" />
+      <circle cx="16" cy="20" r="1" />
+    </svg>
+  );
+}
+
 function FlatbedIcon({ className }: { className?: string }) {
   return (
     <svg 
@@ -144,33 +168,40 @@ const serviceCategories = [
     Icon: Wrench 
   },
   { 
+    id: 'extraccion', 
+    label: 'Extraccion', 
+    description: 'Vehiculo atascado o volcado',
+    Icon: ExtractionIcon,
+    requiresNegotiation: true
+  },
+  { 
     id: 'remolque_especializado', 
     label: 'Remolque Especializado', 
-    description: 'Vehículos especiales',
+    description: 'Vehiculos especiales',
     Icon: Sparkles 
   },
   { 
     id: 'vehiculos_pesados', 
-    label: 'Vehículos Pesados', 
-    description: 'Vehículos de carga',
+    label: 'Vehiculos Pesados', 
+    description: 'Vehiculos de carga',
     Icon: Truck 
   },
   { 
     id: 'maquinarias', 
     label: 'Maquinarias', 
-    description: 'Greda, rodillo, retro y más',
+    description: 'Greda, rodillo, retro y mas',
     Icon: HardHat 
   },
   { 
     id: 'izaje_construccion', 
-    label: 'Izaje y Construcción', 
+    label: 'Izaje y Construccion', 
     description: 'Materiales y equipos',
     Icon: CraneIcon 
   },
   { 
     id: 'remolque_recreativo', 
     label: 'Remolque Recreativo', 
-    description: 'Botes, jetski y más',
+    description: 'Botes, jetski y mas',
     Icon: BoatTrailerIcon 
   },
 ];
