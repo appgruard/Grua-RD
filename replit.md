@@ -71,6 +71,18 @@ The project includes a comprehensive testing setup:
 
 ## Recent Changes
 
+### 2025-12-04: Operator Wallet System - Phase 1 (Data Model)
+- **New Tables Created** (`shared/schema.ts`):
+  - `operator_wallets`: Stores operator balance, total debt, and service blocking status
+  - `wallet_transactions`: Complete transaction history (cash commissions, card payments, debt payments, direct payments, withdrawals, adjustments)
+  - `operator_debts`: Individual debt records with 15-day due date tracking
+- **New Enums**: `tipo_transaccion_billetera` (transaction types), `estado_deuda` (debt status: pending, partial, paid, overdue)
+- **Modified `servicios` table**: Added `commission_processed` boolean field to prevent duplicate commission processing
+- **TypeScript Types**: Insert schemas, select schemas, and inferred types for all new wallet entities
+- **Drizzle Relations**: Proper relationships between wallets, transactions, debts, conductores, and servicios
+- **Database Migration**: Successfully pushed schema changes to PostgreSQL
+- **Documentation**: Updated `WALLET_IMPLEMENTATION_PLAN.md` with Phase 1 completion status
+
 ### 2025-12-04: Responsiveness Improvements
 - **Driver Extraction Evaluation Screen** (`driver/extraction-evaluation.tsx`): Improved mobile responsiveness with adaptive map height, reduced padding, responsive text sizes, and better form spacing for small screens.
 - **Driver Dashboard** (`driver/dashboard.tsx`): Fixed mobile layout with adaptive panel heights, responsive grid layouts, compact navigation buttons, and optimized text/badge sizes for small screens.
@@ -78,5 +90,9 @@ The project includes a comprehensive testing setup:
 - **Documentation**: Updated `PLAN_CORRECCIONES_RESPONSIVIDAD.md` with detailed change logs.
 
 ### Pending Tasks
+- **Wallet System Phase 2**: Implement WalletService backend logic
+- **Wallet System Phase 3**: Create API endpoints for wallet operations
+- **Wallet System Phase 4**: Build operator wallet UI components
+- **Wallet System Phase 5**: Add notifications and alerts
 - Task 5: Update status messages in client tracking screen (change "Conductor" to "Operador")
 - Task 6: Complete terminology changes across remaining files (tracking.tsx, history.tsx, solicitudes.tsx)
