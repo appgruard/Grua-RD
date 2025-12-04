@@ -8,7 +8,7 @@ Este plan detalla la implementación de un sistema de chat dual para la platafor
 
 ---
 
-## Fase 1: Preparación del Schema y Base de Datos
+## Fase 1: Preparación del Schema y Base de Datos ✅ COMPLETADA (4 Dic 2025)
 
 ### 1.1 Añadir Categoría de Extracción
 **Archivo:** `shared/schema.ts`
@@ -43,15 +43,27 @@ montoAsociado: decimal // Para mensajes de tipo monto
 urlArchivo: text       // Para mensajes con archivos adjuntos (fotos/videos)
 ```
 
-### 1.4 Migración de Base de Datos
-**Archivo:** `migrations/XXXX_chat_negociacion.sql`
+### 1.4 Migración de Base de Datos ✅
+**Archivo:** `migrations/0008_negotiation_chat_system.sql`
 
-- Añadir nuevos valores al enum `servicio_categoria`
-- Añadir nuevos valores al enum `servicio_subtipo`
-- Añadir columnas a tabla `servicios`
-- Añadir columnas a tabla `mensajes_chat`
-- Crear enum `estado_negociacion`
-- Crear enum `tipo_mensaje_chat`
+**Implementado:**
+- ✅ Añadido valor `extraccion` al enum `servicio_categoria`
+- ✅ Añadidos 5 nuevos subtipos de extracción al enum `servicio_subtipo`:
+  - `extraccion_zanja`, `extraccion_lodo`, `extraccion_volcado`, `extraccion_accidente`, `extraccion_dificil`
+- ✅ Creado enum `estado_negociacion` con valores: `no_aplica`, `pendiente_evaluacion`, `propuesto`, `confirmado`, `aceptado`, `rechazado`, `cancelado`
+- ✅ Creado enum `tipo_mensaje_chat` con valores: `texto`, `imagen`, `video`, `monto_propuesto`, `monto_confirmado`, `monto_aceptado`, `monto_rechazado`, `sistema`
+- ✅ Añadidas columnas a tabla `servicios`:
+  - `requiere_negociacion` (boolean, NOT NULL DEFAULT false)
+  - `estado_negociacion` (enum, DEFAULT 'no_aplica')
+  - `monto_negociado` (decimal 10,2)
+  - `notas_extraccion` (text)
+  - `descripcion_situacion` (text)
+- ✅ Añadidas columnas a tabla `mensajes_chat`:
+  - `tipo_mensaje` (enum, NOT NULL DEFAULT 'texto')
+  - `monto_asociado` (decimal 10,2)
+  - `url_archivo` (text)
+  - `nombre_archivo` (text)
+- ✅ Índices creados para optimización
 
 ---
 

@@ -79,6 +79,23 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Pages updated:** driver/dashboard, empresa/solicitudes, empresa/historial
 - **Database:** Enum values added to servicio_categoria and servicio_subtipo
 
+### Negotiation Chat System (December 2025) - IN PROGRESS
+- **Document:** `PLAN_CHAT_NEGOCIACION.md`
+- **Status:** 🔄 Phase 1 (Schema) completed (December 4, 2025)
+- **Migration file:** `migrations/0008_negotiation_chat_system.sql` (pending execution)
+- **Purpose:** Dual chat system for Grúa RD tow truck platform
+  - Normal chat for standard services (when driver accepts service)
+  - Negotiation chat for extraction services with price proposal/acceptance flow
+- **New category:** `extraccion` (Extraction) - For difficult vehicle recovery situations
+- **New extraction subtypes:** `extraccion_zanja`, `extraccion_lodo`, `extraccion_volcado`, `extraccion_accidente`, `extraccion_dificil`
+- **New enums:**
+  - `estado_negociacion`: `no_aplica`, `pendiente_evaluacion`, `propuesto`, `confirmado`, `aceptado`, `rechazado`, `cancelado`
+  - `tipo_mensaje_chat`: `texto`, `imagen`, `video`, `monto_propuesto`, `monto_confirmado`, `monto_aceptado`, `monto_rechazado`, `sistema`
+- **Schema changes:**
+  - `servicios` table: Added `requiere_negociacion`, `estado_negociacion`, `monto_negociado`, `notas_extraccion`, `descripcion_situacion`
+  - `mensajes_chat` table: Added `tipo_mensaje`, `monto_asociado`, `url_archivo`, `nombre_archivo`
+- **Remaining phases:** Backend API (2), Chat Components (3), Pages/Flows (4), Notifications (5), Minor Changes (6), Testing (7)
+
 ## Recent Code Audits
 
 ### December 2025 - Navigation Buttons Improvement (Fase 5)
