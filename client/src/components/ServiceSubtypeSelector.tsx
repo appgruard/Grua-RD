@@ -150,10 +150,10 @@ export function ServiceSubtypeSelector({ category, value, onChange }: ServiceSub
               type="button"
               data-testid={`service-subtype-${id}`}
               onClick={() => onChange(isSelected ? null : id)}
-              className={`relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 text-left w-full min-w-0 overflow-hidden ${
+              className={`relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all duration-200 text-left w-full min-w-0 ${
                 isSelected
                   ? 'border-primary bg-primary/5'
-                  : 'border-border bg-card hover-elevate'
+                  : 'border-border bg-card hover:bg-muted/50 active:bg-muted'
               }`}
             >
               <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${

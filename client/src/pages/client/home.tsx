@@ -556,11 +556,11 @@ export default function ClientHome() {
 
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
-      <div className="flex-1 relative min-h-0">
+      <div className="flex-1 relative min-h-0 z-0">
         <MapboxMap
           center={mapCenter}
           markers={markers}
-          className="absolute inset-0"
+          className="absolute inset-0 z-0"
           routeGeometry={routeGeometry}
           focusOnOrigin={!!origin && !destination}
         />
@@ -609,8 +609,8 @@ export default function ClientHome() {
 
       <div 
         className={cn(
-          "bg-background border-t border-border transition-all duration-300 flex flex-col",
-          showExpandedCard ? "min-h-[45vh] max-h-[70vh] h-auto" : "h-14"
+          "bg-background border-t border-border transition-all duration-300 flex flex-col overflow-hidden relative z-20 flex-shrink-0",
+          showExpandedCard ? "min-h-[45vh] max-h-[60vh]" : "h-14"
         )}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >

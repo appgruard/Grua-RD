@@ -217,10 +217,10 @@ export function ServiceCategorySelector({ value, onChange }: ServiceCategorySele
             type="button"
             data-testid={`service-category-${id}`}
             onClick={() => onChange(id)}
-            className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 min-w-0 overflow-hidden ${
+            className={`relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 min-w-0 ${
               isSelected
-                ? 'border-primary bg-primary/5 shadow-md'
-                : 'border-border bg-card hover-elevate'
+                ? 'border-primary bg-primary/5'
+                : 'border-border bg-card hover:bg-muted/50 active:bg-muted'
             }`}
           >
             {isSelected && (
