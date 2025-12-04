@@ -10,6 +10,7 @@ import { calculateRoute, type Coordinates, type RouteGeometry } from '@/lib/maps
 import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck, AlertTriangle, Info } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -63,6 +64,7 @@ export default function ClientHome() {
   const [aseguradoraNombre, setAseguradoraNombre] = useState<string>('');
   const [aseguradoraPoliza, setAseguradoraPoliza] = useState<string>('');
   const [descripcionSituacion, setDescripcionSituacion] = useState<string>('');
+  const [quiereTransporteExtraccion, setQuiereTransporteExtraccion] = useState<boolean>(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [showExpandedCard, setShowExpandedCard] = useState(true);
   const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
@@ -418,11 +420,21 @@ export default function ClientHome() {
     
     const isOnsite = isOnsiteService();
     const isExtraction = isExtractionService();
+    const extractionWithTransport = isExtraction && quiereTransporteExtraccion;
     
     if (!isOnsite && !isExtraction && !destination) {
       toast({
         title: 'Destino requerido',
         description: 'Para servicios de remolque debe seleccionar un destino',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (extractionWithTransport && !destination) {
+      toast({
+        title: 'Destino requerido',
+        description: 'Para transportar el vehiculo debe seleccionar un destino',
         variant: 'destructive',
       });
       return;
@@ -455,10 +467,11 @@ export default function ClientHome() {
       return;
     }
     
-    const finalDestination = (isOnsite || isExtraction) ? origin : destination!;
-    const finalDestinoDireccion = (isOnsite || isExtraction) ? origenDireccion : destinoDireccion;
+    const extractionWithoutTransport = isExtraction && !quiereTransporteExtraccion;
+    const finalDestination = (isOnsite || extractionWithoutTransport) ? origin : destination!;
+    const finalDestinoDireccion = (isOnsite || extractionWithoutTransport) ? origenDireccion : destinoDireccion;
 
-    const currentDistance = (isOnsite || isExtraction) ? 0 : (distanceRef.current || distance || 0);
+    const currentDistance = (isOnsite || extractionWithoutTransport) ? 0 : (distanceRef.current || distance || 0);
     const DEFAULT_MIN_COST = 150;
     const finalCost = isExtraction ? 0 : (cost || (isOnsite ? (ONSITE_SERVICE_PRICES[servicioSubtipo || ''] || DEFAULT_MIN_COST) : DEFAULT_MIN_COST));
 
@@ -518,6 +531,7 @@ export default function ClientHome() {
     setAseguradoraNombre('');
     setAseguradoraPoliza('');
     setDescripcionSituacion('');
+    setQuiereTransporteExtraccion(false);
     setStep('serviceCategory');
   };
 
@@ -534,8 +548,8 @@ export default function ClientHome() {
   };
 
   const markers = [
-    origin && { position: origin, title: isOnsiteService() ? 'Ubicación del servicio' : 'Origen', color: '#22c55e', type: 'origin' as const },
-    destination && requiresTransport() && { position: destination, title: 'Destino', color: '#ef4444', type: 'destination' as const },
+    origin && { position: origin, title: isOnsiteService() ? 'Ubicación del servicio' : (isExtractionService() ? 'Ubicación del vehículo' : 'Origen'), color: '#22c55e', type: 'origin' as const },
+    destination && (requiresTransport() || (isExtractionService() && quiereTransporteExtraccion)) && { position: destination, title: isExtractionService() ? 'Destino de transporte' : 'Destino', color: '#ef4444', type: 'destination' as const },
   ].filter(Boolean) as any[];
 
   const mapCenter = origin || currentLocation;
@@ -555,7 +569,7 @@ export default function ClientHome() {
           <div className="absolute top-3 left-3 right-3 z-10">
             <Card className="p-3 bg-background/95 backdrop-blur-sm">
               <div className="flex items-center gap-3">
-                {requiresTransport() ? (
+                {(requiresTransport() && !isExtractionService()) || (isExtractionService() && quiereTransporteExtraccion) ? (
                   <>
                     <div className="flex flex-col items-center gap-1">
                       <div className="w-3 h-3 rounded-full bg-green-500" />
@@ -564,10 +578,10 @@ export default function ClientHome() {
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
                       <p className="text-sm truncate font-medium" data-testid="text-origin-summary">
-                        {origenDireccion || 'Origen no seleccionado'}
+                        {origenDireccion || (isExtractionService() ? 'Ubicacion del vehiculo' : 'Origen no seleccionado')}
                       </p>
                       <p className="text-sm truncate text-muted-foreground" data-testid="text-destination-summary">
-                        {destinoDireccion || 'Destino no seleccionado'}
+                        {destinoDireccion || (isExtractionService() ? 'Destino de transporte' : 'Destino no seleccionado')}
                       </p>
                     </div>
                   </>
@@ -576,12 +590,12 @@ export default function ClientHome() {
                     <div className="w-3 h-3 rounded-full bg-green-500" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm truncate font-medium" data-testid="text-location-summary">
-                        {origenDireccion || 'Ubicación no seleccionada'}
+                        {origenDireccion || (isExtractionService() ? 'Ubicacion del vehiculo' : 'Ubicación no seleccionada')}
                       </p>
                     </div>
                   </>
                 )}
-                {(distance !== null && duration !== null) && requiresTransport() && (
+                {(distance !== null && duration !== null) && ((requiresTransport() && !isExtractionService()) || (isExtractionService() && quiereTransporteExtraccion)) && (
                   <div className="flex-shrink-0 text-right">
                     <p className="text-sm font-bold">{distance.toFixed(1)} km</p>
                     <p className="text-xs text-muted-foreground">{Math.round(duration)} min</p>
@@ -767,11 +781,11 @@ export default function ClientHome() {
 
               <ScrollArea className="flex-1 min-h-0 px-4">
                 <div className="space-y-4 pb-2">
-                  {isExtractionService() && (
+                  {isExtractionService() && !quiereTransporteExtraccion && (
                     <Alert className="bg-amber-500/10 border-amber-500/30">
                       <AlertTriangle className="h-4 w-4 text-amber-500" />
                       <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
-                        Solo necesitamos la ubicacion del vehiculo. El precio se negociara con el operador.
+                        Indica donde esta el vehiculo. El precio se negociara con el operador.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -793,7 +807,34 @@ export default function ClientHome() {
                     autoFocus
                   />
 
-                  {requiresTransport() && !isExtractionService() && (
+                  {isExtractionService() && (
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex-1 min-w-0 pr-3">
+                        <Label htmlFor="transporte-switch" className="text-sm font-medium cursor-pointer">
+                          Transportar a otro lugar
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Despues de la extraccion, llevar el vehiculo a otro destino
+                        </p>
+                      </div>
+                      <Switch
+                        id="transporte-switch"
+                        checked={quiereTransporteExtraccion}
+                        onCheckedChange={(checked) => {
+                          setQuiereTransporteExtraccion(checked);
+                          if (!checked) {
+                            setDestination(null);
+                            setDestinoDireccion('');
+                            setDistance(null);
+                            setCost(null);
+                          }
+                        }}
+                        data-testid="switch-transporte-extraccion"
+                      />
+                    </div>
+                  )}
+
+                  {(requiresTransport() && !isExtractionService()) || (isExtractionService() && quiereTransporteExtraccion) ? (
                     <AddressSearchInput
                       label="Llevar a"
                       placeholder="¿A donde lo llevamos?"
@@ -809,19 +850,19 @@ export default function ClientHome() {
                       currentLocation={currentLocation}
                       icon="destination"
                     />
-                  )}
+                  ) : null}
 
-                  {isCalculating && !isExtractionService() && (
+                  {isCalculating && (!isExtractionService() || quiereTransporteExtraccion) && (
                     <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span className="text-sm">Calculando ruta...</span>
                     </div>
                   )}
 
-                  {cost !== null && !isCalculating && !isExtractionService() && (
+                  {cost !== null && !isCalculating && (!isExtractionService() || quiereTransporteExtraccion) && (
                     <Card className="p-4 bg-muted/50">
                       <div className="flex items-center justify-between gap-2">
-                        {requiresTransport() && distance !== null ? (
+                        {(requiresTransport() || quiereTransporteExtraccion) && distance !== null ? (
                           <div>
                             <p className="text-sm text-muted-foreground">Distancia estimada</p>
                             <p className="text-lg font-bold">{distance.toFixed(1)} km</p>
@@ -833,11 +874,20 @@ export default function ClientHome() {
                           </div>
                         )}
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Costo estimado</p>
+                          <p className="text-sm text-muted-foreground">{isExtractionService() ? 'Transporte estimado' : 'Costo estimado'}</p>
                           <p className="text-lg font-bold text-primary">RD$ {cost.toFixed(2)}</p>
                         </div>
                       </div>
                     </Card>
+                  )}
+
+                  {isExtractionService() && quiereTransporteExtraccion && (
+                    <Alert className="bg-blue-500/10 border-blue-500/30">
+                      <Info className="h-4 w-4 text-blue-500" />
+                      <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
+                        El costo de transporte es adicional al precio de extraccion que negociaras con el operador.
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </div>
               </ScrollArea>
@@ -845,17 +895,24 @@ export default function ClientHome() {
               <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background">
                 <Button
                   onClick={() => {
-                    if (isExtractionService()) {
+                    if (isExtractionService() && !quiereTransporteExtraccion) {
+                      setStep('confirm');
+                    } else if (isExtractionService() && quiereTransporteExtraccion) {
                       setStep('confirm');
                     } else {
                       handleNextStep();
                     }
                   }}
-                  disabled={!origin || (requiresTransport() && !isExtractionService() && !destination) || (isCalculating && !isExtractionService())}
+                  disabled={
+                    !origin || 
+                    (requiresTransport() && !isExtractionService() && !destination) || 
+                    (isExtractionService() && quiereTransporteExtraccion && !destination) ||
+                    (isCalculating && (!isExtractionService() || quiereTransporteExtraccion))
+                  }
                   className="w-full h-12 text-base"
                   data-testid="button-next"
                 >
-                  {isCalculating && !isExtractionService() ? (
+                  {isCalculating && (!isExtractionService() || quiereTransporteExtraccion) ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Calculando...
@@ -1027,7 +1084,7 @@ export default function ClientHome() {
                   )}
 
                   <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-3 bg-muted rounded-lg">
-                    {(requiresTransport() && !isExtractionService()) ? (
+                    {(requiresTransport() && !isExtractionService()) || (isExtractionService() && quiereTransporteExtraccion) ? (
                       <>
                         <div className="flex flex-col items-center gap-1 flex-shrink-0">
                           <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green-500" />
@@ -1036,11 +1093,11 @@ export default function ClientHome() {
                         </div>
                         <div className="flex-1 min-w-0 space-y-1 sm:space-y-2">
                           <div>
-                            <p className="text-xs text-muted-foreground">Origen</p>
+                            <p className="text-xs text-muted-foreground">{isExtractionService() ? 'Ubicacion del vehiculo' : 'Origen'}</p>
                             <p className="text-xs sm:text-sm font-medium line-clamp-2 break-words">{origenDireccion || `${origin?.lat.toFixed(4)}, ${origin?.lng.toFixed(4)}`}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">Destino</p>
+                            <p className="text-xs text-muted-foreground">{isExtractionService() ? 'Transportar a' : 'Destino'}</p>
                             <p className="text-xs sm:text-sm font-medium line-clamp-2 break-words">{destinoDireccion || `${destination?.lat.toFixed(4)}, ${destination?.lng.toFixed(4)}`}</p>
                           </div>
                         </div>
@@ -1073,14 +1130,32 @@ export default function ClientHome() {
                   )}
 
                   {isExtractionService() ? (
-                    <div className="text-center p-3 sm:p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Precio</p>
-                      <p className="text-lg sm:text-xl font-bold text-amber-600 dark:text-amber-400">
-                        Por definir
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        El operador propondra un monto tras evaluar
-                      </p>
+                    <div className="space-y-2">
+                      <div className="text-center p-3 sm:p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">Precio de Extraccion</p>
+                        <p className="text-lg sm:text-xl font-bold text-amber-600 dark:text-amber-400">
+                          Por definir
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          El operador propondra un monto tras evaluar
+                        </p>
+                      </div>
+                      {quiereTransporteExtraccion && distance !== null && cost !== null && (
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                          <div className="text-center p-2 sm:p-3 bg-muted rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1">Distancia transporte</p>
+                            <p className="text-lg sm:text-xl font-bold" data-testid="text-distance">
+                              {distance.toFixed(1)} km
+                            </p>
+                          </div>
+                          <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg border border-primary/20">
+                            <p className="text-xs text-muted-foreground mb-1">Costo transporte</p>
+                            <p className="text-lg sm:text-xl font-bold text-primary" data-testid="text-cost">
+                              RD$ {cost.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className={requiresTransport() ? "grid grid-cols-2 gap-2 sm:gap-3" : ""}>
