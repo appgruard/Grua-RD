@@ -265,6 +265,7 @@ export const servicios = pgTable("servicios", {
   montoNegociado: decimal("monto_negociado", { precision: 10, scale: 2 }),
   notasExtraccion: text("notas_extraccion"),
   descripcionSituacion: text("descripcion_situacion"),
+  commissionProcessed: boolean("commission_processed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   aceptadoAt: timestamp("aceptado_at"),
   conductorEnSitioAt: timestamp("conductor_en_sitio_at"),
