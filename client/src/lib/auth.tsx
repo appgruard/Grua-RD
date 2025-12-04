@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getQueryFn } from './queryClient';
+import { preloadDriverResourcesOnLogin } from './preload';
 import type { User, UserWithConductor } from '@shared/schema';
 
 interface VerificationStatus {
@@ -89,6 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update the cache immediately with the user data
       if (data?.user) {
         queryClient.setQueryData(['/api/auth/me'], data.user);
+        // Preload driver resources immediately after login for faster dashboard load
+        if (data.user.userType === 'conductor') {
+          preloadDriverResourcesOnLogin();
+        }
       }
       // Also invalidate to ensure fresh data
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });

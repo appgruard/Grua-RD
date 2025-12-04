@@ -63,15 +63,38 @@ export function preloadDriverModules() {
     () => import('@/pages/driver/profile'),
   ];
 
+  // Reduced timeout for faster driver module loading
   driverModules.forEach((loadModule, index) => {
     const key = `driver_${index}`;
     if (!preloadedModules.has(key)) {
       preloadedModules.add(key);
       scheduleIdleTask(() => {
         loadModule().catch(() => {});
-      }, { timeout: 3000 });
+      }, { timeout: 500 });
     }
   });
+}
+
+export function prefetchDriverData() {
+  const driverEndpoints = [
+    '/api/drivers/init',
+  ];
+
+  driverEndpoints.forEach((endpoint) => {
+    if (!prefetchedData.has(endpoint)) {
+      prefetchedData.add(endpoint);
+      queryClient.prefetchQuery({
+        queryKey: [endpoint],
+        staleTime: 1000 * 30,
+      }).catch(() => {});
+    }
+  });
+}
+
+export function preloadDriverResourcesOnLogin() {
+  preloadMapboxResources();
+  preloadDriverModules();
+  prefetchDriverData();
 }
 
 export function prefetchUserData() {

@@ -22,11 +22,19 @@ import { calculateDistance } from '@/hooks/useDriverLocation';
 import { WalletAlertBanner, CashServiceConfirmationModal, useWalletStatus } from '@/components/wallet';
 import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { SiWaze, SiGooglemaps } from 'react-icons/si';
-import type { Servicio, Conductor, ServicioWithDetails, Documento } from '@shared/schema';
+import type { Servicio, Conductor, ServicioWithDetails, Documento, WalletWithDetails } from '@shared/schema';
 import type { Coordinates, RouteGeometry } from '@/lib/maps';
 import { generateWazeNavigationUrl, generateGoogleMapsNavigationUrl } from '@/lib/maps';
 import { getDirections } from '@/lib/mapbox-directions';
 import { cn } from '@/lib/utils';
+
+interface DriverInitData {
+  conductor: Conductor | null;
+  documents: Documento[];
+  activeService: ServicioWithDetails | null;
+  nearbyRequests: Servicio[];
+  wallet: WalletWithDetails | null;
+}
 
 const serviceCategoryLabels: Record<string, string> = {
   remolque_estandar: "Remolque Estandar",
@@ -83,29 +91,32 @@ export default function DriverDashboard() {
   
   const walletStatus = useWalletStatus();
 
-  const { data: driverData, isLoading: isLoadingDriver } = useQuery<Conductor>({
-    queryKey: ['/api/drivers/me'],
-    staleTime: 1000 * 60 * 2,
+  // Single consolidated query for all driver data - much faster than multiple queries
+  const { data: initData, isLoading: isLoadingDriver } = useQuery<DriverInitData>({
+    queryKey: ['/api/drivers/init'],
+    staleTime: 1000 * 30,
   });
 
-  const { data: driverDocuments } = useQuery<Documento[]>({
-    queryKey: ['/api/documents/my-documents'],
-    enabled: !!driverData?.id,
-    staleTime: 1000 * 60 * 5,
-  });
+  // Extract data from the consolidated response
+  const driverData = initData?.conductor;
+  const driverDocuments = initData?.documents;
+  const isLoadingActiveService = isLoadingDriver;
 
+  // Separate queries for data that needs frequent polling
   const { data: nearbyRequests } = useQuery<Servicio[]>({
     queryKey: ['/api/drivers/nearby-requests'],
-    enabled: driverData?.disponible || false,
+    enabled: !!driverData?.disponible,
     refetchInterval: 5000,
     staleTime: 1000 * 3,
+    initialData: initData?.nearbyRequests,
   });
 
-  const { data: activeService, isLoading: isLoadingActiveService } = useQuery<ServicioWithDetails | null>({
+  const { data: activeService } = useQuery<ServicioWithDetails | null>({
     queryKey: ['/api/drivers/active-service'],
     enabled: !!driverData,
     refetchInterval: 10000,
     staleTime: 1000 * 5,
+    initialData: initData?.activeService,
   });
 
   const { send, connectionId } = useWebSocket(
@@ -202,7 +213,9 @@ export default function DriverDashboard() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers/me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/init'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/nearby-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
       toast({
         title: driverData?.disponible ? 'Ahora estás inactivo' : 'Ahora estás disponible',
         description: driverData?.disponible ? 'No recibirás nuevas solicitudes' : 'Puedes recibir solicitudes',

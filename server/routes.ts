@@ -2313,6 +2313,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Optimized endpoint for driver dashboard - returns all data in a single call
+  app.get("/api/drivers/init", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.user!.id;
+      
+      // Fetch conductor first to get conductorId
+      const conductor = await storage.getConductorByUserId(userId);
+      
+      if (!conductor) {
+        return res.json({
+          conductor: null,
+          documents: [],
+          activeService: null,
+          nearbyRequests: [],
+          wallet: null
+        });
+      }
+
+      // Fetch all data in parallel for maximum speed
+      const [documents, allServices, nearbyRequests, wallet] = await Promise.all([
+        storage.getDocumentosByUsuarioId(userId),
+        storage.getServiciosByConductorId(conductor.id),
+        conductor.disponible ? storage.getPendingServicios() : Promise.resolve([]),
+        storage.getWalletByConductorId(conductor.id).catch(() => null)
+      ]);
+
+      // Find active service
+      const activeStates = ['aceptado', 'conductor_en_sitio', 'cargando', 'en_progreso'];
+      const activeService = allServices.find(s => activeStates.includes(s.estado)) || null;
+
+      res.json({
+        conductor,
+        documents: documents || [],
+        activeService,
+        nearbyRequests: nearbyRequests || [],
+        wallet: wallet || null
+      });
+    } catch (error: any) {
+      logSystem.error('Get driver init data error', error);
+      res.status(500).json({ message: "Failed to get driver data" });
+    }
+  });
+
   // Get driver's service categories
   app.get("/api/drivers/me/servicios", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {

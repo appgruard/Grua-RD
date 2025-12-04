@@ -132,12 +132,13 @@ export function MapboxMapWithFastLoad(props: Omit<LazyMapboxMapProps, 'deferLoad
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    // Reduced timeout for faster map loading - using microtask for near-immediate render
     if ('requestIdleCallback' in window) {
-      const id = (window as any).requestIdleCallback(() => setIsReady(true), { timeout: 200 });
+      const id = (window as any).requestIdleCallback(() => setIsReady(true), { timeout: 50 });
       return () => (window as any).cancelIdleCallback(id);
     } else {
-      const timer = setTimeout(() => setIsReady(true), 50);
-      return () => clearTimeout(timer);
+      // Use queueMicrotask for even faster fallback
+      queueMicrotask(() => setIsReady(true));
     }
   }, []);
 
