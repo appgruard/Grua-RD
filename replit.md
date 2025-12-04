@@ -79,15 +79,15 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Pages updated:** driver/dashboard, empresa/solicitudes, empresa/historial
 - **Database:** Enum values added to servicio_categoria and servicio_subtipo
 
-### Negotiation Chat System (December 2025) - IN PROGRESS
+### Negotiation Chat System (December 2025) - PHASE 4 COMPLETED
 - **Document:** `PLAN_CHAT_NEGOCIACION.md`
-- **Status:** 🔄 Phase 1-3 completed (December 4, 2025)
+- **Status:** ✅ Phase 1-4 completed (December 4, 2025)
 - **Migration file:** `migrations/0008_negotiation_chat_system.sql` (executed via db:push)
 - **Purpose:** Dual chat system for Grúa RD tow truck platform
   - Normal chat for standard services (when driver accepts service)
   - Negotiation chat for extraction services with price proposal/acceptance flow
 - **New category:** `extraccion` (Extraction) - For difficult vehicle recovery situations
-- **New extraction subtypes:** `extraccion_zanja`, `extraccion_lodo`, `extraccion_volcado`, `extraccion_accidente`, `extraccion_dificil`
+- **New extraction subtypes:** `zanja`, `lodo`, `volcado`, `accidente`, `dificil`
 - **New enums:**
   - `estado_negociacion`: `no_aplica`, `pendiente_evaluacion`, `propuesto`, `confirmado`, `aceptado`, `rechazado`, `cancelado`
   - `tipo_mensaje_chat`: `texto`, `imagen`, `video`, `monto_propuesto`, `monto_confirmado`, `monto_aceptado`, `monto_rechazado`, `sistema`
@@ -112,7 +112,13 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
   - `AmountProposalCard.tsx` - Driver proposes amounts with validation (min 500, max 500,000 RD$)
   - `AmountResponseCard.tsx` - Client accepts/rejects amounts with confirmation dialogs
   - `EvidenceUploader.tsx` - Upload photos/videos as evidence with camera capture and preview
-- **Remaining phases:** Pages/Flows (4), Notifications (5), Minor Changes (6), Testing (7)
+- **Frontend pages/flows created (Phase 4):**
+  - `client/src/pages/driver/extraction-evaluation.tsx` - Driver evaluation page for extraction services
+  - `client/src/pages/client/home.tsx` - Updated with extraction service flow (no price step, description required)
+  - `client/src/pages/client/tracking.tsx` - Updated with negotiation status, NegotiationChatBox integration
+  - `client/src/pages/driver/dashboard.tsx` - Updated with "Ver y Evaluar" button for extractions, negotiation badges
+  - Route `/driver/extraction-evaluation/:id` added to App.tsx
+- **Remaining phases:** Notifications (5), Minor Changes (6), Testing (7)
 
 ## Recent Code Audits
 
