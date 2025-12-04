@@ -2165,6 +2165,80 @@ export type MensajeTicketWithUsuario = MensajeTicket & {
 
 // ==================== END TICKET SYSTEM ====================
 
+// ==================== OPERATOR WALLET INSERT SCHEMAS & TYPES ====================
+
+// Insert Schemas for Wallet System
+export const insertOperatorWalletSchema = createInsertSchema(operatorWallets, {
+  balance: z.string().optional(),
+  totalDebt: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  cashServicesBlocked: true,
+});
+
+export const insertWalletTransactionSchema = createInsertSchema(walletTransactions, {
+  type: z.enum([
+    "cash_commission",
+    "card_payment",
+    "debt_payment",
+    "direct_payment",
+    "withdrawal",
+    "adjustment"
+  ]),
+  amount: z.string().min(1, "Monto es requerido"),
+  commissionAmount: z.string().optional(),
+  description: z.string().optional(),
+  paymentIntentId: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOperatorDebtSchema = createInsertSchema(operatorDebts, {
+  originalAmount: z.string().min(1, "Monto original es requerido"),
+  remainingAmount: z.string().min(1, "Monto restante es requerido"),
+  status: z.enum(["pending", "partial", "paid", "overdue"]).optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  paidAt: true,
+});
+
+// Select Schemas
+export const selectOperatorWalletSchema = createSelectSchema(operatorWallets);
+export const selectWalletTransactionSchema = createSelectSchema(walletTransactions);
+export const selectOperatorDebtSchema = createSelectSchema(operatorDebts);
+
+// Types
+export type InsertOperatorWallet = z.infer<typeof insertOperatorWalletSchema>;
+export type OperatorWallet = typeof operatorWallets.$inferSelect;
+
+export type InsertWalletTransaction = z.infer<typeof insertWalletTransactionSchema>;
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+
+export type InsertOperatorDebt = z.infer<typeof insertOperatorDebtSchema>;
+export type OperatorDebt = typeof operatorDebts.$inferSelect;
+
+// Helper Types for Wallet System
+export type WalletWithDetails = OperatorWallet & {
+  conductor?: Conductor;
+  pendingDebts?: OperatorDebtWithDaysRemaining[];
+  recentTransactions?: WalletTransaction[];
+};
+
+export type OperatorDebtWithDaysRemaining = OperatorDebt & {
+  daysRemaining: number;
+  servicio?: Servicio;
+};
+
+export type WalletTransactionWithService = WalletTransaction & {
+  servicio?: Servicio;
+};
+
+// ==================== END OPERATOR WALLET TYPES ====================
+
 // Document Reminder Types
 export const insertDocumentoRecordatorioSchema = createInsertSchema(documentoRecordatorios).omit({
   id: true,
