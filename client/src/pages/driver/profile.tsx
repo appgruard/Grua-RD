@@ -20,6 +20,7 @@ import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import DLocalOperatorBankAccountManager from '@/components/DLocalOperatorBankAccountManager';
+import { WalletSection } from '@/components/wallet';
 import type { Conductor, Documento, ConductorVehiculo } from '@shared/schema';
 
 interface VerifikValidation {
@@ -480,6 +481,8 @@ export default function DriverProfile() {
 
       {driverData && (
         <>
+          <WalletSection />
+
           <Card className="p-6 mb-4">
             <div className="flex items-center gap-2 mb-4">
               <Truck className="w-5 h-5 text-primary" />

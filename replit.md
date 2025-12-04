@@ -71,6 +71,21 @@ The project includes a comprehensive testing setup:
 
 ## Recent Changes
 
+### 2025-12-04: Operator Wallet System - Phase 4 (User Interface)
+- **Wallet UI Components Created** (`client/src/components/wallet/`):
+  - `WalletSection.tsx` - Main component with balance/debt cards and dynamic status alerts
+  - `WalletTransactionHistory.tsx` - Drawer showing full transaction history with icons
+  - `DebtDetailModal.tsx` - Drawer with debt details, progress bars, due dates
+  - `PayDebtModal.tsx` - Multi-step payment flow (amount → processing → success/error)
+  - `index.ts` - Component exports
+- **Visual States Implemented**:
+  - No debt: Green indicator with CheckCircle
+  - Active debt in time: Blue indicator with days remaining
+  - Near-due debt (≤3 days): Amber warning alert
+  - Blocked services: Red destructive alert
+- **Integration**: WalletSection added to driver profile page (`client/src/pages/driver/profile.tsx`)
+- **Features**: Responsive design, currency formatting (DOP), debt payment with validation
+
 ### 2025-12-04: Operator Wallet System - Phases 1-3 Complete
 - **WalletService Created** (`server/services/wallet.ts`):
   - Commission calculation (20% on cash payments)
@@ -119,8 +134,7 @@ The project includes a comprehensive testing setup:
 - **Documentation**: Updated `PLAN_CORRECCIONES_RESPONSIVIDAD.md` with detailed change logs.
 
 ### Pending Tasks
-- **Wallet System Phase 4**: Build operator wallet UI components
-- **Wallet System Phase 5**: Add notifications and alerts
+- **Wallet System Phase 5**: Add notifications and alerts for debt reminders
 - **Wallet System Phase 6**: Admin panel for wallet management (optional)
 - Task 5: Update status messages in client tracking screen (change "Conductor" to "Operador")
 - Task 6: Complete terminology changes across remaining files (tracking.tsx, history.tsx, solicitudes.tsx)

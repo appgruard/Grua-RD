@@ -318,12 +318,29 @@ Al completar servicio:
 ```
 
 ### Entregables Fase 4:
-- [ ] Componente `WalletSection.tsx`
-- [ ] Componente `WalletTransactionHistory.tsx`
-- [ ] Componente `DebtDetailModal.tsx`
-- [ ] **Componente `PayDebtModal.tsx` con Stripe Elements**
-- [ ] Integración en la página del operador
-- [ ] Estilos responsive
+- [x] Componente `WalletSection.tsx` *(Completado: 2024-12-04)*
+- [x] Componente `WalletTransactionHistory.tsx` *(Completado: 2024-12-04)*
+- [x] Componente `DebtDetailModal.tsx` *(Completado: 2024-12-04)*
+- [x] **Componente `PayDebtModal.tsx`** *(Completado: 2024-12-04)*
+- [x] Integración en la página del operador *(Completado: 2024-12-04)*
+- [x] Estilos responsive *(Completado: 2024-12-04)*
+
+**Componentes creados en `client/src/components/wallet/`:**
+- `WalletSection.tsx` - Componente principal con tarjetas de balance y deuda
+- `WalletTransactionHistory.tsx` - Drawer con historial de transacciones
+- `DebtDetailModal.tsx` - Drawer con detalles de deudas pendientes
+- `PayDebtModal.tsx` - Drawer con formulario de pago de deuda
+- `index.ts` - Archivo de exportación de componentes
+
+**Estados visuales implementados:**
+- Sin deuda: Indicador verde con CheckCircle
+- Deuda activa: Indicador azul con información de días restantes
+- Deuda próxima a vencer (≤3 días): Indicador ámbar con alerta
+- Servicios bloqueados: Indicador rojo con alerta destructiva
+
+**Integración:**
+- WalletSection agregado a `client/src/pages/driver/profile.tsx`
+- Ubicado después del Card de perfil y antes de "Información de la Grúa"
 
 ---
 
@@ -428,6 +445,7 @@ Para implementar el pago directo con tarjeta, se requiere:
 - [x] **Fase 1: Modelo de Datos** - Tablas creadas y migraciones aplicadas
 - [x] **Fase 2: Lógica de Negocio** - WalletService con todas las funciones principales
 - [x] **Fase 3: API Endpoints** - 6 endpoints implementados con validación completa
+- [x] **Fase 4: Interfaz de Usuario** - Dashboard de billetera para operadores
 
 ### Validaciones Implementadas:
 1. **Proceso de pago de servicio:**
@@ -490,12 +508,17 @@ if (paymentIntent.amount !== Math.round(amount * 100)) {
 ## Próximos Pasos
 
 ### Implementación pendiente:
-1. **Fase 4: Interfaz de Usuario** - Dashboard de billetera para operadores
-2. **Fase 5: Sistema de Notificaciones** - Alertas de deuda próxima a vencer
-3. **Fase 6: Panel de Administración** - Vista de todas las billeteras
+1. **Fase 5: Sistema de Notificaciones** - Alertas de deuda próxima a vencer
+2. **Fase 6: Panel de Administración** - Vista de todas las billeteras
 
 ### Antes de producción:
-1. Configurar integración completa con Stripe
-2. Activar verificación de PaymentIntent
+1. Configurar integración completa con Stripe (Stripe Elements para PayDebtModal)
+2. Activar verificación de PaymentIntent en `/api/wallet/pay-debt`
 3. Implementar webhooks de Stripe para confirmación asíncrona
 4. Pruebas de carga del job de verificación de deudas
+
+### Componentes UI Completados (Fase 4):
+- `WalletSection.tsx` - Muestra balance/deuda con estados visuales dinámicos
+- `WalletTransactionHistory.tsx` - Historial completo en drawer
+- `DebtDetailModal.tsx` - Detalles de deudas con progreso de pago
+- `PayDebtModal.tsx` - Flujo de pago con pasos (monto → procesando → éxito/error)
