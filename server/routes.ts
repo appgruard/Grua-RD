@@ -24,6 +24,7 @@ import { documentValidationService } from "./services/document-validation";
 import { initServiceAutoCancellation, SERVICE_TIMEOUT_MINUTES } from "./services/service-auto-cancel";
 import { calculateHaversineDistance, GEOFENCE_RADIUS_METERS, type Coordinates } from "./utils/geo";
 import { calculateDriverStatus } from "./utils/driver-status";
+import { WalletService, initWalletService } from "./services/wallet";
 
 // Zod validation schemas for aseguradora/admin endpoints
 const updateAseguradoraPerfilSchema = z.object({
@@ -9207,7 +9208,423 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END EMPRESAS / CONTRATOS EMPRESARIALES ====================
 
+  // ==================== OPERATOR WALLET SYSTEM ====================
+
+  // Zod schemas for wallet endpoints
+  const payDebtSchema = z.object({
+    amount: z.number()
+      .positive("El monto debe ser mayor a cero")
+      .max(1000000, "El monto excede el límite permitido"),
+  });
+
+  const processPaymentSchema = z.object({
+    servicioId: z.string().min(1, "ID de servicio es requerido"),
+    paymentMethod: z.enum(["efectivo", "tarjeta"]),
+    serviceAmount: z.number()
+      .positive("El monto debe ser mayor a cero")
+      .max(1000000, "El monto excede el límite permitido"),
+  });
+
+  const completeDebtPaymentSchema = z.object({
+    walletId: z.string().min(1, "ID de billetera es requerido"),
+    amount: z.number()
+      .positive("El monto debe ser mayor a cero")
+      .max(1000000, "El monto excede el límite permitido"),
+    paymentIntentId: z.string().min(1, "ID de pago es requerido"),
+  });
+
+  const adminAdjustmentSchema = z.object({
+    adjustmentType: z.enum(["balance", "debt"]),
+    amount: z.number()
+      .min(-100000, "El ajuste mínimo es -100,000")
+      .max(100000, "El ajuste máximo es 100,000"),
+    reason: z.string().min(5, "La razón debe tener al menos 5 caracteres").max(500, "La razón es muy larga"),
+  });
+
+  // Get operator wallet
+  app.get("/api/wallet", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      let wallet = await WalletService.getWallet(conductor.id);
+      if (!wallet) {
+        wallet = await WalletService.createWallet(conductor.id);
+        wallet = await WalletService.getWallet(conductor.id);
+      }
+
+      res.json(wallet);
+    } catch (error: any) {
+      logSystem.error('Get wallet error', error);
+      res.status(500).json({ message: "Error al obtener billetera" });
+    }
+  });
+
+  // Get wallet transaction history
+  app.get("/api/wallet/transactions", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const transactions = await WalletService.getTransactionHistory(conductor.id, limit);
+      res.json(transactions);
+    } catch (error: any) {
+      logSystem.error('Get wallet transactions error', error);
+      res.status(500).json({ message: "Error al obtener transacciones" });
+    }
+  });
+
+  // Get wallet debts
+  app.get("/api/wallet/debts", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const wallet = await WalletService.getWallet(conductor.id);
+      if (!wallet) {
+        return res.json({ debts: [], totalDebt: 0 });
+      }
+
+      res.json({
+        debts: wallet.pendingDebts || [],
+        totalDebt: parseFloat(wallet.totalDebt),
+        cashServicesBlocked: wallet.cashServicesBlocked,
+      });
+    } catch (error: any) {
+      logSystem.error('Get wallet debts error', error);
+      res.status(500).json({ message: "Error al obtener deudas" });
+    }
+  });
+
+  // Check if operator can accept cash services
+  app.get("/api/wallet/can-accept-cash", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const result = await WalletService.canAcceptCashService(conductor.id);
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Check cash acceptance error', error);
+      res.status(500).json({ message: "Error al verificar estado" });
+    }
+  });
+
+  // Process service payment (internal use - called when service is completed)
+  app.post("/api/wallet/process-payment", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const validation = processPaymentSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
+      }
+
+      const { servicioId, paymentMethod, serviceAmount } = validation.data;
+      
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.commissionProcessed) {
+        return res.status(400).json({ message: "La comisión ya fue procesada para este servicio" });
+      }
+
+      const servicioMetodoPago = servicio.metodoPago;
+      if (servicioMetodoPago && servicioMetodoPago !== paymentMethod) {
+        return res.status(400).json({ 
+          message: `El método de pago no coincide con el servicio. Esperado: ${servicioMetodoPago}` 
+        });
+      }
+
+      const servicioCostoTotal = parseFloat(servicio.costoTotal);
+      const tolerance = 0.01;
+      if (Math.abs(serviceAmount - servicioCostoTotal) > tolerance) {
+        return res.status(400).json({ 
+          message: `El monto no coincide con el costo del servicio. Esperado: ${servicioCostoTotal}` 
+        });
+      }
+      
+      const result = await WalletService.processServicePayment(
+        servicioId,
+        paymentMethod,
+        servicioCostoTotal
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Process payment error', error);
+      res.status(500).json({ message: error.message || "Error al procesar pago" });
+    }
+  });
+
+  // Create payment intent for direct debt payment
+  app.post("/api/wallet/create-payment-intent", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const validation = payDebtSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
+      }
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const result = await WalletService.createDebtPaymentIntent(
+        conductor.id,
+        validation.data.amount
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Create payment intent error', error);
+      res.status(400).json({ message: error.message || "Error al crear intento de pago" });
+    }
+  });
+
+  // Complete debt payment (after Stripe confirmation)
+  // SECURITY NOTE: In production, paymentIntentId MUST be verified with Stripe API
+  // to confirm the payment was actually successful before applying to debt.
+  // Current implementation includes idempotency check but requires Stripe verification.
+  app.post("/api/wallet/pay-debt", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const validation = completeDebtPaymentSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
+      }
+
+      const { walletId, amount, paymentIntentId } = validation.data;
+
+      // Idempotency check - prevent double-application of same payment
+      const existingTransaction = await storage.getTransactionByPaymentIntentId(paymentIntentId);
+      if (existingTransaction) {
+        return res.status(409).json({ 
+          message: "Este pago ya fue procesado anteriormente",
+          transactionId: existingTransaction.id
+        });
+      }
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const wallet = await storage.getWalletByConductorId(conductor.id);
+      if (!wallet || wallet.id !== walletId) {
+        return res.status(403).json({ message: "Billetera no autorizada" });
+      }
+
+      const totalDebt = parseFloat(wallet.totalDebt);
+      if (totalDebt <= 0) {
+        return res.status(400).json({ message: "No tienes deuda pendiente" });
+      }
+
+      if (amount > totalDebt) {
+        return res.status(400).json({ 
+          message: `El monto excede la deuda pendiente. Máximo permitido: RD$${totalDebt.toFixed(2)}`,
+          maxAmount: totalDebt
+        });
+      }
+
+      // PRODUCTION REQUIREMENT: Verify paymentIntentId with Stripe API
+      // Uncomment and configure when Stripe is set up:
+      // const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      // if (paymentIntent.status !== 'succeeded') {
+      //   return res.status(400).json({ message: "El pago no ha sido confirmado" });
+      // }
+      // if (paymentIntent.amount !== Math.round(amount * 100)) {
+      //   return res.status(400).json({ message: "El monto del pago no coincide" });
+      // }
+
+      const result = await WalletService.completeDebtPayment(
+        walletId,
+        amount,
+        paymentIntentId
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Pay debt error', error);
+      res.status(400).json({ message: error.message || "Error al procesar pago" });
+    }
+  });
+
+  // Admin: Get all operator wallets
+  app.get("/api/admin/wallets", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductores = await storage.getAllDrivers();
+      const wallets = [];
+
+      for (const conductor of conductores) {
+        const wallet = await WalletService.getWallet(conductor.id);
+        if (wallet) {
+          wallets.push({
+            ...wallet,
+            conductorNombre: conductor.user.nombre + ' ' + conductor.user.apellido,
+            conductorEmail: conductor.user.email,
+          });
+        }
+      }
+
+      wallets.sort((a, b) => parseFloat(b.totalDebt) - parseFloat(a.totalDebt));
+      res.json(wallets);
+    } catch (error: any) {
+      logSystem.error('Get all wallets error', error);
+      res.status(500).json({ message: "Error al obtener billeteras" });
+    }
+  });
+
+  // Admin: Get wallet by conductor ID
+  app.get("/api/admin/wallets/:conductorId", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const wallet = await WalletService.getWallet(req.params.conductorId);
+      if (!wallet) {
+        return res.status(404).json({ message: "Billetera no encontrada" });
+      }
+
+      const conductor = await storage.getConductorById(req.params.conductorId);
+      const user = conductor ? await storage.getUserById(conductor.userId) : null;
+
+      res.json({
+        ...wallet,
+        conductorNombre: user ? `${user.nombre} ${user.apellido}` : 'N/A',
+        conductorEmail: user?.email || 'N/A',
+      });
+    } catch (error: any) {
+      logSystem.error('Get wallet by conductor error', error);
+      res.status(500).json({ message: "Error al obtener billetera" });
+    }
+  });
+
+  // Admin: Adjust wallet balance or debt
+  app.post("/api/admin/wallets/:walletId/adjust", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const validation = adminAdjustmentSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: validation.error.errors[0].message });
+      }
+
+      const { adjustmentType, amount, reason } = validation.data;
+
+      const updatedWallet = await WalletService.adminAdjustment(
+        req.params.walletId,
+        adjustmentType,
+        amount,
+        reason,
+        req.user!.id
+      );
+
+      res.json(updatedWallet);
+    } catch (error: any) {
+      logSystem.error('Admin wallet adjustment error', error);
+      res.status(400).json({ message: error.message || "Error al ajustar billetera" });
+    }
+  });
+
+  // Admin: Unblock cash services manually
+  app.post("/api/admin/wallets/:walletId/unblock", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      await WalletService.unblockCashServices(req.params.walletId);
+      res.json({ message: "Servicios en efectivo desbloqueados" });
+    } catch (error: any) {
+      logSystem.error('Admin unblock cash services error', error);
+      res.status(400).json({ message: error.message || "Error al desbloquear servicios" });
+    }
+  });
+
+  // Admin: Get wallet statistics
+  app.get("/api/admin/wallets-stats", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductores = await storage.getAllDrivers();
+      let totalBalance = 0;
+      let totalDebt = 0;
+      let operatorsWithDebt = 0;
+      let blockedOperators = 0;
+
+      for (const conductor of conductores) {
+        const wallet = await WalletService.getWallet(conductor.id);
+        if (wallet) {
+          totalBalance += parseFloat(wallet.balance);
+          totalDebt += parseFloat(wallet.totalDebt);
+          if (parseFloat(wallet.totalDebt) > 0) operatorsWithDebt++;
+          if (wallet.cashServicesBlocked) blockedOperators++;
+        }
+      }
+
+      res.json({
+        totalOperators: conductores.length,
+        totalBalance: totalBalance.toFixed(2),
+        totalDebt: totalDebt.toFixed(2),
+        operatorsWithDebt,
+        blockedOperators,
+      });
+    } catch (error: any) {
+      logSystem.error('Get wallet stats error', error);
+      res.status(500).json({ message: "Error al obtener estadísticas" });
+    }
+  });
+
+  // ==================== END OPERATOR WALLET SYSTEM ====================
+
   initServiceAutoCancellation(serviceSessions);
+  initWalletService();
   logSystem.info(`Service auto-cancellation initialized (timeout: ${SERVICE_TIMEOUT_MINUTES} minutes)`);
 
   return httpServer;

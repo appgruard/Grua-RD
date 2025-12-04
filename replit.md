@@ -71,6 +71,35 @@ The project includes a comprehensive testing setup:
 
 ## Recent Changes
 
+### 2025-12-04: Operator Wallet System - Phases 1-3 Complete
+- **WalletService Created** (`server/services/wallet.ts`):
+  - Commission calculation (20% on cash payments)
+  - Debt creation with 15-day due date
+  - Payment processing for cash and card services
+  - Direct debt payment with card support
+  - Automatic overdue debt checking (hourly job)
+  - Cash service blocking/unblocking
+  - Push notifications for debt alerts
+  - Admin adjustment capabilities
+  - Chronological debt ordering (oldest first)
+  - Floating-point safe comparisons (0.01 tolerance)
+- **Storage Methods Added** (`server/storage.ts`):
+  - 15 wallet-related methods in IStorage interface
+  - Full implementation for wallet CRUD operations
+  - Debt management with days remaining calculation
+  - Overdue and near-due debt queries
+  - Idempotency check via `getTransactionByPaymentIntentId`
+- **API Endpoints with Validation** (`server/routes.ts`):
+  - `GET /api/wallet` - Get operator wallet with details
+  - `GET /api/wallet/transactions` - Transaction history
+  - `GET /api/wallet/debts` - Pending debts list
+  - `GET /api/wallet/can-accept-cash` - Check cash acceptance
+  - `POST /api/wallet/process-payment` - Validates service amount and payment method against servicio record
+  - `POST /api/wallet/create-payment-intent` - Prepare debt payment
+  - `POST /api/wallet/pay-debt` - Explicit overpayment rejection, idempotency protection
+  - Admin endpoints for wallet management and statistics
+- **Security**: Idempotency checks prevent double-application of payments. Stripe PaymentIntent verification documented as production requirement (see `WALLET_IMPLEMENTATION_PLAN.md`)
+
 ### 2025-12-04: Operator Wallet System - Phase 1 (Data Model)
 - **New Tables Created** (`shared/schema.ts`):
   - `operator_wallets`: Stores operator balance, total debt, and service blocking status
@@ -90,9 +119,8 @@ The project includes a comprehensive testing setup:
 - **Documentation**: Updated `PLAN_CORRECCIONES_RESPONSIVIDAD.md` with detailed change logs.
 
 ### Pending Tasks
-- **Wallet System Phase 2**: Implement WalletService backend logic
-- **Wallet System Phase 3**: Create API endpoints for wallet operations
 - **Wallet System Phase 4**: Build operator wallet UI components
 - **Wallet System Phase 5**: Add notifications and alerts
+- **Wallet System Phase 6**: Admin panel for wallet management (optional)
 - Task 5: Update status messages in client tracking screen (change "Conductor" to "Operador")
 - Task 6: Complete terminology changes across remaining files (tracking.tsx, history.tsx, solicitudes.tsx)

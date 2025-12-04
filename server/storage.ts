@@ -37,6 +37,9 @@ import {
   serviciosProgramados,
   empresaFacturas,
   empresaFacturaItems,
+  operatorWallets,
+  walletTransactions,
+  operatorDebts,
   type User,
   type InsertUser,
   type Conductor,
@@ -127,6 +130,15 @@ import {
   type EmpresaFacturaItemWithDetails,
   type EmpresaProyectoWithDetails,
   type EmpresaContratoWithDetails,
+  type OperatorWallet,
+  type InsertOperatorWallet,
+  type WalletTransaction,
+  type InsertWalletTransaction,
+  type OperatorDebt,
+  type InsertOperatorDebt,
+  type WalletWithDetails,
+  type OperatorDebtWithDaysRemaining,
+  type WalletTransactionWithService,
 } from '@shared/schema';
 import {
   serviceReceipts,
@@ -554,6 +566,30 @@ export interface IStorage {
   rejectNegotiationAmount(servicioId: string, clienteId: string): Promise<Servicio>;
   createMensajeChatWithMedia(mensaje: InsertMensajeChat & { tipoMensaje?: string; montoAsociado?: string; urlArchivo?: string; nombreArchivo?: string }): Promise<MensajeChat>;
   getServiciosByNegociacionEstado(estado: string): Promise<Servicio[]>;
+
+  // ==================== OPERATOR WALLET SYSTEM (Phase 2) ====================
+  
+  // Operator Wallets
+  createOperatorWallet(conductorId: string): Promise<OperatorWallet>;
+  getWalletByConductorId(conductorId: string): Promise<WalletWithDetails | undefined>;
+  getWalletById(walletId: string): Promise<OperatorWallet | undefined>;
+  updateWallet(walletId: string, data: Partial<OperatorWallet>): Promise<OperatorWallet>;
+
+  // Wallet Transactions
+  createWalletTransaction(transaction: InsertWalletTransaction): Promise<WalletTransaction>;
+  getWalletTransactions(walletId: string, limit?: number): Promise<WalletTransactionWithService[]>;
+  getTransactionByPaymentIntentId(paymentIntentId: string): Promise<WalletTransaction | undefined>;
+
+  // Operator Debts
+  createOperatorDebt(debt: InsertOperatorDebt): Promise<OperatorDebt>;
+  getOperatorDebts(walletId: string): Promise<OperatorDebtWithDaysRemaining[]>;
+  getOperatorDebtById(debtId: string): Promise<OperatorDebt | undefined>;
+  updateOperatorDebt(debtId: string, data: Partial<OperatorDebt>): Promise<OperatorDebt>;
+  getOverdueDebts(): Promise<OperatorDebt[]>;
+  getDebtsNearDue(days: number): Promise<OperatorDebt[]>;
+
+  // Mark service commission as processed
+  markServiceCommissionProcessed(servicioId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3887,6 +3923,176 @@ export class DatabaseStorage implements IStorage {
       limit,
     });
     return results as ServicioProgramadoWithDetails[];
+  }
+
+  // ==================== OPERATOR WALLET SYSTEM (Phase 2) ====================
+
+  // Create a new operator wallet
+  async createOperatorWallet(conductorId: string): Promise<OperatorWallet> {
+    const [wallet] = await db.insert(operatorWallets).values({
+      conductorId,
+      balance: "0.00",
+      totalDebt: "0.00",
+      cashServicesBlocked: false,
+    }).returning();
+    return wallet;
+  }
+
+  // Get wallet by conductor ID with full details (conductor info, pending debts, recent transactions)
+  async getWalletByConductorId(conductorId: string): Promise<WalletWithDetails | undefined> {
+    const wallet = await db.query.operatorWallets.findFirst({
+      where: eq(operatorWallets.conductorId, conductorId),
+      with: {
+        conductor: true,
+      },
+    });
+
+    if (!wallet) {
+      return undefined;
+    }
+
+    // Get pending debts with days remaining
+    const now = new Date();
+    const debtsResult = await db.select().from(operatorDebts)
+      .where(and(
+        eq(operatorDebts.walletId, wallet.id),
+        ne(operatorDebts.status, 'paid')
+      ))
+      .orderBy(operatorDebts.dueDate);
+
+    const pendingDebts: OperatorDebtWithDaysRemaining[] = debtsResult.map(debt => ({
+      ...debt,
+      daysRemaining: Math.ceil((new Date(debt.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+    }));
+
+    // Get recent transactions (last 10)
+    const recentTransactions = await db.select().from(walletTransactions)
+      .where(eq(walletTransactions.walletId, wallet.id))
+      .orderBy(desc(walletTransactions.createdAt))
+      .limit(10);
+
+    return {
+      ...wallet,
+      pendingDebts,
+      recentTransactions,
+    } as WalletWithDetails;
+  }
+
+  // Get wallet by ID
+  async getWalletById(walletId: string): Promise<OperatorWallet | undefined> {
+    const [wallet] = await db.select().from(operatorWallets)
+      .where(eq(operatorWallets.id, walletId));
+    return wallet;
+  }
+
+  // Update wallet
+  async updateWallet(walletId: string, data: Partial<OperatorWallet>): Promise<OperatorWallet> {
+    const [wallet] = await db.update(operatorWallets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(operatorWallets.id, walletId))
+      .returning();
+    return wallet;
+  }
+
+  // Create a wallet transaction
+  async createWalletTransaction(transaction: InsertWalletTransaction): Promise<WalletTransaction> {
+    const [newTransaction] = await db.insert(walletTransactions)
+      .values(transaction)
+      .returning();
+    return newTransaction;
+  }
+
+  // Get wallet transactions with service details
+  async getWalletTransactions(walletId: string, limit: number = 50): Promise<WalletTransactionWithService[]> {
+    const transactions = await db.query.walletTransactions.findMany({
+      where: eq(walletTransactions.walletId, walletId),
+      with: {
+        servicio: true,
+      },
+      orderBy: desc(walletTransactions.createdAt),
+      limit,
+    });
+    return transactions as WalletTransactionWithService[];
+  }
+
+  // Get transaction by payment intent ID (for idempotency checks)
+  async getTransactionByPaymentIntentId(paymentIntentId: string): Promise<WalletTransaction | undefined> {
+    const [transaction] = await db.select().from(walletTransactions)
+      .where(eq(walletTransactions.paymentIntentId, paymentIntentId));
+    return transaction;
+  }
+
+  // Create an operator debt
+  async createOperatorDebt(debt: InsertOperatorDebt): Promise<OperatorDebt> {
+    const [newDebt] = await db.insert(operatorDebts)
+      .values(debt)
+      .returning();
+    return newDebt;
+  }
+
+  // Get operator debts with days remaining calculation
+  async getOperatorDebts(walletId: string): Promise<OperatorDebtWithDaysRemaining[]> {
+    const now = new Date();
+    const debts = await db.query.operatorDebts.findMany({
+      where: eq(operatorDebts.walletId, walletId),
+      with: {
+        servicio: true,
+      },
+      orderBy: operatorDebts.dueDate,
+    });
+
+    return debts.map(debt => ({
+      ...debt,
+      daysRemaining: Math.ceil((new Date(debt.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+    })) as OperatorDebtWithDaysRemaining[];
+  }
+
+  // Get operator debt by ID
+  async getOperatorDebtById(debtId: string): Promise<OperatorDebt | undefined> {
+    const [debt] = await db.select().from(operatorDebts)
+      .where(eq(operatorDebts.id, debtId));
+    return debt;
+  }
+
+  // Update operator debt
+  async updateOperatorDebt(debtId: string, data: Partial<OperatorDebt>): Promise<OperatorDebt> {
+    const [debt] = await db.update(operatorDebts)
+      .set(data)
+      .where(eq(operatorDebts.id, debtId))
+      .returning();
+    return debt;
+  }
+
+  // Get all overdue debts (dueDate < now AND status != 'paid')
+  async getOverdueDebts(): Promise<OperatorDebt[]> {
+    const now = new Date();
+    return db.select().from(operatorDebts)
+      .where(and(
+        lt(operatorDebts.dueDate, now),
+        ne(operatorDebts.status, 'paid')
+      ))
+      .orderBy(operatorDebts.dueDate);
+  }
+
+  // Get debts near due (dueDate <= now + days AND status in ('pending', 'partial'))
+  async getDebtsNearDue(days: number): Promise<OperatorDebt[]> {
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + (days * 24 * 60 * 60 * 1000));
+    
+    return db.select().from(operatorDebts)
+      .where(and(
+        lte(operatorDebts.dueDate, futureDate),
+        gte(operatorDebts.dueDate, now),
+        sql`${operatorDebts.status} IN ('pending', 'partial')`
+      ))
+      .orderBy(operatorDebts.dueDate);
+  }
+
+  // Mark service commission as processed
+  async markServiceCommissionProcessed(servicioId: string): Promise<void> {
+    await db.update(servicios)
+      .set({ commissionProcessed: true })
+      .where(eq(servicios.id, servicioId));
   }
 }
 
