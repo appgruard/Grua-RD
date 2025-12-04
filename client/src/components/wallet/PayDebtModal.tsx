@@ -106,11 +106,10 @@ export function PayDebtModal({
     try {
       const paymentIntentResult = await createPaymentIntentMutation.mutateAsync(amountNum);
       
-      const paymentId = `direct_${paymentIntentResult.walletId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+      // Use the paymentIntentId from the backend response for idempotency
       await completePaymentMutation.mutateAsync({
         amount: paymentIntentResult.amount,
-        paymentIntentId: paymentId,
+        paymentIntentId: paymentIntentResult.paymentIntentId,
       });
 
       setStep('success');

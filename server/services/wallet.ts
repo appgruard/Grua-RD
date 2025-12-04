@@ -344,6 +344,10 @@ export class WalletService {
   /**
    * Pay debt directly with operator's card
    * Returns payment intent data for Stripe processing
+   * 
+   * PRODUCTION NOTE: Replace paymentIntentId generation with actual Stripe
+   * PaymentIntent creation using stripe.paymentIntents.create()
+   * The returned clientSecret should be used with Stripe Elements on the frontend
    */
   static async createDebtPaymentIntent(
     conductorId: string,
@@ -353,6 +357,7 @@ export class WalletService {
     amount: number;
     walletId: string;
     totalDebt: number;
+    paymentIntentId: string;
     message: string;
   }> {
     const wallet = await storage.getWalletByConductorId(conductorId);
@@ -373,11 +378,16 @@ export class WalletService {
       amount = totalDebt;
     }
 
+    // Generate a unique payment intent ID for this transaction
+    // PRODUCTION: Replace with stripe.paymentIntents.create() and return the actual PaymentIntent ID
+    const paymentIntentId = `pi_dev_${wallet.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     return {
       success: true,
       amount,
       walletId: wallet.id,
       totalDebt,
+      paymentIntentId,
       message: `Pago de RD$${amount.toFixed(2)} listo para procesar`
     };
   }
