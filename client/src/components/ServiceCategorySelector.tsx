@@ -177,7 +177,7 @@ const serviceCategories = [
   { 
     id: 'remolque_especializado', 
     label: 'Remolque Especializado', 
-    description: 'Vehiculos especiales',
+    description: 'Vehiculos especiales o en situaciones complejas',
     Icon: Sparkles 
   },
   { 

@@ -304,37 +304,43 @@ GET /api/drivers/available-requests ✅
 
 ---
 
-## Fase 5: Notificaciones y Alertas
+## Fase 5: Notificaciones y Alertas ✅ COMPLETADA (4 Dic 2025)
 
-### 5.1 Notificaciones Push
+### 5.1 Notificaciones Push ✅
 **Archivo:** `server/push-service.ts`
 
-**Nuevas notificaciones:**
-- "El operador ha enviado una cotización"
-- "El cliente ha aceptado tu cotización"
-- "El cliente ha rechazado la cotización"
-- "Nueva solicitud de extracción disponible"
+**Notificaciones implementadas:**
+- ✅ `notifyNegotiationAmountProposed()` - "El operador ha enviado una cotización"
+- ✅ `notifyNegotiationAmountConfirmed()` - "Cotización confirmada, por favor responde"
+- ✅ `notifyNegotiationAmountAccepted()` - "El cliente ha aceptado tu cotización"
+- ✅ `notifyNegotiationAmountRejected()` - "El cliente ha rechazado la cotización"
+- ✅ `notifyNewExtractionRequest()` - "Nueva solicitud de extracción disponible"
 
-### 5.2 Notificaciones In-App
-**Componentes:**
-- Toast para acciones inmediatas
-- Badges en tabs de navegación
-- Indicadores de mensajes no leídos
+### 5.2 Notificaciones In-App ✅
+**Componentes implementados:**
+- ✅ Toast para acciones inmediatas en `AmountProposalCard.tsx` y `AmountResponseCard.tsx`
+- ✅ Badges en tabs de navegación en `MobileLayout.tsx`:
+  - Punto de notificación en tab "Inicio" cuando hay servicios activos
+  - Punto ámbar cuando hay negociaciones pendientes de respuesta
+- ✅ Indicadores de mensajes no leídos en `NegotiationChatBox.tsx`:
+  - Badge con contador de mensajes no leídos
+  - Iconos Check/CheckCheck para estado de lectura
+  - Indicador de conexión WebSocket
 
 ---
 
-## Fase 6: Cambios Menores y Correcciones
+## Fase 6: Cambios Menores y Correcciones ✅ COMPLETADA (4 Dic 2025)
 
-### 6.1 Actualizar Descripción de Remolque Especializado
+### 6.1 Actualizar Descripción de Remolque Especializado ✅
 **Archivo:** `client/src/components/ServiceCategorySelector.tsx`
 
-**Cambio:**
+**Cambio realizado:**
 ```typescript
 // Antes:
-{ id: 'remolque_especializado', label: 'Remolque Especializado', description: 'Vehículos especiales' }
+{ id: 'remolque_especializado', label: 'Remolque Especializado', description: 'Vehiculos especiales' }
 
 // Después:
-{ id: 'remolque_especializado', label: 'Remolque Especializado', description: 'Vehículos especiales o en situaciones complejas' }
+{ id: 'remolque_especializado', label: 'Remolque Especializado', description: 'Vehiculos especiales o en situaciones complejas' }
 ```
 
 ---
@@ -444,4 +450,4 @@ client/src/App.tsx (nueva ruta)
 ---
 
 *Documento creado: Diciembre 2025*
-*Última actualización: Diciembre 2025*
+*Última actualización: 4 Diciembre 2025 - Fases 5 y 6 completadas*
