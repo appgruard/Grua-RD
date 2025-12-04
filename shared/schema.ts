@@ -43,7 +43,8 @@ export const VALID_SERVICE_CATEGORIES = [
   "vehiculos_pesados",
   "maquinarias",
   "izaje_construccion",
-  "remolque_recreativo"
+  "remolque_recreativo",
+  "extraccion"
 ] as const;
 
 export const servicioCategoriaEnum = pgEnum("servicio_categoria", [...VALID_SERVICE_CATEGORIES]);
@@ -101,7 +102,13 @@ export const servicioSubtipoEnum = pgEnum("servicio_subtipo", [
   // Remolque Recreativo
   "remolque_botes",
   "remolque_jetski",
-  "remolque_cuatrimoto"
+  "remolque_cuatrimoto",
+  // Extracción (servicios que requieren negociación)
+  "extraccion_zanja",
+  "extraccion_lodo",
+  "extraccion_volcado",
+  "extraccion_accidente",
+  "extraccion_dificil"
 ]);
 
 export const aseguradoraEstadoEnum = pgEnum("aseguradora_estado", ["pendiente", "aprobado", "rechazado"]);
@@ -132,6 +139,27 @@ export const estadoPagoAseguradoraEnum = pgEnum("estado_pago_aseguradora", [
   "pendiente_facturar",
   "facturado",
   "pagado"
+]);
+
+export const estadoNegociacionEnum = pgEnum("estado_negociacion", [
+  "no_aplica",
+  "pendiente_evaluacion",
+  "propuesto",
+  "confirmado",
+  "aceptado",
+  "rechazado",
+  "cancelado"
+]);
+
+export const tipoMensajeChatEnum = pgEnum("tipo_mensaje_chat", [
+  "texto",
+  "imagen",
+  "video",
+  "monto_propuesto",
+  "monto_confirmado",
+  "monto_aceptado",
+  "monto_rechazado",
+  "sistema"
 ]);
 
 // Users Table
@@ -232,6 +260,11 @@ export const servicios = pgTable("servicios", {
   vehiculoColor: text("vehiculo_color"),
   vehiculoFotoUrl: text("vehiculo_foto_url"),
   vehiculoCapacidad: text("vehiculo_capacidad"),
+  requiereNegociacion: boolean("requiere_negociacion").default(false).notNull(),
+  estadoNegociacion: estadoNegociacionEnum("estado_negociacion").default("no_aplica"),
+  montoNegociado: decimal("monto_negociado", { precision: 10, scale: 2 }),
+  notasExtraccion: text("notas_extraccion"),
+  descripcionSituacion: text("descripcion_situacion"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   aceptadoAt: timestamp("aceptado_at"),
   iniciadoAt: timestamp("iniciado_at"),
@@ -278,6 +311,10 @@ export const mensajesChat = pgTable("mensajes_chat", {
   servicioId: varchar("servicio_id").notNull().references(() => servicios.id, { onDelete: "cascade" }),
   remitenteId: varchar("remitente_id").notNull().references(() => users.id),
   contenido: text("contenido").notNull(),
+  tipoMensaje: tipoMensajeChatEnum("tipo_mensaje").default("texto").notNull(),
+  montoAsociado: decimal("monto_asociado", { precision: 10, scale: 2 }),
+  urlArchivo: text("url_archivo"),
+  nombreArchivo: text("nombre_archivo"),
   leido: boolean("leido").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
