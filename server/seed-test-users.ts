@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db, pool } from "./db";
-import { users, conductores, documentos } from "@shared/schema";
+import { users, conductores, documentos, conductorVehiculos } from "@shared/schema";
 
 interface TestUser {
   email: string;
@@ -205,6 +205,31 @@ async function seedTestUsers(): Promise<void> {
         }
 
         console.log(`  -> Created ${documentTypes.length} verified documents for ${testUser.email}`);
+
+        // Create vehicles for each main service category
+        const serviceCategories = [
+          "remolque_estandar",
+          "auxilio_vial",
+          "remolque_especializado",
+          "vehiculos_pesados",
+        ] as const;
+
+        for (const categoria of serviceCategories) {
+          await db.insert(conductorVehiculos).values({
+            conductorId: createdConductor.id,
+            categoria: categoria,
+            placa: testUser.conductorData.placaGrua,
+            color: "Blanco",
+            capacidad: "5 toneladas",
+            marca: testUser.conductorData.marcaGrua,
+            modelo: testUser.conductorData.modeloGrua,
+            anio: "2022",
+            detalles: `Grúa ${testUser.conductorData.marcaGrua} para ${categoria}`,
+            activo: true,
+          });
+        }
+
+        console.log(`  -> Created ${serviceCategories.length} vehicle configurations for ${testUser.email}`);
       }
     } catch (error) {
       console.error(`Error creating user ${testUser.email}:`, error);
