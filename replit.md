@@ -101,3 +101,38 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
   - Medium Priority: Driver dashboards, automated reports, manual interventions
   - Low Priority: Self-service portals, API integrations, chat support
 - Document serves as roadmap for future admin panel enhancements
+
+### Driver Dashboard Performance Optimization (December 2024)
+Optimized the driver app's initial loading time after first login with the following changes:
+
+**Backend Optimizations:**
+1. Created new `getActiveServiceByConductorId()` function in storage.ts
+   - Uses targeted query to find only active services (states: aceptado, conductor_en_sitio, cargando, en_progreso)
+   - Replaces inefficient pattern of fetching ALL conductor services and filtering client-side
+   - Uses Drizzle's `findFirst` with `or()` operator for optimal single-record retrieval
+
+2. Created new `getWalletSummaryByConductorId()` function in storage.ts
+   - Returns only essential wallet fields: id, balance, totalDebt, cashServicesBlocked
+   - Eliminates unnecessary joins and queries for pendingDebts and recentTransactions
+   - Separate `/api/wallet` endpoint still provides full details when needed
+
+3. Updated `/api/drivers/init` endpoint in routes.ts
+   - Uses new optimized functions instead of fetching all data
+   - Added documentation comments explaining optimizations
+   - All queries still execute in parallel with Promise.all
+
+**Frontend Optimizations:**
+1. Enhanced `preload.ts` with aggressive preloading:
+   - Added `scheduleImmediateTask()` using queueMicrotask for critical resources
+   - Added `addDnsPrefetch()` for faster DNS resolution to Mapbox servers
+   - Created `preloadMapboxModule()` to cache MapboxMap import promise
+   - Driver modules now load immediately without waiting for idle callback
+   - Reduced prefetch endpoints to only `/api/drivers/init` (consolidated endpoint)
+   - Increased fetch priority for Mapbox style with `priority: 'high'`
+
+**Performance Impact:**
+- Reduced database queries from 4 (with full data) to 4 (with minimal data)
+- Eliminated fetching all historical services when only active service needed
+- Eliminated wallet debt/transaction sub-queries during init
+- Faster module loading with immediate scheduling instead of idle callbacks
+- DNS prefetch reduces connection time to Mapbox servers

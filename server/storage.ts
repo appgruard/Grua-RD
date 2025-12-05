@@ -1,5 +1,5 @@
 import { db } from './db';
-import { eq, and, desc, isNull, sql, gte, lte, lt, between, ne } from 'drizzle-orm';
+import { eq, and, desc, isNull, sql, gte, lte, lt, between, ne, or } from 'drizzle-orm';
 import {
   users,
   conductores,
@@ -195,6 +195,7 @@ export interface IStorage {
   getServicioById(id: string): Promise<ServicioWithDetails | undefined>;
   getServiciosByClientId(clientId: string): Promise<ServicioWithDetails[]>;
   getServiciosByConductorId(conductorId: string): Promise<ServicioWithDetails[]>;
+  getActiveServiceByConductorId(conductorId: string): Promise<ServicioWithDetails | null>;
   getPendingServicios(): Promise<Servicio[]>;
   getExpiredPendingServicios(timeoutMinutes: number): Promise<Servicio[]>;
   cancelExpiredServicios(timeoutMinutes: number): Promise<Servicio[]>;
@@ -577,6 +578,7 @@ export interface IStorage {
   // Operator Wallets
   createOperatorWallet(conductorId: string): Promise<OperatorWallet>;
   getWalletByConductorId(conductorId: string): Promise<WalletWithDetails | undefined>;
+  getWalletSummaryByConductorId(conductorId: string): Promise<{ id: string; balance: string; totalDebt: string; cashServicesBlocked: boolean } | null>;
   getWalletById(walletId: string): Promise<OperatorWallet | undefined>;
   updateWallet(walletId: string, data: Partial<OperatorWallet>): Promise<OperatorWallet>;
 
@@ -893,6 +895,29 @@ export class DatabaseStorage implements IStorage {
       orderBy: desc(servicios.createdAt),
     });
     return results as any;
+  }
+
+  async getActiveServiceByConductorId(conductorId: string): Promise<ServicioWithDetails | null> {
+    // Query for active service states only - much faster than fetching all services
+    const result = await db.query.servicios.findFirst({
+      where: and(
+        eq(servicios.conductorId, conductorId),
+        or(
+          eq(servicios.estado, 'aceptado'),
+          eq(servicios.estado, 'conductor_en_sitio'),
+          eq(servicios.estado, 'cargando'),
+          eq(servicios.estado, 'en_progreso')
+        )
+      ),
+      with: {
+        cliente: true,
+        conductor: true,
+        calificacion: true,
+        vehiculo: true,
+      },
+      orderBy: desc(servicios.createdAt),
+    });
+    return result as ServicioWithDetails | null;
   }
 
   async getPendingServicios(): Promise<Servicio[]> {
@@ -4009,6 +4034,21 @@ export class DatabaseStorage implements IStorage {
       pendingDebts,
       recentTransactions,
     } as WalletWithDetails;
+  }
+
+  // Optimized wallet summary for init - only essential fields, no joins
+  async getWalletSummaryByConductorId(conductorId: string): Promise<{ id: string; balance: string; totalDebt: string; cashServicesBlocked: boolean } | null> {
+    const wallet = await db.select({
+      id: operatorWallets.id,
+      balance: operatorWallets.balance,
+      totalDebt: operatorWallets.totalDebt,
+      cashServicesBlocked: operatorWallets.cashServicesBlocked,
+    })
+      .from(operatorWallets)
+      .where(eq(operatorWallets.conductorId, conductorId))
+      .limit(1);
+
+    return wallet[0] || null;
   }
 
   // Get wallet by ID

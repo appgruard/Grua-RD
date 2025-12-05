@@ -2314,6 +2314,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Optimized endpoint for driver dashboard - returns all data in a single call
+  // Performance optimizations:
+  // 1. Uses getActiveServiceByConductorId instead of fetching all services
+  // 2. Fetches only essential wallet data (balance, status)
+  // 3. All queries run in parallel with Promise.all
   app.get("/api/drivers/init", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
       return res.status(401).json({ message: "Not authorized" });
@@ -2336,16 +2340,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch all data in parallel for maximum speed
-      const [documents, allServices, nearbyRequests, wallet] = await Promise.all([
+      // Optimized: Uses dedicated active service query instead of fetching all services
+      // Optimized: Uses wallet summary (basic fields only) instead of full wallet with debts
+      const [documents, activeService, nearbyRequests, wallet] = await Promise.all([
         storage.getDocumentosByUsuarioId(userId),
-        storage.getServiciosByConductorId(conductor.id),
+        storage.getActiveServiceByConductorId(conductor.id),
         conductor.disponible ? storage.getPendingServicios() : Promise.resolve([]),
-        storage.getWalletByConductorId(conductor.id).catch(() => null)
+        storage.getWalletSummaryByConductorId(conductor.id).catch(() => null)
       ]);
-
-      // Find active service
-      const activeStates = ['aceptado', 'conductor_en_sitio', 'cargando', 'en_progreso'];
-      const activeService = allServices.find(s => activeStates.includes(s.estado)) || null;
 
       res.json({
         conductor,
