@@ -1,26 +1,46 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { Calendar, Download, Clock, CheckCircle, XCircle, DollarSign, Car, FileText, MapPin, RefreshCcw, AlertCircle } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
+import { Calendar, Download, Clock, CheckCircle, XCircle, DollarSign, FileText, MapPin, RefreshCcw, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const AnalyticsCharts = lazy(() => import('@/components/admin/AnalyticsCharts'));
+
+function ChartsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i}>
+          <CardHeader>
+            <Skeleton className="h-6 w-40" />
+          </CardHeader>
+          <CardContent>
+            <div className="h-80 flex items-end gap-2">
+              {['45%', '70%', '55%', '85%', '60%', '75%', '50%'].map((h, j) => (
+                <Skeleton key={j} className="flex-1" style={{ height: h }} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent>
+          <div className="h-80 flex items-center justify-center">
+            <Skeleton className="h-48 w-48 rounded-full" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { LazyCalendar as CalendarComponent } from '@/components/ui/lazy-calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
@@ -94,8 +114,6 @@ interface VehicleDistribution {
   count: number;
   revenue: number;
 }
-
-const COLORS = ['#0F2947', '#F5A623', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 const statusLabels: Record<string, string> = {
   pendiente: 'Pendiente',
@@ -455,215 +473,30 @@ export default function Analytics() {
         </TabsList>
 
         <TabsContent value="charts" className="space-y-6 mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card data-testid="card-revenue-chart">
-              <CardHeader>
-                <CardTitle>Ingresos por Periodo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {revenueError ? (
-                  <ErrorCard title="ingresos" onRetry={() => refetchRevenue()} />
-                ) : revenueLoading ? (
-                  <div className="h-80 flex items-center justify-center">
-                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                  </div>
-                ) : revenueData && revenueData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <LineChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis />
-                      <Tooltip
-                        formatter={(value: number) => [`RD$ ${value.toFixed(2)}`, 'Ingresos']}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="revenue"
-                        stroke="#0F2947"
-                        strokeWidth={2}
-                        name="Ingresos (RD$)"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-muted-foreground">
-                    No hay datos de ingresos para el periodo seleccionado
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-services-chart">
-              <CardHeader>
-                <CardTitle>Servicios por Periodo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {servicesError ? (
-                  <ErrorCard title="servicios" onRetry={() => refetchServices()} />
-                ) : servicesLoading ? (
-                  <div className="h-80 flex items-center justify-center">
-                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                  </div>
-                ) : servicesData && servicesData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={servicesData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="count" fill="#F5A623" name="Servicios" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-muted-foreground">
-                    No hay datos de servicios para el periodo seleccionado
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-vehicle-distribution">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Car className="w-5 h-5" />
-                  Distribucion por Tipo de Vehiculo
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {vehicleError ? (
-                  <ErrorCard title="distribucion de vehiculos" onRetry={() => refetchVehicles()} />
-                ) : vehicleLoading ? (
-                  <div className="h-80 flex items-center justify-center">
-                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                  </div>
-                ) : vehicleData && vehicleData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <PieChart>
-                      <Pie
-                        data={vehicleData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ tipoVehiculo, percent }) =>
-                          `${vehicleLabels[tipoVehiculo] || tipoVehiculo}: ${(percent * 100).toFixed(0)}%`
-                        }
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="count"
-                      >
-                        {vehicleData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: number, name: string, props: any) => [
-                          `${value} servicios (RD$ ${props.payload.revenue.toFixed(2)})`,
-                          vehicleLabels[props.payload.tipoVehiculo] || props.payload.tipoVehiculo,
-                        ]}
-                      />
-                      <Legend
-                        formatter={(value, entry: any) =>
-                          vehicleLabels[entry.payload.tipoVehiculo] || entry.payload.tipoVehiculo
-                        }
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-muted-foreground">
-                    No hay datos de vehiculos para el periodo seleccionado
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-peak-hours-chart">
-              <CardHeader>
-                <CardTitle>Horarios Pico</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {peakHoursError ? (
-                  <ErrorCard title="horarios pico" onRetry={() => refetchPeakHours()} />
-                ) : peakHoursLoading ? (
-                  <div className="h-80 flex items-center justify-center">
-                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                  </div>
-                ) : peakHoursData && peakHoursData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={peakHoursData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="hour"
-                        tickFormatter={(hour) => `${hour}:00`}
-                      />
-                      <YAxis />
-                      <Tooltip
-                        labelFormatter={(hour) => `Hora: ${hour}:00`}
-                      />
-                      <Legend />
-                      <Bar dataKey="count" fill="#10b981" name="Servicios" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-muted-foreground">
-                    No hay datos de horarios disponibles
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-status-chart" className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Estados de Servicios</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {statusError ? (
-                  <ErrorCard title="estados de servicios" onRetry={() => refetchStatus()} />
-                ) : statusLoading ? (
-                  <div className="h-80 flex items-center justify-center">
-                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                  </div>
-                ) : statusBreakdown && statusBreakdown.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <PieChart>
-                      <Pie
-                        data={statusBreakdown}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ status, percent }) =>
-                          `${statusLabels[status] || status}: ${(percent * 100).toFixed(0)}%`
-                        }
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="count"
-                      >
-                        {statusBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: number, name: string, props: any) => [
-                          value,
-                          statusLabels[props.payload.status] || props.payload.status,
-                        ]}
-                      />
-                      <Legend
-                        formatter={(value, entry: any) =>
-                          statusLabels[entry.payload.status] || entry.payload.status
-                        }
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-80 flex items-center justify-center text-muted-foreground">
-                    No hay datos de estados para el periodo seleccionado
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <Suspense fallback={<ChartsSkeleton />}>
+            <AnalyticsCharts
+              revenueData={revenueData}
+              revenueLoading={revenueLoading}
+              revenueError={revenueError}
+              refetchRevenue={refetchRevenue}
+              servicesData={servicesData}
+              servicesLoading={servicesLoading}
+              servicesError={servicesError}
+              refetchServices={refetchServices}
+              vehicleData={vehicleData}
+              vehicleLoading={vehicleLoading}
+              vehicleError={vehicleError}
+              refetchVehicles={refetchVehicles}
+              peakHoursData={peakHoursData}
+              peakHoursLoading={peakHoursLoading}
+              peakHoursError={peakHoursError}
+              refetchPeakHours={refetchPeakHours}
+              statusBreakdown={statusBreakdown}
+              statusLoading={statusLoading}
+              statusError={statusError}
+              refetchStatus={refetchStatus}
+            />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="heatmap" className="mt-6">

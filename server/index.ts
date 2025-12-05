@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import cors from "cors";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { logger } from "./logger";
@@ -8,6 +9,16 @@ import { pool, initializeTicketTables } from "./db";
 import { checkStorageHealth } from "./services/object-storage";
 
 const app = express();
+
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6,
+}));
 
 const isDevelopment = process.env.NODE_ENV === "development";
 
