@@ -4228,7 +4228,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { distanceKm, servicioCategoria, servicioSubtipo } = req.body;
       
-      const ONSITE_SERVICE_PRICES: Record<string, number> = {
+      // Default fallback prices (used when no tariff is configured)
+      const DEFAULT_PRECIO_BASE = 150;
+      const DEFAULT_TARIFA_POR_KM = 20;
+      
+      // Default prices for onsite services (auxilio vial) when no specific tariff exists
+      const DEFAULT_ONSITE_PRICES: Record<string, number> = {
         'cambio_goma': 500,
         'inflado_neumatico': 300,
         'paso_corriente': 400,
@@ -4238,49 +4243,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'diagnostico_obd': 600,
       };
 
-      const TRANSPORT_CATEGORY_MULTIPLIERS: Record<string, number> = {
-        'remolque_estandar': 1.0,
-        'remolque_especializado': 1.5,
-        'vehiculos_pesados': 2.0,
-        'maquinarias': 2.2,
-        'izaje_construccion': 1.8,
-        'remolque_recreativo': 1.3,
-        'auxilio_vial': 1.0,
-      };
-
-      const TRANSPORT_SUBTYPE_ADDITIONAL: Record<string, number> = {
-        'extraccion_vehiculo': 200,
-        'vehiculo_sin_llanta': 100,
-        'vehiculo_sin_direccion': 150,
-        'vehiculo_chocado': 200,
-        'vehiculo_lujo': 300,
-        'vehiculo_electrico': 250,
-        'camiones_cisternas': 300,
-        'de_carga': 200,
-        'patana_cabezote': 500,
-        'volteo': 300,
-        'transporte_maquinarias': 400,
-        'montacargas': 350,
-        'retroexcavadora': 400,
-        'rodillo': 350,
-        'greda': 400,
-        'tractor': 350,
-        'excavadora': 450,
-        'pala_mecanica': 400,
-        'izaje_materiales': 0,
-        'subida_muebles': 100,
-        'transporte_equipos': 150,
-        'remolque_botes': 100,
-        'remolque_jetski': 50,
-        'remolque_cuatrimoto': 50,
-      };
+      // List of onsite services (no distance required)
+      const ONSITE_SUBTYPES = [
+        'cambio_goma', 'inflado_neumatico', 'paso_corriente', 
+        'cerrajero_automotriz', 'suministro_combustible', 'envio_bateria', 'diagnostico_obd'
+      ];
 
       const isOnsiteService = servicioCategoria === 'auxilio_vial' && 
         servicioSubtipo && 
-        ONSITE_SERVICE_PRICES[servicioSubtipo] !== undefined;
+        ONSITE_SUBTYPES.includes(servicioSubtipo);
+
+      // Get the specific tariff for this category/subtype combination
+      const tarifa = await storage.getTarifaByCategoriaySubtipo(
+        servicioCategoria || null, 
+        servicioSubtipo || null
+      );
 
       if (isOnsiteService && servicioSubtipo) {
-        const total = ONSITE_SERVICE_PRICES[servicioSubtipo];
+        // For onsite services, use the tariff's precioBase if available, otherwise use defaults
+        const total = tarifa 
+          ? parseFloat(tarifa.precioBase as string) 
+          : (DEFAULT_ONSITE_PRICES[servicioSubtipo] || 500);
+        
         return res.json({
           total,
           precioBase: total,
@@ -4288,6 +4272,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           distanceKm: 0,
           isOnsiteService: true,
           servicioSubtipo,
+          tarifaNombre: tarifa?.nombre || 'Tarifa por defecto',
+          isDefaultPricing: !tarifa,
         });
       }
 
@@ -4306,26 +4292,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const tarifa = await storage.getActiveTarifa();
-      const DEFAULT_PRECIO_BASE = 150;
-      const DEFAULT_TARIFA_POR_KM = 20;
-
+      // Use the tariff values directly - no multipliers needed since
+      // each subcategory now has its own configured tariff
       const precioBase = tarifa ? parseFloat(tarifa.precioBase as string) : DEFAULT_PRECIO_BASE;
       const tarifaPorKm = tarifa ? parseFloat(tarifa.tarifaPorKm as string) : DEFAULT_TARIFA_POR_KM;
       
-      const categoryMultiplier = TRANSPORT_CATEGORY_MULTIPLIERS[servicioCategoria] || 1.0;
-      const subtypeAdditional = servicioSubtipo ? (TRANSPORT_SUBTYPE_ADDITIONAL[servicioSubtipo] || 0) : 0;
-      
-      const baseTotal = precioBase + (parsedDistance * tarifaPorKm);
-      const total = (baseTotal * categoryMultiplier) + subtypeAdditional;
+      // Calculate total: base price + (distance * per-km rate)
+      const total = precioBase + (parsedDistance * tarifaPorKm);
 
       res.json({ 
         total, 
         precioBase, 
         tarifaPorKm, 
         distanceKm: parsedDistance,
-        categoryMultiplier,
-        subtypeAdditional,
+        tarifaNombre: tarifa?.nombre || 'Tarifa por defecto',
+        tarifaId: tarifa?.id || null,
+        servicioCategoria: tarifa?.servicioCategoria || servicioCategoria,
+        servicioSubtipo: tarifa?.servicioSubtipo || servicioSubtipo,
         isDefaultPricing: !tarifa,
         isOnsiteService: false,
       });
