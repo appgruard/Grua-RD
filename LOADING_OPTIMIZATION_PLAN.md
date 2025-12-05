@@ -6,6 +6,131 @@ Este documento presenta un plan comprehensivo para mejorar la velocidad de carga
 
 ---
 
+## Estado de Implementación - Fase 4 ✅ COMPLETADA
+
+| Tarea | Estado | Notas |
+|-------|--------|-------|
+| 4.1 Web Vitals Tracking | **COMPLETADO** | Tracking de CLS, FCP, INP, LCP, TTFB con envío a servidor |
+| 4.2 Bundle Analysis | **DISPONIBLE** | Comando `npx vite-bundle-visualizer` listo para uso manual |
+| 4.3 Analytics Endpoint | **COMPLETADO** | POST /api/analytics/web-vitals con logging estructurado |
+| 4.4 Custom Metrics | **COMPLETADO** | Métricas adicionales: DOM_CONTENT_LOADED, LOAD_EVENT, DOM_INTERACTIVE |
+
+### Archivos Creados/Modificados (Fase 4)
+
+**Nuevos archivos:**
+- `client/src/lib/analytics.ts` - Módulo completo de Web Vitals con tracking y reportes
+
+**Archivos modificados:**
+- `client/src/main.tsx` - Inicialización de Web Vitals y medición de carga de página
+- `server/routes.ts` - Endpoint para recibir métricas de Web Vitals
+
+### Implementación de Web Vitals
+
+```typescript
+// client/src/lib/analytics.ts
+import { onCLS, onFCP, onINP, onLCP, onTTFB, type Metric } from 'web-vitals';
+
+export function initWebVitals(): void {
+  onCLS(sendMetric);
+  onFCP(sendMetric);
+  onINP(sendMetric);   // Reemplaza FID en web-vitals v4
+  onLCP(sendMetric);
+  onTTFB(sendMetric);
+}
+```
+
+### Métricas Trackeadas
+
+| Métrica | Descripción | Umbral Bueno | Umbral Pobre |
+|---------|-------------|--------------|--------------|
+| CLS | Cumulative Layout Shift | ≤ 0.1 | > 0.25 |
+| FCP | First Contentful Paint | ≤ 1.8s | > 3.0s |
+| INP | Interaction to Next Paint | ≤ 200ms | > 500ms |
+| LCP | Largest Contentful Paint | ≤ 2.5s | > 4.0s |
+| TTFB | Time to First Byte | ≤ 800ms | > 1.8s |
+
+### Métricas Personalizadas Adicionales
+
+```typescript
+// Métricas de carga de página
+measurePageLoad(); // Dispara automáticamente:
+- DOM_CONTENT_LOADED: Tiempo hasta DOMContentLoaded
+- LOAD_EVENT: Tiempo hasta evento load
+- DOM_INTERACTIVE: Tiempo hasta DOM interactivo
+```
+
+### Uso del Módulo Analytics
+
+```typescript
+// Inicialización automática en main.tsx
+import { initWebVitals, measurePageLoad } from './lib/analytics';
+
+initWebVitals();      // Activa tracking de Core Web Vitals
+measurePageLoad();    // Activa métricas de carga de página
+
+// Para métricas personalizadas en cualquier parte de la app:
+import { reportCustomMetric } from '@/lib/analytics';
+
+reportCustomMetric('MY_CUSTOM_METRIC', 150.5);
+```
+
+### Visualización de Métricas (Desarrollo)
+
+En modo desarrollo, las métricas se muestran en la consola con colores:
+- 🟢 Verde: Bueno
+- 🟡 Amarillo: Necesita mejora
+- 🔴 Rojo: Pobre
+
+### Endpoint de Analytics
+
+```typescript
+// POST /api/analytics/web-vitals
+// Body: { name, value, rating, delta, id, navigationType }
+// Response: 204 No Content
+
+// Las métricas se envían con:
+// - navigator.sendBeacon() para evitar bloquear navegación
+// - fetch() con keepalive como fallback
+```
+
+### Logging de Métricas (Servidor)
+
+Las métricas se registran en los logs del servidor con el formato:
+```json
+{
+  "level": "info",
+  "message": "Web Vital metric received",
+  "metric": "LCP",
+  "value": "1250.00",
+  "rating": "good",
+  "delta": "1250.00",
+  "metricId": "v4-1234567890",
+  "navigationType": "navigate"
+}
+```
+
+### Bundle Analysis (Herramienta Manual)
+
+Para analizar el tamaño del bundle y optimizar dependencias:
+
+```bash
+# Generar visualización interactiva del bundle
+npx vite-bundle-visualizer
+
+# Alternativa: rollup-plugin-visualizer (requiere instalación)
+npm install --save-dev rollup-plugin-visualizer
+```
+
+La herramienta genera un reporte HTML interactivo que muestra:
+- Tamaño de cada chunk
+- Dependencias incluidas en cada chunk
+- Módulos más pesados
+- Oportunidades de code splitting
+
+Ejecutar periódicamente para identificar regresiones en tamaño de bundle.
+
+---
+
 ## Estado de Implementación - Fase 3 ✅ COMPLETADA
 
 | Tarea | Estado | Notas |

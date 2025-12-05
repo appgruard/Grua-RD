@@ -673,6 +673,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Web Vitals Analytics Endpoint
+  app.post("/api/analytics/web-vitals", express.json(), (req: Request, res: Response) => {
+    try {
+      const { name, value, rating, delta, id, navigationType } = req.body;
+      
+      if (!name || typeof value !== 'number') {
+        return res.status(400).json({ message: "Invalid metric data" });
+      }
+
+      logSystem.info('Web Vital metric received', {
+        metric: name,
+        value: value.toFixed(2),
+        rating,
+        delta: delta?.toFixed(2),
+        metricId: id,
+        navigationType,
+        userAgent: req.headers['user-agent']?.substring(0, 100),
+      });
+
+      res.status(204).end();
+    } catch (error) {
+      logSystem.error('Web Vitals endpoint error', error);
+      res.status(500).json({ message: "Error processing metric" });
+    }
+  });
+
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
       const { password, userType, conductorData, cedulaVerificada: _ignored, ...userData } = req.body;
