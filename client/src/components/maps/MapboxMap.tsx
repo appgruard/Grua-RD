@@ -520,7 +520,7 @@ export function MapboxMap({
             >
               {isDriverType ? (
                 <div 
-                  className={`relative flex items-end justify-center ${isDriverMarker ? 'animate-pulse' : ''}`}
+                  className="relative flex items-end justify-center"
                   title={marker.title}
                   style={{ 
                     filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3)) drop-shadow(0 1px 2px rgba(0,0,0,0.2))'
