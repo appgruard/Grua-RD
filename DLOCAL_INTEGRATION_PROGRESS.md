@@ -2,18 +2,23 @@
 
 **Proyecto:** Sistema de Pagos y Nómina para Servicio de Grúas - República Dominicana  
 **Fecha de Inicio:** Diciembre 2024  
-**Estado Actual:** 95% completado
+**Estado Actual:** En implementación - Plan de 6 Fases
+**Proveedor de Pagos:** dLocal (único proveedor)
 
 ---
 
 ## 📋 Resumen Ejecutivo
 
-Se está implementando la integración con dLocal para:
+Se está implementando la integración completa con dLocal para:
 - ✅ Autorización y captura de pagos con tarjeta (flujo de pre-autorización)
 - ✅ Cancelación de autorizaciones y reembolsos
 - ✅ Sistema de nómina programada (lunes y viernes)
 - ✅ Retiros del mismo día con comisión de 100 DOP
 - ✅ Interfaz de usuario para saldo de operadores
+- 🔄 **NUEVO:** Tokenización real de tarjetas con dLocal API
+- 🔄 **NUEVO:** Cobro real de deudas con tarjetas guardadas
+- 🔄 **NUEVO:** Seguimiento de comisiones dLocal en panel admin
+- 🔄 **NUEVO:** Branding profesional de PDFs (Grúa RD)
 
 ---
 
@@ -49,11 +54,21 @@ Se está implementando la integración con dLocal para:
   - Nuevo enum `tipoRetiroEnum`
   - Relaciones y esquemas de inserción/selección
 
+**Actualización Diciembre 2024 - Fase 1 Completada:**
+- ✅ Tabla `comisiones` - Nuevos campos para tracking de comisiones dLocal:
+  - `dlocal_fee_amount` - Monto de comisión cobrada por dLocal
+  - `dlocal_fee_currency` - Moneda de la comisión (default: DOP)
+  - `dlocal_net_amount` - Monto neto después de comisión dLocal
+- ✅ Tabla `wallet_transactions` - Nuevos campos para pagos de deuda:
+  - `dlocal_transaction_id` - ID de transacción dLocal
+  - `dlocal_fee_amount` - Comisión dLocal en pagos de deuda
+
 **Estado de BD:**
 - ✅ Tablas creadas
 - ✅ Campos añadidos
 - ✅ Enums configurados
 - ✅ Relaciones definidas
+- ✅ Migraciones ejecutadas (Fase 1)
 
 ### 3. **Flujo de Autorización en Solicitud de Servicio** ✓
 - **Archivo:** `server/routes.ts` (línea ~1600)
@@ -167,9 +182,24 @@ Se está implementando la integración con dLocal para:
 
 ---
 
-## ⏳ POR HACER (5%)
+## 🚀 PLAN DE 6 FASES - IMPLEMENTACIÓN COMPLETA
 
-### FASE 4: Configuración y Testing
+Ver documento detallado: `PLAN_DLOCAL_COMPLETO.md`
+
+| Fase | Descripción | Estado |
+|------|-------------|--------|
+| 1 | Actualizar esquema BD (campos comisiones dLocal) | ✅ COMPLETADO |
+| 2 | Mejorar servicio dLocal (tokenización real, cobro tarjetas guardadas) | ⏳ Pendiente |
+| 3 | Corregir endpoints de tarjetas (cobros reales) | ⏳ Pendiente |
+| 4 | Panel Admin - Visualización de comisiones dLocal | ⏳ Pendiente |
+| 5 | Branding profesional en PDFs (Grúa RD) | ⏳ Pendiente |
+| 6 | Limpieza de documentación | ⏳ Pendiente |
+
+---
+
+## ⏳ POR HACER - FASES RESTANTES
+
+### FASE 2: Mejorar Servicio dLocal
 
 #### 3.1 Componente de Balance del Operador
 - **Ubicación:** `client/src/pages/driver/profile.tsx`
@@ -320,12 +350,12 @@ ALLOWED_ORIGINS=http://localhost:5000
 ### Dependencias Instaladas
 - ✅ @neondatabase/serverless (PostgreSQL)
 - ✅ drizzle-orm + drizzle-kit
-- ✅ @stripe/react-stripe-js (no se usa, pero disponible)
 - ✅ @tanstack/react-query
 - ✅ react-hook-form + @hookform/resolvers
 - ✅ zod (validación)
 - ✅ lucide-react (iconos)
 - ✅ tailwindcss + shadcn/ui (estilos)
+- ✅ pdfkit (generación de PDFs con branding)
 
 ### Tablas de BD Relacionadas
 ```
