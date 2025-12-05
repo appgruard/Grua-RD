@@ -10,7 +10,7 @@ Este documento presenta un plan comprehensivo para mejorar la velocidad de carga
 
 | Tarea | Estado | Notas |
 |-------|--------|-------|
-| 1.1 Code Splitting Manual Chunks | BLOQUEADO | No se puede editar vite.config.ts por restricciones del sistema |
+| 1.1 Code Splitting Manual Chunks | **COMPLETADO** | manualChunks configurado en vite.config.ts |
 | 1.2 Lazy Loading Componentes | **COMPLETADO** | Recharts aislado en módulos que se cargan con React.lazy() |
 | 1.3 CSS Crítico Inline | **COMPLETADO** | Agregado en client/index.html con soporte dark mode |
 | 1.4 Compresión Backend | **COMPLETADO** | Middleware compression agregado en server/index.ts (nivel 6) |
@@ -24,6 +24,7 @@ Este documento presenta un plan comprehensivo para mejorar la velocidad de carga
 - `client/src/components/socio/SocioCharts.tsx` - Componente separado para charts del portal de socios
 
 **Archivos modificados:**
+- `vite.config.ts` - manualChunks para code splitting de vendors
 - `client/index.html` - CSS crítico inline para estado de carga inicial
 - `server/index.ts` - Middleware de compresión gzip (nivel 6)
 - `client/src/pages/admin/analytics.tsx` - Usa React.lazy() para AnalyticsCharts y LazyCalendar
