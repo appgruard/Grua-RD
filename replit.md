@@ -164,3 +164,32 @@ Implemented comprehensive loading optimizations documented in `LOADING_OPTIMIZAT
 - Query is disabled if no session cookie exists
 - Eliminates unnecessary API calls for logged-out users
 - Immediate redirect to login for unauthenticated visitors
+
+### Loading Optimization Phase 3 (December 2024)
+
+**3.1 Skeleton Screens Mejorados:**
+- Created specialized skeletons for each page type in `client/src/components/skeletons/`
+- DriverDashboardSkeleton, ClientHomeSkeleton, TrackingSkeleton for main pages
+- ProfileSkeleton for user profile pages
+- MapSkeleton and FormSkeleton for reusable components
+- All skeletons exported from `index.ts` barrel file
+
+**3.2 React Query Optimizations:**
+- Added `gcTime: 10 minutes` for extended cache retention
+- Set `staleTime: 5 minutes` for data freshness
+- Configured `refetchOnMount: false` to prevent unnecessary refetches
+- Added `refetchOnReconnect: 'always'` for connection recovery
+
+**3.3 OptimizedImage Component:**
+- Created `client/src/components/ui/OptimizedImage.tsx`
+- Uses IntersectionObserver for viewport-based lazy loading
+- Shows skeleton while loading with smooth fade-in
+- Supports fallback images on error
+- Separate `wrapperClassName` and `imageClassName` props for proper styling
+- ProfileImage variant for avatar use cases
+
+**3.4 Dynamic Preconnect por Rol:**
+- Script in `index.html` that executes before React
+- Reads `lastUserType` from localStorage
+- Adds dns-prefetch and preconnect for Mapbox URLs for conductor/cliente users
+- Works in both development and production environments

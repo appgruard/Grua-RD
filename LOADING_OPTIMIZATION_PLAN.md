@@ -6,6 +6,116 @@ Este documento presenta un plan comprehensivo para mejorar la velocidad de carga
 
 ---
 
+## Estado de Implementación - Fase 3 ✅ COMPLETADA
+
+| Tarea | Estado | Notas |
+|-------|--------|-------|
+| 3.1 Skeleton Screens Mejorados | **COMPLETADO** | Skeletons específicos por tipo de página: DriverDashboard, ClientHome, Tracking, Profile, Map, Form |
+| 3.2 React Query Optimizations | **COMPLETADO** | gcTime: 10min, staleTime: 5min, refetchOnMount: false, refetchOnReconnect: 'always' |
+| 3.3 Imágenes Optimizadas | **COMPLETADO** | Componente OptimizedImage con IntersectionObserver, lazy loading y skeleton |
+| 3.4 Dynamic Preconnect por Rol | **COMPLETADO** | Script en index.html que agrega DNS prefetch y preconnect para Mapbox según tipo de usuario |
+
+### Archivos Creados/Modificados (Fase 3)
+
+**Nuevos archivos:**
+- `client/src/components/skeletons/DriverDashboardSkeleton.tsx` - Skeleton para dashboard de conductor con mapa
+- `client/src/components/skeletons/ClientHomeSkeleton.tsx` - Skeleton para home de cliente con selector de servicios
+- `client/src/components/skeletons/TrackingSkeleton.tsx` - Skeleton para página de tracking
+- `client/src/components/skeletons/ProfileSkeleton.tsx` - Skeletons para perfiles (conductor/cliente)
+- `client/src/components/skeletons/MapSkeleton.tsx` - Skeleton para componentes de mapa
+- `client/src/components/skeletons/FormSkeleton.tsx` - Skeletons para formularios (campos, select, textarea)
+- `client/src/components/skeletons/index.ts` - Barrel export para todos los skeletons
+- `client/src/components/ui/OptimizedImage.tsx` - Componente de imagen optimizada con lazy loading
+
+**Archivos modificados:**
+- `client/src/lib/queryClient.ts` - Configuración optimizada de React Query con gcTime y refetch settings
+- `client/index.html` - Script de modulepreload dinámico basado en tipo de usuario
+
+### React Query Optimizations
+
+```typescript
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes - data considered fresh
+      gcTime: 1000 * 60 * 10, // 10 minutes - keep unused data in cache
+      refetchOnWindowFocus: false,
+      refetchOnMount: false, // Don't refetch if data exists and not stale
+      refetchOnReconnect: 'always', // Always refetch when connection restored
+    },
+  },
+});
+```
+
+### Componente OptimizedImage
+
+```typescript
+// Uso básico con lazy loading automático
+<OptimizedImage
+  src="/path/to/image.jpg"
+  alt="Descripción"
+  width={300}
+  height={200}
+  objectFit="cover"
+/>
+
+// Imagen de perfil con fallback
+<ProfileImage
+  src={user.fotoUrl}
+  alt={user.nombre}
+  size="lg"
+  fallbackInitials="JD"
+/>
+```
+
+Características:
+- Usa IntersectionObserver para cargar solo cuando es visible
+- Muestra Skeleton mientras carga
+- Soporte para fallback en caso de error
+- Atributos `loading="lazy"` y `decoding="async"` nativos
+
+### Dynamic Preconnect por Rol
+
+Script en `index.html` que ejecuta antes de React para acelerar conexiones de red:
+```javascript
+var userType = localStorage.getItem('lastUserType');
+if (userType === 'conductor' || userType === 'cliente') {
+  var mapboxLinks = ['https://api.mapbox.com', 'https://tiles.mapbox.com', 'https://events.mapbox.com'];
+  mapboxLinks.forEach(function(href) {
+    // Agrega dns-prefetch para resolución DNS temprana
+    var dnsLink = document.createElement('link');
+    dnsLink.rel = 'dns-prefetch';
+    dnsLink.href = href;
+    document.head.appendChild(dnsLink);
+    // Agrega preconnect para establecer conexión TCP/TLS temprana
+    var preconnectLink = document.createElement('link');
+    preconnectLink.rel = 'preconnect';
+    preconnectLink.href = href;
+    document.head.appendChild(preconnectLink);
+  });
+}
+```
+
+Este enfoque funciona tanto en desarrollo como en producción, ya que trabaja con URLs externas estáticas en lugar de rutas de módulos que cambian durante el build.
+
+### Catálogo de Skeletons Disponibles
+
+| Skeleton | Uso |
+|----------|-----|
+| `DashboardSkeleton` | Dashboard genérico con stats cards |
+| `DriverDashboardSkeleton` | Dashboard de conductor con mapa y controles |
+| `ClientHomeSkeleton` | Home del cliente con selector de servicios |
+| `TrackingSkeleton` | Página de tracking con mapa e info de conductor |
+| `ProfileSkeleton` | Perfil de conductor con documentos |
+| `ClientProfileSkeleton` | Perfil de cliente simplificado |
+| `MapSkeleton` | Área de mapa con controles |
+| `TableSkeleton` | Tabla con filas y columnas |
+| `ServiceCardSkeleton` | Tarjeta de servicio |
+| `FormSkeleton` | Formulario con campos |
+| `FormCardSkeleton` | Card con formulario |
+
+---
+
 ## Estado de Implementación - Fase 2 ✅ COMPLETADA
 
 | Tarea | Estado | Notas |

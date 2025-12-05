@@ -104,6 +104,28 @@
         } catch (e) {}
       })();
     </script>
+    <!-- Dynamic DNS prefetch based on user type for faster API/resource loading -->
+    <script>
+      (function() {
+        try {
+          var userType = localStorage.getItem('lastUserType');
+          if (userType === 'conductor' || userType === 'cliente') {
+            var mapboxLinks = ['https://api.mapbox.com', 'https://tiles.mapbox.com', 'https://events.mapbox.com'];
+            mapboxLinks.forEach(function(href) {
+              var dnsLink = document.createElement('link');
+              dnsLink.rel = 'dns-prefetch';
+              dnsLink.href = href;
+              document.head.appendChild(dnsLink);
+              var preconnectLink = document.createElement('link');
+              preconnectLink.rel = 'preconnect';
+              preconnectLink.href = href;
+              preconnectLink.crossOrigin = 'anonymous';
+              document.head.appendChild(preconnectLink);
+            });
+          }
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script src="/seo-meta.js"></script>
     <script type="module" src="/src/main.tsx"></script>
