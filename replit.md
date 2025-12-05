@@ -136,3 +136,31 @@ Optimized the driver app's initial loading time after first login with the follo
 - Eliminated wallet debt/transaction sub-queries during init
 - Faster module loading with immediate scheduling instead of idle callbacks
 - DNS prefetch reduces connection time to Mapbox servers
+
+### Loading Optimization Phase 2 (December 2024)
+
+Implemented comprehensive loading optimizations documented in `LOADING_OPTIMIZATION_PLAN.md`:
+
+**2.1 Self-Hosted Fonts:**
+- Downloaded Inter font files (400, 500, 600, 700 weights) to `client/public/fonts/`
+- Created `client/src/fonts.css` with `@font-face` declarations and `font-display: swap`
+- Removed Google Fonts dependency from `index.html`
+- Added `<link rel="preload">` hints for critical font weights
+
+**2.2 Enhanced Service Worker (v6.0):**
+- Added new `ASSETS_CACHE` for JS/CSS assets
+- Implemented stale-while-revalidate strategy for build chunks
+- Cache-first strategy for self-hosted fonts
+- Background cache updates without blocking UI
+
+**2.3 Role-Based Preloading:**
+- New `preloadByUserType()` function routes preloading by user role
+- `preloadFromLastSession()` uses localStorage to hint next session
+- Dedicated preload functions: `preloadAdminModules()`, `preloadClientModules()`, `preloadSocioModules()`
+- Integrated with AuthProvider's login success handler
+
+**2.4 AuthProvider Cookie Optimization:**
+- Added `hasSessionCookie()` check for instant user feedback
+- Query is disabled if no session cookie exists
+- Eliminates unnecessary API calls for logged-out users
+- Immediate redirect to login for unauthenticated visitors
