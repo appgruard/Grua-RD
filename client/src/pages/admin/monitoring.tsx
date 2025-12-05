@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MapboxMap } from '@/components/maps/MapboxMap';
+import { MapboxMapWithFastLoad } from '@/components/maps/LazyMapboxMap';
 import type { MarkerType } from '@/components/maps/MapboxMap';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -147,7 +147,7 @@ export default function AdminMonitoring() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
           <Card className="p-4 h-[600px]">
-            <MapboxMap
+            <MapboxMapWithFastLoad
               center={center}
               zoom={zoom}
               markers={markers}
