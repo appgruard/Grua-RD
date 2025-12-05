@@ -3193,6 +3193,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       logService.completed(servicio.id, duration);
 
+      // Process wallet payment/commission for the completed service
+      if (servicio.metodoPago && servicio.costoTotal && !servicio.commissionProcessed) {
+        try {
+          const paymentMethod = servicio.metodoPago as 'efectivo' | 'tarjeta';
+          const serviceAmount = parseFloat(servicio.costoTotal);
+          
+          const walletResult = await WalletService.processServicePayment(
+            servicio.id,
+            paymentMethod,
+            serviceAmount
+          );
+          
+          logSystem.info('Wallet processed on service completion', {
+            servicioId: servicio.id,
+            conductorId: servicio.conductorId,
+            paymentMethod,
+            serviceAmount,
+            commission: walletResult.commission,
+            operatorEarnings: walletResult.operatorEarnings
+          });
+        } catch (walletError: any) {
+          logSystem.error('Wallet processing error on service completion', walletError, {
+            servicioId: servicio.id,
+            conductorId: servicio.conductorId
+          });
+          // Don't fail the service completion, just log the wallet error
+        }
+      }
+
       if (serviceSessions.has(servicio.id)) {
         const broadcast = JSON.stringify({
           type: 'service_status_change',
@@ -9749,6 +9778,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get wallet stats error', error);
       res.status(500).json({ message: "Error al obtener estadísticas" });
+    }
+  });
+
+  // Admin: Process pending commissions for completed services that weren't processed
+  app.post("/api/admin/wallets/process-pending-commissions", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      // Get all completed services that haven't had commission processed
+      const allServices = await storage.getAllServicios();
+      const pendingServices = allServices.filter(s => 
+        s.estado === 'completado' && 
+        !s.commissionProcessed && 
+        s.conductorId && 
+        s.metodoPago && 
+        s.costoTotal
+      );
+
+      const results = [];
+      let processedCount = 0;
+      let failedCount = 0;
+
+      for (const servicio of pendingServices) {
+        try {
+          const paymentMethod = servicio.metodoPago as 'efectivo' | 'tarjeta';
+          const serviceAmount = parseFloat(servicio.costoTotal);
+          
+          const walletResult = await WalletService.processServicePayment(
+            servicio.id,
+            paymentMethod,
+            serviceAmount
+          );
+          
+          results.push({
+            servicioId: servicio.id,
+            conductorId: servicio.conductorId,
+            paymentMethod,
+            serviceAmount,
+            commission: walletResult.commission,
+            operatorEarnings: walletResult.operatorEarnings,
+            success: true
+          });
+          processedCount++;
+          
+          logSystem.info('Retroactively processed wallet for service', {
+            servicioId: servicio.id,
+            conductorId: servicio.conductorId,
+            paymentMethod,
+            serviceAmount,
+            commission: walletResult.commission
+          });
+        } catch (error: any) {
+          results.push({
+            servicioId: servicio.id,
+            conductorId: servicio.conductorId,
+            error: error.message,
+            success: false
+          });
+          failedCount++;
+          
+          logSystem.error('Failed to process wallet for service', error, {
+            servicioId: servicio.id,
+            conductorId: servicio.conductorId
+          });
+        }
+      }
+
+      res.json({
+        message: `Procesados ${processedCount} servicios, ${failedCount} fallidos`,
+        total: pendingServices.length,
+        processed: processedCount,
+        failed: failedCount,
+        results
+      });
+    } catch (error: any) {
+      logSystem.error('Process pending commissions error', error);
+      res.status(500).json({ message: "Error al procesar comisiones pendientes" });
     }
   });
 

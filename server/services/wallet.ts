@@ -65,7 +65,7 @@ export class WalletService {
     }
 
     const wallet = await storage.createOperatorWallet(conductorId);
-    logTransaction.info('Operator wallet created', { 
+    logSystem.info('Operator wallet created', { 
       walletId: wallet.id, 
       conductorId 
     });
@@ -143,7 +143,21 @@ export class WalletService {
       throw new Error('Servicio no tiene conductor asignado');
     }
 
-    const wallet = await this.ensureWalletExists(servicio.conductorId);
+    // The service stores the user_id as conductorId, but wallet needs the conductor table id
+    // First try to get conductor by user_id, then fall back to direct id
+    let conductorTableId = servicio.conductorId;
+    const conductorByUserId = await storage.getConductorByUserId(servicio.conductorId);
+    if (conductorByUserId) {
+      conductorTableId = conductorByUserId.id;
+    } else {
+      // Check if it's already a conductor table id
+      const conductorById = await storage.getConductorById(servicio.conductorId);
+      if (!conductorById) {
+        throw new Error('Conductor no encontrado para este servicio');
+      }
+    }
+
+    const wallet = await this.ensureWalletExists(conductorTableId);
     const commission = this.calculateCommission(serviceAmount);
     const operatorEarnings = serviceAmount - commission;
 
@@ -164,7 +178,7 @@ export class WalletService {
 
     await storage.markServiceCommissionProcessed(servicioId);
 
-    logTransaction.info('Service payment processed', {
+    logSystem.info('Service payment processed', {
       servicioId,
       paymentMethod,
       serviceAmount,
@@ -496,7 +510,7 @@ export class WalletService {
       }
     }
 
-    logTransaction.info('Direct debt payment completed', {
+    logSystem.info('Direct debt payment completed', {
       walletId,
       amountPaid: totalPaid,
       remainingDebt: newDebt,
@@ -706,7 +720,7 @@ export class WalletService {
       description: `Ajuste admin: ${reason} (por ${adminId})`
     });
 
-    logTransaction.info('Admin wallet adjustment', {
+    logSystem.info('Admin wallet adjustment', {
       walletId,
       adjustmentType,
       amount,
@@ -737,10 +751,79 @@ export class WalletService {
       logSystem.error('Failed to send wallet notification', { userId, error });
     }
   }
+
+  /**
+   * Process pending commissions for completed services that weren't processed
+   * This is called on startup to fix any services that were missed
+   */
+  static async processPendingCommissions(): Promise<{
+    total: number;
+    processed: number;
+    failed: number;
+  }> {
+    const allServices = await storage.getAllServicios();
+    const pendingServices = allServices.filter(s => 
+      s.estado === 'completado' && 
+      !s.commissionProcessed && 
+      s.conductorId && 
+      s.metodoPago && 
+      s.costoTotal
+    );
+
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const servicio of pendingServices) {
+      try {
+        const paymentMethod = servicio.metodoPago as 'efectivo' | 'tarjeta';
+        const serviceAmount = parseFloat(servicio.costoTotal);
+        
+        await this.processServicePayment(
+          servicio.id,
+          paymentMethod,
+          serviceAmount
+        );
+        
+        processedCount++;
+        
+        logSystem.info('Retroactively processed wallet for service', {
+          servicioId: servicio.id,
+          conductorId: servicio.conductorId,
+          paymentMethod,
+          serviceAmount
+        });
+      } catch (error: any) {
+        failedCount++;
+        logSystem.error('Failed to process wallet for service', { 
+          servicioId: servicio.id,
+          conductorId: servicio.conductorId,
+          error: error.message 
+        });
+      }
+    }
+
+    return {
+      total: pendingServices.length,
+      processed: processedCount,
+      failed: failedCount
+    };
+  }
 }
 
-export function initWalletService(): void {
+export async function initWalletService(): Promise<void> {
   WalletService.initDebtCheckJob();
+  
+  // Process any pending commissions from completed services
+  setTimeout(async () => {
+    try {
+      const result = await WalletService.processPendingCommissions();
+      if (result.processed > 0) {
+        logSystem.info('Processed pending commissions on startup', result);
+      }
+    } catch (error) {
+      logSystem.error('Failed to process pending commissions on startup', { error });
+    }
+  }, 5000); // Wait 5 seconds for database to be ready
 }
 
 export function stopWalletService(): void {
