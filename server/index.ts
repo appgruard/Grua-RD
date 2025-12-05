@@ -10,6 +10,102 @@ import { checkStorageHealth } from "./services/object-storage";
 
 const app = express();
 
+const STATIC_FILE_EXTENSIONS = /\.(js|css|woff2|woff|ttf|eot|otf|png|jpg|jpeg|gif|svg|ico|webp|avif|mp4|webm|pdf|map)$/i;
+const FONT_EXTENSIONS = /\.(woff2|woff|ttf|eot|otf)$/i;
+const HASHED_ASSET_PATTERN = /[-_.][A-Za-z0-9_-]{6,}\.(js|css)$/;
+
+function isStaticFileRequest(path: string): boolean {
+  return STATIC_FILE_EXTENSIONS.test(path);
+}
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = process.hrtime.bigint();
+  
+  const originalSend = res.send;
+  res.send = function(body) {
+    const end = process.hrtime.bigint();
+    const durationMs = Number(end - start) / 1e6;
+    if (!res.headersSent) {
+      res.setHeader('X-Response-Time', `${durationMs.toFixed(2)}ms`);
+    }
+    return originalSend.call(this, body);
+  };
+  
+  const originalJson = res.json;
+  res.json = function(body) {
+    const end = process.hrtime.bigint();
+    const durationMs = Number(end - start) / 1e6;
+    if (!res.headersSent) {
+      res.setHeader('X-Response-Time', `${durationMs.toFixed(2)}ms`);
+    }
+    return originalJson.call(this, body);
+  };
+  
+  const originalEnd = res.end;
+  res.end = function(this: Response, chunk?: any, encoding?: BufferEncoding | (() => void), cb?: () => void) {
+    const endTime = process.hrtime.bigint();
+    const durationMs = Number(endTime - start) / 1e6;
+    if (!res.headersSent) {
+      res.setHeader('X-Response-Time', `${durationMs.toFixed(2)}ms`);
+    }
+    return originalEnd.call(this, chunk, encoding as BufferEncoding, cb);
+  } as typeof res.end;
+  
+  next();
+});
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const path = req.path;
+  
+  if (FONT_EXTENSIONS.test(path)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Vary', 'Accept-Encoding');
+  } else if (HASHED_ASSET_PATTERN.test(path)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Vary', 'Accept-Encoding');
+  } else if (STATIC_FILE_EXTENSIONS.test(path)) {
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Vary', 'Accept-Encoding');
+  }
+  
+  next();
+});
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const acceptHeader = req.headers.accept || '';
+  const isHtmlRequest = acceptHeader.includes('text/html');
+  const path = req.path;
+  
+  if (isHtmlRequest && !isStaticFileRequest(path) && !path.startsWith('/api')) {
+    const hints: string[] = [];
+    
+    hints.push('</fonts/inter-400.woff2>; rel=preload; as=font; type="font/woff2"; crossorigin');
+    hints.push('</fonts/inter-500.woff2>; rel=preload; as=font; type="font/woff2"; crossorigin');
+    
+    hints.push('<https://api.mapbox.com>; rel=preconnect');
+    hints.push('<https://tiles.mapbox.com>; rel=preconnect');
+    
+    if (hints.length > 0) {
+      res.setHeader('Link', hints.join(', '));
+    }
+  }
+  
+  next();
+});
+
+declare global {
+  namespace Express {
+    interface Request {
+      isStaticFile?: boolean;
+    }
+  }
+}
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  req.isStaticFile = isStaticFileRequest(req.path);
+  next();
+});
+
 app.use(compression({
   filter: (req, res) => {
     if (req.headers['x-no-compression']) {
@@ -211,6 +307,10 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: false, limit: '20mb' }));
 
 app.use((req, res, next) => {
+  if (req.isStaticFile) {
+    return next();
+  }
+
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
