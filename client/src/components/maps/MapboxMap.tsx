@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import Map, { Marker, GeolocateControl, Source, Layer } from 'react-map-gl/mapbox';
 import type { MapRef, MapMouseEvent } from 'react-map-gl/mapbox';
-import { Loader2, MapPin, Truck, Car, Flag, Wrench } from 'lucide-react';
+import { Loader2, MapPin, Car, Flag, Wrench, CircleOff } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import watermarkLogo from '@assets/20251129_191904_0001_1764458415723.png';
 import type { RouteGeometry } from '@/lib/maps';
@@ -11,7 +11,41 @@ export interface Coordinates {
   lng: number;
 }
 
-export type MarkerType = 'origin' | 'destination' | 'driver' | 'service' | 'default';
+export type MarkerType = 'origin' | 'destination' | 'driver' | 'driver_inactive' | 'service' | 'default';
+
+function TowTruckIcon({ className, isActive = true }: { className?: string; isActive?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"
+        fill="currentColor"
+        opacity={isActive ? 1 : 0.5}
+      />
+      <circle cx="6" cy="17" r="2" fill={isActive ? "currentColor" : "#64748b"} />
+      <circle cx="18" cy="17" r="2" fill={isActive ? "currentColor" : "#64748b"} />
+      <path
+        d="M17 9.5V12h2.5L17 9.5z"
+        fill={isActive ? "#0F2947" : "#475569"}
+      />
+      {!isActive && (
+        <line
+          x1="2"
+          y1="2"
+          x2="22"
+          y2="22"
+          stroke="#ef4444"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
+}
 
 interface MapboxMapProps {
   center: Coordinates;
@@ -56,7 +90,8 @@ function getMarkerColor(icon?: string, color?: string, type?: MarkerType): strin
   if (color) return color;
   if (type === 'origin' || icon?.includes('green')) return '#22c55e';
   if (type === 'destination' || icon?.includes('red')) return '#ef4444';
-  if (type === 'driver' || icon?.includes('blue')) return '#3b82f6';
+  if (type === 'driver' || icon?.includes('blue')) return '#0F2947';
+  if (type === 'driver_inactive') return '#94a3b8';
   if (type === 'service') return '#f59e0b';
   return '#0F2947';
 }
@@ -83,12 +118,20 @@ function getMarkerType(title?: string, color?: string, type?: MarkerType): Marke
     return 'destination';
   }
   
+  if (lowerTitle.includes('inactivo') || 
+      lowerTitle.includes('inactive') ||
+      lowerTitle.includes('desconectado') ||
+      lowerTitle.includes('offline') ||
+      color === '#94a3b8') {
+    return 'driver_inactive';
+  }
+  
   if (lowerTitle.includes('conductor') || 
       lowerTitle.includes('driver') || 
       lowerTitle.includes('grúa') ||
       lowerTitle.includes('grua') ||
       lowerTitle.includes('operador') ||
-      color === '#3b82f6') {
+      color === '#0F2947') {
     return 'driver';
   }
   
@@ -110,7 +153,9 @@ function MarkerIcon({ type, className }: { type: MarkerType; className?: string 
     case 'destination':
       return <Flag className={iconClass} />;
     case 'driver':
-      return <Truck className={iconClass} />;
+      return <TowTruckIcon className={iconClass} isActive={true} />;
+    case 'driver_inactive':
+      return <TowTruckIcon className={iconClass} isActive={false} />;
     case 'service':
       return <Wrench className={iconClass} />;
     default:
@@ -379,6 +424,8 @@ export function MapboxMap({
         {markers.map((marker, index) => {
           const markerType = getMarkerType(marker.title, marker.color, marker.type);
           const isDriverMarker = markerType === 'driver';
+          const isInactiveDriver = markerType === 'driver_inactive';
+          const isDriverType = isDriverMarker || isInactiveDriver;
           
           return (
             <Marker
@@ -389,17 +436,24 @@ export function MapboxMap({
             >
               <div 
                 className={`
-                  ${isDriverMarker ? 'w-10 h-10' : 'w-8 h-8'} 
-                  rounded-full border-2 border-white shadow-lg flex items-center justify-center
-                  ${isDriverMarker ? 'animate-pulse' : ''}
+                  ${isDriverType ? 'w-11 h-11' : 'w-8 h-8'} 
+                  rounded-full border-2 shadow-lg flex items-center justify-center relative
+                  ${isDriverMarker ? 'animate-pulse border-white' : ''}
+                  ${isInactiveDriver ? 'border-slate-400 opacity-70' : ''}
+                  ${!isDriverType ? 'border-white' : ''}
                 `}
                 style={{ backgroundColor: getMarkerColor(marker.icon, marker.color, markerType) }}
                 title={marker.title}
               >
                 <MarkerIcon 
                   type={markerType} 
-                  className={isDriverMarker ? 'w-5 h-5 text-white' : 'w-4 h-4 text-white'} 
+                  className={isDriverType ? 'w-6 h-6 text-white' : 'w-4 h-4 text-white'} 
                 />
+                {isInactiveDriver && (
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-slate-500 rounded-full flex items-center justify-center border border-white">
+                    <CircleOff className="w-2.5 h-2.5 text-white" />
+                  </div>
+                )}
               </div>
             </Marker>
           );

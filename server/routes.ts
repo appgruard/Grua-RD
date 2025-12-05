@@ -3920,11 +3920,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const drivers = await storage.getAvailableDrivers();
-      // Sanitize driver data including embedded user objects
       res.json(getSafeDrivers(drivers));
     } catch (error: any) {
       logSystem.error('Get active drivers error', error);
       res.status(500).json({ message: "Failed to get active drivers" });
+    }
+  });
+
+  app.get("/api/admin/monitoring-drivers", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allDrivers = await storage.getAllDrivers();
+      res.json(getSafeDrivers(allDrivers));
+    } catch (error: any) {
+      logSystem.error('Get monitoring drivers error', error);
+      res.status(500).json({ message: "Failed to get monitoring drivers" });
     }
   });
 
