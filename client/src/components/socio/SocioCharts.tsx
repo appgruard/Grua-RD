@@ -35,7 +35,7 @@ export default function SocioCharts({ chartData, formatCurrency }: SocioChartsPr
             tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
           />
           <Tooltip 
-            formatter={(value: number) => [formatCurrency(value), 'Monto']}
+            formatter={(value: unknown) => [formatCurrency(value as number), 'Monto']}
             labelStyle={{ color: 'var(--foreground)' }}
             contentStyle={{ 
               backgroundColor: 'var(--background)', 

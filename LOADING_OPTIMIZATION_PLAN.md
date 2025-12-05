@@ -6,14 +6,14 @@ Este documento presenta un plan comprehensivo para mejorar la velocidad de carga
 
 ---
 
-## Estado de Implementación - Fase 1
+## Estado de Implementación - Fase 1 ✅ COMPLETADA
 
 | Tarea | Estado | Notas |
 |-------|--------|-------|
 | 1.1 Code Splitting Manual Chunks | BLOQUEADO | No se puede editar vite.config.ts por restricciones del sistema |
-| 1.2 Lazy Loading Componentes | PARCIAL | Creados lazy-chart.tsx, lazy-calendar.tsx, lazy-carousel.tsx. Calendar integrado en analytics.tsx. Nota: Recharts se importa directamente en analytics.tsx, requiere refactoring mayor para lazy-load |
-| 1.3 CSS Crítico Inline | COMPLETADO | Agregado en client/index.html con soporte dark mode |
-| 1.4 Compresión Backend | COMPLETADO | Middleware compression agregado en server/index.ts (nivel 6) |
+| 1.2 Lazy Loading Componentes | **COMPLETADO** | Recharts aislado en módulos que se cargan con React.lazy() |
+| 1.3 CSS Crítico Inline | **COMPLETADO** | Agregado en client/index.html con soporte dark mode |
+| 1.4 Compresión Backend | **COMPLETADO** | Middleware compression agregado en server/index.ts (nivel 6) |
 
 ### Archivos Creados/Modificados (Fase 1)
 
@@ -21,10 +21,13 @@ Este documento presenta un plan comprehensivo para mejorar la velocidad de carga
 - `client/src/components/ui/lazy-chart.tsx` - Lazy loading para ChartContainer y componentes relacionados
 - `client/src/components/ui/lazy-calendar.tsx` - Lazy loading para Calendar con skeleton
 - `client/src/components/ui/lazy-carousel.tsx` - Lazy loading para Carousel con skeleton
+- `client/src/components/socio/SocioCharts.tsx` - Componente separado para charts del portal de socios
 
 **Archivos modificados:**
 - `client/index.html` - CSS crítico inline para estado de carga inicial
 - `server/index.ts` - Middleware de compresión gzip (nivel 6)
+- `client/src/pages/admin/analytics.tsx` - Usa React.lazy() para AnalyticsCharts y LazyCalendar
+- `client/src/pages/socio/dashboard.tsx` - Usa React.lazy() para cargar charts (Recharts)
 
 ### Uso de Componentes Lazy
 
@@ -45,11 +48,41 @@ import { LazyCalendar } from '@/components/ui/lazy-calendar';
 <LazyCalendar mode="range" selected={dateRange} />
 ```
 
+### Patrón de Lazy Loading para Recharts (componentes completos)
+
+```typescript
+// Para páginas que usan Recharts directamente, crear componente separado
+// y cargarlo con React.lazy()
+
+// En la página principal:
+import { lazy, Suspense } from 'react';
+const MyCharts = lazy(() => import('@/components/MyCharts'));
+
+// En el JSX:
+<Suspense fallback={<ChartSkeleton />}>
+  <MyCharts data={data} />
+</Suspense>
+```
+
 ### Limitaciones Conocidas
 
-1. **Recharts directo en analytics.tsx**: La página de analytics importa componentes de Recharts directamente (LineChart, BarChart, etc.) en lugar de usar el wrapper ChartContainer. Esto requiere refactoring mayor para lazy-load.
+1. **vite.config.ts bloqueado**: No se puede configurar manualChunks para code splitting de vendors.
 
-2. **vite.config.ts bloqueado**: No se puede configurar manualChunks para code splitting de vendors.
+### Estrategia de Lazy Loading Implementada
+
+La Fase 1 utiliza dos enfoques complementarios:
+
+1. **Componentes UI Lazy** (lazy-chart.tsx, lazy-calendar.tsx, lazy-carousel.tsx):
+   - Wrappers que cargan componentes de UI pesados bajo demanda
+   - Incluyen skeletons específicos para cada tipo de componente
+   - Útiles para componentes que se usan en múltiples lugares
+
+2. **Módulos aislados con React.lazy()**:
+   - `AnalyticsCharts.tsx`: Contiene toda la lógica de Recharts para analytics, cargado lazy desde analytics.tsx
+   - `SocioCharts.tsx`: Contiene los charts del portal de socios, cargado lazy desde socio/dashboard.tsx
+   - Los componentes de Recharts se importan directamente dentro de estos módulos
+   - El beneficio es que Recharts solo se descarga cuando el usuario navega a estas secciones
+   - Cada módulo incluye su propio Suspense con skeleton personalizado
 
 ---
 
