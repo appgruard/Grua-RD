@@ -78,3 +78,26 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - Updated `/api/drivers/nearby-requests` endpoint to filter by driver's service categories and vehicle capabilities
 - Drivers only see services matching their registered categories AND having appropriate vehicles
 - Services with null category default to 'remolque_estandar' for backwards compatibility
+
+### Tariff Category Assignment (December 2024)
+- Added `servicioCategoria` field to tarifas table using the existing service category enum
+- Updated admin pricing page (`/admin/pricing`) with category selector dropdown
+- Tariffs can now be assigned to specific service categories for differentiated pricing
+- UI groups tariffs by category for better organization
+
+### Operator Wallet Earnings Tracking (December 2024)
+- Added `totalCashEarnings` and `totalCardEarnings` fields to operator_wallets table
+- WalletService now tracks earnings separately by payment method:
+  - Cash: Operator keeps 100% physically, owes 20% commission as debt
+  - Card: Platform takes 20%, 80% added to operator balance
+- Updated WalletSection UI to display earnings breakdown (cash vs card)
+- Updated admin wallets page with new earnings columns in table and detail view
+- Color-coded display: amber for cash earnings, blue for card earnings
+
+### Admin Panel Evaluation Document (December 2024)
+- Created comprehensive ADMIN_PANEL_EVALUATION.md analyzing all 14 admin modules
+- Identified 32 improvement opportunities across categories:
+  - High Priority: Pagination, advanced filters, alerts, service details
+  - Medium Priority: Driver dashboards, automated reports, manual interventions
+  - Low Priority: Self-service portals, API integrations, chat support
+- Document serves as roadmap for future admin panel enhancements
