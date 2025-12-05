@@ -396,6 +396,9 @@ export const comisiones = pgTable("comisiones", {
   estadoPagoEmpresa: estadoPagoEnum("estado_pago_empresa").default("pendiente").notNull(),
   dlocalPayoutId: text("dlocal_payout_id"),
   dlocalPayoutStatus: text("dlocal_payout_status"),
+  dlocalFeeAmount: decimal("dlocal_fee_amount", { precision: 12, scale: 2 }),
+  dlocalFeeCurrency: varchar("dlocal_fee_currency", { length: 3 }).default("DOP"),
+  dlocalNetAmount: decimal("dlocal_net_amount", { precision: 12, scale: 2 }),
   fechaPagoOperador: timestamp("fecha_pago_operador"),
   fechaPagoEmpresa: timestamp("fecha_pago_empresa"),
   notas: text("notas"),
@@ -2064,6 +2067,8 @@ export const walletTransactions = pgTable("wallet_transactions", {
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }),
   paymentIntentId: text("payment_intent_id"),
+  dlocalTransactionId: text("dlocal_transaction_id"),
+  dlocalFeeAmount: decimal("dlocal_fee_amount", { precision: 12, scale: 2 }),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
