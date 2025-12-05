@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import Map, { Marker, GeolocateControl, Source, Layer } from 'react-map-gl/mapbox';
 import type { MapRef, MapMouseEvent } from 'react-map-gl/mapbox';
-import { Loader2, MapPin, Car, Flag, Wrench, CircleOff } from 'lucide-react';
+import { Loader2, MapPin, CircleOff } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import watermarkLogo from '@assets/20251129_191904_0001_1764458415723.png';
 import type { RouteGeometry } from '@/lib/maps';
@@ -12,6 +12,133 @@ export interface Coordinates {
 }
 
 export type MarkerType = 'origin' | 'destination' | 'driver' | 'driver_inactive' | 'service' | 'default';
+
+function CarIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 24"
+      fill="none"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Car body */}
+      <path
+        d="M4 14C4 13 4.5 12 6 12L26 12C27.5 12 28 13 28 14L28 17C28 17.5 27.5 18 27 18L5 18C4.5 18 4 17.5 4 17L4 14Z"
+        fill="currentColor"
+      />
+      {/* Car roof/cabin */}
+      <path
+        d="M8 12L10 7C10.3 6.3 11 6 12 6L20 6C21 6 21.7 6.3 22 7L24 12"
+        fill="currentColor"
+      />
+      {/* Windshield */}
+      <path
+        d="M10.5 11L12 7.5L20 7.5L21.5 11L10.5 11Z"
+        fill="#87CEEB"
+        opacity="0.9"
+      />
+      {/* Headlights */}
+      <rect x="26" y="13.5" width="2" height="1.5" rx="0.5" fill="#f59e0b" />
+      <rect x="4" y="13.5" width="2" height="1.5" rx="0.5" fill="#ef4444" opacity="0.8" />
+      {/* Front wheel */}
+      <circle cx="9" cy="18" r="3" fill="currentColor" />
+      <circle cx="9" cy="18" r="1.8" fill="#0F2947" opacity="0.8" />
+      <circle cx="9" cy="18" r="0.8" fill="#ddd" />
+      {/* Rear wheel */}
+      <circle cx="23" cy="18" r="3" fill="currentColor" />
+      <circle cx="23" cy="18" r="1.8" fill="#0F2947" opacity="0.8" />
+      <circle cx="23" cy="18" r="0.8" fill="#ddd" />
+    </svg>
+  );
+}
+
+function DestinationFlagIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 32"
+      fill="none"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Flag pole */}
+      <rect x="3" y="2" width="2.5" height="28" rx="1" fill="currentColor" />
+      {/* Flag */}
+      <path
+        d="M5.5 3L22 6L22 14L5.5 11Z"
+        fill="currentColor"
+      />
+      {/* Checkered pattern on flag */}
+      <rect x="7" y="4.5" width="3" height="2" fill="white" opacity="0.9" />
+      <rect x="13" y="4.5" width="3" height="2" fill="white" opacity="0.9" />
+      <rect x="10" y="6.5" width="3" height="2" fill="white" opacity="0.9" />
+      <rect x="16" y="6.5" width="3" height="2" fill="white" opacity="0.9" />
+      <rect x="7" y="8.5" width="3" height="2" fill="white" opacity="0.9" />
+      <rect x="13" y="8.5" width="3" height="2" fill="white" opacity="0.9" />
+      {/* Base */}
+      <ellipse cx="4.25" cy="30" rx="4" ry="1.5" fill="currentColor" opacity="0.6" />
+    </svg>
+  );
+}
+
+function ServiceIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 28 28"
+      fill="none"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Wrench */}
+      <path
+        d="M6 22L16 12"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      {/* Wrench head */}
+      <path
+        d="M16 12C16 12 18 10 20 10C22 10 24 11 24 13C24 15 23 16 21 16C19 16 18 15 17 14"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      {/* Wrench handle end */}
+      <circle cx="5" cy="23" r="2.5" fill="currentColor" />
+      {/* Gear/cog behind */}
+      <circle cx="20" cy="8" r="4" fill="currentColor" opacity="0.3" />
+      <circle cx="20" cy="8" r="2" fill="currentColor" opacity="0.5" />
+      {/* Warning triangle accent */}
+      <path
+        d="M3 8L6 3L9 8Z"
+        fill="#f59e0b"
+        opacity="0.9"
+      />
+      <rect x="5.25" y="4.5" width="1.5" height="2" rx="0.5" fill="white" />
+      <circle cx="6" cy="7" r="0.6" fill="white" />
+    </svg>
+  );
+}
+
+function LocationPinIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 32"
+      fill="none"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Pin shape */}
+      <path
+        d="M12 0C6 0 1 5 1 11C1 19 12 31 12 31C12 31 23 19 23 11C23 5 18 0 12 0Z"
+        fill="currentColor"
+      />
+      {/* Inner circle */}
+      <circle cx="12" cy="11" r="5" fill="white" opacity="0.9" />
+      <circle cx="12" cy="11" r="2.5" fill="currentColor" opacity="0.7" />
+    </svg>
+  );
+}
 
 function TowTruckIcon({ className, isActive = true }: { className?: string; isActive?: boolean }) {
   const mainColor = isActive ? "currentColor" : "#64748b";
@@ -228,22 +355,20 @@ function getMarkerType(title?: string, color?: string, type?: MarkerType): Marke
   return 'default';
 }
 
-function MarkerIcon({ type, className }: { type: MarkerType; className?: string }) {
-  const iconClass = className || "w-3.5 h-3.5 text-white";
-  
+function getMarkerIconComponent(type: MarkerType) {
   switch (type) {
     case 'origin':
-      return <Car className={iconClass} />;
+      return { Component: CarIcon, size: 'w-10 h-8', color: 'text-green-600' };
     case 'destination':
-      return <Flag className={iconClass} />;
+      return { Component: DestinationFlagIcon, size: 'w-8 h-10', color: 'text-red-500' };
     case 'driver':
-      return <TowTruckIcon className={iconClass} isActive={true} />;
+      return { Component: TowTruckIcon, size: 'w-12 h-8', color: 'text-primary', isActive: true };
     case 'driver_inactive':
-      return <TowTruckIcon className={iconClass} isActive={false} />;
+      return { Component: TowTruckIcon, size: 'w-12 h-8', color: 'text-slate-400', isActive: false };
     case 'service':
-      return <Wrench className={iconClass} />;
+      return { Component: ServiceIcon, size: 'w-9 h-9', color: 'text-amber-500' };
     default:
-      return <MapPin className={iconClass} />;
+      return { Component: LocationPinIcon, size: 'w-7 h-9', color: 'text-primary' };
   }
 }
 
@@ -507,9 +632,10 @@ export function MapboxMap({
 
         {markers.map((marker, index) => {
           const markerType = getMarkerType(marker.title, marker.color, marker.type);
-          const isDriverMarker = markerType === 'driver';
+          const iconConfig = getMarkerIconComponent(markerType);
+          const { Component, size, color } = iconConfig;
+          const isActive = 'isActive' in iconConfig ? iconConfig.isActive : true;
           const isInactiveDriver = markerType === 'driver_inactive';
-          const isDriverType = isDriverMarker || isInactiveDriver;
           
           return (
             <Marker
@@ -518,36 +644,27 @@ export function MapboxMap({
               latitude={marker.position.lat}
               anchor="bottom"
             >
-              {isDriverType ? (
-                <div 
-                  className="relative flex items-end justify-center"
-                  title={marker.title}
-                  style={{ 
-                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3)) drop-shadow(0 1px 2px rgba(0,0,0,0.2))'
-                  }}
-                >
+              <div 
+                className="relative flex items-end justify-center"
+                title={marker.title}
+                style={{ 
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.35)) drop-shadow(0 1px 2px rgba(0,0,0,0.25))'
+                }}
+              >
+                {markerType === 'driver' || markerType === 'driver_inactive' ? (
                   <TowTruckIcon 
-                    className={`w-12 h-8 ${isDriverMarker ? 'text-primary' : 'text-slate-400'}`}
-                    isActive={isDriverMarker}
+                    className={`${size} ${color}`}
+                    isActive={isActive}
                   />
-                  {isInactiveDriver && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-slate-500 rounded-full flex items-center justify-center border border-white shadow-sm">
-                      <CircleOff className="w-2.5 h-2.5 text-white" />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div 
-                  className="w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center"
-                  style={{ backgroundColor: getMarkerColor(marker.icon, marker.color, markerType) }}
-                  title={marker.title}
-                >
-                  <MarkerIcon 
-                    type={markerType} 
-                    className="w-4 h-4 text-white" 
-                  />
-                </div>
-              )}
+                ) : (
+                  <Component className={`${size} ${color}`} />
+                )}
+                {isInactiveDriver && (
+                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-slate-500 rounded-full flex items-center justify-center border border-white shadow-sm">
+                    <CircleOff className="w-2.5 h-2.5 text-white" />
+                  </div>
+                )}
+              </div>
             </Marker>
           );
         })}
