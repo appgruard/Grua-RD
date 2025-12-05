@@ -158,11 +158,112 @@ export function prefetchUserData() {
   });
 }
 
+export function preloadAdminModules() {
+  const adminModules = [
+    () => import('@/pages/admin/dashboard'),
+    () => import('@/pages/admin/analytics'),
+  ];
+
+  adminModules.forEach((loadModule, index) => {
+    const key = `admin_${index}`;
+    if (!preloadedModules.has(key)) {
+      preloadedModules.add(key);
+      scheduleIdleTask(() => {
+        loadModule().catch(() => {});
+      }, { timeout: 1000 });
+    }
+  });
+}
+
+export function preloadClientModules() {
+  preloadMapboxModule();
+  
+  const clientModules = [
+    () => import('@/pages/client/home'),
+    () => import('@/pages/client/tracking'),
+    () => import('@/components/ServiceCategorySelector'),
+  ];
+
+  clientModules.forEach((loadModule, index) => {
+    const key = `client_${index}`;
+    if (!preloadedModules.has(key)) {
+      preloadedModules.add(key);
+      scheduleIdleTask(() => {
+        loadModule().catch(() => {});
+      }, { timeout: 1000 });
+    }
+  });
+}
+
+export function preloadSocioModules() {
+  const socioModules = [
+    () => import('@/pages/socio/dashboard'),
+  ];
+
+  socioModules.forEach((loadModule, index) => {
+    const key = `socio_${index}`;
+    if (!preloadedModules.has(key)) {
+      preloadedModules.add(key);
+      scheduleIdleTask(() => {
+        loadModule().catch(() => {});
+      }, { timeout: 1000 });
+    }
+  });
+}
+
+export function preloadByUserType(userType: string) {
+  const moduleLoaders: Record<string, () => void> = {
+    cliente: () => {
+      preloadMapboxResources();
+      preloadClientModules();
+    },
+    conductor: () => {
+      preloadMapboxResources();
+      preloadDriverModules();
+      prefetchDriverData();
+    },
+    admin: () => {
+      preloadAdminModules();
+    },
+    socio: () => {
+      preloadSocioModules();
+    },
+  };
+
+  const loader = moduleLoaders[userType];
+  if (loader) {
+    loader();
+  }
+
+  // Store user type for next session preload hint
+  try {
+    localStorage.setItem('lastUserType', userType);
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
+export function preloadFromLastSession() {
+  try {
+    const lastUserType = localStorage.getItem('lastUserType');
+    if (lastUserType) {
+      scheduleIdleTask(() => {
+        preloadByUserType(lastUserType);
+      }, { timeout: 2000 });
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
 export function initializePreloading() {
   if (typeof window === 'undefined') return;
 
   // Start Mapbox preconnections immediately
   preloadMapboxResources();
+
+  // Preload based on last session if available
+  preloadFromLastSession();
 
   scheduleIdleTask(() => {
     preloadCriticalModules();

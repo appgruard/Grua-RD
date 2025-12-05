@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getQueryFn } from './queryClient';
-import { preloadDriverResourcesOnLogin } from './preload';
+import { preloadByUserType, preloadDriverResourcesOnLogin } from './preload';
 import type { User, UserWithConductor } from '@shared/schema';
 
 interface VerificationStatus {
@@ -46,16 +46,30 @@ interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function hasSessionCookie(): boolean {
+  if (typeof document === 'undefined') return true;
+  return document.cookie.includes('connect.sid');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [pendingVerification, setPendingVerification] = useState<VerificationStatus | null>(null);
   const [pendingVerificationUser, setPendingVerificationUser] = useState<UserWithConductor | null>(null);
   
-  const { data: user, isLoading } = useQuery<UserWithConductor | null>({
+  // Check cookie existence for instant feedback (no network request needed)
+  const cookieExists = hasSessionCookie();
+  
+  const { data: user, isLoading: queryLoading } = useQuery<UserWithConductor | null>({
     queryKey: ['/api/auth/me'],
     queryFn: getQueryFn({ on401: 'returnNull' }),
     retry: false,
+    // Only fetch if cookie exists - saves a network request for logged out users
+    enabled: cookieExists,
   });
+  
+  // If no cookie exists, we know immediately user is not logged in
+  // This provides instant feedback without waiting for API call
+  const isLoading = cookieExists ? queryLoading : false;
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
@@ -90,7 +104,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update the cache immediately with the user data
       if (data?.user) {
         queryClient.setQueryData(['/api/auth/me'], data.user);
-        // Preload driver resources immediately after login for faster dashboard load
+        // Preload resources based on user type for faster navigation
+        preloadByUserType(data.user.userType);
+        // Additional fast preload for drivers (backwards compatibility)
         if (data.user.userType === 'conductor') {
           preloadDriverResourcesOnLogin();
         }

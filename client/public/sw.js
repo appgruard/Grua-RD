@@ -1,7 +1,8 @@
-const VERSION = '5.0';
+const VERSION = '6.0';
 const STATIC_CACHE = `gruard-static-v${VERSION}`;
 const DYNAMIC_CACHE = `gruard-dynamic-v${VERSION}`;
 const RUNTIME_CACHE = `gruard-runtime-v${VERSION}`;
+const ASSETS_CACHE = `gruard-assets-v${VERSION}`;
 
 const CACHE_DURATION = {
   static: 30 * 24 * 60 * 60 * 1000,
@@ -33,7 +34,8 @@ self.addEventListener('activate', (event) => {
           if (
             cacheName !== STATIC_CACHE && 
             cacheName !== DYNAMIC_CACHE &&
-            cacheName !== RUNTIME_CACHE
+            cacheName !== RUNTIME_CACHE &&
+            cacheName !== ASSETS_CACHE
           ) {
             console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
@@ -56,6 +58,49 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
+    return;
+  }
+
+  // Stale-while-revalidate strategy for JS/CSS assets (build chunks)
+  if (url.origin === location.origin && 
+      (request.destination === 'script' || request.destination === 'style') &&
+      (url.pathname.includes('/assets/') || url.pathname.endsWith('.js') || url.pathname.endsWith('.css'))) {
+    event.respondWith(
+      caches.open(ASSETS_CACHE).then((cache) => {
+        return cache.match(request).then((cachedResponse) => {
+          // Always fetch in background to revalidate
+          const fetchPromise = fetch(request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              cache.put(request, networkResponse.clone());
+            }
+            return networkResponse;
+          }).catch(() => cachedResponse);
+
+          // Return cached response immediately if available, network fetch happens in background
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
+    return;
+  }
+
+  // Cache-first for font files (self-hosted)
+  if (url.origin === location.origin && request.destination === 'font') {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then((cache) => {
+        return cache.match(request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return fetch(request).then((response) => {
+            if (response && response.status === 200) {
+              cache.put(request, response.clone());
+            }
+            return response;
+          });
+        });
+      })
+    );
     return;
   }
 

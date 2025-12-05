@@ -6,6 +6,79 @@ Este documento presenta un plan comprehensivo para mejorar la velocidad de carga
 
 ---
 
+## Estado de Implementación - Fase 2 ✅ COMPLETADA
+
+| Tarea | Estado | Notas |
+|-------|--------|-------|
+| 2.1 Fuentes Self-Hosted | **COMPLETADO** | Fonts Inter descargadas localmente en /fonts/, preload configurado |
+| 2.2 Service Worker Mejorado | **COMPLETADO** | Estrategia stale-while-revalidate para JS/CSS, cache-first para fonts |
+| 2.3 Preload de Rutas por Rol | **COMPLETADO** | preloadByUserType() implementado con soporte para todos los roles |
+| 2.4 Optimización AuthProvider | **COMPLETADO** | Verificación instantánea con cookie, query solo si existe sesión |
+
+### Archivos Creados/Modificados (Fase 2)
+
+**Nuevos archivos:**
+- `client/src/fonts.css` - @font-face declarations para Inter font self-hosted
+- `client/public/fonts/inter-400.woff2` - Inter Regular
+- `client/public/fonts/inter-500.woff2` - Inter Medium
+- `client/public/fonts/inter-600.woff2` - Inter SemiBold
+- `client/public/fonts/inter-700.woff2` - Inter Bold
+
+**Archivos modificados:**
+- `client/index.html` - Removido Google Fonts, agregado preload para fonts locales
+- `client/src/main.tsx` - Importa fonts.css para cargar fuentes locales
+- `client/public/sw.js` - v6.0 con stale-while-revalidate para JS/CSS y cache-first para fonts
+- `client/src/lib/preload.ts` - Nuevas funciones preloadByUserType(), preloadFromLastSession(), preloadAdminModules(), etc.
+- `client/src/lib/auth.tsx` - Optimización con hasSessionCookie() para verificación instantánea
+
+### Estrategias de Caching del Service Worker (v6.0)
+
+1. **Stale-While-Revalidate** (JS/CSS assets):
+   - Retorna respuesta cacheada inmediatamente
+   - Actualiza cache en background con la respuesta de red
+   - Mejor experiencia de usuario con contenido instantáneo
+
+2. **Cache-First** (Fonts locales):
+   - Fuentes servidas directamente desde cache
+   - Solo red si no está cacheado
+   - Elimina dependencia de Google Fonts CDN
+
+3. **Runtime Cache** (Maps API):
+   - Cache con duración configurable
+   - Revalidación cuando expira
+
+### Optimización del AuthProvider
+
+```typescript
+// Antes: Siempre hacía fetch a /api/auth/me
+const { data: user, isLoading } = useQuery(['/api/auth/me']);
+
+// Después: Solo fetch si existe cookie de sesión
+const cookieExists = hasSessionCookie();
+const { data: user, isLoading: queryLoading } = useQuery({
+  queryKey: ['/api/auth/me'],
+  enabled: cookieExists, // Solo si hay cookie
+});
+// Usuarios sin cookie ven login inmediatamente (isLoading = false)
+```
+
+### Sistema de Preload por Rol
+
+```typescript
+// Llamado automáticamente después de login exitoso
+preloadByUserType(user.userType);
+
+// También precarga al inicio basado en última sesión
+preloadFromLastSession(); // Lee de localStorage
+
+// Ejemplo para conductor:
+// - Precarga MapboxMap
+// - Precarga driver/dashboard y driver/profile
+// - Prefetch de /api/drivers/init
+```
+
+---
+
 ## Estado de Implementación - Fase 1 ✅ COMPLETADA
 
 | Tarea | Estado | Notas |
