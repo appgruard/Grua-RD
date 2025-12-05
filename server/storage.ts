@@ -25,6 +25,7 @@ import {
   socios,
   distribucionesSocios,
   clientPaymentMethods,
+  operatorPaymentMethods,
   operatorBankAccounts,
   operatorWithdrawals,
   scheduledPayouts,
@@ -97,6 +98,8 @@ import {
   type DistribucionSocioWithDetails,
   type ClientPaymentMethod,
   type InsertClientPaymentMethod,
+  type OperatorPaymentMethod,
+  type InsertOperatorPaymentMethod,
   type OperatorBankAccount,
   type InsertOperatorBankAccount,
   type OperatorWithdrawal,
@@ -470,6 +473,15 @@ export interface IStorage {
   updateClientPaymentMethod(id: string, data: Partial<ClientPaymentMethod>): Promise<ClientPaymentMethod>;
   setDefaultClientPaymentMethod(id: string, userId: string): Promise<ClientPaymentMethod>;
   deleteClientPaymentMethod(id: string): Promise<void>;
+
+  // Operator Payment Methods (for debt payment)
+  createOperatorPaymentMethod(paymentMethod: InsertOperatorPaymentMethod): Promise<OperatorPaymentMethod>;
+  getOperatorPaymentMethodById(id: string): Promise<OperatorPaymentMethod | undefined>;
+  getOperatorPaymentMethodsByConductorId(conductorId: string): Promise<OperatorPaymentMethod[]>;
+  getDefaultOperatorPaymentMethod(conductorId: string): Promise<OperatorPaymentMethod | undefined>;
+  updateOperatorPaymentMethod(id: string, data: Partial<OperatorPaymentMethod>): Promise<OperatorPaymentMethod>;
+  setDefaultOperatorPaymentMethod(id: string, conductorId: string): Promise<OperatorPaymentMethod>;
+  deleteOperatorPaymentMethod(id: string): Promise<void>;
 
   // Operator Bank Accounts (dLocal Payouts)
   createOperatorBankAccount(data: InsertOperatorBankAccount): Promise<OperatorBankAccount>;
@@ -3233,6 +3245,75 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClientPaymentMethod(id: string): Promise<void> {
     await db.delete(clientPaymentMethods).where(eq(clientPaymentMethods.id, id));
+  }
+
+  // ==================== OPERATOR PAYMENT METHODS (for debt payment) ====================
+
+  async createOperatorPaymentMethod(paymentMethod: InsertOperatorPaymentMethod): Promise<OperatorPaymentMethod> {
+    const existingMethods = await this.getOperatorPaymentMethodsByConductorId(paymentMethod.conductorId);
+    const isFirst = existingMethods.length === 0;
+    
+    const [method] = await db.insert(operatorPaymentMethods).values({
+      ...paymentMethod,
+      isDefault: isFirst,
+    }).returning();
+    return method;
+  }
+
+  async getOperatorPaymentMethodById(id: string): Promise<OperatorPaymentMethod | undefined> {
+    const [method] = await db.select().from(operatorPaymentMethods).where(eq(operatorPaymentMethods.id, id));
+    return method;
+  }
+
+  async getOperatorPaymentMethodsByConductorId(conductorId: string): Promise<OperatorPaymentMethod[]> {
+    return db.select()
+      .from(operatorPaymentMethods)
+      .where(eq(operatorPaymentMethods.conductorId, conductorId))
+      .orderBy(desc(operatorPaymentMethods.isDefault), desc(operatorPaymentMethods.createdAt));
+  }
+
+  async getDefaultOperatorPaymentMethod(conductorId: string): Promise<OperatorPaymentMethod | undefined> {
+    const [method] = await db.select()
+      .from(operatorPaymentMethods)
+      .where(and(
+        eq(operatorPaymentMethods.conductorId, conductorId),
+        eq(operatorPaymentMethods.isDefault, true)
+      ));
+    return method;
+  }
+
+  async updateOperatorPaymentMethod(id: string, data: Partial<OperatorPaymentMethod>): Promise<OperatorPaymentMethod> {
+    const [method] = await db.update(operatorPaymentMethods)
+      .set(data)
+      .where(eq(operatorPaymentMethods.id, id))
+      .returning();
+    return method;
+  }
+
+  async setDefaultOperatorPaymentMethod(id: string, conductorId: string): Promise<OperatorPaymentMethod> {
+    await db.update(operatorPaymentMethods)
+      .set({ isDefault: false })
+      .where(and(
+        eq(operatorPaymentMethods.conductorId, conductorId),
+        eq(operatorPaymentMethods.isDefault, true)
+      ));
+    
+    const [method] = await db.update(operatorPaymentMethods)
+      .set({ isDefault: true })
+      .where(and(
+        eq(operatorPaymentMethods.id, id),
+        eq(operatorPaymentMethods.conductorId, conductorId)
+      ))
+      .returning();
+    
+    if (!method) {
+      throw new Error('Payment method not found or not owned by operator');
+    }
+    return method;
+  }
+
+  async deleteOperatorPaymentMethod(id: string): Promise<void> {
+    await db.delete(operatorPaymentMethods).where(eq(operatorPaymentMethods.id, id));
   }
 
   // ==================== OPERATOR BANK ACCOUNTS (dLocal Payouts) ====================

@@ -1048,6 +1048,32 @@ export const clientPaymentMethodsRelations = relations(clientPaymentMethods, ({ 
   }),
 }));
 
+// ==================== OPERATOR PAYMENT METHODS (dLocal) ====================
+
+// Operator Payment Methods Table (dLocal card tokens for operators to pay debts)
+export const operatorPaymentMethods = pgTable("operator_payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
+  dlocalCardId: text("dlocal_card_id").notNull(),
+  cardBrand: text("card_brand").notNull(),
+  last4: text("last4").notNull(),
+  expiryMonth: integer("expiry_month").notNull(),
+  expiryYear: integer("expiry_year").notNull(),
+  cardholderName: text("cardholder_name"),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Operator Payment Methods Relations
+export const operatorPaymentMethodsRelations = relations(operatorPaymentMethods, ({ one }) => ({
+  conductor: one(conductores, {
+    fields: [operatorPaymentMethods.conductorId],
+    references: [conductores.id],
+  }),
+}));
+
+// ==================== END OPERATOR PAYMENT METHODS ====================
+
 // ==================== OPERATOR BANK ACCOUNTS (dLocal Payouts) ====================
 
 // Estado de cuenta bancaria del operador
@@ -1579,6 +1605,19 @@ export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentM
   isDefault: true,
 });
 
+export const insertOperatorPaymentMethodSchema = createInsertSchema(operatorPaymentMethods, {
+  dlocalCardId: z.string().min(1, "ID de tarjeta dLocal es requerido"),
+  cardBrand: z.string().min(1, "Marca de tarjeta es requerida"),
+  last4: z.string().length(4, "Los últimos 4 dígitos son requeridos"),
+  expiryMonth: z.number().min(1).max(12),
+  expiryYear: z.number().min(2024),
+  cardholderName: z.string().optional(),
+}).omit({
+  id: true,
+  createdAt: true,
+  isDefault: true,
+});
+
 export const insertOperatorBankAccountSchema = createInsertSchema(operatorBankAccounts, {
   nombreTitular: z.string().min(1, "Nombre del titular es requerido"),
   cedula: z.string().regex(/^\d{11}$/, "Cédula debe tener 11 dígitos"),
@@ -1759,6 +1798,7 @@ export const selectServicioAseguradoraSchema = createSelectSchema(serviciosAsegu
 export const selectSocioSchema = createSelectSchema(socios);
 export const selectDistribucionSocioSchema = createSelectSchema(distribucionesSocios);
 export const selectClientPaymentMethodSchema = createSelectSchema(clientPaymentMethods);
+export const selectOperatorPaymentMethodSchema = createSelectSchema(operatorPaymentMethods);
 export const selectOperatorBankAccountSchema = createSelectSchema(operatorBankAccounts);
 export const selectOperatorWithdrawalSchema = createSelectSchema(operatorWithdrawals);
 export const selectScheduledPayoutSchema = createSelectSchema(scheduledPayouts);
@@ -1832,6 +1872,9 @@ export type DistribucionSocio = typeof distribucionesSocios.$inferSelect;
 
 export type InsertClientPaymentMethod = z.infer<typeof insertClientPaymentMethodSchema>;
 export type ClientPaymentMethod = typeof clientPaymentMethods.$inferSelect;
+
+export type InsertOperatorPaymentMethod = z.infer<typeof insertOperatorPaymentMethodSchema>;
+export type OperatorPaymentMethod = typeof operatorPaymentMethods.$inferSelect;
 
 export type InsertOperatorBankAccount = z.infer<typeof insertOperatorBankAccountSchema>;
 export type OperatorBankAccount = typeof operatorBankAccounts.$inferSelect;

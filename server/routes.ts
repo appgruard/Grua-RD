@@ -6560,6 +6560,324 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END CLIENT PAYMENT METHODS ====================
 
+  // ==================== OPERATOR PAYMENT METHODS (for debt payment) ====================
+
+  // Get operator's payment methods
+  app.get("/api/operator/payment-methods", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const methods = await storage.getOperatorPaymentMethodsByConductorId(conductor.id);
+      res.json(methods);
+    } catch (error: any) {
+      logSystem.error('Get operator payment methods error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to get payment methods" });
+    }
+  });
+
+  // Add a new payment method for operator
+  app.post("/api/operator/payment-methods", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const { cardNumber, cardExpiry, cardCVV, cardholderName } = req.body;
+
+      if (!cardNumber || !cardExpiry || !cardCVV) {
+        return res.status(400).json({ 
+          message: "Datos de tarjeta incompletos (cardNumber, cardExpiry, cardCVV son requeridos)" 
+        });
+      }
+
+      const cleanNumber = cardNumber.replace(/\s/g, '');
+      const cleanExpiry = cardExpiry.replace('/', '');
+      
+      if (!/^\d{15,16}$/.test(cleanNumber)) {
+        return res.status(400).json({ 
+          message: "Número de tarjeta inválido. Debe contener 15-16 dígitos." 
+        });
+      }
+      
+      if (!/^\d{4}$/.test(cleanExpiry)) {
+        return res.status(400).json({ 
+          message: "Fecha de vencimiento inválida. Usa formato MMYY." 
+        });
+      }
+      
+      const month = parseInt(cleanExpiry.substring(0, 2), 10);
+      const year = 2000 + parseInt(cleanExpiry.substring(2, 4), 10);
+      if (month < 1 || month > 12) {
+        return res.status(400).json({ 
+          message: "Mes de vencimiento inválido." 
+        });
+      }
+      
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        return res.status(400).json({ 
+          message: "La tarjeta ha expirado." 
+        });
+      }
+      
+      if (!/^\d{3,4}$/.test(cardCVV)) {
+        return res.status(400).json({ 
+          message: "CVV inválido. Debe contener 3-4 dígitos." 
+        });
+      }
+
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
+      
+      if (!dlocalPaymentService.isConfigured()) {
+        return res.status(503).json({ 
+          message: "El servicio de pagos no está configurado. Por favor, contacta al administrador.",
+          configured: false 
+        });
+      }
+
+      // Determine card brand from card number
+      let cardBrand = 'unknown';
+      if (cleanNumber.startsWith('4')) {
+        cardBrand = 'visa';
+      } else if (cleanNumber.startsWith('5')) {
+        cardBrand = 'mastercard';
+      } else if (cleanNumber.startsWith('3')) {
+        cardBrand = 'amex';
+      }
+
+      // Parse expiry
+      let expiryMonth = 0;
+      let expiryYear = 0;
+      if (cleanExpiry.length === 4) {
+        expiryMonth = parseInt(cleanExpiry.substring(0, 2), 10);
+        expiryYear = 2000 + parseInt(cleanExpiry.substring(2, 4), 10);
+      }
+
+      // Get last 4 digits
+      const last4 = cleanNumber.slice(-4);
+
+      // Generate a secure token for the card
+      const cardToken = `DLOCAL_OP_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+      // Save payment method
+      const paymentMethod = await storage.createOperatorPaymentMethod({
+        conductorId: conductor.id,
+        dlocalCardId: cardToken,
+        cardBrand,
+        last4,
+        expiryMonth,
+        expiryYear,
+        cardholderName: cardholderName || null,
+      });
+
+      logTransaction.info('Operator payment method created', { 
+        conductorId: conductor.id,
+        paymentMethodId: paymentMethod.id,
+        cardBrand,
+        last4,
+      });
+
+      res.json({
+        success: true,
+        message: "Tarjeta guardada correctamente",
+        paymentMethod: {
+          id: paymentMethod.id,
+          cardBrand: paymentMethod.cardBrand,
+          last4: paymentMethod.last4,
+          expiryMonth: paymentMethod.expiryMonth,
+          expiryYear: paymentMethod.expiryYear,
+          isDefault: paymentMethod.isDefault,
+        },
+      });
+    } catch (error: any) {
+      logSystem.error('Create operator payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Error al guardar la tarjeta" });
+    }
+  });
+
+  // Set default payment method for operator
+  app.put("/api/operator/payment-methods/:id/default", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const { id } = req.params;
+      
+      // Verify ownership
+      const method = await storage.getOperatorPaymentMethodById(id);
+      if (!method) {
+        return res.status(404).json({ message: "Método de pago no encontrado" });
+      }
+      
+      if (method.conductorId !== conductor.id) {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      const updatedMethod = await storage.setDefaultOperatorPaymentMethod(id, conductor.id);
+
+      logSystem.info('Operator payment method set as default', { 
+        conductorId: conductor.id,
+        paymentMethodId: id,
+      });
+
+      res.json({
+        success: true,
+        message: "Tarjeta predeterminada actualizada",
+        paymentMethod: updatedMethod,
+      });
+    } catch (error: any) {
+      logSystem.error('Set default operator payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Error al actualizar la tarjeta predeterminada" });
+    }
+  });
+
+  // Delete operator payment method
+  app.delete("/api/operator/payment-methods/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const { id } = req.params;
+      
+      // Verify ownership
+      const method = await storage.getOperatorPaymentMethodById(id);
+      if (!method) {
+        return res.status(404).json({ message: "Método de pago no encontrado" });
+      }
+      
+      if (method.conductorId !== conductor.id) {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      await storage.deleteOperatorPaymentMethod(id);
+
+      // If this was the default, set another one as default
+      if (method.isDefault) {
+        const remainingMethods = await storage.getOperatorPaymentMethodsByConductorId(conductor.id);
+        if (remainingMethods.length > 0) {
+          await storage.setDefaultOperatorPaymentMethod(remainingMethods[0].id, conductor.id);
+        }
+      }
+
+      logSystem.info('Operator payment method deleted', { 
+        conductorId: conductor.id,
+        paymentMethodId: id,
+      });
+
+      res.json({
+        success: true,
+        message: "Tarjeta eliminada correctamente",
+      });
+    } catch (error: any) {
+      logSystem.error('Delete operator payment method error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Error al eliminar la tarjeta" });
+    }
+  });
+
+  // Pay debt with saved card
+  app.post("/api/operator/pay-debt-with-card", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const { paymentMethodId, amount } = req.body;
+
+      if (!paymentMethodId || !amount) {
+        return res.status(400).json({ 
+          message: "Se requiere el método de pago y el monto" 
+        });
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ 
+          message: "Monto inválido" 
+        });
+      }
+
+      // Verify payment method ownership
+      const paymentMethod = await storage.getOperatorPaymentMethodById(paymentMethodId);
+      if (!paymentMethod) {
+        return res.status(404).json({ message: "Método de pago no encontrado" });
+      }
+      
+      if (paymentMethod.conductorId !== conductor.id) {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      // Get wallet and verify debt
+      const wallet = await WalletService.getWallet(conductor.id);
+      if (!wallet) {
+        return res.status(404).json({ message: "Wallet no encontrado" });
+      }
+
+      const totalDebt = parseFloat(wallet.totalDebt);
+      if (totalDebt <= 0) {
+        return res.status(400).json({ message: "No tienes deuda pendiente" });
+      }
+
+      const paymentAmount = Math.min(parsedAmount, totalDebt);
+
+      // Process the debt payment
+      const result = await WalletService.completeDebtPayment(
+        wallet.id,
+        paymentAmount.toFixed(2),
+        `card:${paymentMethod.last4}`
+      );
+
+      logTransaction.info('Operator debt paid with saved card', { 
+        conductorId: conductor.id,
+        paymentMethodId,
+        amount: paymentAmount,
+        remainingDebt: parseFloat(wallet.totalDebt) - paymentAmount,
+      });
+
+      res.json({
+        success: true,
+        message: `Pago de RD$${paymentAmount.toFixed(2)} procesado correctamente`,
+        remainingDebt: (totalDebt - paymentAmount).toFixed(2),
+        wallet: result,
+      });
+    } catch (error: any) {
+      logSystem.error('Pay debt with card error', error, { userId: req.user!.id });
+      res.status(500).json({ message: error.message || "Error al procesar el pago" });
+    }
+  });
+
+  // ==================== END OPERATOR PAYMENT METHODS ====================
+
   // Payment status polling for clients
   app.get("/api/payments/:servicioId/status", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
