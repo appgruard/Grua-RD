@@ -81,6 +81,50 @@ interface DLocalPayoutResponse {
   currency: string;
 }
 
+// New interfaces for card tokenization and saved card charging (Phase 2)
+interface SaveCardRequest {
+  cardNumber: string;
+  cardExpiry: string;
+  cardCVV: string;
+  cardholderName?: string;
+  email: string;
+  name: string;
+  document: string;
+}
+
+interface SaveCardResponse {
+  cardId: string;
+  brand: string;
+  last4: string;
+  expiryMonth: number;
+  expiryYear: number;
+}
+
+interface ChargeWithSavedCardRequest {
+  cardId: string;
+  amount: number;
+  description: string;
+  orderId: string;
+  email: string;
+  name: string;
+  document: string;
+}
+
+interface ChargeWithSavedCardResponse {
+  paymentId: string;
+  status: string;
+  amount: number;
+  feeAmount: number;
+  feeCurrency: string;
+  netAmount: number;
+}
+
+interface DLocalFees {
+  feeAmount: number;
+  feeCurrency: string;
+  netAmount: number;
+}
+
 const DLOCAL_STATUS_CODES: Record<string, string> = {
   "100": "La transacción fue aprobada",
   "200": "La transacción fue rechazada",
@@ -694,6 +738,397 @@ export class DLocalPaymentService {
     const companyAmount = parseFloat((totalAmount * companyPercentage).toFixed(2));
     
     return { operatorAmount, companyAmount };
+  }
+
+  /**
+   * PHASE 2: Real card tokenization with validation charge
+   * 
+   * This method tokenizes a card by:
+   * 1. Making a small validation charge of 10 DOP (minimum allowed) with save: true
+   * 2. If payment succeeds, extracting the card_id from the response
+   * 3. Automatically refunding the 10 DOP charge
+   * 4. Returning the real dLocal token
+   */
+  async saveCardWithValidation(request: SaveCardRequest): Promise<SaveCardResponse> {
+    if (!this.isConfigured()) {
+      throw new Error("dLocal payment service not configured. Configure DLOCAL_X_LOGIN, DLOCAL_X_TRANS_KEY, and DLOCAL_SECRET_KEY.");
+    }
+
+    const VALIDATION_AMOUNT = 10; // Minimum amount in DOP for validation
+    
+    return this.executeWithRetry(
+      async () => {
+        const orderId = `VALIDATE-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        
+        // Parse card expiry
+        const [expMonth, expYear] = request.cardExpiry.split('/');
+        const fullYear = parseInt(expYear.length === 2 ? `20${expYear}` : expYear);
+        
+        // Step 1: Create payment with save: true to get real card token
+        const payload = {
+          amount: VALIDATION_AMOUNT,
+          currency: "DOP",
+          country: "DO",
+          payment_method_id: "CARD",
+          payment_method_flow: "DIRECT",
+          order_id: orderId,
+          description: "Validación de tarjeta - Grúa RD",
+          notification_url: `${process.env.ALLOWED_ORIGINS?.split(',')[0] || 'http://localhost:5000'}/api/dlocal/webhook`,
+          payer: {
+            name: request.name,
+            email: request.email,
+            document: request.document,
+            address: {
+              country: "DO",
+            },
+          },
+          card: {
+            holder_name: request.cardholderName || request.name,
+            number: request.cardNumber.replace(/\s/g, ''),
+            cvv: request.cardCVV,
+            expiration_month: parseInt(expMonth),
+            expiration_year: fullYear,
+            capture: true,
+            save: true, // This tells dLocal to save the card and return a card_id
+          },
+        };
+
+        const payloadStr = JSON.stringify(payload);
+        
+        logger.info("Initiating card validation payment", {
+          orderId,
+          amount: VALIDATION_AMOUNT,
+          email: request.email,
+        });
+        
+        const response = await fetch(`${this.apiUrl}/payments`, {
+          method: "POST",
+          headers: this.getHeaders(payloadStr),
+          body: payloadStr,
+        });
+
+        const data = await response.json();
+
+        // Check for HTTP errors first
+        if (!response.ok) {
+          logger.error("Card validation payment HTTP error", {
+            orderId,
+            status: response.status,
+            error: data,
+          });
+          throw new Error(data.message || `Error de validación de tarjeta: ${this.getStatusMessage(data.status_code || "400")}`);
+        }
+
+        // Validate payment status - must be PAID or AUTHORIZED for a successful validation
+        const validStatuses = ["PAID", "AUTHORIZED"];
+        if (!validStatuses.includes(data.status)) {
+          logger.error("Card validation payment not approved", {
+            orderId,
+            status: data.status,
+            statusCode: data.status_code,
+            statusDetail: data.status_detail,
+          });
+          
+          // Provide user-friendly error messages based on status
+          const errorMessages: Record<string, string> = {
+            "PENDING": "La validación está pendiente. Intente con otra tarjeta.",
+            "IN_PROCESS": "La validación está en proceso. Intente nuevamente en unos minutos.",
+            "REJECTED": "La tarjeta fue rechazada. Verifique los datos e intente nuevamente.",
+            "CANCELLED": "La validación fue cancelada. Intente nuevamente.",
+            "EXPIRED": "La transacción expiró. Intente nuevamente.",
+          };
+          
+          const errorMsg = errorMessages[data.status] || 
+            `Validación de tarjeta fallida: ${this.getStatusMessage(data.status_code || "200")}`;
+          throw new Error(errorMsg);
+        }
+
+        // Validate payment ID exists before proceeding to refund
+        const paymentId = data.id;
+        if (!paymentId) {
+          logger.error("No payment ID in validation response", { data });
+          throw new Error("Error interno: No se recibió ID de transacción de dLocal.");
+        }
+
+        // CRITICAL: Check if we got the card_id - this is the whole point of the validation
+        const cardId = data.card?.card_id;
+        if (!cardId || typeof cardId !== 'string' || cardId.trim() === '') {
+          logger.error("No valid card_id in validation response", { 
+            data,
+            cardField: data.card,
+          });
+          throw new Error("dLocal no devolvió un token de tarjeta válido. La tarjeta no pudo ser guardada.");
+        }
+
+        logger.info("Card validation payment successful, proceeding to refund", {
+          paymentId,
+          cardId,
+          orderId,
+        });
+
+        // Step 2: Refund the validation charge
+        try {
+          const refundPayload = {
+            payment_id: paymentId,
+            amount: VALIDATION_AMOUNT,
+            currency: "DOP",
+          };
+
+          const refundPayloadStr = JSON.stringify(refundPayload);
+          
+          const refundResponse = await fetch(`${this.apiUrl}/refunds`, {
+            method: "POST",
+            headers: this.getHeaders(refundPayloadStr),
+            body: refundPayloadStr,
+          });
+
+          const refundData = await refundResponse.json();
+
+          if (!refundResponse.ok) {
+            logger.warn("Validation refund failed, but card was saved", {
+              paymentId,
+              cardId,
+              refundError: refundData,
+            });
+            // Don't throw - the card was still saved successfully
+          } else {
+            logger.info("Validation charge refunded successfully", {
+              refundId: refundData.id,
+              paymentId,
+            });
+          }
+        } catch (refundError: any) {
+          logger.warn("Error refunding validation charge", {
+            paymentId,
+            error: refundError.message,
+          });
+          // Don't throw - the card was still saved successfully
+        }
+
+        // Extract card information from response
+        const cardInfo = data.card || {};
+        const last4 = cardInfo.last4 || request.cardNumber.slice(-4);
+        const brand = cardInfo.brand || this.detectCardBrand(request.cardNumber);
+
+        logger.info("Card saved successfully with real dLocal token", {
+          cardId,
+          brand,
+          last4,
+        });
+
+        return {
+          cardId,
+          brand,
+          last4,
+          expiryMonth: parseInt(expMonth),
+          expiryYear: fullYear,
+        };
+      },
+      "dLocal Card Validation",
+      { email: request.email }
+    );
+  }
+
+  /**
+   * PHASE 2: Charge a saved card using the real dLocal card_id
+   * 
+   * This method charges a previously saved card and extracts fee information.
+   * Fee data is extracted from dLocal's response - if not present, fees are set to 0
+   * with a warning logged for manual review.
+   */
+  async chargeWithSavedCard(request: ChargeWithSavedCardRequest): Promise<ChargeWithSavedCardResponse> {
+    if (!this.isConfigured()) {
+      throw new Error("dLocal payment service not configured. Configure DLOCAL_X_LOGIN, DLOCAL_X_TRANS_KEY, and DLOCAL_SECRET_KEY.");
+    }
+
+    // Validate request parameters
+    if (!request.cardId || typeof request.cardId !== 'string' || request.cardId.trim() === '') {
+      throw new Error("Se requiere un token de tarjeta válido para procesar el pago.");
+    }
+
+    if (!request.amount || request.amount <= 0) {
+      throw new Error("El monto debe ser mayor a 0.");
+    }
+
+    return this.executeWithRetry(
+      async () => {
+        const payload = {
+          amount: request.amount,
+          currency: "DOP",
+          country: "DO",
+          payment_method_id: "CARD",
+          payment_method_flow: "DIRECT",
+          order_id: request.orderId,
+          description: request.description,
+          notification_url: `${process.env.ALLOWED_ORIGINS?.split(',')[0] || 'http://localhost:5000'}/api/dlocal/webhook`,
+          payer: {
+            name: request.name,
+            email: request.email,
+            document: request.document,
+            address: {
+              country: "DO",
+            },
+          },
+          card: {
+            card_id: request.cardId,
+            capture: true,
+          },
+        };
+
+        const payloadStr = JSON.stringify(payload);
+        
+        logger.info("Charging saved card", {
+          orderId: request.orderId,
+          amount: request.amount,
+          cardId: request.cardId.substring(0, 8) + "...",
+        });
+        
+        const response = await fetch(`${this.apiUrl}/payments`, {
+          method: "POST",
+          headers: this.getHeaders(payloadStr),
+          body: payloadStr,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          logger.error("Saved card charge failed", {
+            orderId: request.orderId,
+            status: response.status,
+            error: data,
+          });
+          throw new Error(data.message || `Pago fallido: ${this.getStatusMessage(data.status_code || "400")}`);
+        }
+
+        // Validate payment ID exists
+        if (!data.id) {
+          logger.error("No payment ID in charge response", { data });
+          throw new Error("Error interno: No se recibió ID de transacción de dLocal.");
+        }
+
+        // Validate payment status
+        const validStatuses = ["PAID", "AUTHORIZED"];
+        if (!validStatuses.includes(data.status)) {
+          logger.error("Saved card charge not approved", {
+            orderId: request.orderId,
+            status: data.status,
+            statusCode: data.status_code,
+          });
+          throw new Error(`Pago rechazado: ${this.getStatusMessage(data.status_code || "200")}`);
+        }
+
+        // Get the actual amount from response (should match request, but use API response as source of truth)
+        const chargedAmount = data.amount !== undefined ? parseFloat(data.amount) : request.amount;
+
+        // Extract fee information from dLocal response (no estimation)
+        const fees = this.extractDLocalFees(data, chargedAmount);
+
+        logger.info("Saved card charged successfully", {
+          paymentId: data.id,
+          orderId: request.orderId,
+          amount: chargedAmount,
+          feeAmount: fees.feeAmount,
+          feeSource: fees.feeAmount > 0 ? "dlocal_response" : "not_provided",
+          netAmount: fees.netAmount,
+        });
+
+        return {
+          paymentId: data.id,
+          status: data.status,
+          amount: chargedAmount,
+          feeAmount: fees.feeAmount,
+          feeCurrency: fees.feeCurrency,
+          netAmount: fees.netAmount,
+        };
+      },
+      "dLocal Saved Card Charge",
+      { orderId: request.orderId, amount: request.amount }
+    );
+  }
+
+  /**
+   * PHASE 2: Extract dLocal fee information from payment response
+   * 
+   * dLocal includes fee information in their payment response.
+   * This function extracts and calculates:
+   * - feeAmount: The amount dLocal charged as processing fee
+   * - feeCurrency: The currency of the fee (typically same as payment)
+   * - netAmount: The amount after deducting the fee
+   * 
+   * IMPORTANT: This function does NOT estimate fees. If dLocal does not provide
+   * fee data in the response, feeAmount will be 0 and a warning will be logged.
+   * This ensures accurate financial reporting rather than fabricated numbers.
+   */
+  extractDLocalFees(paymentResponse: any, originalAmount: number): DLocalFees {
+    let feeAmount = 0;
+    let feeCurrency = "DOP";
+    let feeFound = false;
+    
+    // Check for explicit fee fields in dLocal response
+    // dLocal may return fee information in different formats
+    if (paymentResponse.fee_amount !== undefined && paymentResponse.fee_amount !== null) {
+      const parsed = parseFloat(paymentResponse.fee_amount);
+      if (!isNaN(parsed) && parsed >= 0) {
+        feeAmount = parsed;
+        feeFound = true;
+      }
+    } else if (paymentResponse.fee !== undefined && paymentResponse.fee !== null) {
+      const parsed = parseFloat(paymentResponse.fee);
+      if (!isNaN(parsed) && parsed >= 0) {
+        feeAmount = parsed;
+        feeFound = true;
+      }
+    } else if (paymentResponse.processor_fee !== undefined && paymentResponse.processor_fee !== null) {
+      const parsed = parseFloat(paymentResponse.processor_fee);
+      if (!isNaN(parsed) && parsed >= 0) {
+        feeAmount = parsed;
+        feeFound = true;
+      }
+    }
+
+    // Log warning if fee data was not provided by dLocal
+    if (!feeFound) {
+      logger.warn("dLocal response did not include fee information - fee set to 0", {
+        paymentId: paymentResponse.id,
+        originalAmount,
+        responseKeys: Object.keys(paymentResponse || {}),
+      });
+    }
+
+    // Get fee currency if available
+    if (paymentResponse.fee_currency) {
+      feeCurrency = paymentResponse.fee_currency;
+    }
+
+    // Calculate net amount (originalAmount - feeAmount)
+    const netAmount = parseFloat((originalAmount - feeAmount).toFixed(2));
+
+    return {
+      feeAmount: parseFloat(feeAmount.toFixed(2)),
+      feeCurrency,
+      netAmount,
+    };
+  }
+
+  /**
+   * Detect card brand from card number
+   */
+  private detectCardBrand(cardNumber: string): string {
+    const cleanNumber = cardNumber.replace(/\s/g, '');
+    
+    if (/^4/.test(cleanNumber)) {
+      return "VISA";
+    } else if (/^5[1-5]/.test(cleanNumber) || /^2[2-7]/.test(cleanNumber)) {
+      return "MASTERCARD";
+    } else if (/^3[47]/.test(cleanNumber)) {
+      return "AMEX";
+    } else if (/^6(?:011|5)/.test(cleanNumber)) {
+      return "DISCOVER";
+    } else if (/^3(?:0[0-5]|[68])/.test(cleanNumber)) {
+      return "DINERS";
+    }
+    
+    return "UNKNOWN";
   }
 }
 

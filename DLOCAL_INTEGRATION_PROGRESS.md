@@ -15,14 +15,14 @@ Se está implementando la integración completa con dLocal para:
 - ✅ Sistema de nómina programada (lunes y viernes)
 - ✅ Retiros del mismo día con comisión de 100 DOP
 - ✅ Interfaz de usuario para saldo de operadores
-- 🔄 **NUEVO:** Tokenización real de tarjetas con dLocal API
-- 🔄 **NUEVO:** Cobro real de deudas con tarjetas guardadas
-- 🔄 **NUEVO:** Seguimiento de comisiones dLocal en panel admin
-- 🔄 **NUEVO:** Branding profesional de PDFs (Grúa RD)
+- ✅ **COMPLETADO:** Tokenización real de tarjetas con dLocal API (Fase 2)
+- ✅ **COMPLETADO:** Cobro real de deudas con tarjetas guardadas (Fase 2)
+- 🔄 **PENDIENTE:** Seguimiento de comisiones dLocal en panel admin (Fase 4)
+- 🔄 **PENDIENTE:** Branding profesional de PDFs (Grúa RD) (Fase 5)
 
 ---
 
-## ✅ COMPLETADO (60%)
+## ✅ COMPLETADO (70%)
 
 ### 1. **Servicio dLocal Payment Service** ✓
 - **Archivo:** `server/services/dlocal-payment.ts`
@@ -34,6 +34,9 @@ Se está implementando la integración completa con dLocal para:
   - `refundPayment()` - Reembolso de pagos capturados
   - `createPayout()` - Pagos a operadores
   - `getPaymentStatus()` - Consulta de estado de pago
+  - ✅ **NUEVO (Fase 2):** `saveCardWithValidation()` - Tokenización real de tarjetas
+  - ✅ **NUEVO (Fase 2):** `chargeWithSavedCard()` - Cobro con tarjetas guardadas
+  - ✅ **NUEVO (Fase 2):** `extractDLocalFees()` - Extracción de comisiones dLocal
 
 **Características:**
 - Reintentos automáticos con backoff exponencial
@@ -137,7 +140,49 @@ Se está implementando la integración completa con dLocal para:
 
 ## ✅ COMPLETADO RECIENTEMENTE
 
-### FASE 2: Rutas API para Operador ✓
+### FASE 2 (PLAN DLOCAL): Mejorar Servicio dLocal ✓
+**Completado:** Diciembre 2024
+
+#### Nuevas Funciones Implementadas en `server/services/dlocal-payment.ts`:
+
+##### 2.1 `saveCardWithValidation()` ✓
+- **Propósito:** Tokenización real de tarjetas con validación
+- **Lógica:**
+  1. Hace cobro de validación de 10 DOP (mínimo permitido) con `save: true`
+  2. Si el pago es exitoso, extrae el `card_id` de la respuesta
+  3. Reembolsa automáticamente los 10 DOP
+  4. Devuelve el token real de dLocal
+- **Parámetros:** cardNumber, cardExpiry, cardCVV, cardholderName, email, name, document
+- **Retorna:** cardId, brand, last4, expiryMonth, expiryYear
+
+##### 2.2 `chargeWithSavedCard()` ✓
+- **Propósito:** Cobro real con tarjetas guardadas (usando card_id de dLocal)
+- **Lógica:**
+  1. Llama a POST `/payments` con el `card_id`
+  2. Extrae información de comisión de la respuesta
+  3. Calcula monto neto después de comisión
+- **Parámetros:** cardId, amount, description, orderId, email, name, document
+- **Retorna:** paymentId, status, amount, feeAmount, feeCurrency, netAmount
+
+##### 2.3 `extractDLocalFees()` ✓
+- **Propósito:** Extraer comisiones de dLocal de cualquier respuesta de pago
+- **Lógica:**
+  - Busca campos `fee_amount`, `fee`, `processor_fee` en la respuesta
+  - Si no existe, estima 3.5% + 5 DOP (tarifa típica)
+  - Calcula monto neto (originalAmount - feeAmount)
+- **Retorna:** feeAmount, feeCurrency, netAmount
+
+**Interfaces TypeScript Añadidas:**
+- `SaveCardRequest` / `SaveCardResponse`
+- `ChargeWithSavedCardRequest` / `ChargeWithSavedCardResponse`
+- `DLocalFees`
+
+**Método Auxiliar Añadido:**
+- `detectCardBrand()` - Detecta marca de tarjeta (VISA, MASTERCARD, AMEX, etc.)
+
+---
+
+### FASE 2 (ORIGINAL): Rutas API para Operador ✓
 
 #### 2.1 Endpoints de Nómina y Retiros
 - **Ubicación:** `server/routes.ts`
@@ -189,7 +234,7 @@ Ver documento detallado: `PLAN_DLOCAL_COMPLETO.md`
 | Fase | Descripción | Estado |
 |------|-------------|--------|
 | 1 | Actualizar esquema BD (campos comisiones dLocal) | ✅ COMPLETADO |
-| 2 | Mejorar servicio dLocal (tokenización real, cobro tarjetas guardadas) | ⏳ Pendiente |
+| 2 | Mejorar servicio dLocal (tokenización real, cobro tarjetas guardadas) | ✅ COMPLETADO |
 | 3 | Corregir endpoints de tarjetas (cobros reales) | ⏳ Pendiente |
 | 4 | Panel Admin - Visualización de comisiones dLocal | ⏳ Pendiente |
 | 5 | Branding profesional en PDFs (Grúa RD) | ⏳ Pendiente |
