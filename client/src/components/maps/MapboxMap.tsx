@@ -20,103 +20,99 @@ function TowTruckIcon({ className, isActive = true }: { className?: string; isAc
   
   return (
     <svg
-      viewBox="0 0 40 28"
+      viewBox="0 0 32 24"
       fill="none"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
       {/* Flatbed/platform */}
       <rect
-        x="14"
-        y="12"
-        width="24"
-        height="3"
+        x="12"
+        y="10"
+        width="16"
+        height="2.5"
         rx="0.5"
         fill={mainColor}
         opacity={isActive ? 1 : 0.6}
       />
       {/* Inclined ramp at rear */}
       <path
-        d="M36 12L40 8L40 12Z"
+        d="M27 10L31 7L31 10Z"
         fill={mainColor}
         opacity={isActive ? 0.9 : 0.5}
       />
       {/* Lifting arm base */}
       <rect
-        x="14"
-        y="8"
-        width="3"
+        x="12"
+        y="6"
+        width="2.5"
         height="4"
         fill={mainColor}
         opacity={isActive ? 1 : 0.6}
       />
       {/* Lifting arm */}
       <path
-        d="M15.5 8L22 3"
+        d="M13.5 6L19 2"
         stroke={mainColor}
-        strokeWidth="2.5"
+        strokeWidth="2"
         strokeLinecap="round"
         opacity={isActive ? 1 : 0.6}
       />
       {/* Hook at end of arm */}
       <path
-        d="M22 3C22 3 24 3 24 5C24 6.5 22 7 21 6"
+        d="M19 2C19 2 21 2 21 3.5C21 5 19 5.5 18 4.5"
         stroke={mainColor}
-        strokeWidth="2"
+        strokeWidth="1.5"
         strokeLinecap="round"
         fill="none"
         opacity={isActive ? 1 : 0.6}
       />
       {/* Truck cabin */}
       <path
-        d="M2 10C2 9 2.5 8 4 8L10 8C11.5 8 13 9 13 11L13 15C13 15.5 12.5 16 12 16L2 16C1.5 16 1 15.5 1 15L1 11C1 10.5 1.5 10 2 10Z"
+        d="M2 8C2 7 2.5 6 4 6L9 6C10.5 6 11 7 11 8.5L11 12.5C11 13 10.5 13.5 10 13.5L2 13.5C1.5 13.5 1 13 1 12.5L1 9C1 8.5 1.5 8 2 8Z"
         fill={mainColor}
         opacity={isActive ? 1 : 0.6}
       />
       {/* Cabin windshield */}
       <path
-        d="M3 10L5 8.5L10 8.5L11 10L11 13L3 13Z"
+        d="M2.5 8L4 6.5L8.5 6.5L9.5 8L9.5 11L2.5 11Z"
         fill={windowColor}
         opacity={isActive ? 0.9 : 0.5}
       />
       {/* Cabin-bed connector */}
       <rect
-        x="12"
-        y="12"
+        x="10"
+        y="10"
         width="3"
-        height="4"
+        height="3.5"
         fill={mainColor}
         opacity={isActive ? 1 : 0.6}
       />
       {/* Truck body under flatbed */}
       <rect
-        x="14"
-        y="15"
-        width="20"
-        height="3"
+        x="12"
+        y="12.5"
+        width="14"
+        height="2.5"
         rx="0.5"
         fill={mainColor}
         opacity={isActive ? 0.85 : 0.5}
       />
       {/* Front wheel */}
-      <circle cx="6" cy="19" r="3.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
-      <circle cx="6" cy="19" r="2" fill={detailColor} opacity={isActive ? 0.8 : 0.4} />
-      <circle cx="6" cy="19" r="1" fill={isActive ? "#ddd" : "#777"} />
-      {/* Middle wheel */}
-      <circle cx="20" cy="19" r="3.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
-      <circle cx="20" cy="19" r="2" fill={detailColor} opacity={isActive ? 0.8 : 0.4} />
-      <circle cx="20" cy="19" r="1" fill={isActive ? "#ddd" : "#777"} />
+      <circle cx="5" cy="16" r="3" fill={mainColor} opacity={isActive ? 1 : 0.6} />
+      <circle cx="5" cy="16" r="1.8" fill={detailColor} opacity={isActive ? 0.8 : 0.4} />
+      <circle cx="5" cy="16" r="0.8" fill={isActive ? "#ddd" : "#777"} />
       {/* Rear wheel */}
-      <circle cx="30" cy="19" r="3.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
-      <circle cx="30" cy="19" r="2" fill={detailColor} opacity={isActive ? 0.8 : 0.4} />
-      <circle cx="30" cy="19" r="1" fill={isActive ? "#ddd" : "#777"} />
+      <circle cx="22" cy="16" r="3" fill={mainColor} opacity={isActive ? 1 : 0.6} />
+      <circle cx="22" cy="16" r="1.8" fill={detailColor} opacity={isActive ? 0.8 : 0.4} />
+      <circle cx="22" cy="16" r="0.8" fill={isActive ? "#ddd" : "#777"} />
       {/* Warning lights on top */}
       <rect
-        x="5"
-        y="6"
-        width="4"
-        height="2"
-        rx="1"
+        x="4"
+        y="4.5"
+        width="3.5"
+        height="1.5"
+        rx="0.75"
         fill={isActive ? "#f59e0b" : "#666"}
         opacity={isActive ? 0.9 : 0.4}
       />
@@ -124,10 +120,10 @@ function TowTruckIcon({ className, isActive = true }: { className?: string; isAc
         <line
           x1="2"
           y1="2"
-          x2="38"
-          y2="22"
+          x2="30"
+          y2="18"
           stroke="#ef4444"
-          strokeWidth="2.5"
+          strokeWidth="2"
           strokeLinecap="round"
         />
       )}
