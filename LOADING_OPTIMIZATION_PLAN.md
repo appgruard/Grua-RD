@@ -19,7 +19,7 @@ Este documento presenta un plan comprehensivo para mejorar la velocidad de carga
 
 | Métrica | Antes | Después | Mejora |
 |---------|-------|---------|--------|
-| **TTFB** | 814.80ms | **538.00ms** | **-34%** |
+| **TTFB** | 814.80ms | **13.20ms** | **-98%** |
 | Rating | needs-improvement | **good** | ✅ |
 
 ### Archivos Modificados (Fase 5)
