@@ -13,31 +13,91 @@ export interface Coordinates {
 
 export type MarkerType = 'origin' | 'destination' | 'driver' | 'driver_inactive' | 'service' | 'default';
 
-function TowTruckIcon({ className, isActive = true }: { className?: string; isActive?: boolean }) {
+function CraneIcon({ className, isActive = true }: { className?: string; isActive?: boolean }) {
+  const mainColor = isActive ? "currentColor" : "#64748b";
+  const detailColor = isActive ? "#0F2947" : "#475569";
+  
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 32 32"
       fill="none"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
+      {/* Crane boom/arm */}
       <path
-        d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4z"
-        fill="currentColor"
+        d="M6 24L22 8"
+        stroke={mainColor}
+        strokeWidth="3"
+        strokeLinecap="round"
+        opacity={isActive ? 1 : 0.6}
+      />
+      {/* Crane tower/mast */}
+      <path
+        d="M6 24V10"
+        stroke={mainColor}
+        strokeWidth="3"
+        strokeLinecap="round"
+        opacity={isActive ? 1 : 0.6}
+      />
+      {/* Hook cable */}
+      <path
+        d="M22 8V18"
+        stroke={mainColor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity={isActive ? 1 : 0.6}
+      />
+      {/* Hook */}
+      <path
+        d="M22 18C22 18 24 19 24 21C24 23 22 24 20 24C18 24 20 22 20 21"
+        stroke={mainColor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity={isActive ? 1 : 0.6}
+      />
+      {/* Truck cabin */}
+      <rect
+        x="2"
+        y="22"
+        width="12"
+        height="6"
+        rx="1"
+        fill={mainColor}
         opacity={isActive ? 1 : 0.5}
       />
-      <circle cx="6" cy="17" r="2" fill={isActive ? "currentColor" : "#64748b"} />
-      <circle cx="18" cy="17" r="2" fill={isActive ? "currentColor" : "#64748b"} />
+      {/* Cabin window */}
+      <rect
+        x="4"
+        y="23.5"
+        width="4"
+        height="2.5"
+        rx="0.5"
+        fill={detailColor}
+        opacity={isActive ? 0.8 : 0.4}
+      />
+      {/* Front wheel */}
+      <circle cx="5" cy="28" r="2.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
+      <circle cx="5" cy="28" r="1" fill={isActive ? "#fff" : "#94a3b8"} />
+      {/* Rear wheel */}
+      <circle cx="11" cy="28" r="2.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
+      <circle cx="11" cy="28" r="1" fill={isActive ? "#fff" : "#94a3b8"} />
+      {/* Support struts */}
       <path
-        d="M17 9.5V12h2.5L17 9.5z"
-        fill={isActive ? "#0F2947" : "#475569"}
+        d="M6 16L10 24"
+        stroke={mainColor}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        opacity={isActive ? 0.7 : 0.4}
       />
       {!isActive && (
         <line
-          x1="2"
-          y1="2"
-          x2="22"
-          y2="22"
+          x1="4"
+          y1="4"
+          x2="28"
+          y2="28"
           stroke="#ef4444"
           strokeWidth="2.5"
           strokeLinecap="round"
@@ -153,9 +213,9 @@ function MarkerIcon({ type, className }: { type: MarkerType; className?: string 
     case 'destination':
       return <Flag className={iconClass} />;
     case 'driver':
-      return <TowTruckIcon className={iconClass} isActive={true} />;
+      return <CraneIcon className={iconClass} isActive={true} />;
     case 'driver_inactive':
-      return <TowTruckIcon className={iconClass} isActive={false} />;
+      return <CraneIcon className={iconClass} isActive={false} />;
     case 'service':
       return <Wrench className={iconClass} />;
     default:
@@ -434,27 +494,36 @@ export function MapboxMap({
               latitude={marker.position.lat}
               anchor="bottom"
             >
-              <div 
-                className={`
-                  ${isDriverType ? 'w-11 h-11' : 'w-8 h-8'} 
-                  rounded-full border-2 shadow-lg flex items-center justify-center relative
-                  ${isDriverMarker ? 'animate-pulse border-white' : ''}
-                  ${isInactiveDriver ? 'border-slate-400 opacity-70' : ''}
-                  ${!isDriverType ? 'border-white' : ''}
-                `}
-                style={{ backgroundColor: getMarkerColor(marker.icon, marker.color, markerType) }}
-                title={marker.title}
-              >
-                <MarkerIcon 
-                  type={markerType} 
-                  className={isDriverType ? 'w-6 h-6 text-white' : 'w-4 h-4 text-white'} 
-                />
-                {isInactiveDriver && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-slate-500 rounded-full flex items-center justify-center border border-white">
-                    <CircleOff className="w-2.5 h-2.5 text-white" />
-                  </div>
-                )}
-              </div>
+              {isDriverType ? (
+                <div 
+                  className={`relative flex items-end justify-center ${isDriverMarker ? 'animate-pulse' : ''}`}
+                  title={marker.title}
+                  style={{ 
+                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3)) drop-shadow(0 1px 2px rgba(0,0,0,0.2))'
+                  }}
+                >
+                  <CraneIcon 
+                    className={`w-10 h-10 ${isDriverMarker ? 'text-primary' : 'text-slate-400'}`}
+                    isActive={isDriverMarker}
+                  />
+                  {isInactiveDriver && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-slate-500 rounded-full flex items-center justify-center border border-white shadow-sm">
+                      <CircleOff className="w-2.5 h-2.5 text-white" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div 
+                  className="w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center"
+                  style={{ backgroundColor: getMarkerColor(marker.icon, marker.color, markerType) }}
+                  title={marker.title}
+                >
+                  <MarkerIcon 
+                    type={markerType} 
+                    className="w-4 h-4 text-white" 
+                  />
+                </div>
+              )}
             </Marker>
           );
         })}
