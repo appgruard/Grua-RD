@@ -13,91 +13,119 @@ export interface Coordinates {
 
 export type MarkerType = 'origin' | 'destination' | 'driver' | 'driver_inactive' | 'service' | 'default';
 
-function CraneIcon({ className, isActive = true }: { className?: string; isActive?: boolean }) {
+function TowTruckIcon({ className, isActive = true }: { className?: string; isActive?: boolean }) {
   const mainColor = isActive ? "currentColor" : "#64748b";
   const detailColor = isActive ? "#0F2947" : "#475569";
+  const windowColor = isActive ? "#87CEEB" : "#94a3b8";
   
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="0 0 40 28"
       fill="none"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Crane boom/arm */}
+      {/* Flatbed/platform */}
+      <rect
+        x="14"
+        y="12"
+        width="24"
+        height="3"
+        rx="0.5"
+        fill={mainColor}
+        opacity={isActive ? 1 : 0.6}
+      />
+      {/* Inclined ramp at rear */}
       <path
-        d="M6 24L22 8"
+        d="M36 12L40 8L40 12Z"
+        fill={mainColor}
+        opacity={isActive ? 0.9 : 0.5}
+      />
+      {/* Lifting arm base */}
+      <rect
+        x="14"
+        y="8"
+        width="3"
+        height="4"
+        fill={mainColor}
+        opacity={isActive ? 1 : 0.6}
+      />
+      {/* Lifting arm */}
+      <path
+        d="M15.5 8L22 3"
         stroke={mainColor}
-        strokeWidth="3"
+        strokeWidth="2.5"
         strokeLinecap="round"
         opacity={isActive ? 1 : 0.6}
       />
-      {/* Crane tower/mast */}
+      {/* Hook at end of arm */}
       <path
-        d="M6 24V10"
-        stroke={mainColor}
-        strokeWidth="3"
-        strokeLinecap="round"
-        opacity={isActive ? 1 : 0.6}
-      />
-      {/* Hook cable */}
-      <path
-        d="M22 8V18"
+        d="M22 3C22 3 24 3 24 5C24 6.5 22 7 21 6"
         stroke={mainColor}
         strokeWidth="2"
         strokeLinecap="round"
-        opacity={isActive ? 1 : 0.6}
-      />
-      {/* Hook */}
-      <path
-        d="M22 18C22 18 24 19 24 21C24 23 22 24 20 24C18 24 20 22 20 21"
-        stroke={mainColor}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
         fill="none"
         opacity={isActive ? 1 : 0.6}
       />
       {/* Truck cabin */}
-      <rect
-        x="2"
-        y="22"
-        width="12"
-        height="6"
-        rx="1"
+      <path
+        d="M2 10C2 9 2.5 8 4 8L10 8C11.5 8 13 9 13 11L13 15C13 15.5 12.5 16 12 16L2 16C1.5 16 1 15.5 1 15L1 11C1 10.5 1.5 10 2 10Z"
         fill={mainColor}
-        opacity={isActive ? 1 : 0.5}
+        opacity={isActive ? 1 : 0.6}
       />
-      {/* Cabin window */}
+      {/* Cabin windshield */}
+      <path
+        d="M3 10L5 8.5L10 8.5L11 10L11 13L3 13Z"
+        fill={windowColor}
+        opacity={isActive ? 0.9 : 0.5}
+      />
+      {/* Cabin-bed connector */}
       <rect
-        x="4"
-        y="23.5"
-        width="4"
-        height="2.5"
+        x="12"
+        y="12"
+        width="3"
+        height="4"
+        fill={mainColor}
+        opacity={isActive ? 1 : 0.6}
+      />
+      {/* Truck body under flatbed */}
+      <rect
+        x="14"
+        y="15"
+        width="20"
+        height="3"
         rx="0.5"
-        fill={detailColor}
-        opacity={isActive ? 0.8 : 0.4}
+        fill={mainColor}
+        opacity={isActive ? 0.85 : 0.5}
       />
       {/* Front wheel */}
-      <circle cx="5" cy="28" r="2.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
-      <circle cx="5" cy="28" r="1" fill={isActive ? "#fff" : "#94a3b8"} />
+      <circle cx="6" cy="19" r="3.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
+      <circle cx="6" cy="19" r="2" fill={detailColor} opacity={isActive ? 0.8 : 0.4} />
+      <circle cx="6" cy="19" r="1" fill={isActive ? "#ddd" : "#777"} />
+      {/* Middle wheel */}
+      <circle cx="20" cy="19" r="3.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
+      <circle cx="20" cy="19" r="2" fill={detailColor} opacity={isActive ? 0.8 : 0.4} />
+      <circle cx="20" cy="19" r="1" fill={isActive ? "#ddd" : "#777"} />
       {/* Rear wheel */}
-      <circle cx="11" cy="28" r="2.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
-      <circle cx="11" cy="28" r="1" fill={isActive ? "#fff" : "#94a3b8"} />
-      {/* Support struts */}
-      <path
-        d="M6 16L10 24"
-        stroke={mainColor}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        opacity={isActive ? 0.7 : 0.4}
+      <circle cx="30" cy="19" r="3.5" fill={mainColor} opacity={isActive ? 1 : 0.6} />
+      <circle cx="30" cy="19" r="2" fill={detailColor} opacity={isActive ? 0.8 : 0.4} />
+      <circle cx="30" cy="19" r="1" fill={isActive ? "#ddd" : "#777"} />
+      {/* Warning lights on top */}
+      <rect
+        x="5"
+        y="6"
+        width="4"
+        height="2"
+        rx="1"
+        fill={isActive ? "#f59e0b" : "#666"}
+        opacity={isActive ? 0.9 : 0.4}
       />
       {!isActive && (
         <line
-          x1="4"
-          y1="4"
-          x2="28"
-          y2="28"
+          x1="2"
+          y1="2"
+          x2="38"
+          y2="22"
           stroke="#ef4444"
           strokeWidth="2.5"
           strokeLinecap="round"
@@ -213,9 +241,9 @@ function MarkerIcon({ type, className }: { type: MarkerType; className?: string 
     case 'destination':
       return <Flag className={iconClass} />;
     case 'driver':
-      return <CraneIcon className={iconClass} isActive={true} />;
+      return <TowTruckIcon className={iconClass} isActive={true} />;
     case 'driver_inactive':
-      return <CraneIcon className={iconClass} isActive={false} />;
+      return <TowTruckIcon className={iconClass} isActive={false} />;
     case 'service':
       return <Wrench className={iconClass} />;
     default:
@@ -502,8 +530,8 @@ export function MapboxMap({
                     filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3)) drop-shadow(0 1px 2px rgba(0,0,0,0.2))'
                   }}
                 >
-                  <CraneIcon 
-                    className={`w-10 h-10 ${isDriverMarker ? 'text-primary' : 'text-slate-400'}`}
+                  <TowTruckIcon 
+                    className={`w-12 h-8 ${isDriverMarker ? 'text-primary' : 'text-slate-400'}`}
                     isActive={isDriverMarker}
                   />
                   {isInactiveDriver && (
