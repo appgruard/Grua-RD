@@ -290,6 +290,7 @@ export const tarifas = pgTable("tarifas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nombre: text("nombre").notNull(),
   servicioCategoria: servicioCategoriaEnum("servicio_categoria"),
+  servicioSubtipo: servicioSubtipoEnum("servicio_subtipo"),
   precioBase: decimal("precio_base", { precision: 10, scale: 2 }).notNull(),
   tarifaPorKm: decimal("tarifa_por_km", { precision: 10, scale: 2 }).notNull(),
   tarifaNocturnaMultiplicador: decimal("tarifa_nocturna_multiplicador", { precision: 3, scale: 2 }).default("1.5"),
@@ -1421,6 +1422,21 @@ export const insertTarifaSchema = createInsertSchema(tarifas, {
     "izaje_construccion",
     "remolque_recreativo",
     "extraccion"
+  ]).optional().nullable(),
+  servicioSubtipo: z.enum([
+    "cambio_goma", "inflado_neumatico", "paso_corriente", "cerrajero_automotriz",
+    "suministro_combustible", "envio_bateria", "diagnostico_obd", "extraccion_vehiculo",
+    "vehiculo_sin_llanta", "vehiculo_sin_direccion", "vehiculo_chocado", "vehiculo_electrico",
+    "vehiculo_lujo", "vehiculo_deportivo", "vehiculo_bajo", "vehiculo_modificado",
+    "traslado_especial", "servicio_premium",
+    "moto_accidentada", "moto_no_prende", "scooter_pasola", "delivery_accidentado",
+    "moto_alto_cilindraje", "traslado_local_moto", "reubicacion_moto",
+    "camion_liviano", "camion_mediano", "camiones_cisternas", "de_carga",
+    "patana_cabezote", "volteo", "transporte_maquinarias", "montacargas",
+    "retroexcavadora", "rodillo", "greda", "excavadora", "pala_mecanica", "tractor",
+    "izaje_materiales", "subida_muebles", "transporte_equipos",
+    "remolque_botes", "remolque_jetski", "remolque_cuatrimoto",
+    "extraccion_zanja", "extraccion_lodo", "extraccion_volcado", "extraccion_accidente", "extraccion_dificil"
   ]).optional().nullable(),
 }).omit({
   id: true,

@@ -211,6 +211,7 @@ export interface IStorage {
   // Tarifas
   createTarifa(tarifa: InsertTarifa): Promise<Tarifa>;
   getActiveTarifa(): Promise<Tarifa | undefined>;
+  getTarifaByCategoriaySubtipo(categoria: string | null, subtipo: string | null): Promise<Tarifa | undefined>;
   getAllTarifas(): Promise<Tarifa[]>;
   updateTarifa(id: string, data: Partial<Tarifa>): Promise<Tarifa>;
 
@@ -1053,6 +1054,59 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(tarifas.createdAt))
       .limit(1);
     return tarifa;
+  }
+
+  async getTarifaByCategoriaySubtipo(categoria: string | null, subtipo: string | null): Promise<Tarifa | undefined> {
+    // Priority order for finding tariff:
+    // 1. Exact match: category + subtype
+    // 2. Category only (no subtype)
+    // 3. General tariff (no category, no subtype)
+    
+    // Try exact match first (category + subtype)
+    if (categoria && subtipo) {
+      const [exactMatch] = await db
+        .select()
+        .from(tarifas)
+        .where(and(
+          eq(tarifas.activo, true),
+          eq(tarifas.servicioCategoria, categoria as any),
+          eq(tarifas.servicioSubtipo, subtipo as any)
+        ))
+        .orderBy(desc(tarifas.createdAt))
+        .limit(1);
+      
+      if (exactMatch) return exactMatch;
+    }
+    
+    // Try category only match
+    if (categoria) {
+      const [categoryMatch] = await db
+        .select()
+        .from(tarifas)
+        .where(and(
+          eq(tarifas.activo, true),
+          eq(tarifas.servicioCategoria, categoria as any),
+          sql`${tarifas.servicioSubtipo} IS NULL`
+        ))
+        .orderBy(desc(tarifas.createdAt))
+        .limit(1);
+      
+      if (categoryMatch) return categoryMatch;
+    }
+    
+    // Fallback to general tariff (no category, no subtype)
+    const [generalTariff] = await db
+      .select()
+      .from(tarifas)
+      .where(and(
+        eq(tarifas.activo, true),
+        sql`${tarifas.servicioCategoria} IS NULL`,
+        sql`${tarifas.servicioSubtipo} IS NULL`
+      ))
+      .orderBy(desc(tarifas.createdAt))
+      .limit(1);
+    
+    return generalTariff;
   }
 
   async getAllTarifas(): Promise<Tarifa[]> {
