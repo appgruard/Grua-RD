@@ -29,7 +29,7 @@ Grúa RD uses a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js)
 - **Authentication & Security**: Role-based access with Passport.js and session management.
 - **Client Features**: Map-based service requests, real-time tracking, service history, automatic price calculation, and insurance document management.
 - **Driver Features**: Request dashboard, accept/reject services, real-time GPS updates, availability toggle, and specialized truck/vehicle management per service category. Includes an Operator Wallet System for commission calculation, debt management, and payment processing.
-- **Admin Features**: Dashboard with analytics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration, document validation, and support ticket system.
+- **Admin Features**: Dashboard with analytics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration with subcategory support (allowing independent pricing per service type), document validation, and support ticket system.
 - **Enterprise Portal (B2B)**: Business management, contract/tariff configuration, project tracking, scheduled services, and invoicing.
 - **Real-time Communication**: WebSockets for location updates, client-driver chat, and automatic service cancellation.
 - **Push Notifications**: Web Push API and Capacitor for service updates and chat messages.
