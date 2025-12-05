@@ -65,6 +65,8 @@ interface OperatorWallet {
   conductorId: number;
   balance: string;
   totalDebt: string;
+  totalCashEarnings: string;
+  totalCardEarnings: string;
   cashServicesBlocked: boolean;
   createdAt: string;
   updatedAt: string;
@@ -358,6 +360,8 @@ export default function AdminWallets() {
             <TableRow>
               <TableHead>Operador</TableHead>
               <TableHead className="text-right">Balance</TableHead>
+              <TableHead className="text-right">Efectivo</TableHead>
+              <TableHead className="text-right">Tarjeta</TableHead>
               <TableHead className="text-right">Deuda</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
@@ -367,7 +371,7 @@ export default function AdminWallets() {
             {walletsLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={7}>
                     <div className="h-6 bg-muted rounded animate-pulse" />
                   </TableCell>
                 </TableRow>
@@ -388,6 +392,16 @@ export default function AdminWallets() {
                     <TableCell className="text-right" data-testid={`cell-balance-${wallet.id}`}>
                       <span className={balance > 0 ? 'text-green-600 font-medium' : ''} data-testid={`text-balance-${wallet.id}`}>
                         {formatCurrency(wallet.balance)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right" data-testid={`cell-cash-earnings-${wallet.id}`}>
+                      <span className="text-amber-600 font-medium" data-testid={`text-cash-earnings-${wallet.id}`}>
+                        {formatCurrency(wallet.totalCashEarnings || '0')}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right" data-testid={`cell-card-earnings-${wallet.id}`}>
+                      <span className="text-blue-600 font-medium" data-testid={`text-card-earnings-${wallet.id}`}>
+                        {formatCurrency(wallet.totalCardEarnings || '0')}
                       </span>
                     </TableCell>
                     <TableCell className="text-right" data-testid={`cell-debt-${wallet.id}`}>
@@ -447,7 +461,7 @@ export default function AdminWallets() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8">
+                <TableCell colSpan={7} className="text-center py-8">
                   <Wallet className="w-10 h-10 mx-auto mb-2 text-muted-foreground/50" />
                   <p className="text-muted-foreground">No se encontraron billeteras</p>
                 </TableCell>
@@ -484,6 +498,18 @@ export default function AdminWallets() {
                     <p className="text-sm text-muted-foreground">Deuda Total</p>
                     <p className="text-xl font-bold text-destructive" data-testid="detail-text-debt">
                       {formatCurrency(walletDetails.totalDebt)}
+                    </p>
+                  </Card>
+                  <Card className="p-4" data-testid="detail-card-cash-earnings">
+                    <p className="text-sm text-muted-foreground">Ganancia Efectivo</p>
+                    <p className="text-xl font-bold text-amber-600" data-testid="detail-text-cash-earnings">
+                      {formatCurrency(walletDetails.totalCashEarnings || '0')}
+                    </p>
+                  </Card>
+                  <Card className="p-4" data-testid="detail-card-card-earnings">
+                    <p className="text-sm text-muted-foreground">Ganancia Tarjeta</p>
+                    <p className="text-xl font-bold text-blue-600" data-testid="detail-text-card-earnings">
+                      {formatCurrency(walletDetails.totalCardEarnings || '0')}
                     </p>
                   </Card>
                 </div>

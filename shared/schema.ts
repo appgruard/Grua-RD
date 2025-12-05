@@ -289,6 +289,7 @@ export const dismissedServices = pgTable("dismissed_services", {
 export const tarifas = pgTable("tarifas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nombre: text("nombre").notNull(),
+  servicioCategoria: servicioCategoriaEnum("servicio_categoria"),
   precioBase: decimal("precio_base", { precision: 10, scale: 2 }).notNull(),
   tarifaPorKm: decimal("tarifa_por_km", { precision: 10, scale: 2 }).notNull(),
   tarifaNocturnaMultiplicador: decimal("tarifa_nocturna_multiplicador", { precision: 3, scale: 2 }).default("1.5"),
@@ -1408,6 +1409,19 @@ export const insertServicioSchema = createInsertSchema(servicios, {
 
 export const insertTarifaSchema = createInsertSchema(tarifas, {
   nombre: z.string().min(1),
+  servicioCategoria: z.enum([
+    "remolque_estandar",
+    "remolque_motocicletas",
+    "remolque_plataforma",
+    "auxilio_vial",
+    "remolque_especializado",
+    "camiones_pesados",
+    "vehiculos_pesados",
+    "maquinarias",
+    "izaje_construccion",
+    "remolque_recreativo",
+    "extraccion"
+  ]).optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
@@ -1975,6 +1989,8 @@ export const operatorWallets = pgTable("operator_wallets", {
   conductorId: varchar("conductor_id").notNull().unique().references(() => conductores.id, { onDelete: "cascade" }),
   balance: decimal("balance", { precision: 12, scale: 2 }).default("0.00").notNull(),
   totalDebt: decimal("total_debt", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  totalCashEarnings: decimal("total_cash_earnings", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  totalCardEarnings: decimal("total_card_earnings", { precision: 12, scale: 2 }).default("0.00").notNull(),
   cashServicesBlocked: boolean("cash_services_blocked").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -2181,6 +2197,8 @@ export type MensajeTicketWithUsuario = MensajeTicket & {
 export const insertOperatorWalletSchema = createInsertSchema(operatorWallets, {
   balance: z.string().optional(),
   totalDebt: z.string().optional(),
+  totalCashEarnings: z.string().optional(),
+  totalCardEarnings: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,

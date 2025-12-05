@@ -179,6 +179,7 @@ export class WalletService {
 
   /**
    * Process cash payment - creates debt for commission
+   * Operator keeps 80% of cash physically, owes 20% commission
    */
   private static async processCashPayment(
     wallet: OperatorWallet,
@@ -209,14 +210,17 @@ export class WalletService {
       walletId: wallet.id,
       servicioId: servicio.id,
       type: 'cash_commission',
-      amount: commission.toFixed(2),
+      amount: operatorEarnings.toFixed(2),
       commissionAmount: commission.toFixed(2),
-      description: `Comisión por servicio en efectivo - ${servicio.id.slice(0, 8)}`
+      description: `Servicio en efectivo - Ganancia: RD$${operatorEarnings.toFixed(2)}, Comisión: RD$${commission.toFixed(2)}`
     });
 
     const currentDebt = parseFloat(wallet.totalDebt) || 0;
+    const currentCashEarnings = parseFloat(wallet.totalCashEarnings || '0') || 0;
+    
     await storage.updateWallet(wallet.id, {
-      totalDebt: (currentDebt + commission).toFixed(2)
+      totalDebt: (currentDebt + commission).toFixed(2),
+      totalCashEarnings: (currentCashEarnings + operatorEarnings).toFixed(2)
     });
 
     const conductor = await storage.getConductorById(servicio.conductorId!);
@@ -224,7 +228,7 @@ export class WalletService {
       await this.sendNotification(
         conductor.userId,
         'Nueva comisión registrada',
-        `Se ha registrado una comisión de RD$${commission.toFixed(2)}. Tienes ${DEBT_DUE_DAYS} días para pagarla.`
+        `Ganaste RD$${operatorEarnings.toFixed(2)} en efectivo. Comisión: RD$${commission.toFixed(2)} (${DEBT_DUE_DAYS} días para pagar).`
       );
     }
 
@@ -233,7 +237,7 @@ export class WalletService {
       commission,
       operatorEarnings,
       newDebt: commission,
-      message: `Servicio en efectivo procesado. Comisión: RD$${commission.toFixed(2)}, Ganancia neta: RD$${operatorEarnings.toFixed(2)}`
+      message: `Servicio en efectivo procesado. Ganancia: RD$${operatorEarnings.toFixed(2)}, Comisión: RD$${commission.toFixed(2)}`
     };
   }
 
@@ -306,10 +310,12 @@ export class WalletService {
     const cappedDebtPaid = Math.min(totalDebtPaid, currentDebt);
     const newBalance = parseFloat(wallet.balance) + remainingEarnings;
     const newDebt = Math.max(0, currentDebt - cappedDebtPaid);
+    const currentCardEarnings = parseFloat(wallet.totalCardEarnings || '0') || 0;
 
     const updateData: Partial<OperatorWallet> = {
       balance: newBalance.toFixed(2),
-      totalDebt: newDebt.toFixed(2)
+      totalDebt: newDebt.toFixed(2),
+      totalCardEarnings: (currentCardEarnings + operatorEarnings).toFixed(2)
     };
 
     const shouldUnblock = newDebt <= 0.01 && wallet.cashServicesBlocked;

@@ -15,7 +15,8 @@ import {
   TrendingUp,
   TrendingDown,
   Ban,
-  History
+  History,
+  Banknote
 } from 'lucide-react';
 import { WalletTransactionHistory } from './WalletTransactionHistory';
 import { DebtDetailModal } from './DebtDetailModal';
@@ -26,6 +27,8 @@ interface WalletData {
   conductorId: string;
   balance: string;
   totalDebt: string;
+  totalCashEarnings: string;
+  totalCardEarnings: string;
   cashServicesBlocked: boolean;
   pendingDebts: PendingDebt[];
   recentTransactions: WalletTransaction[];
@@ -175,6 +178,9 @@ export function WalletSection() {
 
   const balance = parseFloat(wallet.balance);
   const totalDebt = parseFloat(wallet.totalDebt);
+  const totalCashEarnings = parseFloat(wallet.totalCashEarnings || '0');
+  const totalCardEarnings = parseFloat(wallet.totalCardEarnings || '0');
+  const totalEarnings = totalCashEarnings + totalCardEarnings;
   const statusInfo = getDebtStatusInfo(wallet);
   const StatusIcon = statusInfo.icon;
 
@@ -197,6 +203,44 @@ export function WalletSection() {
           </Button>
         </div>
 
+        <div className="mb-4 p-4 rounded-lg bg-primary/5 border border-primary/10">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Ganancias Totales</span>
+          </div>
+          <p className="text-2xl font-bold text-primary mb-3" data-testid="text-total-earnings">
+            {formatCurrency(totalEarnings)}
+          </p>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center gap-2 mb-1">
+                <Banknote className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
+                <span className="text-xs text-muted-foreground">Efectivo</span>
+              </div>
+              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-500" data-testid="text-cash-earnings">
+                {formatCurrency(totalCashEarnings)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                80% de pagos en efectivo
+              </p>
+            </div>
+            
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <div className="flex items-center gap-2 mb-1">
+                <CreditCard className="w-4 h-4 text-blue-600 dark:text-blue-500" />
+                <span className="text-xs text-muted-foreground">Tarjeta</span>
+              </div>
+              <p className="text-lg font-bold text-blue-600 dark:text-blue-500" data-testid="text-card-earnings">
+                {formatCurrency(totalCardEarnings)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                80% de pagos con tarjeta
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div 
             className="p-4 rounded-lg bg-green-500/10 border border-green-500/20"
@@ -204,10 +248,13 @@ export function WalletSection() {
           >
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-500" />
-              <span className="text-sm text-muted-foreground">Balance</span>
+              <span className="text-sm text-muted-foreground">Balance Disponible</span>
             </div>
             <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-500" data-testid="text-wallet-balance">
               {formatCurrency(balance)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              De servicios con tarjeta
             </p>
           </div>
 
@@ -219,7 +266,7 @@ export function WalletSection() {
           >
             <div className="flex items-center gap-2 mb-2">
               <TrendingDown className={`w-4 h-4 ${statusInfo.color}`} />
-              <span className="text-sm text-muted-foreground">Deuda</span>
+              <span className="text-sm text-muted-foreground">Deuda Pendiente</span>
             </div>
             <div className="flex items-center justify-between gap-1">
               <p className={`text-xl sm:text-2xl font-bold ${statusInfo.color}`} data-testid="text-wallet-debt">
@@ -229,6 +276,9 @@ export function WalletSection() {
                 <ChevronRight className={`w-4 h-4 ${statusInfo.color}`} />
               )}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              20% comisión de efectivo
+            </p>
           </button>
         </div>
 
