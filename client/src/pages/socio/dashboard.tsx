@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +20,23 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+
+const SocioCharts = lazy(() => import('@/components/socio/SocioCharts'));
+
+function ChartSkeleton() {
+  const heights = ['45%', '70%', '55%', '85%', '60%', '75%', '50%'];
+  return (
+    <div className="h-[300px] flex items-end gap-2 px-4">
+      {heights.map((height, i) => (
+        <Skeleton
+          key={i}
+          className="flex-1"
+          style={{ height }}
+        />
+      ))}
+    </div>
+  );
+}
 
 interface SocioResumen {
   porcentajeParticipacion: number;
@@ -287,37 +304,9 @@ export default function SocioDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="periodo" 
-                    tick={{ fontSize: 12 }}
-                    tickLine={false}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12 }}
-                    tickLine={false}
-                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip 
-                    formatter={(value: number) => [formatCurrency(value), 'Monto']}
-                    labelStyle={{ color: 'var(--foreground)' }}
-                    contentStyle={{ 
-                      backgroundColor: 'var(--background)', 
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px'
-                    }}
-                  />
-                  <Bar 
-                    dataKey="monto" 
-                    fill="hsl(var(--primary))" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <Suspense fallback={<ChartSkeleton />}>
+              <SocioCharts chartData={chartData} formatCurrency={formatCurrency} />
+            </Suspense>
           </CardContent>
         </Card>
       )}
