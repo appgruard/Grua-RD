@@ -65,6 +65,8 @@ export interface EmailService {
   sendEmail(options: EmailOptions): Promise<boolean>;
   sendOTPEmail(email: string, code: string, userName?: string): Promise<boolean>;
   sendWelcomeEmail(email: string, userName: string): Promise<boolean>;
+  sendClientWelcomeEmail(email: string, userName: string): Promise<boolean>;
+  sendOperatorWelcomeEmail(email: string, userName: string): Promise<boolean>;
   sendServiceNotification(email: string, subject: string, message: string): Promise<boolean>;
   sendPasswordResetEmail(email: string, resetLink: string, userName?: string): Promise<boolean>;
   sendDocumentApprovalEmail(email: string, documentType: string, approved: boolean, reason?: string): Promise<boolean>;
@@ -236,6 +238,206 @@ class ResendEmailService implements EmailService {
       html,
       text,
     });
+  }
+
+  async sendClientWelcomeEmail(email: string, userName: string): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send client welcome email');
+      return false;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a GruaRD</h1>
+          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Tu servicio de gruas de confianza</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Hola ${userName},</p>
+          
+          <p style="font-size: 16px;">
+            Gracias por registrarte en GruaRD. Estamos comprometidos a brindarte el mejor servicio de asistencia vial en Republica Dominicana.
+          </p>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Como solicitar un servicio:</h3>
+            <ol style="margin: 0; padding-left: 20px; color: #555;">
+              <li style="margin-bottom: 8px;">Ingresa a tu cuenta en GruaRD</li>
+              <li style="margin-bottom: 8px;">Indica tu ubicacion actual</li>
+              <li style="margin-bottom: 8px;">Selecciona el tipo de servicio que necesitas</li>
+              <li style="margin-bottom: 8px;">Confirma y espera a tu operador</li>
+            </ol>
+          </div>
+          
+          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Metodos de pago disponibles:</h4>
+            <p style="margin: 0; font-size: 14px; color: #555;">
+              Efectivo, Tarjeta de credito/debito, Transferencia bancaria
+            </p>
+          </div>
+          
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #856404; margin: 0 0 10px 0;">Linea de emergencias 24/7:</h4>
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #1e3a5f;">
+              +1 (809) 555-GRUA
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://gruard.com" style="background: #1e3a5f; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Ir a GruaRD</a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            Tienes preguntas? Contactanos en info@gruard.com<br>
+            GruaRD - Tu servicio de gruas de confianza
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Hola ${userName},\n\nGracias por registrarte en GruaRD. Estamos comprometidos a brindarte el mejor servicio de asistencia vial.\n\nComo solicitar un servicio:\n1. Ingresa a tu cuenta en GruaRD\n2. Indica tu ubicacion actual\n3. Selecciona el tipo de servicio\n4. Confirma y espera a tu operador\n\nMetodos de pago: Efectivo, Tarjeta, Transferencia\n\nLinea de emergencias 24/7: +1 (809) 555-GRUA\n\nGruaRD - Tu servicio de gruas de confianza`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD <${resend.fromEmail}>`,
+        to: [email],
+        subject: 'Bienvenido a GruaRD - Tu servicio de gruas de confianza',
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send client welcome email:', error);
+        return false;
+      }
+
+      logger.info(`Client welcome email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending client welcome email:', error);
+      return false;
+    }
+  }
+
+  async sendOperatorWelcomeEmail(email: string, userName: string): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send operator welcome email');
+      return false;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido al Equipo GruaRD</h1>
+          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Gracias por unirte como operador</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Hola ${userName},</p>
+          
+          <p style="font-size: 16px;">
+            Gracias por registrarte como operador en GruaRD. Estamos emocionados de tenerte en nuestro equipo de profesionales.
+          </p>
+          
+          <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #155724; margin: 0 0 10px 0;">Proximos pasos:</h4>
+            <ol style="margin: 0; padding-left: 20px; color: #155724;">
+              <li style="margin-bottom: 8px;">Completa la verificacion de tus documentos</li>
+              <li style="margin-bottom: 8px;">Espera la aprobacion de nuestro equipo</li>
+              <li style="margin-bottom: 8px;">Configura tu perfil y disponibilidad</li>
+              <li style="margin-bottom: 8px;">Comienza a recibir solicitudes de servicio</li>
+            </ol>
+          </div>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Beneficios de ser operador GruaRD:</h3>
+            <ul style="margin: 0; padding-left: 20px; color: #555;">
+              <li style="margin-bottom: 8px;"><strong>80% de comision</strong> - Tu te quedas con el 80% de cada servicio</li>
+              <li style="margin-bottom: 8px;"><strong>Flexibilidad total</strong> - Trabaja cuando quieras</li>
+              <li style="margin-bottom: 8px;"><strong>Pagos semanales</strong> - Recibe tus ganancias puntualmente</li>
+              <li style="margin-bottom: 8px;"><strong>Soporte 24/7</strong> - Siempre estamos para ayudarte</li>
+              <li style="margin-bottom: 8px;"><strong>Sin costos ocultos</strong> - Transparencia total</li>
+            </ul>
+          </div>
+          
+          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Tips para maximizar tus ingresos:</h4>
+            <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 14px;">
+              <li style="margin-bottom: 6px;">Mantente disponible en horas pico (7-9am, 5-8pm)</li>
+              <li style="margin-bottom: 6px;">Responde rapidamente a las solicitudes</li>
+              <li style="margin-bottom: 6px;">Ofrece un servicio profesional y amable</li>
+              <li style="margin-bottom: 6px;">Mantiene tu equipo en optimas condiciones</li>
+            </ul>
+          </div>
+          
+          <div style="background: #f8d7da; border-left: 4px solid #dc3545; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #721c24; margin: 0 0 10px 0;">Importante:</h4>
+            <p style="margin: 0; font-size: 14px; color: #721c24;">
+              Debes completar la verificacion de documentos antes de poder recibir solicitudes. 
+              Esto incluye: licencia de conducir, seguro del vehiculo y documentos de la grua.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://gruard.com" style="background: #28a745; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Completar Verificacion</a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 14px; color: #666; text-align: center;">
+            <strong>Soporte para Operadores:</strong><br>
+            Email: operadores@gruard.com<br>
+            WhatsApp: +1 (809) 555-OPER
+          </p>
+          
+          <p style="font-size: 12px; color: #999; text-align: center; margin-top: 20px;">
+            GruaRD - Juntos hacemos la diferencia
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Hola ${userName},\n\nGracias por registrarte como operador en GruaRD. Estamos emocionados de tenerte en nuestro equipo.\n\nProximos pasos:\n1. Completa la verificacion de tus documentos\n2. Espera la aprobacion de nuestro equipo\n3. Configura tu perfil y disponibilidad\n4. Comienza a recibir solicitudes\n\nBeneficios:\n- 80% de comision por servicio\n- Flexibilidad total\n- Pagos semanales\n- Soporte 24/7\n\nImportante: Debes completar la verificacion de documentos antes de poder recibir solicitudes.\n\nSoporte: operadores@gruard.com\n\nGruaRD - Juntos hacemos la diferencia`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD <${resend.fromEmail}>`,
+        to: [email],
+        subject: 'Bienvenido al Equipo GruaRD - Proximos pasos',
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send operator welcome email:', error);
+        return false;
+      }
+
+      logger.info(`Operator welcome email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending operator welcome email:', error);
+      return false;
+    }
   }
 
   async sendServiceNotification(email: string, subject: string, message: string): Promise<boolean> {
@@ -638,6 +840,16 @@ class MockEmailService implements EmailService {
 
   async sendWelcomeEmail(email: string, userName: string): Promise<boolean> {
     logger.info(`📧 [MOCK EMAIL] Bienvenida para ${email} (${userName})`);
+    return true;
+  }
+
+  async sendClientWelcomeEmail(email: string, userName: string): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Bienvenida cliente para ${email} (${userName})`);
+    return true;
+  }
+
+  async sendOperatorWelcomeEmail(email: string, userName: string): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Bienvenida operador para ${email} (${userName})`);
     return true;
   }
 

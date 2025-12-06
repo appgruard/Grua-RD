@@ -270,10 +270,13 @@ sendAdminCreatedEmail(email, nombre, permisos, tempPassword): Promise<boolean>
    - POST /api/tickets/:id/mensaje - Email cuando staff responde
 3. Probar flujo completo - Pendiente test manual
 
-### Fase 2: Emails de Registro (Prioridad Alta)
-1. Mejorar email de bienvenida para clientes
-2. Crear email de bienvenida para operadores
-3. Integrar en flujo de registro
+### Fase 2: Emails de Registro (Prioridad Alta) - COMPLETADA
+1. ~~Mejorar email de bienvenida para clientes~~ - HECHO
+   - `sendClientWelcomeEmail()` - Email detallado con instrucciones de uso, metodos de pago y linea de emergencia
+2. ~~Crear email de bienvenida para operadores~~ - HECHO
+   - `sendOperatorWelcomeEmail()` - Email con proximos pasos, beneficios (80% comision), tips para maximizar ingresos
+3. ~~Integrar en flujo de registro~~ - HECHO
+   - POST /api/auth/register - Envia email segun tipo de usuario (cliente o conductor)
 
 ### Fase 3: Sistema de Socios (Prioridad Media)
 1. Agregar campo `primerInicioSesion`

@@ -765,6 +765,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Send welcome email based on user type (use the created user's type, not request body)
+      try {
+        const emailService = await getEmailService();
+        const userName = user.nombre || user.email.split('@')[0];
+        const actualUserType = user.userType || 'cliente';
+        
+        if (actualUserType === 'conductor') {
+          await emailService.sendOperatorWelcomeEmail(user.email, userName);
+          logSystem.info("Operator welcome email sent", { userId: user.id, email: user.email });
+        } else if (actualUserType === 'cliente') {
+          await emailService.sendClientWelcomeEmail(user.email, userName);
+          logSystem.info("Client welcome email sent", { userId: user.id, email: user.email });
+        }
+      } catch (emailError) {
+        // Don't fail registration if email fails
+        logSystem.warn("Failed to send welcome email during registration", { 
+          userId: user.id, 
+          email: user.email, 
+          error: emailError instanceof Error ? emailError.message : 'Unknown error'
+        });
+      }
+
       const updatedUser = await storage.getUserById(user.id);
 
       req.login(updatedUser || user, (err) => {
