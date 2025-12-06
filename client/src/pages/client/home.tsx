@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { calculateRoute, type Coordinates, type RouteGeometry } from '@/lib/maps';
+import { calculateRoute, type Coordinates } from '@/lib/maps';
 import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck, AlertTriangle, Info, Clock, Navigation } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -23,8 +23,7 @@ import { InsuranceForm } from '@/components/InsuranceForm';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import type { Servicio } from '@shared/schema';
-
-type Step = 'serviceCategory' | 'serviceSubtype' | 'extractionDescription' | 'location' | 'vehicleType' | 'payment' | 'confirm';
+import { useServiceRequest } from '@/lib/serviceRequestContext';
 
 const ONSITE_SUBTYPES = [
   'cambio_goma',
@@ -49,27 +48,50 @@ const ONSITE_SERVICE_PRICES: Record<string, number> = {
 export default function ClientHome() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  const {
+    step,
+    setStep,
+    servicioCategoria,
+    setServicioCategoria,
+    servicioSubtipo,
+    setServicioSubtipo,
+    tipoVehiculo,
+    setTipoVehiculo,
+    metodoPago,
+    setMetodoPago,
+    selectedCardId,
+    setSelectedCardId,
+    aseguradoraNombre,
+    setAseguradoraNombre,
+    aseguradoraPoliza,
+    setAseguradoraPoliza,
+    descripcionSituacion,
+    setDescripcionSituacion,
+    quiereTransporteExtraccion,
+    setQuiereTransporteExtraccion,
+    origin,
+    setOrigin,
+    destination,
+    setDestination,
+    origenDireccion,
+    setOrigenDireccion,
+    destinoDireccion,
+    setDestinoDireccion,
+    distance,
+    setDistance,
+    duration,
+    setDuration,
+    cost,
+    setCost,
+    routeGeometry,
+    setRouteGeometry,
+    resetServiceRequest,
+  } = useServiceRequest();
+
   const [currentLocation, setCurrentLocation] = useState<Coordinates>({ lat: 18.4861, lng: -69.9312 });
-  const [origin, setOrigin] = useState<Coordinates | null>(null);
-  const [origenDireccion, setOrigenDireccion] = useState<string>('');
-  const [destination, setDestination] = useState<Coordinates | null>(null);
-  const [destinoDireccion, setDestinoDireccion] = useState<string>('');
-  const [distance, setDistance] = useState<number | null>(null);
-  const [duration, setDuration] = useState<number | null>(null);
-  const [cost, setCost] = useState<number | null>(null);
-  const [step, setStep] = useState<Step>('serviceCategory');
-  const [servicioCategoria, setServicioCategoria] = useState<string | null>(null);
-  const [servicioSubtipo, setServicioSubtipo] = useState<string | null>(null);
-  const [tipoVehiculo, setTipoVehiculo] = useState<string | null>(null);
-  const [metodoPago, setMetodoPago] = useState<string>('efectivo');
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
-  const [aseguradoraNombre, setAseguradoraNombre] = useState<string>('');
-  const [aseguradoraPoliza, setAseguradoraPoliza] = useState<string>('');
-  const [descripcionSituacion, setDescripcionSituacion] = useState<string>('');
-  const [quiereTransporteExtraccion, setQuiereTransporteExtraccion] = useState<boolean>(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [showExpandedCard, setShowExpandedCard] = useState(true);
-  const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
   const distanceRef = useRef<number | null>(null);
 
   const { data: insuranceStatus } = useQuery<{
@@ -158,6 +180,8 @@ export default function ClientHome() {
         title: 'Solicitud enviada',
         description: 'Esperando que un operador acepte',
       });
+      resetServiceRequest();
+      distanceRef.current = null;
       setLocation(`/client/tracking/${service.id}`);
     },
     onError: () => {
@@ -543,24 +567,8 @@ export default function ClientHome() {
   };
 
   const reset = () => {
-    setOrigin(null);
-    setDestination(null);
-    setOrigenDireccion('');
-    setDestinoDireccion('');
-    setDistance(null);
-    setDuration(null);
-    setCost(null);
-    setRouteGeometry(null);
-    setServicioCategoria(null);
-    setServicioSubtipo(null);
-    setTipoVehiculo(null);
-    setMetodoPago('efectivo');
-    setSelectedCardId(null);
-    setAseguradoraNombre('');
-    setAseguradoraPoliza('');
-    setDescripcionSituacion('');
-    setQuiereTransporteExtraccion(false);
-    setStep('serviceCategory');
+    resetServiceRequest();
+    distanceRef.current = null;
   };
 
   const getCategoryLabel = (categoryId: string | null): string => {

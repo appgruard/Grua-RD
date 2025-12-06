@@ -11,6 +11,7 @@ import { EmpresaLayout } from '@/components/layout/EmpresaLayout';
 import { InstallPWA, UpdateAvailable, OfflineIndicator } from '@/components/InstallPWA';
 import { ThemeProvider } from '@/components/ThemeToggle';
 import { initializePreloading, preloadDriverModules } from '@/lib/preload';
+import { ServiceRequestProvider } from '@/lib/serviceRequestContext';
 
 initializePreloading();
 
@@ -474,13 +475,15 @@ export default function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <TooltipProvider>
-            <OfflineIndicator />
-            <Toaster />
-            <Router />
-            <InstallPWA />
-            <UpdateAvailable />
-          </TooltipProvider>
+          <ServiceRequestProvider>
+            <TooltipProvider>
+              <OfflineIndicator />
+              <Toaster />
+              <Router />
+              <InstallPWA />
+              <UpdateAvailable />
+            </TooltipProvider>
+          </ServiceRequestProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
