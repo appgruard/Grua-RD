@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Users,
@@ -15,6 +16,7 @@ import {
   Handshake,
   Wallet,
   CreditCard,
+  UserCog,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -33,30 +35,43 @@ import {
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
+import { type AdminPermiso } from '@shared/schema';
 
 interface AdminLayoutProps {
   children: ReactNode;
 }
 
 const menuItems = [
-  { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' },
-  { path: '/admin/analytics', icon: BarChart3, label: 'Analytics', testId: 'nav-analytics' },
-  { path: '/admin/users', icon: Users, label: 'Usuarios', testId: 'nav-users' },
-  { path: '/admin/drivers', icon: Truck, label: 'Conductores', testId: 'nav-drivers' },
-  { path: '/admin/wallets', icon: Wallet, label: 'Billeteras', testId: 'nav-wallets' },
-  { path: '/admin/payment-fees', icon: CreditCard, label: 'Comisiones', testId: 'nav-payment-fees' },
-  { path: '/admin/services', icon: FileText, label: 'Servicios', testId: 'nav-services' },
-  { path: '/admin/pricing', icon: DollarSign, label: 'Tarifas', testId: 'nav-pricing' },
-  { path: '/admin/monitoring', icon: Map, label: 'Monitoreo', testId: 'nav-monitoring' },
-  { path: '/admin/verifications', icon: ShieldCheck, label: 'Verificaciones', testId: 'nav-verifications' },
-  { path: '/admin/aseguradoras', icon: Building2, label: 'Gestión Aseguradoras', testId: 'nav-aseguradoras' },
-  { path: '/admin/tickets', icon: MessageCircle, label: 'Tickets Soporte', testId: 'nav-tickets' },
-  { path: '/admin/socios', icon: Handshake, label: 'Socios e Inversores', testId: 'nav-socios' },
+  { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard', permiso: 'dashboard' as AdminPermiso },
+  { path: '/admin/analytics', icon: BarChart3, label: 'Analytics', testId: 'nav-analytics', permiso: 'analytics' as AdminPermiso },
+  { path: '/admin/users', icon: Users, label: 'Usuarios', testId: 'nav-users', permiso: 'usuarios' as AdminPermiso },
+  { path: '/admin/drivers', icon: Truck, label: 'Conductores', testId: 'nav-drivers', permiso: 'operadores' as AdminPermiso },
+  { path: '/admin/wallets', icon: Wallet, label: 'Billeteras', testId: 'nav-wallets', permiso: 'billeteras' as AdminPermiso },
+  { path: '/admin/payment-fees', icon: CreditCard, label: 'Comisiones', testId: 'nav-payment-fees', permiso: 'comisiones_pago' as AdminPermiso },
+  { path: '/admin/services', icon: FileText, label: 'Servicios', testId: 'nav-services', permiso: 'servicios' as AdminPermiso },
+  { path: '/admin/pricing', icon: DollarSign, label: 'Tarifas', testId: 'nav-pricing', permiso: 'tarifas' as AdminPermiso },
+  { path: '/admin/monitoring', icon: Map, label: 'Monitoreo', testId: 'nav-monitoring', permiso: 'monitoreo' as AdminPermiso },
+  { path: '/admin/verifications', icon: ShieldCheck, label: 'Verificaciones', testId: 'nav-verifications', permiso: 'verificaciones' as AdminPermiso },
+  { path: '/admin/aseguradoras', icon: Building2, label: 'Gestión Aseguradoras', testId: 'nav-aseguradoras', permiso: 'aseguradoras' as AdminPermiso },
+  { path: '/admin/tickets', icon: MessageCircle, label: 'Tickets Soporte', testId: 'nav-tickets', permiso: 'tickets' as AdminPermiso },
+  { path: '/admin/socios', icon: Handshake, label: 'Socios e Inversores', testId: 'nav-socios', permiso: 'socios' as AdminPermiso },
+  { path: '/admin/administradores', icon: UserCog, label: 'Administradores', testId: 'nav-administradores', permiso: 'admin_usuarios' as AdminPermiso },
 ];
 
 function AppSidebar() {
   const [location] = useLocation();
   const { logout, user } = useAuth();
+
+  const { data: permissionsData } = useQuery<{ permisos: AdminPermiso[] }>({
+    queryKey: ['/api/admin/me/permissions'],
+  });
+
+  const adminPermisos = permissionsData?.permisos || [];
+  const hasAllPermissions = adminPermisos.length === 0;
+
+  const filteredMenuItems = hasAllPermissions 
+    ? menuItems 
+    : menuItems.filter(item => adminPermisos.includes(item.permiso));
 
   return (
     <Sidebar>
@@ -74,7 +89,7 @@ function AppSidebar() {
           </div>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location === item.path;
                 

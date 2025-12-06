@@ -13,7 +13,7 @@ import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
-import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema, insertCalificacionSchema, insertEmpresaSchema, insertEmpresaEmpleadoSchema, insertEmpresaContratoSchema, insertEmpresaTarifaSchema, insertEmpresaProyectoSchema, insertEmpresaConductorAsignadoSchema, insertServicioProgramadoSchema, insertEmpresaFacturaSchema, insertEmpresaFacturaItemSchema, VALID_SERVICE_CATEGORIES } from "@shared/schema";
+import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensajeChatSchema, insertPushSubscriptionSchema, insertDocumentoSchema, insertTicketSchema, insertMensajeTicketSchema, insertSocioSchema, insertDistribucionSocioSchema, insertCalificacionSchema, insertEmpresaSchema, insertEmpresaEmpleadoSchema, insertEmpresaContratoSchema, insertEmpresaTarifaSchema, insertEmpresaProyectoSchema, insertEmpresaConductorAsignadoSchema, insertServicioProgramadoSchema, insertEmpresaFacturaSchema, insertEmpresaFacturaItemSchema, VALID_SERVICE_CATEGORIES, ADMIN_PERMISOS, type AdminPermiso } from "@shared/schema";
 import type { User, Servicio, Empresa } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
@@ -9182,6 +9182,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get distribution error', error);
       res.status(500).json({ message: "Error al obtener distribución" });
+    }
+  });
+
+  // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
+
+  // Validation schema for creating administrators
+  const createAdministradorSchema = z.object({
+    email: z.string().email("Email inválido"),
+    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+    nombre: z.string().min(1, "Nombre es requerido"),
+    apellido: z.string().optional(),
+    permisos: z.array(z.enum(ADMIN_PERMISOS)).min(1, "Debe tener al menos un permiso"),
+    notas: z.string().optional().nullable(),
+  });
+
+  // Validation schema for updating administrators
+  const updateAdministradorSchema = z.object({
+    permisos: z.array(z.enum(ADMIN_PERMISOS)).min(1, "Debe tener al menos un permiso").optional(),
+    notas: z.string().optional().nullable(),
+  });
+
+  // Helper function to verify admin has required permission
+  async function verifyAdminPermission(req: Request, res: Response, requiredPermission: AdminPermiso): Promise<boolean> {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      res.status(401).json({ message: "No autorizado" });
+      return false;
+    }
+
+    const currentAdmin = await storage.getAdministradorByUserId(req.user!.id);
+    
+    // If no administrator record exists (legacy full admin), allow access
+    if (!currentAdmin) {
+      return true;
+    }
+
+    // Check if admin is active
+    if (!currentAdmin.activo) {
+      res.status(403).json({ message: "Tu cuenta de administrador está desactivada" });
+      return false;
+    }
+
+    // Check if admin has the required permission
+    if (!currentAdmin.permisos || !currentAdmin.permisos.includes(requiredPermission)) {
+      res.status(403).json({ message: "No tienes permisos para gestionar administradores" });
+      return false;
+    }
+
+    return true;
+  }
+
+  // Get all administrators (admin only with admin_usuarios permission)
+  app.get("/api/admin/administradores", async (req: Request, res: Response) => {
+    const hasPermission = await verifyAdminPermission(req, res, 'admin_usuarios');
+    if (!hasPermission) return;
+
+    try {
+      const administradores = await storage.getAdministradores();
+      res.json(administradores);
+    } catch (error: any) {
+      logSystem.error('Get all administrators error', error);
+      res.status(500).json({ message: "Error al obtener administradores" });
+    }
+  });
+
+  // Get administrator by ID (admin only with admin_usuarios permission)
+  app.get("/api/admin/administradores/:id", async (req: Request, res: Response) => {
+    const hasPermission = await verifyAdminPermission(req, res, 'admin_usuarios');
+    if (!hasPermission) return;
+
+    try {
+      const admin = await storage.getAdministradorById(req.params.id);
+      if (!admin) {
+        return res.status(404).json({ message: "Administrador no encontrado" });
+      }
+      res.json(admin);
+    } catch (error: any) {
+      logSystem.error('Get administrator by ID error', error);
+      res.status(500).json({ message: "Error al obtener administrador" });
+    }
+  });
+
+  // Create new administrator (admin only with admin_usuarios permission)
+  app.post("/api/admin/administradores", async (req: Request, res: Response) => {
+    const hasPermission = await verifyAdminPermission(req, res, 'admin_usuarios');
+    if (!hasPermission) return;
+
+    const parsed = createAdministradorSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        message: "Datos inválidos",
+        errors: parsed.error.errors 
+      });
+    }
+
+    try {
+      const existingUser = await storage.getUserByEmail(parsed.data.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Ya existe un usuario con ese email" });
+      }
+
+      const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+      const newUser = await storage.createUser({
+        email: parsed.data.email,
+        passwordHash,
+        nombre: parsed.data.nombre,
+        apellido: parsed.data.apellido || '',
+        userType: 'admin',
+        estadoCuenta: 'activo',
+        emailVerificado: true,
+      });
+
+      const admin = await storage.createAdministrador({
+        userId: newUser.id,
+        permisos: parsed.data.permisos,
+        notas: parsed.data.notas || null,
+        creadoPor: req.user!.id,
+        activo: true,
+      });
+
+      const emailService = await getEmailService();
+      await emailService.sendAdminCreatedEmail(
+        parsed.data.email,
+        parsed.data.nombre,
+        parsed.data.password,
+        parsed.data.permisos
+      );
+
+      logAuth.info('Administrator created', { 
+        adminId: admin.id, 
+        userId: newUser.id,
+        email: parsed.data.email,
+        createdBy: req.user!.id 
+      });
+
+      const adminWithDetails = await storage.getAdministradorById(admin.id);
+      res.status(201).json(adminWithDetails);
+    } catch (error: any) {
+      logSystem.error('Create administrator error', error);
+      res.status(500).json({ message: "Error al crear administrador" });
+    }
+  });
+
+  // Update administrator permissions (admin only with admin_usuarios permission)
+  app.put("/api/admin/administradores/:id", async (req: Request, res: Response) => {
+    const hasPermission = await verifyAdminPermission(req, res, 'admin_usuarios');
+    if (!hasPermission) return;
+
+    const parsed = updateAdministradorSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        message: "Datos inválidos",
+        errors: parsed.error.errors 
+      });
+    }
+
+    try {
+      const admin = await storage.getAdministradorById(req.params.id);
+      if (!admin) {
+        return res.status(404).json({ message: "Administrador no encontrado" });
+      }
+
+      const updated = await storage.updateAdministrador(req.params.id, parsed.data);
+      if (!updated) {
+        return res.status(404).json({ message: "No se pudo actualizar el administrador" });
+      }
+
+      logAuth.info('Administrator updated', { 
+        adminId: req.params.id, 
+        updatedBy: req.user!.id 
+      });
+
+      const adminWithDetails = await storage.getAdministradorById(req.params.id);
+      res.json(adminWithDetails);
+    } catch (error: any) {
+      logSystem.error('Update administrator error', error);
+      res.status(500).json({ message: "Error al actualizar administrador" });
+    }
+  });
+
+  // Toggle administrator active status (admin only with admin_usuarios permission)
+  app.put("/api/admin/administradores/:id/toggle", async (req: Request, res: Response) => {
+    const hasPermission = await verifyAdminPermission(req, res, 'admin_usuarios');
+    if (!hasPermission) return;
+
+    try {
+      const admin = await storage.getAdministradorById(req.params.id);
+      if (!admin) {
+        return res.status(404).json({ message: "Administrador no encontrado" });
+      }
+
+      if (admin.userId === req.user!.id) {
+        return res.status(400).json({ message: "No puedes desactivar tu propia cuenta" });
+      }
+
+      const updated = await storage.toggleAdministradorActivo(req.params.id);
+      if (!updated) {
+        return res.status(404).json({ message: "No se pudo cambiar el estado" });
+      }
+
+      logAuth.info('Administrator status toggled', { 
+        adminId: req.params.id, 
+        newStatus: updated.activo,
+        changedBy: req.user!.id 
+      });
+
+      const adminWithDetails = await storage.getAdministradorById(req.params.id);
+      res.json(adminWithDetails);
+    } catch (error: any) {
+      logSystem.error('Toggle administrator status error', error);
+      res.status(500).json({ message: "Error al cambiar estado del administrador" });
+    }
+  });
+
+  // Get current admin permissions (for sidebar filtering)
+  app.get("/api/admin/me/permissions", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const admin = await storage.getAdministradorByUserId(req.user!.id);
+      if (!admin) {
+        return res.json({ permisos: ADMIN_PERMISOS, isFullAdmin: true });
+      }
+      res.json({ 
+        permisos: admin.permisos,
+        isFullAdmin: false,
+        activo: admin.activo,
+        primerInicioSesion: admin.primerInicioSesion
+      });
+    } catch (error: any) {
+      logSystem.error('Get admin permissions error', error);
+      res.status(500).json({ message: "Error al obtener permisos" });
     }
   });
 
