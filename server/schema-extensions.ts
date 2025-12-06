@@ -34,6 +34,17 @@ export const verificationAudit = pgTable("verification_audit", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Email Verification Tokens Table - Stores tokens for email verification
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  token: text("token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  verified: boolean("verified").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Service Receipts Table - Stores PDF receipt metadata for completed services
 export const serviceReceipts = pgTable("service_receipts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -49,6 +60,8 @@ export type OtpToken = typeof otpTokens.$inferSelect;
 export type NewOtpToken = typeof otpTokens.$inferInsert;
 export type VerificationAudit = typeof verificationAudit.$inferSelect;
 export type NewVerificationAudit = typeof verificationAudit.$inferInsert;
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
+export type NewEmailVerificationToken = typeof emailVerificationTokens.$inferInsert;
 export type ServiceReceipt = typeof serviceReceipts.$inferSelect;
 export type NewServiceReceipt = typeof serviceReceipts.$inferInsert;
 
