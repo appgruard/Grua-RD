@@ -52,6 +52,15 @@ export interface EmailOptions {
   text?: string;
 }
 
+export interface TicketEmailData {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  categoria: string;
+  prioridad: string;
+  estado: string;
+}
+
 export interface EmailService {
   sendEmail(options: EmailOptions): Promise<boolean>;
   sendOTPEmail(email: string, code: string, userName?: string): Promise<boolean>;
@@ -59,6 +68,9 @@ export interface EmailService {
   sendServiceNotification(email: string, subject: string, message: string): Promise<boolean>;
   sendPasswordResetEmail(email: string, resetLink: string, userName?: string): Promise<boolean>;
   sendDocumentApprovalEmail(email: string, documentType: string, approved: boolean, reason?: string): Promise<boolean>;
+  sendTicketCreatedEmail(email: string, userName: string, ticket: TicketEmailData): Promise<boolean>;
+  sendTicketStatusChangedEmail(email: string, userName: string, ticket: TicketEmailData, oldStatus: string, newStatus: string): Promise<boolean>;
+  sendTicketSupportResponseEmail(email: string, userName: string, ticket: TicketEmailData, mensaje: string): Promise<boolean>;
   isConfigured(): Promise<boolean>;
 }
 
@@ -371,6 +383,242 @@ class ResendEmailService implements EmailService {
       text,
     });
   }
+
+  async sendTicketCreatedEmail(email: string, userName: string, ticket: TicketEmailData): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.support);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send ticket created email');
+      return false;
+    }
+
+    const prioridadTexto: Record<string, string> = {
+      'baja': '48-72 horas',
+      'media': '24-48 horas',
+      'alta': '12-24 horas',
+      'urgente': '2-6 horas'
+    };
+
+    const categoriaTexto: Record<string, string> = {
+      'problema_tecnico': 'Problema Tecnico',
+      'consulta_servicio': 'Consulta de Servicio',
+      'queja': 'Queja',
+      'sugerencia': 'Sugerencia',
+      'problema_pago': 'Problema de Pago',
+      'otro': 'Otro'
+    };
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD Soporte</h1>
+          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Ticket Creado</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Hola ${userName},</p>
+          
+          <p style="font-size: 16px;">Tu ticket de soporte ha sido creado exitosamente.</p>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Numero de Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>Titulo:</strong> ${ticket.titulo}</p>
+            <p style="margin: 5px 0;"><strong>Categoria:</strong> ${categoriaTexto[ticket.categoria] || ticket.categoria}</p>
+            <p style="margin: 5px 0;"><strong>Prioridad:</strong> ${ticket.prioridad.charAt(0).toUpperCase() + ticket.prioridad.slice(1)}</p>
+            <p style="margin: 5px 0;"><strong>Estado:</strong> Abierto</p>
+          </div>
+          
+          <p style="font-size: 14px; color: #666;">
+            <strong>Tiempo estimado de respuesta:</strong> ${prioridadTexto[ticket.prioridad] || '24-48 horas'}
+          </p>
+          
+          <p style="font-size: 14px; color: #666;">
+            Te notificaremos por correo cuando haya actualizaciones en tu ticket.
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            GruaRD Soporte - support@gruard.com
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Hola ${userName},\n\nTu ticket de soporte ha sido creado.\n\nNumero: #${ticket.id.slice(-8).toUpperCase()}\nTitulo: ${ticket.titulo}\nCategoria: ${categoriaTexto[ticket.categoria] || ticket.categoria}\nPrioridad: ${ticket.prioridad}\n\nTiempo estimado de respuesta: ${prioridadTexto[ticket.prioridad] || '24-48 horas'}\n\nGruaRD Soporte`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD Soporte <${resend.fromEmail}>`,
+        to: [email],
+        subject: `Ticket #${ticket.id.slice(-8).toUpperCase()} creado - ${ticket.titulo}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send ticket created email:', error);
+        return false;
+      }
+
+      logger.info(`Ticket created email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending ticket created email:', error);
+      return false;
+    }
+  }
+
+  async sendTicketStatusChangedEmail(email: string, userName: string, ticket: TicketEmailData, oldStatus: string, newStatus: string): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.support);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send ticket status email');
+      return false;
+    }
+
+    const estadoTexto: Record<string, { label: string; mensaje: string; color: string }> = {
+      'abierto': { label: 'Abierto', mensaje: 'Tu ticket ha sido reabierto y sera atendido pronto.', color: '#17a2b8' },
+      'en_proceso': { label: 'En Proceso', mensaje: 'Nuestro equipo esta trabajando en tu solicitud.', color: '#ffc107' },
+      'resuelto': { label: 'Resuelto', mensaje: 'Tu ticket ha sido resuelto. Si necesitas mas ayuda, puedes responder a este ticket.', color: '#28a745' },
+      'cerrado': { label: 'Cerrado', mensaje: 'Tu ticket ha sido cerrado. Gracias por contactarnos.', color: '#6c757d' }
+    };
+
+    const estado = estadoTexto[newStatus] || { label: newStatus, mensaje: '', color: '#666' };
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD Soporte</h1>
+          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Actualizacion de Ticket</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Hola ${userName},</p>
+          
+          <p style="font-size: 16px;">El estado de tu ticket ha sido actualizado.</p>
+          
+          <div style="background: white; border-left: 4px solid ${estado.color}; padding: 15px 20px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>Titulo:</strong> ${ticket.titulo}</p>
+            <p style="margin: 5px 0;"><strong>Nuevo Estado:</strong> <span style="color: ${estado.color}; font-weight: bold;">${estado.label}</span></p>
+          </div>
+          
+          <p style="font-size: 14px; color: #666;">${estado.mensaje}</p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            GruaRD Soporte - support@gruard.com
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Hola ${userName},\n\nEl estado de tu ticket #${ticket.id.slice(-8).toUpperCase()} ha cambiado a: ${estado.label}\n\n${estado.mensaje}\n\nGruaRD Soporte`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD Soporte <${resend.fromEmail}>`,
+        to: [email],
+        subject: `Ticket #${ticket.id.slice(-8).toUpperCase()} - Estado: ${estado.label}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send ticket status email:', error);
+        return false;
+      }
+
+      logger.info(`Ticket status email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending ticket status email:', error);
+      return false;
+    }
+  }
+
+  async sendTicketSupportResponseEmail(email: string, userName: string, ticket: TicketEmailData, mensaje: string): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.support);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send ticket response email');
+      return false;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD Soporte</h1>
+          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Nueva Respuesta</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Hola ${userName},</p>
+          
+          <p style="font-size: 16px;">Nuestro equipo de soporte ha respondido a tu ticket.</p>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0; font-size: 12px; color: #666;"><strong>Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()} - ${ticket.titulo}</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 10px 0;">
+            <p style="margin: 0; font-size: 14px; white-space: pre-wrap;">${mensaje}</p>
+          </div>
+          
+          <p style="font-size: 14px; color: #666;">
+            Puedes responder a este ticket desde tu cuenta en GruaRD.
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center;">
+            GruaRD Soporte - support@gruard.com
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Hola ${userName},\n\nNuestro equipo de soporte ha respondido a tu ticket #${ticket.id.slice(-8).toUpperCase()}.\n\nMensaje:\n${mensaje}\n\nPuedes responder desde tu cuenta en GruaRD.\n\nGruaRD Soporte`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD Soporte <${resend.fromEmail}>`,
+        to: [email],
+        subject: `Respuesta a Ticket #${ticket.id.slice(-8).toUpperCase()} - ${ticket.titulo}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send ticket response email:', error);
+        return false;
+      }
+
+      logger.info(`Ticket response email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending ticket response email:', error);
+      return false;
+    }
+  }
 }
 
 class MockEmailService implements EmailService {
@@ -405,6 +653,21 @@ class MockEmailService implements EmailService {
 
   async sendDocumentApprovalEmail(email: string, documentType: string, approved: boolean, reason?: string): Promise<boolean> {
     logger.info(`📧 [MOCK EMAIL] Documento ${documentType} ${approved ? 'aprobado' : 'rechazado'} para ${email}`);
+    return true;
+  }
+
+  async sendTicketCreatedEmail(email: string, userName: string, ticket: TicketEmailData): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Ticket creado #${ticket.id.slice(-8)} para ${email}`);
+    return true;
+  }
+
+  async sendTicketStatusChangedEmail(email: string, userName: string, ticket: TicketEmailData, oldStatus: string, newStatus: string): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Ticket #${ticket.id.slice(-8)} cambio de ${oldStatus} a ${newStatus} para ${email}`);
+    return true;
+  }
+
+  async sendTicketSupportResponseEmail(email: string, userName: string, ticket: TicketEmailData, mensaje: string): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Respuesta a ticket #${ticket.id.slice(-8)} para ${email}`);
     return true;
   }
 }

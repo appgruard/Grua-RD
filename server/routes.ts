@@ -8263,6 +8263,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const ticket = await storage.createTicket(validationResult.data);
       logSystem.info('Ticket created', { ticketId: ticket.id, userId: req.user!.id, categoria: ticket.categoria });
+      
+      // Send email notification to user
+      const emailService = await getEmailService();
+      const user = await storage.getUser(req.user!.id);
+      if (user?.email) {
+        emailService.sendTicketCreatedEmail(user.email, user.nombre || 'Usuario', {
+          id: ticket.id,
+          titulo: ticket.titulo,
+          descripcion: ticket.descripcion || '',
+          categoria: ticket.categoria,
+          prioridad: ticket.prioridad,
+          estado: ticket.estado
+        }).catch(err => logSystem.error('Failed to send ticket created email', err));
+      }
+      
       res.json(ticket);
     } catch (error: any) {
       logSystem.error('Create ticket error', error);
@@ -8344,6 +8359,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (isAdmin && ticket.estado === 'abierto') {
         await storage.cambiarEstadoTicket(req.params.id, 'en_proceso');
+      }
+
+      // Send email to ticket owner when staff responds
+      if (isAdmin) {
+        const emailService = await getEmailService();
+        const ticketOwner = await storage.getUser(ticket.usuarioId);
+        if (ticketOwner?.email) {
+          emailService.sendTicketSupportResponseEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
+            id: ticket.id,
+            titulo: ticket.titulo,
+            descripcion: ticket.descripcion || '',
+            categoria: ticket.categoria,
+            prioridad: ticket.prioridad,
+            estado: ticket.estado
+          }, req.body.contenido).catch(err => logSystem.error('Failed to send ticket response email', err));
+        }
       }
 
       logSystem.info('Ticket message sent', { ticketId: req.params.id, messageId: mensaje.id, isStaff: isAdmin });
@@ -8490,8 +8521,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket no encontrado" });
       }
 
+      const oldStatus = ticket.estado;
       const updated = await storage.cambiarEstadoTicket(req.params.id, estado);
       logSystem.info('Ticket status changed', { ticketId: req.params.id, newStatus: estado, changedBy: req.user!.id });
+      
+      // Send email notification to ticket owner
+      const emailService = await getEmailService();
+      const ticketOwner = await storage.getUser(ticket.usuarioId);
+      if (ticketOwner?.email) {
+        emailService.sendTicketStatusChangedEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
+          id: ticket.id,
+          titulo: ticket.titulo,
+          descripcion: ticket.descripcion || '',
+          categoria: ticket.categoria,
+          prioridad: ticket.prioridad,
+          estado: estado
+        }, oldStatus, estado).catch(err => logSystem.error('Failed to send ticket status email', err));
+      }
+      
       res.json(updated);
     } catch (error: any) {
       logSystem.error('Change ticket status error', error);
