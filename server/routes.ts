@@ -6649,31 +6649,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Determine card brand from card number
-      let cardBrand = 'unknown';
-      if (cleanNumber.startsWith('4')) {
-        cardBrand = 'visa';
-      } else if (cleanNumber.startsWith('5')) {
-        cardBrand = 'mastercard';
-      } else if (cleanNumber.startsWith('3')) {
-        cardBrand = 'amex';
+      // Get user data for dLocal tokenization
+      const user = req.user!;
+
+      // Use real dLocal tokenization via saveCardWithValidation
+      let tokenResult;
+      try {
+        tokenResult = await dlocalPaymentService.saveCardWithValidation({
+          cardNumber: cleanNumber,
+          cardExpiry: cardExpiry,
+          cardCVV: cardCVV,
+          cardholderName: cardholderName || `${user.nombre} ${user.apellido}`,
+          email: user.email,
+          name: `${user.nombre} ${user.apellido}`,
+          document: conductor.cedula || user.cedula || '00000000000',
+        });
+      } catch (dlocalError: any) {
+        logTransaction.error('dLocal card tokenization failed', {
+          conductorId: conductor.id,
+          error: dlocalError.message,
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: dlocalError.message || "Error al validar la tarjeta con el procesador de pagos. Verifique los datos e intente nuevamente.",
+        });
       }
 
-      // Parse expiry
-      let expiryMonth = 0;
-      let expiryYear = 0;
-      if (cleanExpiry.length === 4) {
-        expiryMonth = parseInt(cleanExpiry.substring(0, 2), 10);
-        expiryYear = 2000 + parseInt(cleanExpiry.substring(2, 4), 10);
-      }
+      // Use real dLocal token data
+      const cardToken = tokenResult.cardId;
+      const cardBrand = tokenResult.brand;
+      const last4 = tokenResult.last4;
+      const expiryMonth = tokenResult.expiryMonth;
+      const expiryYear = tokenResult.expiryYear;
 
-      // Get last 4 digits
-      const last4 = cleanNumber.slice(-4);
-
-      // Generate a secure token for the card
-      const cardToken = `DLOCAL_OP_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-      // Save payment method
+      // Save payment method with real dLocal token
       const paymentMethod = await storage.createOperatorPaymentMethod({
         conductorId: conductor.id,
         dlocalCardId: cardToken,
@@ -6684,11 +6694,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardholderName: cardholderName || null,
       });
 
-      logTransaction.info('Operator payment method created', { 
+      logTransaction.info('Operator payment method created with real dLocal tokenization', { 
         conductorId: conductor.id,
         paymentMethodId: paymentMethod.id,
         cardBrand,
         last4,
+        tokenized: true,
       });
 
       res.json({
