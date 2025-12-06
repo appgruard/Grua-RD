@@ -1852,31 +1852,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         score: result.score
       });
 
+      // If Verifik API fails (404, network error, etc.), mark for manual review
       if (!result.success) {
+        logSystem.warn("Verifik face validation failed, marking for manual review", {
+          userId: req.user!.id,
+          error: result.error
+        });
+        
+        // Store the score as 0 to indicate it needs manual review
+        await storage.updateUser(req.user!.id, {
+          fotoVerificada: false,
+          fotoVerificadaScore: "0"
+        });
+        
         return res.json({
           verified: false,
           score: 0,
-          error: result.error || "Error al validar la foto"
+          requiresManualReview: true,
+          message: "La validación automática no está disponible. La foto será revisada manualmente por un administrador."
         });
       }
 
-      if (result.isHumanFace && result.score) {
+      // Verifik succeeded - check if it's a valid human face
+      if (result.isHumanFace && result.score >= 0.6) {
         await storage.updateUser(req.user!.id, {
           fotoVerificada: true,
           fotoVerificadaScore: result.score.toString()
         });
-        logSystem.info("Profile photo verified and saved", {
+        logSystem.info("Profile photo verified automatically", {
           userId: req.user!.id,
           score: result.score
         });
+        
+        return res.json({
+          verified: true,
+          score: result.score,
+          scanId: result.scanId,
+          message: "Foto verificada exitosamente"
+        });
       }
 
+      // Verifik succeeded but score is too low or not a valid human face - mark for manual review
+      logSystem.info("Profile photo needs manual review due to low score or invalid face", {
+        userId: req.user!.id,
+        score: result.score,
+        isHumanFace: result.isHumanFace
+      });
+      
+      await storage.updateUser(req.user!.id, {
+        fotoVerificada: false,
+        fotoVerificadaScore: result.score.toString()
+      });
+
       res.json({
-        verified: result.isHumanFace,
+        verified: false,
         score: result.score,
         scanId: result.scanId,
+        requiresManualReview: true,
         details: result.details,
-        error: result.isHumanFace ? undefined : (result.details || "La foto no parece ser de un rostro humano válido")
+        message: result.details || "La foto no cumple con los requisitos automáticos y será revisada manualmente por un administrador."
       });
     } catch (error: any) {
       logSystem.error("Verify profile photo error", error, { userId: req.user?.id });
@@ -4252,7 +4286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const driversWithPendingPhoto = allUsers.filter(user => 
         user.userType === 'conductor' && 
         !user.fotoVerificada &&
-        user.photoUrl
+        user.fotoUrl
       );
 
       const pendingPhotos = driversWithPendingPhoto.map(user => ({
@@ -4262,7 +4296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: user.email,
         cedula: user.cedula,
         phone: user.phone,
-        photoUrl: user.photoUrl,
+        photoUrl: user.fotoUrl,
         cedulaVerificada: user.cedulaVerificada,
         telefonoVerificado: user.telefonoVerificado,
         fotoVerificada: user.fotoVerificada,
@@ -4273,7 +4307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = {
         totalPending: pendingPhotos.length,
         totalDrivers: allUsers.filter(u => u.userType === 'conductor').length,
-        totalWithPhoto: allUsers.filter(u => u.userType === 'conductor' && u.photoUrl).length,
+        totalWithPhoto: allUsers.filter(u => u.userType === 'conductor' && u.fotoUrl).length,
         totalVerified: allUsers.filter(u => u.userType === 'conductor' && u.fotoVerificada).length,
       };
 
@@ -4307,7 +4341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User is not a driver" });
       }
 
-      if (!user.photoUrl) {
+      if (!user.fotoUrl) {
         return res.status(400).json({ message: "User has no profile photo to approve" });
       }
 
