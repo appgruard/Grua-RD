@@ -6,6 +6,13 @@ interface ResendCredentials {
   fromEmail: string;
 }
 
+// Email addresses for different purposes
+export const EMAIL_ADDRESSES = {
+  verification: 'verification@gruard.com',
+  support: 'support@gruard.com',
+  info: 'info@gruard.com',
+};
+
 async function getResendCredentials(): Promise<ResendCredentials | null> {
   try {
     const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -48,7 +55,7 @@ async function getResendCredentials(): Promise<ResendCredentials | null> {
   }
 }
 
-async function getResendClient(): Promise<{ client: Resend; fromEmail: string } | null> {
+async function getResendClient(customFromEmail?: string): Promise<{ client: Resend; fromEmail: string } | null> {
   const credentials = await getResendCredentials();
   if (!credentials) {
     return null;
@@ -56,7 +63,7 @@ async function getResendClient(): Promise<{ client: Resend; fromEmail: string } 
   
   return {
     client: new Resend(credentials.apiKey),
-    fromEmail: credentials.fromEmail
+    fromEmail: customFromEmail || credentials.fromEmail
   };
 }
 
@@ -115,6 +122,13 @@ class ResendEmailService implements EmailService {
   async sendOTPEmail(email: string, code: string, userName?: string): Promise<boolean> {
     const greeting = userName ? `Hola ${userName}` : 'Hola';
     
+    // Use verification-specific email address
+    const resend = await getResendClient(EMAIL_ADDRESSES.verification);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send OTP email');
+      return false;
+    }
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -157,12 +171,26 @@ class ResendEmailService implements EmailService {
 
     const text = `${greeting},\n\nTu código de verificación GruaRD es: ${code}\n\nEste código es válido por 10 minutos.\n\nSi no solicitaste este código, puedes ignorar este correo.`;
 
-    return this.sendEmail({
-      to: email,
-      subject: `Tu código de verificación GruaRD: ${code}`,
-      html,
-      text,
-    });
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD Verificación <${resend.fromEmail}>`,
+        to: [email],
+        subject: `Tu código de verificación GruaRD: ${code}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send OTP email:', error);
+        return false;
+      }
+
+      logger.info(`OTP email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending OTP email:', error);
+      return false;
+    }
   }
 
   async sendWelcomeEmail(email: string, userName: string): Promise<boolean> {

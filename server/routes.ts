@@ -1155,54 +1155,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/send-otp", async (req: Request, res: Response) => {
     try {
-      const { telefono, tipoOperacion } = req.body;
+      const { email, tipoOperacion } = req.body;
 
-      if (!telefono || !tipoOperacion) {
-        return res.status(400).json({ message: "Teléfono y tipo de operación son requeridos" });
+      if (!email || !tipoOperacion) {
+        return res.status(400).json({ message: "Correo electrónico y tipo de operación son requeridos" });
       }
 
       if (!['registro', 'recuperacion_password'].includes(tipoOperacion)) {
         return res.status(400).json({ message: "Tipo de operación inválido" });
       }
 
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Formato de correo electrónico inválido" });
+      }
+
       const codigo = generateOTP();
       const expiraEn = new Date(Date.now() + 10 * 60 * 1000);
 
       await storage.deleteExpiredVerificationCodes();
-      await storage.deletePriorVerificationCodes(telefono, tipoOperacion);
+      await storage.deletePriorVerificationCodes(email, tipoOperacion);
 
       await storage.createVerificationCode({
-        telefono,
+        telefono: email, // Using telefono field to store email
         codigo,
         expiraEn,
         tipoOperacion,
       });
 
-      const mensaje = `Tu código de verificación para GruaRD es: ${codigo}. Válido por 10 minutos.`;
-      const smsService = await getSMSService();
-      await smsService.sendSMS(telefono, mensaje);
+      // Get user name if exists for personalized email
+      const user = await storage.getUserByEmail(email);
+      const userName = user?.nombre || undefined;
 
-      logAuth.otpSent(telefono);
+      // Send verification code via email
+      const emailService = await getEmailService();
+      const sent = await emailService.sendOTPEmail(email, codigo, userName);
+
+      if (!sent) {
+        logSystem.error('Failed to send OTP email', null, { email });
+        return res.status(500).json({ message: "Error al enviar el código de verificación. Por favor intente nuevamente." });
+      }
+
+      logAuth.otpSent(email);
 
       res.json({ 
-        message: "Código enviado exitosamente",
+        message: "Código enviado a tu correo electrónico",
         expiresIn: 600
       });
     } catch (error: any) {
-      logSystem.error('Send OTP error', error, { telefono });
+      logSystem.error('Send OTP error', error, { email: req.body.email });
       res.status(500).json({ message: "Error al enviar código de verificación" });
     }
   });
 
   app.post("/api/auth/verify-otp", async (req: Request, res: Response) => {
     try {
-      const { telefono, codigo, tipoOperacion } = req.body;
+      const { email, codigo, tipoOperacion } = req.body;
 
-      if (!telefono || !codigo || !tipoOperacion) {
+      if (!email || !codigo || !tipoOperacion) {
         return res.status(400).json({ message: "Datos incompletos" });
       }
 
-      const verificationCode = await storage.getActiveVerificationCode(telefono, tipoOperacion);
+      // Using telefono field to store email in verification codes
+      const verificationCode = await storage.getActiveVerificationCode(email, tipoOperacion);
 
       if (!verificationCode) {
         return res.status(400).json({ message: "Código inválido o expirado" });
@@ -1210,36 +1226,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (verificationCode.intentos >= 3) {
         await storage.markVerificationCodeAsUsed(verificationCode.id);
-        logAuth.otpFailed(telefono, verificationCode.intentos);
+        logAuth.otpFailed(email, verificationCode.intentos);
         return res.status(400).json({ message: "Demasiados intentos. Solicita un nuevo código" });
       }
 
       if (verificationCode.codigo !== codigo) {
         await storage.incrementVerificationAttempts(verificationCode.id);
-        logAuth.otpFailed(telefono, verificationCode.intentos + 1);
+        logAuth.otpFailed(email, verificationCode.intentos + 1);
         return res.status(400).json({ message: "Código incorrecto" });
       }
 
       await storage.markVerificationCodeAsUsed(verificationCode.id);
 
       if (tipoOperacion === 'registro') {
-        const user = await storage.getUserByPhone(telefono);
+        const user = await storage.getUserByEmail(email);
         if (user) {
           await storage.updateUser(user.id, { 
-            telefonoVerificado: true,
+            emailVerificado: true,
             estadoCuenta: 'activo'
           });
         }
       }
 
-      logAuth.otpVerified(telefono);
+      logAuth.otpVerified(email);
 
       res.json({ 
         message: "Código verificado exitosamente",
         verified: true
       });
     } catch (error: any) {
-      logSystem.error('Verify OTP error', error, { telefono });
+      logSystem.error('Verify OTP error', error, { email: req.body.email });
       res.status(500).json({ message: "Error al verificar código" });
     }
   });
