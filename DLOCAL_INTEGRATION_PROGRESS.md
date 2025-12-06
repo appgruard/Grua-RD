@@ -17,12 +17,13 @@ Se está implementando la integración completa con dLocal para:
 - ✅ Interfaz de usuario para saldo de operadores
 - ✅ **COMPLETADO:** Tokenización real de tarjetas con dLocal API (Fase 2)
 - ✅ **COMPLETADO:** Cobro real de deudas con tarjetas guardadas (Fase 2)
+- ✅ **COMPLETADO:** Endpoints de tarjetas con cobros reales (Fase 3)
 - 🔄 **PENDIENTE:** Seguimiento de comisiones dLocal en panel admin (Fase 4)
 - 🔄 **PENDIENTE:** Branding profesional de PDFs (Grúa RD) (Fase 5)
 
 ---
 
-## ✅ COMPLETADO (70%)
+## ✅ COMPLETADO (80%)
 
 ### 1. **Servicio dLocal Payment Service** ✓
 - **Archivo:** `server/services/dlocal-payment.ts`
@@ -227,6 +228,49 @@ Se está implementando la integración completa con dLocal para:
 
 ---
 
+### FASE 3 (PLAN DLOCAL): Corregir Endpoints de Tarjetas ✓
+**Completado:** Diciembre 2024
+
+#### Endpoints Actualizados en `server/routes.ts`:
+
+##### 3.1 `POST /api/operator/payment-methods` ✓
+- **Propósito:** Guardar tarjeta de pago para operadores
+- **Cambios:**
+  - Reemplazada generación fake de token con `dlocalPaymentService.saveCardWithValidation()` real
+  - Importación dinámica de dlocalPaymentService
+  - Manejo de errores con mensajes en español para fallos de dLocal
+  - Usa `tokenResult.cardId`, `brand`, `last4`, `expiryMonth`, `expiryYear` de respuesta dLocal
+  - Logging actualizado para indicar tokenización real
+
+##### 3.2 `POST /api/client/payment-methods` ✓
+- **Propósito:** Guardar tarjeta de pago para clientes
+- **Cambios:**
+  - Reemplazada generación fake de token con `dlocalPaymentService.saveCardWithValidation()` real
+  - Importación dinámica de dlocalPaymentService
+  - Manejo de errores con mensajes en español para fallos de dLocal
+  - Usa `tokenResult.cardId`, `brand`, `last4`, `expiryMonth`, `expiryYear` de respuesta dLocal
+  - Logging actualizado para indicar tokenización real
+
+##### 3.3 `POST /api/operator/pay-debt-with-card` ✓
+- **Propósito:** Pagar deuda del operador con tarjeta guardada
+- **Cambios:**
+  - Añadida importación dinámica de dlocalPaymentService
+  - Verifica si dLocal está configurado antes de procesar
+  - Obtiene `cardId` real de `paymentMethod.dlocalCardId`
+  - Llama a `dlocalPaymentService.chargeWithSavedCard()` para cobrar la tarjeta
+  - En éxito, llama a `WalletService.completeDebtPayment` con `dlocal:${chargeResult.paymentId}` como referencia
+  - Retorna información de comisión en respuesta: `feeInfo: { feeAmount, feeCurrency, netAmount }`
+  - Manejo de errores con mensajes en español
+
+**Características Comunes:**
+- ✅ Tokenización real con dLocal API (no tokens fake)
+- ✅ Cobros reales con tarjetas guardadas
+- ✅ Tracking de comisiones dLocal
+- ✅ Mensajes de error localizados en español
+- ✅ No se expone información sensible de tarjetas
+
+---
+
 ## 🚀 PLAN DE 6 FASES - IMPLEMENTACIÓN COMPLETA
 
 Ver documento detallado: `PLAN_DLOCAL_COMPLETO.md`
@@ -235,7 +279,7 @@ Ver documento detallado: `PLAN_DLOCAL_COMPLETO.md`
 |------|-------------|--------|
 | 1 | Actualizar esquema BD (campos comisiones dLocal) | ✅ COMPLETADO |
 | 2 | Mejorar servicio dLocal (tokenización real, cobro tarjetas guardadas) | ✅ COMPLETADO |
-| 3 | Corregir endpoints de tarjetas (cobros reales) | ⏳ Pendiente |
+| 3 | Corregir endpoints de tarjetas (cobros reales) | ✅ COMPLETADO |
 | 4 | Panel Admin - Visualización de comisiones dLocal | ⏳ Pendiente |
 | 5 | Branding profesional en PDFs (Grúa RD) | ⏳ Pendiente |
 | 6 | Limpieza de documentación | ⏳ Pendiente |
