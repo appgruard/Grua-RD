@@ -406,7 +406,7 @@ export default function VerifyPending() {
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/auth/send-otp', {
-        telefono: currentUser?.phone,
+        email: currentUser?.email,
         tipoOperacion: 'registro'
       });
       if (!res.ok) {
@@ -417,7 +417,7 @@ export default function VerifyPending() {
     },
     onSuccess: () => {
       setOtpTimer(60);
-      toast({ title: 'Código enviado', description: 'Revisa tu teléfono para el código de verificación' });
+      toast({ title: 'Código enviado', description: 'Revisa tu correo electrónico para el código de verificación' });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -427,7 +427,7 @@ export default function VerifyPending() {
   const verifyOtpMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/auth/verify-otp', {
-        telefono: currentUser?.phone,
+        email: currentUser?.email,
         codigo: otpCode,
         tipoOperacion: 'registro'
       });
@@ -439,7 +439,7 @@ export default function VerifyPending() {
     },
     onSuccess: async () => {
       setPhoneVerified(true);
-      toast({ title: 'Teléfono verificado', description: 'Tu número de teléfono ha sido verificado' });
+      toast({ title: 'Correo verificado', description: 'Tu correo electrónico ha sido verificado' });
       
       if (isDriver) {
         setCurrentStep('photo');

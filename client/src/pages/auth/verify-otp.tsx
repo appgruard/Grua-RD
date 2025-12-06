@@ -20,7 +20,7 @@ export default function VerifyOTP() {
   const [resending, setResending] = useState(false);
 
   const params = new URLSearchParams(location.split('?')[1]);
-  const phone = params.get('phone') || '';
+  const email = params.get('email') || '';
   const type = params.get('type') || 'registro';
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function VerifyOTP() {
     setResending(true);
     try {
       const res = await apiRequest('POST', '/api/auth/send-otp', {
-        telefono: phone,
+        email: email,
         tipoOperacion: type,
       });
 
@@ -44,7 +44,7 @@ export default function VerifyOTP() {
 
       toast({
         title: 'Código reenviado',
-        description: 'Revisa tu teléfono para el nuevo código',
+        description: 'Revisa tu correo electrónico para el nuevo código',
       });
       setTimeLeft(600);
       setCodigo('');
@@ -72,7 +72,7 @@ export default function VerifyOTP() {
 
     try {
       const res = await apiRequest('POST', '/api/auth/verify-otp', {
-        telefono: phone,
+        email: email,
         codigo,
         tipoOperacion: type,
       });
@@ -84,7 +84,7 @@ export default function VerifyOTP() {
 
       toast({
         title: '¡Verificación exitosa!',
-        description: 'Tu teléfono ha sido verificado correctamente',
+        description: 'Tu correo electrónico ha sido verificado correctamente',
       });
 
       setTimeout(() => {
@@ -120,9 +120,9 @@ export default function VerifyOTP() {
               className="w-32 h-32 object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold">Verificar Teléfono</CardTitle>
+          <CardTitle className="text-2xl font-bold">Verificar Correo Electrónico</CardTitle>
           <CardDescription>
-            Ingresa el código enviado a {phone}
+            Ingresa el código enviado a {email}
           </CardDescription>
         </CardHeader>
         <CardContent>
