@@ -34,9 +34,22 @@ export interface ReceiptData {
 }
 
 export class PDFService {
+  private readonly BRAND_PRIMARY = "#0b2545";
+  private readonly BRAND_SECONDARY = "#1e40af";
+  private readonly BRAND_ACCENT = "#f5a623";
+  private readonly TEXT_PRIMARY = "#1f2937";
+  private readonly TEXT_SECONDARY = "#64748b";
+  private readonly SUCCESS_COLOR = "#22c55e";
+  private readonly BORDER_COLOR = "#e2e8f0";
+  
+  private readonly COMPANY_NAME = "Grua RD";
+  private readonly COMPANY_TAGLINE = "Servicios de Grua Republica Dominicana";
+  private readonly COMPANY_PHONE = "(809) 555-1234";
+  private readonly COMPANY_EMAIL = "soporte@gruard.com";
+  private readonly COMPANY_WEBSITE = "www.gruard.com";
+  
   private readonly BRAND_COLOR = "#2563eb";
   private readonly SECONDARY_COLOR = "#64748b";
-  private readonly SUCCESS_COLOR = "#22c55e";
 
   async generateReceipt(data: ReceiptData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
@@ -87,23 +100,7 @@ export class PDFService {
   }
 
   private addHeader(doc: PDFKit.PDFDocument, data: ReceiptData): void {
-    doc
-      .fontSize(28)
-      .fillColor(this.BRAND_COLOR)
-      .font("Helvetica-Bold")
-      .text("Grúa RD", 50, 50);
-
-    doc
-      .fontSize(10)
-      .fillColor(this.SECONDARY_COLOR)
-      .font("Helvetica")
-      .text("Servicios de Grúa República Dominicana", 50, 85);
-
-    doc
-      .fontSize(20)
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .text("RECIBO DE SERVICIO", 350, 50, { align: "right" });
+    this.addBrandedHeader(doc, "RECIBO DE SERVICIO");
   }
 
   private addReceiptInfo(doc: PDFKit.PDFDocument, data: ReceiptData): void {
@@ -327,40 +324,91 @@ export class PDFService {
   }
 
   private addFooter(doc: PDFKit.PDFDocument, data: ReceiptData): void {
-    const pageHeight = doc.page.height;
-    const footerY = pageHeight - 80;
+    this.addBrandedFooter(doc);
+  }
 
+  private addBrandedHeader(doc: PDFKit.PDFDocument, title: string): void {
+    const pageWidth = doc.page.width;
+    
+    doc.rect(0, 0, pageWidth, 8).fill(this.BRAND_PRIMARY);
+    
     doc
-      .moveTo(50, footerY - 20)
-      .lineTo(550, footerY - 20)
-      .strokeColor("#e2e8f0")
+      .fontSize(32)
+      .fillColor(this.BRAND_PRIMARY)
+      .font("Helvetica-Bold")
+      .text(this.COMPANY_NAME, 50, 25);
+    
+    doc
+      .moveTo(50, 65)
+      .lineTo(180, 65)
+      .strokeColor(this.BRAND_ACCENT)
+      .lineWidth(3)
       .stroke();
+    
+    doc
+      .fontSize(10)
+      .fillColor(this.TEXT_SECONDARY)
+      .font("Helvetica")
+      .text(this.COMPANY_TAGLINE, 50, 75);
+    
+    doc
+      .fontSize(18)
+      .fillColor(this.TEXT_PRIMARY)
+      .font("Helvetica-Bold")
+      .text(title, 300, 35, { align: "right", width: 250 });
+    
+    doc
+      .moveTo(50, 100)
+      .lineTo(550, 100)
+      .strokeColor(this.BORDER_COLOR)
+      .lineWidth(1)
+      .stroke();
+  }
 
+  private addBrandedFooter(doc: PDFKit.PDFDocument): void {
+    const pageHeight = doc.page.height;
+    const pageWidth = doc.page.width;
+    const footerY = pageHeight - 100;
+    
+    doc
+      .moveTo(50, footerY)
+      .lineTo(550, footerY)
+      .strokeColor(this.BORDER_COLOR)
+      .lineWidth(1)
+      .stroke();
+    
     doc
       .fontSize(9)
-      .fillColor(this.SECONDARY_COLOR)
+      .fillColor(this.TEXT_SECONDARY)
       .font("Helvetica")
-      .text("Gracias por usar GruaRD", 50, footerY, {
+      .text(
+        `Tel: ${this.COMPANY_PHONE}  |  Email: ${this.COMPANY_EMAIL}  |  Web: ${this.COMPANY_WEBSITE}`,
+        50,
+        footerY + 15,
+        { align: "center", width: 500 }
+      );
+    
+    doc
+      .fontSize(10)
+      .fillColor(this.BRAND_PRIMARY)
+      .font("Helvetica-Bold")
+      .text("Gracias por confiar en Grua RD!", 50, footerY + 35, {
         align: "center",
         width: 500,
       });
-
-    doc.text(
-      "Para soporte técnico, contáctenos: soporte@gruard.com | Tel: (809) 555-1234",
-      50,
-      footerY + 15,
-      { align: "center", width: 500 }
-    );
-
+    
     doc
       .fontSize(8)
-      .fillColor("#94a3b8")
+      .fillColor(this.TEXT_SECONDARY)
+      .font("Helvetica")
       .text(
-        "Este documento es un comprobante digital válido del servicio prestado.",
+        "Este documento es un comprobante digital valido del servicio prestado.",
         50,
-        footerY + 35,
+        footerY + 55,
         { align: "center", width: 500 }
       );
+    
+    doc.rect(0, pageHeight - 8, pageWidth, 8).fill(this.BRAND_PRIMARY);
   }
 
   generateReceiptNumber(): string {
