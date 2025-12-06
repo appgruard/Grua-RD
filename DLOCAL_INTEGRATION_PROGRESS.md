@@ -18,12 +18,12 @@ Se está implementando la integración completa con dLocal para:
 - ✅ **COMPLETADO:** Tokenización real de tarjetas con dLocal API (Fase 2)
 - ✅ **COMPLETADO:** Cobro real de deudas con tarjetas guardadas (Fase 2)
 - ✅ **COMPLETADO:** Endpoints de tarjetas con cobros reales (Fase 3)
-- 🔄 **PENDIENTE:** Seguimiento de comisiones dLocal en panel admin (Fase 4)
+- ✅ **COMPLETADO:** Panel Admin - Visualización de comisiones dLocal (Fase 4)
 - 🔄 **PENDIENTE:** Branding profesional de PDFs (Grúa RD) (Fase 5)
 
 ---
 
-## ✅ COMPLETADO (80%)
+## ✅ COMPLETADO (90%)
 
 ### 1. **Servicio dLocal Payment Service** ✓
 - **Archivo:** `server/services/dlocal-payment.ts`
@@ -271,6 +271,47 @@ Se está implementando la integración completa con dLocal para:
 
 ---
 
+### FASE 4 (PLAN DLOCAL): Panel Admin - Visualización de Comisiones ✓
+**Completado:** Diciembre 2024
+
+#### 4.1 Endpoint Backend: `GET /api/admin/payment-fees` ✓
+- **Ubicación:** `server/routes.ts`
+- **Propósito:** Obtener estadísticas completas de comisiones dLocal
+- **Respuesta:**
+  - `summary`: totalCollected, totalDLocalFees, netReceived, feePercentage, totalOperatorShare, totalCompanyShare
+  - `byPeriod`: Datos agrupados por fecha (collected, fees, net)
+  - `recentTransactions`: Últimas 50 transacciones ordenadas por fecha descendente
+- **Características:**
+  - Requiere autenticación admin
+  - Ordenamiento por fecha más reciente
+  - Cálculo consistente de netAmount (montoTotal - dlocalFee cuando dlocalNetAmount es null)
+
+#### 4.2 Página Frontend: `client/src/pages/admin/payment-fees.tsx` ✓
+- **Propósito:** Visualización de comisiones del procesador de pagos
+- **Elementos implementados:**
+  - 3 tarjetas principales: Total Cobrado, Comisión dLocal (con %), Neto Recibido
+  - 2 tarjetas adicionales: Total Operadores (80%), Total Empresa (20%)
+  - Tabla de transacciones recientes con columnas: Servicio, Monto, Comisión, Neto, Operador, Empresa, Fecha
+  - Estados de carga con Skeleton
+  - Formato de moneda DOP (Intl.NumberFormat)
+  - data-testid en todos los elementos interactivos
+
+#### 4.3 Integración en Sidebar de Admin ✓
+- **Archivo:** `client/src/components/layout/AdminLayout.tsx`
+- **Cambios:**
+  - Añadido item de menú "Comisiones" con icono CreditCard
+  - Ubicado después de "Billeteras"
+  - Ruta: `/admin/payment-fees`
+
+#### 4.4 Ruta Protegida ✓
+- **Archivo:** `client/src/App.tsx`
+- **Cambios:**
+  - Importación lazy del componente AdminPaymentFees
+  - Ruta `/admin/payment-fees` protegida con ProtectedRoute para admins
+  - Envuelta en AdminLayout
+
+---
+
 ## 🚀 PLAN DE 6 FASES - IMPLEMENTACIÓN COMPLETA
 
 Ver documento detallado: `PLAN_DLOCAL_COMPLETO.md`
@@ -280,7 +321,7 @@ Ver documento detallado: `PLAN_DLOCAL_COMPLETO.md`
 | 1 | Actualizar esquema BD (campos comisiones dLocal) | ✅ COMPLETADO |
 | 2 | Mejorar servicio dLocal (tokenización real, cobro tarjetas guardadas) | ✅ COMPLETADO |
 | 3 | Corregir endpoints de tarjetas (cobros reales) | ✅ COMPLETADO |
-| 4 | Panel Admin - Visualización de comisiones dLocal | ⏳ Pendiente |
+| 4 | Panel Admin - Visualización de comisiones dLocal | ✅ COMPLETADO |
 | 5 | Branding profesional en PDFs (Grúa RD) | ⏳ Pendiente |
 | 6 | Limpieza de documentación | ⏳ Pendiente |
 

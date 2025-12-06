@@ -3857,6 +3857,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/payment-fees", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allComisiones = await storage.getAllComisiones();
+      
+      let totalCollected = 0;
+      let totalDLocalFees = 0;
+      let totalOperatorShare = 0;
+      let totalCompanyShare = 0;
+      
+      const byPeriodMap: Record<string, { collected: number; fees: number; net: number }> = {};
+      
+      for (const comision of allComisiones) {
+        const montoTotal = parseFloat(comision.montoTotal || '0');
+        const dlocalFee = parseFloat(comision.dlocalFeeAmount || '0');
+        const montoOperador = parseFloat(comision.montoOperador || '0');
+        const montoEmpresa = parseFloat(comision.montoEmpresa || '0');
+        
+        totalCollected += montoTotal;
+        totalDLocalFees += dlocalFee;
+        totalOperatorShare += montoOperador;
+        totalCompanyShare += montoEmpresa;
+        
+        const dateKey = comision.createdAt 
+          ? new Date(comision.createdAt).toISOString().split('T')[0]
+          : 'unknown';
+        
+        if (!byPeriodMap[dateKey]) {
+          byPeriodMap[dateKey] = { collected: 0, fees: 0, net: 0 };
+        }
+        byPeriodMap[dateKey].collected += montoTotal;
+        byPeriodMap[dateKey].fees += dlocalFee;
+        byPeriodMap[dateKey].net += montoTotal - dlocalFee;
+      }
+      
+      const netReceived = totalCollected - totalDLocalFees;
+      const feePercentage = totalCollected > 0 ? (totalDLocalFees / totalCollected) * 100 : 0;
+      
+      const byPeriod = Object.entries(byPeriodMap)
+        .map(([date, data]) => ({
+          date,
+          collected: data.collected,
+          fees: data.fees,
+          net: data.net,
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+      
+      // Sort by createdAt descending to get most recent first
+      const sortedComisiones = [...allComisiones].sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      
+      const recentTransactions = sortedComisiones
+        .slice(0, 50)
+        .map((c) => {
+          const montoTotal = parseFloat(c.montoTotal || '0');
+          const dlocalFee = parseFloat(c.dlocalFeeAmount || '0');
+          // Calculate net consistently: if dlocalNetAmount exists use it, otherwise compute montoTotal - dlocalFee
+          const netAmount = c.dlocalNetAmount 
+            ? parseFloat(c.dlocalNetAmount) 
+            : montoTotal - dlocalFee;
+          
+          return {
+            id: c.id,
+            servicioId: c.servicioId,
+            amount: montoTotal,
+            dlocalFee: dlocalFee,
+            netAmount: netAmount,
+            operatorShare: parseFloat(c.montoOperador || '0'),
+            companyShare: parseFloat(c.montoEmpresa || '0'),
+            createdAt: c.createdAt?.toISOString() || '',
+        }));
+      
+      res.json({
+        summary: {
+          totalCollected,
+          totalDLocalFees,
+          netReceived,
+          feePercentage,
+          totalOperatorShare,
+          totalCompanyShare,
+        },
+        byPeriod,
+        recentTransactions,
+      });
+    } catch (error: any) {
+      logSystem.error('Get payment fees error', error);
+      res.status(500).json({ message: "Failed to get payment fees" });
+    }
+  });
+
   app.get("/api/admin/users", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
       return res.status(401).json({ message: "Not authorized" });
