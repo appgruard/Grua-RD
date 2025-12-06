@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { 
-  Loader2, IdCard, Phone, CheckCircle2, AlertCircle, 
+  Loader2, IdCard, Mail, CheckCircle2, AlertCircle, 
   Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, 
   UserCircle, ArrowRight, Circle, CheckCircle
 } from 'lucide-react';
@@ -137,10 +137,10 @@ export default function VerifyPending() {
       },
       {
         id: 'phone',
-        title: 'Verificar Teléfono',
-        shortTitle: 'Teléfono',
-        description: 'Confirma tu número con un código SMS',
-        icon: Phone,
+        title: 'Verificar Correo',
+        shortTitle: 'Correo',
+        description: 'Confirma tu correo electrónico con un código',
+        icon: Mail,
         completed: phoneVerified,
         current: currentStep === 'phone'
       }
@@ -722,18 +722,18 @@ export default function VerifyPending() {
                   {phoneVerified ? (
                     <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
                   ) : (
-                    <Phone className="w-5 h-5" />
+                    <Mail className="w-5 h-5" />
                   )}
                 </div>
                 <div className="flex-1">
                   <CardTitle className="text-base flex items-center justify-between gap-2">
-                    <span>Paso 2: Verificación de Teléfono</span>
+                    <span>Paso 2: Verificación de Correo</span>
                     {phoneVerified && (
                       <Badge className="bg-green-500 hover:bg-green-600">Verificado</Badge>
                     )}
                   </CardTitle>
                   <CardDescription>
-                    {phoneVerified ? 'Tu teléfono ha sido verificado' : currentUser?.phone || 'Sin teléfono registrado'}
+                    {phoneVerified ? 'Tu correo ha sido verificado' : currentUser?.email || 'Sin correo registrado'}
                   </CardDescription>
                 </div>
               </div>
@@ -749,8 +749,8 @@ export default function VerifyPending() {
                 )}
 
                 <div className="bg-muted/50 p-3 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Enviaremos un código SMS a:</p>
-                  <p className="font-medium">{currentUser?.phone}</p>
+                  <p className="text-sm text-muted-foreground mb-1">Enviaremos un código a:</p>
+                  <p className="font-medium">{currentUser?.email}</p>
                 </div>
 
                 <div className="space-y-2">
