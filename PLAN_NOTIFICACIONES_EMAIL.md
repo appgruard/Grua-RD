@@ -11,6 +11,10 @@ Este documento describe el plan para implementar un sistema completo de notifica
 ### Infraestructura de Email
 - **Servicio**: Resend (ya configurado con secrets `RESEND_API_KEY` y `RESEND_FROM_EMAIL`)
 - **Archivo principal**: `server/email-service.ts`
+- **Direcciones de correo disponibles**:
+  - `verification@gruard.com` - Para codigos OTP y verificaciones
+  - `support@gruard.com` - Para tickets de soporte y respuestas del equipo
+  - `info@gruard.com` - Para informaciones generales, bienvenidas y comunicaciones corporativas
 - **Funciones existentes**:
   - `sendEmail()` - Envio general
   - `sendOTPEmail()` - Codigos de verificacion
@@ -49,6 +53,7 @@ Este documento describe el plan para implementar un sistema completo de notifica
 #### 1.1 Email al crear un ticket
 - **Trigger**: Cliente crea un nuevo ticket
 - **Destinatario**: Cliente que creo el ticket
+- **Remitente**: support@gruard.com
 - **Contenido**:
   - Numero de ticket
   - Titulo y descripcion
@@ -59,6 +64,7 @@ Este documento describe el plan para implementar un sistema completo de notifica
 #### 1.2 Email de cambio de estado del ticket
 - **Trigger**: Estado del ticket cambia (abierto -> en_proceso -> resuelto -> cerrado)
 - **Destinatario**: Cliente propietario del ticket
+- **Remitente**: support@gruard.com
 - **Contenido**:
   - Nuevo estado
   - Mensaje contextual segun el estado
@@ -78,6 +84,7 @@ Este documento describe el plan para implementar un sistema completo de notifica
 #### 2.1 Email de agradecimiento al registrarse
 - **Trigger**: Operador completa el registro
 - **Destinatario**: Nuevo operador
+- **Remitente**: info@gruard.com
 - **Contenido**:
   - Agradecimiento por unirse al equipo
   - Proximos pasos (verificacion de documentos)
@@ -91,6 +98,7 @@ Este documento describe el plan para implementar un sistema completo de notifica
 #### 3.1 Email de bienvenida al registrarse
 - **Trigger**: Cliente completa el registro
 - **Destinatario**: Nuevo cliente
+- **Remitente**: info@gruard.com
 - **Contenido** (conciso):
   - Agradecimiento por usar GruaRD
   - Como solicitar un servicio
@@ -107,6 +115,7 @@ Este documento describe el plan para implementar un sistema completo de notifica
 #### 4.2 Email de bienvenida al socio
 - **Trigger**: Admin crea un nuevo socio
 - **Destinatario**: Nuevo socio
+- **Remitente**: info@gruard.com
 - **Contenido**:
   - Bienvenida como socio/inversor
   - Credenciales de acceso (usuario: su email)
@@ -119,6 +128,7 @@ Este documento describe el plan para implementar un sistema completo de notifica
 #### 5.1 Email de primer inicio de sesion
 - **Trigger**: Socio inicia sesion por primera vez
 - **Destinatario**: Socio
+- **Remitente**: info@gruard.com
 - **Contenido**:
   - Agradecimiento por ser parte del equipo inversor
   - Recordatorio de cambiar contrasena si no lo ha hecho
@@ -173,6 +183,7 @@ export const administradores = pgTable("administradores", {
 #### 6.3 Email de bienvenida al administrador
 - **Trigger**: Admin crea un nuevo usuario de administracion
 - **Destinatario**: Nuevo administrador
+- **Remitente**: info@gruard.com
 - **Contenido**:
   - Bienvenida al equipo de GruaRD
   - Credenciales de acceso
