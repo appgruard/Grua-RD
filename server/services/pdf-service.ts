@@ -467,39 +467,17 @@ export class PDFService {
   }
 
   private addAnalyticsHeader(doc: PDFKit.PDFDocument, data: AnalyticsReportData): void {
-    doc
-      .fontSize(28)
-      .fillColor(this.BRAND_COLOR)
-      .font("Helvetica-Bold")
-      .text("Grua RD", 50, 50);
-
+    this.addBrandedHeader(doc, "REPORTE DE ANALYTICS");
+    
     doc
       .fontSize(10)
-      .fillColor(this.SECONDARY_COLOR)
+      .fillColor(this.TEXT_SECONDARY)
       .font("Helvetica")
-      .text("Servicios de Grua Republica Dominicana", 50, 85);
-
-    doc
-      .fontSize(20)
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .text("REPORTE DE ANALYTICS", 350, 50, { align: "right" });
-
-    doc
-      .fontSize(10)
-      .fillColor(this.SECONDARY_COLOR)
-      .font("Helvetica")
-      .text(`Periodo: ${data.startDate} - ${data.endDate}`, 350, 80, { align: "right" });
-
+      .text(`Periodo: ${data.startDate} - ${data.endDate}`, 50, 120);
+    
     doc
       .fontSize(9)
-      .text(`Generado: ${new Date().toLocaleDateString("es-DO")}`, 350, 95, { align: "right" });
-
-    doc
-      .moveTo(50, 120)
-      .lineTo(550, 120)
-      .strokeColor("#e2e8f0")
-      .stroke();
+      .text(`Generado: ${new Date().toLocaleDateString("es-DO")}`, 350, 120, { align: "right", width: 200 });
   }
 
   private addKPISection(doc: PDFKit.PDFDocument, data: AnalyticsReportData): void {
@@ -683,33 +661,7 @@ export class PDFService {
   }
 
   private addAnalyticsFooter(doc: PDFKit.PDFDocument): void {
-    const pageHeight = doc.page.height;
-    const footerY = pageHeight - 60;
-
-    doc
-      .moveTo(50, footerY - 20)
-      .lineTo(550, footerY - 20)
-      .strokeColor("#e2e8f0")
-      .stroke();
-
-    doc
-      .fontSize(9)
-      .fillColor(this.SECONDARY_COLOR)
-      .font("Helvetica")
-      .text("Reporte generado automaticamente por Grua RD Analytics", 50, footerY, {
-        align: "center",
-        width: 500,
-      });
-
-    doc
-      .fontSize(8)
-      .fillColor("#94a3b8")
-      .text(
-        "Este documento es confidencial y de uso interno.",
-        50,
-        footerY + 15,
-        { align: "center", width: 500 }
-      );
+    this.addBrandedFooter(doc);
   }
 
   async generarEstadoFinancieroSocio(data: EstadoFinancieroSocioData): Promise<Buffer> {
@@ -760,24 +712,8 @@ export class PDFService {
   }
 
   private addSocioHeader(doc: PDFKit.PDFDocument, data: EstadoFinancieroSocioData): void {
-    doc
-      .fontSize(28)
-      .fillColor(this.BRAND_COLOR)
-      .font("Helvetica-Bold")
-      .text("Grua RD", 50, 50);
-
-    doc
-      .fontSize(10)
-      .fillColor(this.SECONDARY_COLOR)
-      .font("Helvetica")
-      .text("Portal de Socios e Inversores", 50, 85);
-
-    doc
-      .fontSize(20)
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .text("ESTADO FINANCIERO", 350, 50, { align: "right" });
-
+    this.addBrandedHeader(doc, "ESTADO FINANCIERO");
+    
     const [year, month] = data.periodo.split("-");
     const monthNames = [
       "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -787,19 +723,13 @@ export class PDFService {
 
     doc
       .fontSize(10)
-      .fillColor(this.SECONDARY_COLOR)
+      .fillColor(this.TEXT_SECONDARY)
       .font("Helvetica")
-      .text(`Periodo: ${periodoDisplay}`, 350, 80, { align: "right" });
-
+      .text(`Periodo: ${periodoDisplay}`, 50, 120);
+    
     doc
       .fontSize(9)
-      .text(`Generado: ${new Date().toLocaleDateString("es-DO")}`, 350, 95, { align: "right" });
-
-    doc
-      .moveTo(50, 120)
-      .lineTo(550, 120)
-      .strokeColor("#e2e8f0")
-      .stroke();
+      .text(`Generado: ${new Date().toLocaleDateString("es-DO")}`, 350, 120, { align: "right", width: 200 });
   }
 
   private addSocioInfo(doc: PDFKit.PDFDocument, data: EstadoFinancieroSocioData): void {
@@ -973,40 +903,7 @@ export class PDFService {
   }
 
   private addSocioFooter(doc: PDFKit.PDFDocument): void {
-    const pageHeight = doc.page.height;
-    const footerY = pageHeight - 80;
-
-    doc
-      .moveTo(50, footerY - 20)
-      .lineTo(550, footerY - 20)
-      .strokeColor("#e2e8f0")
-      .stroke();
-
-    doc
-      .fontSize(9)
-      .fillColor(this.SECONDARY_COLOR)
-      .font("Helvetica")
-      .text("Grua RD - Portal de Socios", 50, footerY, {
-        align: "center",
-        width: 500,
-      });
-
-    doc.text(
-      "Para consultas sobre distribuciones, contacte: socios@gruard.com | Tel: (809) 555-1234",
-      50,
-      footerY + 15,
-      { align: "center", width: 500 }
-    );
-
-    doc
-      .fontSize(8)
-      .fillColor("#94a3b8")
-      .text(
-        "Este documento es confidencial y contiene informacion financiera privilegiada.",
-        50,
-        footerY + 35,
-        { align: "center", width: 500 }
-      );
+    this.addBrandedFooter(doc);
   }
 }
 
