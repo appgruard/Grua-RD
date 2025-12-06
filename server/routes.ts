@@ -6398,31 +6398,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Determine card brand from card number (cleanNumber already defined above)
-      let cardBrand = 'unknown';
-      if (cleanNumber.startsWith('4')) {
-        cardBrand = 'visa';
-      } else if (cleanNumber.startsWith('5')) {
-        cardBrand = 'mastercard';
-      } else if (cleanNumber.startsWith('3')) {
-        cardBrand = 'amex';
+      // Get user data for dLocal tokenization
+      const user = req.user!;
+
+      // Use real dLocal tokenization via saveCardWithValidation
+      let tokenResult;
+      try {
+        tokenResult = await dlocalPaymentService.saveCardWithValidation({
+          cardNumber: cleanNumber,
+          cardExpiry: cardExpiry,
+          cardCVV: cardCVV,
+          cardholderName: cardholderName || `${user.nombre} ${user.apellido}`,
+          email: user.email,
+          name: `${user.nombre} ${user.apellido}`,
+          document: user.cedula || '00000000000',
+        });
+      } catch (dlocalError: any) {
+        logTransaction.error('dLocal card tokenization failed for client', {
+          userId: user.id,
+          error: dlocalError.message,
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: dlocalError.message || "Error al validar la tarjeta con el procesador de pagos. Verifique los datos e intente nuevamente.",
+        });
       }
 
-      // Parse expiry (cleanExpiry already defined above)
-      let expiryMonth = 0;
-      let expiryYear = 0;
-      if (cleanExpiry.length === 4) {
-        expiryMonth = parseInt(cleanExpiry.substring(0, 2), 10);
-        expiryYear = 2000 + parseInt(cleanExpiry.substring(2, 4), 10);
-      }
+      // Use real dLocal token data
+      const cardToken = tokenResult.cardId;
+      const cardBrand = tokenResult.brand;
+      const last4 = tokenResult.last4;
+      const expiryMonth = tokenResult.expiryMonth;
+      const expiryYear = tokenResult.expiryYear;
 
-      // Get last 4 digits
-      const last4 = cleanNumber.slice(-4);
-
-      // Generate a secure token for the card (dLocal uses redirect-based payments, so we store card info securely)
-      const cardToken = `DLOCAL_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-      // Save payment method
+      // Save payment method with real dLocal token
       const paymentMethod = await storage.createClientPaymentMethod({
         userId: req.user!.id,
         dlocalToken: cardToken,
@@ -6433,11 +6443,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardholderName: cardholderName || null,
       });
 
-      logTransaction.info('Client payment method created', { 
+      logTransaction.info('Client payment method created with real dLocal tokenization', { 
         userId: req.user!.id,
         paymentMethodId: paymentMethod.id,
         cardBrand,
         last4,
+        tokenized: true,
       });
 
       res.json({
@@ -6861,17 +6872,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const paymentAmount = Math.min(parsedAmount, totalDebt);
 
-      // Process the debt payment
+      // Import dLocal service for real payment processing
+      const { dlocalPaymentService } = await import('./services/dlocal-payment');
+
+      if (!dlocalPaymentService.isConfigured()) {
+        return res.status(503).json({ 
+          message: "El servicio de pagos no está configurado. Por favor, contacta al administrador.",
+        });
+      }
+
+      // Get the real dLocal card ID
+      const cardId = paymentMethod.dlocalCardId;
+      if (!cardId) {
+        return res.status(400).json({ 
+          message: "Esta tarjeta no tiene un token válido. Por favor, elimínela y agregue la tarjeta nuevamente." 
+        });
+      }
+
+      // Get user data for the charge
+      const user = req.user!;
+
+      // Charge the saved card via dLocal
+      let chargeResult;
+      try {
+        chargeResult = await dlocalPaymentService.chargeWithSavedCard({
+          cardId: cardId,
+          amount: paymentAmount,
+          description: `Pago de deuda - Operador ${conductor.id}`,
+          orderId: `DEBT-${wallet.id}-${Date.now()}`,
+          email: user.email,
+          name: `${user.nombre} ${user.apellido}`,
+          document: conductor.cedula || user.cedula || '00000000000',
+        });
+      } catch (dlocalError: any) {
+        logTransaction.error('dLocal debt payment charge failed', {
+          conductorId: conductor.id,
+          error: dlocalError.message,
+        });
+        
+        return res.status(400).json({
+          success: false,
+          message: dlocalError.message || "Error al procesar el pago. Verifique su tarjeta e intente nuevamente.",
+        });
+      }
+
+      // Charge successful - complete the debt payment with dLocal transaction ID
       const result = await WalletService.completeDebtPayment(
         wallet.id,
         paymentAmount.toFixed(2),
-        `card:${paymentMethod.last4}`
+        `dlocal:${chargeResult.paymentId}`
       );
 
-      logTransaction.info('Operator debt paid with saved card', { 
+      logTransaction.info('Operator debt paid with real dLocal charge', { 
         conductorId: conductor.id,
         paymentMethodId,
+        dlocalPaymentId: chargeResult.paymentId,
         amount: paymentAmount,
+        feeAmount: chargeResult.feeAmount,
+        netAmount: chargeResult.netAmount,
         remainingDebt: parseFloat(wallet.totalDebt) - paymentAmount,
       });
 
@@ -6880,6 +6938,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `Pago de RD$${paymentAmount.toFixed(2)} procesado correctamente`,
         remainingDebt: (totalDebt - paymentAmount).toFixed(2),
         wallet: result,
+        dlocalPaymentId: chargeResult.paymentId,
+        feeInfo: {
+          feeAmount: chargeResult.feeAmount,
+          feeCurrency: chargeResult.feeCurrency,
+          netAmount: chargeResult.netAmount,
+        },
       });
     } catch (error: any) {
       logSystem.error('Pay debt with card error', error, { userId: req.user!.id });
