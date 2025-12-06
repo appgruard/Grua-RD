@@ -143,6 +143,10 @@ import {
   type WalletWithDetails,
   type OperatorDebtWithDaysRemaining,
   type WalletTransactionWithService,
+  administradores,
+  type Administrador,
+  type InsertAdministrador,
+  type AdministradorWithDetails,
 } from '@shared/schema';
 import {
   serviceReceipts,
@@ -610,6 +614,17 @@ export interface IStorage {
 
   // Mark service commission as processed
   markServiceCommissionProcessed(servicioId: string): Promise<void>;
+
+  // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
+  
+  // Administradores CRUD
+  getAdministradores(): Promise<AdministradorWithDetails[]>;
+  getAdministradorById(id: string): Promise<AdministradorWithDetails | undefined>;
+  getAdministradorByUserId(userId: string): Promise<AdministradorWithDetails | undefined>;
+  createAdministrador(data: InsertAdministrador): Promise<Administrador>;
+  updateAdministrador(id: string, data: Partial<InsertAdministrador>): Promise<Administrador | undefined>;
+  toggleAdministradorActivo(id: string): Promise<Administrador | undefined>;
+  updateAdminPrimerInicioSesion(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4301,6 +4316,74 @@ export class DatabaseStorage implements IStorage {
     await db.update(servicios)
       .set({ commissionProcessed: true })
       .where(eq(servicios.id, servicioId));
+  }
+
+  // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
+
+  async getAdministradores(): Promise<AdministradorWithDetails[]> {
+    const results = await db.query.administradores.findMany({
+      with: {
+        user: true,
+        creadoPorUsuario: true,
+      },
+      orderBy: desc(administradores.createdAt),
+    });
+    return results as AdministradorWithDetails[];
+  }
+
+  async getAdministradorById(id: string): Promise<AdministradorWithDetails | undefined> {
+    const result = await db.query.administradores.findFirst({
+      where: eq(administradores.id, id),
+      with: {
+        user: true,
+        creadoPorUsuario: true,
+      },
+    });
+    return result as AdministradorWithDetails | undefined;
+  }
+
+  async getAdministradorByUserId(userId: string): Promise<AdministradorWithDetails | undefined> {
+    const result = await db.query.administradores.findFirst({
+      where: eq(administradores.userId, userId),
+      with: {
+        user: true,
+        creadoPorUsuario: true,
+      },
+    });
+    return result as AdministradorWithDetails | undefined;
+  }
+
+  async createAdministrador(data: InsertAdministrador): Promise<Administrador> {
+    const [admin] = await db.insert(administradores).values(data).returning();
+    return admin;
+  }
+
+  async updateAdministrador(id: string, data: Partial<InsertAdministrador>): Promise<Administrador | undefined> {
+    const [admin] = await db
+      .update(administradores)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(administradores.id, id))
+      .returning();
+    return admin;
+  }
+
+  async toggleAdministradorActivo(id: string): Promise<Administrador | undefined> {
+    const admin = await this.getAdministradorById(id);
+    if (!admin) return undefined;
+    
+    const [updated] = await db
+      .update(administradores)
+      .set({ activo: !admin.activo, updatedAt: new Date() })
+      .where(eq(administradores.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateAdminPrimerInicioSesion(id: string): Promise<void> {
+    await db
+      .update(administradores)
+      .set({ primerInicioSesion: false, updatedAt: new Date() })
+      .where(eq(administradores.id, id));
   }
 }
 

@@ -2361,3 +2361,121 @@ export type DocumentoWithReminderStatus = Documento & {
   recordatoriosEnviados?: DocumentoRecordatorio[];
   conductor?: Conductor;
 };
+
+// ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
+
+// Admin modules/permissions enum
+export const ADMIN_PERMISOS = [
+  "dashboard",
+  "analytics",
+  "usuarios",
+  "operadores",
+  "billeteras",
+  "comisiones_pago",
+  "servicios",
+  "tarifas",
+  "monitoreo",
+  "verificaciones",
+  "documentos",
+  "tickets",
+  "socios",
+  "aseguradoras",
+  "empresas",
+  "configuracion",
+  "admin_usuarios"
+] as const;
+
+export type AdminPermiso = typeof ADMIN_PERMISOS[number];
+
+// Administradores Table
+export const administradores = pgTable("administradores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  permisos: text("permisos").array().notNull(),
+  activo: boolean("activo").default(true).notNull(),
+  primerInicioSesion: boolean("primer_inicio_sesion").default(true).notNull(),
+  creadoPor: varchar("creado_por").references(() => users.id),
+  notas: text("notas"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Administradores Relations
+export const administradoresRelations = relations(administradores, ({ one }) => ({
+  user: one(users, {
+    fields: [administradores.userId],
+    references: [users.id],
+  }),
+  creadoPorUsuario: one(users, {
+    fields: [administradores.creadoPor],
+    references: [users.id],
+  }),
+}));
+
+// Administradores Insert Schema
+export const insertAdministradorSchema = createInsertSchema(administradores, {
+  permisos: z.array(z.enum(ADMIN_PERMISOS)).min(1, "Debe tener al menos un permiso"),
+  notas: z.string().optional().nullable(),
+}).omit({
+  id: true,
+  primerInicioSesion: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Administradores Select Schema
+export const selectAdministradorSchema = createSelectSchema(administradores);
+
+// Administradores Types
+export type InsertAdministrador = z.infer<typeof insertAdministradorSchema>;
+export type Administrador = typeof administradores.$inferSelect;
+
+// Administrador Helper Types
+export type AdministradorWithDetails = Administrador & {
+  user?: User;
+  creadoPorUsuario?: User;
+};
+
+// Map of permission to sidebar routes
+export const ADMIN_PERMISO_RUTAS: Record<AdminPermiso, string> = {
+  dashboard: "/admin",
+  analytics: "/admin/analytics",
+  usuarios: "/admin/users",
+  operadores: "/admin/drivers",
+  billeteras: "/admin/wallets",
+  comisiones_pago: "/admin/payment-fees",
+  servicios: "/admin/services",
+  tarifas: "/admin/pricing",
+  monitoreo: "/admin/monitoring",
+  verificaciones: "/admin/verifications",
+  documentos: "/admin/documents",
+  tickets: "/admin/tickets",
+  socios: "/admin/socios",
+  aseguradoras: "/admin/aseguradoras",
+  empresas: "/admin/empresas",
+  configuracion: "/admin/configuracion",
+  admin_usuarios: "/admin/administradores",
+};
+
+// Human-readable labels for permissions
+export const ADMIN_PERMISO_LABELS: Record<AdminPermiso, string> = {
+  dashboard: "Dashboard",
+  analytics: "Analytics",
+  usuarios: "Usuarios",
+  operadores: "Conductores",
+  billeteras: "Billeteras",
+  comisiones_pago: "Comisiones de Pago",
+  servicios: "Servicios",
+  tarifas: "Tarifas",
+  monitoreo: "Monitoreo",
+  verificaciones: "Verificaciones",
+  documentos: "Documentos",
+  tickets: "Tickets Soporte",
+  socios: "Socios e Inversores",
+  aseguradoras: "Aseguradoras",
+  empresas: "Empresas",
+  configuracion: "Configuracion",
+  admin_usuarios: "Gestionar Administradores",
+};
+
+// ==================== END ADMINISTRADORES ====================
