@@ -1,13 +1,12 @@
 import webpush from 'web-push';
 import { storage } from './storage';
+import { logSystem } from './logger';
 
 const VAPID_PUBLIC_KEY = process.env.VITE_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-  console.warn('⚠️  VAPID keys not configured. Push notifications will not work.');
-  console.warn('   Generate keys with: npx web-push generate-vapid-keys');
-  console.warn('   Then set VAPID_PRIVATE_KEY and VITE_VAPID_PUBLIC_KEY in environment variables');
+  logSystem.warn('VAPID keys not configured. Push notifications will not work. Generate keys with: npx web-push generate-vapid-keys');
 } else {
   webpush.setVapidDetails(
     'mailto:admin@gruard.com',
@@ -28,7 +27,7 @@ interface PushNotificationPayload {
 export class PushNotificationService {
   async sendToUser(userId: string, payload: PushNotificationPayload): Promise<void> {
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-      console.log('Push notifications not configured, skipping notification');
+      logSystem.debug('Push notifications not configured, skipping notification');
       return;
     }
 
@@ -36,7 +35,7 @@ export class PushNotificationService {
       const subscriptions = await storage.getPushSubscriptionsByUserId(userId);
       
       if (subscriptions.length === 0) {
-        console.log(`No push subscriptions found for user ${userId}`);
+        logSystem.debug('No push subscriptions found for user', { userId });
         return;
       }
 
@@ -61,20 +60,20 @@ export class PushNotificationService {
             },
             notificationPayload
           );
-          console.log(`Push notification sent successfully to endpoint: ${sub.endpoint.substring(0, 50)}...`);
+          logSystem.debug('Push notification sent successfully', { endpoint: sub.endpoint.substring(0, 50) });
         } catch (error: any) {
           if (error.statusCode === 410 || error.statusCode === 404) {
-            console.log(`Subscription expired, removing: ${sub.endpoint.substring(0, 50)}...`);
+            logSystem.debug('Subscription expired, removing', { endpoint: sub.endpoint.substring(0, 50) });
             await storage.deletePushSubscription(sub.endpoint);
           } else {
-            console.error('Error sending push notification:', error);
+            logSystem.error('Error sending push notification', error);
           }
         }
       });
 
       await Promise.allSettled(sendPromises);
     } catch (error) {
-      console.error('Error in sendToUser:', error);
+      logSystem.error('Error in sendToUser', error);
     }
   }
 

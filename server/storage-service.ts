@@ -1,4 +1,5 @@
 import { Client } from '@replit/object-storage';
+import { logSystem } from './logger';
 
 class StorageService {
   private client: Client | null = null;
@@ -16,13 +17,11 @@ class StorageService {
     try {
       this.client = new Client();
       this.initialized = true;
-      console.log('✅ Replit Object Storage initialized successfully');
+      logSystem.info('Replit Object Storage initialized successfully');
     } catch (error) {
       this.initialized = true;
       this.initError = error instanceof Error ? error : new Error('Failed to initialize Object Storage');
-      console.warn('⚠️  Replit Object Storage not available. Please create a bucket in the Replit workspace.');
-      console.warn('   Documents upload feature will not work until a bucket is created.');
-      console.warn('   Error:', this.initError.message);
+      logSystem.warn('Replit Object Storage not available. Documents upload feature will not work until a bucket is created.', { error: this.initError.message });
       throw this.initError;
     }
   }
@@ -44,7 +43,7 @@ class StorageService {
     );
 
     if (!ok) {
-      console.error('Error uploading file:', error);
+      logSystem.error('Error uploading file', error, { objectPath });
       throw new Error(`Failed to upload file: ${error}`);
     }
 
@@ -60,7 +59,7 @@ class StorageService {
     const { ok, value, error } = await this.client!.downloadAsBytes(objectPath);
 
     if (!ok) {
-      console.error('Error downloading file:', error);
+      logSystem.error('Error downloading file', error, { objectPath });
       throw new Error(`Failed to download file: ${error}`);
     }
 
@@ -73,7 +72,7 @@ class StorageService {
     const { ok, error } = await this.client!.delete(objectPath);
 
     if (!ok) {
-      console.error('Error deleting file:', error);
+      logSystem.error('Error deleting file', error, { objectPath });
       throw new Error(`Failed to delete file: ${error}`);
     }
   }
@@ -84,7 +83,7 @@ class StorageService {
     const { ok, value, error } = await this.client!.list({ prefix });
 
     if (!ok) {
-      console.error('Error listing files:', error);
+      logSystem.error('Error listing files', error, { prefix });
       throw new Error(`Failed to list files: ${error}`);
     }
 
