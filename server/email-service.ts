@@ -15,42 +15,20 @@ export const EMAIL_ADDRESSES = {
 
 async function getResendCredentials(): Promise<ResendCredentials | null> {
   try {
-    const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-    const xReplitToken = process.env.REPL_IDENTITY 
-      ? 'repl ' + process.env.REPL_IDENTITY 
-      : process.env.WEB_REPL_RENEWAL 
-      ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-      : null;
+    const apiKey = process.env.RESEND_API_KEY;
+    const fromEmail = process.env.RESEND_FROM_EMAIL;
 
-    if (!hostname || !xReplitToken) {
-      logger.warn('Replit connector environment not available for Resend');
-      return null;
-    }
-
-    const response = await fetch(
-      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
-      {
-        headers: {
-          'Accept': 'application/json',
-          'X_REPLIT_TOKEN': xReplitToken
-        }
-      }
-    );
-
-    const data = await response.json();
-    const connectionSettings = data.items?.[0];
-
-    if (!connectionSettings || !connectionSettings.settings.api_key) {
-      logger.warn('Resend connector not configured properly');
+    if (!apiKey) {
+      logger.warn('RESEND_API_KEY not configured');
       return null;
     }
 
     return {
-      apiKey: connectionSettings.settings.api_key,
-      fromEmail: connectionSettings.settings.from_email || 'noreply@gruard.com'
+      apiKey,
+      fromEmail: fromEmail || 'noreply@gruard.com'
     };
   } catch (error) {
-    logger.error('Failed to fetch Resend credentials:', error);
+    logger.error('Failed to get Resend credentials:', error);
     return null;
   }
 }
