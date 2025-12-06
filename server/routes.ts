@@ -8264,21 +8264,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticket = await storage.createTicket(validationResult.data);
       logSystem.info('Ticket created', { ticketId: ticket.id, userId: req.user!.id, categoria: ticket.categoria });
       
-      // Send email notification to user
-      const emailService = await getEmailService();
-      const user = await storage.getUser(req.user!.id);
-      if (user?.email) {
-        emailService.sendTicketCreatedEmail(user.email, user.nombre || 'Usuario', {
-          id: ticket.id,
-          titulo: ticket.titulo,
-          descripcion: ticket.descripcion || '',
-          categoria: ticket.categoria,
-          prioridad: ticket.prioridad,
-          estado: ticket.estado
-        }).catch(err => logSystem.error('Failed to send ticket created email', err));
-      }
-      
       res.json(ticket);
+      
+      // Send email notification asynchronously (fire-and-forget)
+      const userId = req.user!.id;
+      const ticketSnapshot = {
+        id: ticket.id,
+        titulo: ticket.titulo,
+        descripcion: ticket.descripcion || '',
+        categoria: ticket.categoria,
+        prioridad: ticket.prioridad,
+        estado: ticket.estado
+      };
+      void (async () => {
+        try {
+          const emailService = await getEmailService();
+          if (!emailService) {
+            logSystem.warn('Email service not configured, skipping ticket created email');
+            return;
+          }
+          const user = await storage.getUser(userId);
+          if (user?.email) {
+            await emailService.sendTicketCreatedEmail(user.email, user.nombre || 'Usuario', ticketSnapshot);
+          }
+        } catch (err) {
+          logSystem.error('Failed to send ticket created email', err);
+        }
+      })();
     } catch (error: any) {
       logSystem.error('Create ticket error', error);
       res.status(500).json({ message: "Error al crear ticket" });
@@ -8361,24 +8373,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.cambiarEstadoTicket(req.params.id, 'en_proceso');
       }
 
-      // Send email to ticket owner when staff responds
-      if (isAdmin) {
-        const emailService = await getEmailService();
-        const ticketOwner = await storage.getUser(ticket.usuarioId);
-        if (ticketOwner?.email) {
-          emailService.sendTicketSupportResponseEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
-            id: ticket.id,
-            titulo: ticket.titulo,
-            descripcion: ticket.descripcion || '',
-            categoria: ticket.categoria,
-            prioridad: ticket.prioridad,
-            estado: ticket.estado
-          }, req.body.contenido).catch(err => logSystem.error('Failed to send ticket response email', err));
-        }
-      }
-
       logSystem.info('Ticket message sent', { ticketId: req.params.id, messageId: mensaje.id, isStaff: isAdmin });
       res.json(mensaje);
+
+      // Send email to ticket owner when staff responds (fire-and-forget)
+      if (isAdmin) {
+        const ticketSnapshot = {
+          id: ticket.id,
+          titulo: ticket.titulo,
+          descripcion: ticket.descripcion || '',
+          categoria: ticket.categoria,
+          prioridad: ticket.prioridad,
+          estado: ticket.estado,
+          usuarioId: ticket.usuarioId
+        };
+        const contenido = String(req.body.contenido || '');
+        void (async () => {
+          try {
+            const emailService = await getEmailService();
+            if (!emailService) {
+              logSystem.warn('Email service not configured, skipping ticket response email');
+              return;
+            }
+            const ticketOwner = await storage.getUser(ticketSnapshot.usuarioId);
+            if (ticketOwner?.email) {
+              await emailService.sendTicketSupportResponseEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
+                id: ticketSnapshot.id,
+                titulo: ticketSnapshot.titulo,
+                descripcion: ticketSnapshot.descripcion,
+                categoria: ticketSnapshot.categoria,
+                prioridad: ticketSnapshot.prioridad,
+                estado: ticketSnapshot.estado
+              }, contenido);
+            }
+          } catch (err) {
+            logSystem.error('Failed to send ticket response email', err);
+          }
+        })();
+      }
     } catch (error: any) {
       logSystem.error('Create ticket message error', error);
       res.status(500).json({ message: "Error al enviar mensaje" });
@@ -8525,21 +8557,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.cambiarEstadoTicket(req.params.id, estado);
       logSystem.info('Ticket status changed', { ticketId: req.params.id, newStatus: estado, changedBy: req.user!.id });
       
-      // Send email notification to ticket owner
-      const emailService = await getEmailService();
-      const ticketOwner = await storage.getUser(ticket.usuarioId);
-      if (ticketOwner?.email) {
-        emailService.sendTicketStatusChangedEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
-          id: ticket.id,
-          titulo: ticket.titulo,
-          descripcion: ticket.descripcion || '',
-          categoria: ticket.categoria,
-          prioridad: ticket.prioridad,
-          estado: estado
-        }, oldStatus, estado).catch(err => logSystem.error('Failed to send ticket status email', err));
-      }
-      
       res.json(updated);
+
+      // Send email notification to ticket owner (fire-and-forget)
+      const ticketSnapshot = {
+        id: ticket.id,
+        titulo: ticket.titulo,
+        descripcion: ticket.descripcion || '',
+        categoria: ticket.categoria,
+        prioridad: ticket.prioridad,
+        usuarioId: ticket.usuarioId
+      };
+      const previousStatus = oldStatus;
+      const newStatus = estado;
+      void (async () => {
+        try {
+          const emailService = await getEmailService();
+          if (!emailService) {
+            logSystem.warn('Email service not configured, skipping ticket status email');
+            return;
+          }
+          const ticketOwner = await storage.getUser(ticketSnapshot.usuarioId);
+          if (ticketOwner?.email) {
+            await emailService.sendTicketStatusChangedEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
+              id: ticketSnapshot.id,
+              titulo: ticketSnapshot.titulo,
+              descripcion: ticketSnapshot.descripcion,
+              categoria: ticketSnapshot.categoria,
+              prioridad: ticketSnapshot.prioridad,
+              estado: newStatus
+            }, previousStatus, newStatus);
+          }
+        } catch (err) {
+          logSystem.error('Failed to send ticket status email', err);
+        }
+      })();
     } catch (error: any) {
       logSystem.error('Change ticket status error', error);
       res.status(500).json({ message: "Error al cambiar estado del ticket" });
