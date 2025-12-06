@@ -75,6 +75,7 @@ export interface EmailService {
   sendTicketSupportResponseEmail(email: string, userName: string, ticket: TicketEmailData, mensaje: string): Promise<boolean>;
   sendSocioCreatedEmail(email: string, nombre: string, tempPassword: string, porcentaje: string): Promise<boolean>;
   sendSocioFirstLoginEmail(email: string, nombre: string): Promise<boolean>;
+  sendAdminCreatedEmail(email: string, nombre: string, tempPassword: string, permisos: string[]): Promise<boolean>;
   isConfigured(): Promise<boolean>;
 }
 
@@ -1022,6 +1023,133 @@ class ResendEmailService implements EmailService {
       return false;
     }
   }
+
+  async sendAdminCreatedEmail(email: string, nombre: string, tempPassword: string, permisos: string[]): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send admin created email');
+      return false;
+    }
+
+    const permisosLabels: Record<string, string> = {
+      dashboard: "Dashboard",
+      analytics: "Analytics",
+      usuarios: "Usuarios",
+      operadores: "Conductores",
+      billeteras: "Billeteras",
+      comisiones_pago: "Comisiones de Pago",
+      servicios: "Servicios",
+      tarifas: "Tarifas",
+      monitoreo: "Monitoreo",
+      verificaciones: "Verificaciones",
+      documentos: "Documentos",
+      tickets: "Tickets Soporte",
+      socios: "Socios e Inversores",
+      aseguradoras: "Aseguradoras",
+      empresas: "Empresas",
+      configuracion: "Configuracion",
+      admin_usuarios: "Gestionar Administradores",
+    };
+
+    const permisosFormatted = permisos.map(p => permisosLabels[p] || p).join(', ');
+    const permisosList = permisos.map(p => `<li style="margin-bottom: 6px;">${permisosLabels[p] || p}</li>`).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a GruaRD</h1>
+          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Panel de Administracion</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Estimado/a ${nombre},</p>
+          
+          <p style="font-size: 16px;">
+            Se le ha asignado acceso al Panel de Administracion de GruaRD. A continuacion encontrara sus credenciales de acceso.
+          </p>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Credenciales de Acceso:</h3>
+            <p style="margin: 8px 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 8px 0;"><strong>Contrasena temporal:</strong> <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px;">${tempPassword}</code></p>
+          </div>
+          
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #856404; margin: 0 0 10px 0;">Importante - Seguridad:</h4>
+            <p style="margin: 0; font-size: 14px; color: #856404;">
+              Por seguridad, le recomendamos cambiar su contrasena en su primer inicio de sesion. 
+              No comparta sus credenciales con nadie.
+            </p>
+          </div>
+          
+          <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #155724; margin: 0 0 10px 0;">Permisos Asignados:</h4>
+            <ul style="margin: 0; padding-left: 20px; color: #155724; font-size: 14px;">
+              ${permisosList}
+            </ul>
+          </div>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Lineamientos Internos:</h3>
+            <ul style="margin: 0; padding-left: 20px; color: #555;">
+              <li style="margin-bottom: 8px;">Maneje la informacion de usuarios con confidencialidad</li>
+              <li style="margin-bottom: 8px;">Documente cualquier accion administrativa relevante</li>
+              <li style="margin-bottom: 8px;">Reporte cualquier incidente de seguridad inmediatamente</li>
+              <li style="margin-bottom: 8px;">No realice cambios sin la debida autorizacion</li>
+              <li style="margin-bottom: 8px;">Cierre sesion cuando no este usando el sistema</li>
+            </ul>
+          </div>
+          
+          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Soporte Interno:</h4>
+            <p style="margin: 0; font-size: 14px; color: #555;">
+              Si tiene alguna pregunta o necesita asistencia, contacte al administrador principal.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://gruard.com/admin" style="background: #1e3a5f; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Acceder al Panel</a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #999; text-align: center; margin-top: 20px;">
+            GruaRD - Panel de Administracion
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Estimado/a ${nombre},\n\nSe le ha asignado acceso al Panel de Administracion de GruaRD.\n\nCredenciales de acceso:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nPermisos asignados: ${permisosFormatted}\n\nImportante: Cambie su contrasena en el primer inicio de sesion y no comparta sus credenciales.\n\nLineamientos:\n- Maneje la informacion con confidencialidad\n- Documente acciones administrativas\n- Reporte incidentes de seguridad\n- Cierre sesion cuando no use el sistema\n\nGruaRD - Panel de Administracion`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD <${resend.fromEmail}>`,
+        to: [email],
+        subject: 'Bienvenido al Panel de Administracion GruaRD - Credenciales de Acceso',
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send admin created email:', error);
+        return false;
+      }
+
+      logger.info(`Admin created email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending admin created email:', error);
+      return false;
+    }
+  }
 }
 
 class MockEmailService implements EmailService {
@@ -1091,6 +1219,11 @@ class MockEmailService implements EmailService {
 
   async sendSocioFirstLoginEmail(email: string, nombre: string): Promise<boolean> {
     logger.info(`📧 [MOCK EMAIL] Primer inicio sesion socio para ${email} (${nombre})`);
+    return true;
+  }
+
+  async sendAdminCreatedEmail(email: string, nombre: string, tempPassword: string, permisos: string[]): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Admin creado para ${email} (${nombre}) - Permisos: ${permisos.join(', ')}`);
     return true;
   }
 }
