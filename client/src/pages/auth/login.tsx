@@ -94,13 +94,8 @@ export default function Login() {
         setLocation('/client');
       }
     } catch (error: any) {
-      // Check if this is a verification required error
+      // Check if this is a verification required error - redirect silently without error message
       if (error?.requiresVerification) {
-        toast({
-          title: 'Verificación requerida',
-          description: 'Debes completar la verificación de identidad para continuar',
-          variant: 'default',
-        });
         setLocation('/verify-pending');
         return;
       }
