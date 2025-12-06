@@ -3933,7 +3933,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             operatorShare: parseFloat(c.montoOperador || '0'),
             companyShare: parseFloat(c.montoEmpresa || '0'),
             createdAt: c.createdAt?.toISOString() || '',
-        }));
+          };
+        });
       
       res.json({
         summary: {
