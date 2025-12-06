@@ -1,0 +1,7 @@
+# APK and IPA files
+*.apk
+*.ipa
+*.aab
+
+# Keep the directory structure
+!.gitignore
