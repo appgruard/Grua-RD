@@ -603,6 +603,7 @@ export const socios = pgTable("socios", {
   montoInversion: decimal("monto_inversion", { precision: 12, scale: 2 }).notNull(),
   fechaInversion: timestamp("fecha_inversion").notNull(),
   activo: boolean("activo").default(true).notNull(),
+  primerInicioSesion: boolean("primer_inicio_sesion").default(true).notNull(),
   cuentaBancaria: text("cuenta_bancaria"),
   bancoNombre: text("banco_nombre"),
   tipoCuenta: text("tipo_cuenta"),

@@ -1111,7 +1111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", passport.authenticate("local"), (req: Request, res: Response) => {
+  app.post("/api/auth/login", passport.authenticate("local"), async (req: Request, res: Response) => {
     const user = req.user as any;
     
     // Skip verification check for admin, aseguradora, socio, and empresa users
@@ -1153,6 +1153,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           redirectTo: '/verify-pending',
           user: safeUserData,
         });
+      }
+    }
+    
+    // Check for socio first login and send welcome email
+    if (user && user.userType === 'socio') {
+      try {
+        const socio = await storage.getSocioByUserId(user.id);
+        if (socio && socio.primerInicioSesion) {
+          // Send first login email
+          const emailService = await getEmailService();
+          await emailService.sendSocioFirstLoginEmail(user.email, user.nombre || 'Socio');
+          
+          // Mark first login as completed
+          await storage.updateSocio(socio.id, { primerInicioSesion: false });
+          
+          logSystem.info('Socio first login processed', { socioId: socio.id, userId: user.id });
+        }
+      } catch (error) {
+        logSystem.error('Error processing socio first login', error, { userId: user.id });
       }
     }
     
@@ -8872,6 +8891,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fechaInversion: fechaInversion ? new Date(fechaInversion) : new Date(),
         notas: notas || null,
       });
+
+      // Send welcome email to new socio with credentials
+      try {
+        const emailService = await getEmailService();
+        await emailService.sendSocioCreatedEmail(
+          email,
+          nombre,
+          password,
+          String(porcentajeParticipacion)
+        );
+        logSystem.info('Socio welcome email sent', { socioId: socio.id, email });
+      } catch (emailError) {
+        logSystem.error('Failed to send socio welcome email', emailError, { socioId: socio.id, email });
+      }
 
       logSystem.info('Partner created', { socioId: socio.id, createdBy: req.user!.id });
       res.status(201).json(socio);

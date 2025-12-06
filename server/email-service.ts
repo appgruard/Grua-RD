@@ -73,6 +73,8 @@ export interface EmailService {
   sendTicketCreatedEmail(email: string, userName: string, ticket: TicketEmailData): Promise<boolean>;
   sendTicketStatusChangedEmail(email: string, userName: string, ticket: TicketEmailData, oldStatus: string, newStatus: string): Promise<boolean>;
   sendTicketSupportResponseEmail(email: string, userName: string, ticket: TicketEmailData, mensaje: string): Promise<boolean>;
+  sendSocioCreatedEmail(email: string, nombre: string, tempPassword: string, porcentaje: string): Promise<boolean>;
+  sendSocioFirstLoginEmail(email: string, nombre: string): Promise<boolean>;
   isConfigured(): Promise<boolean>;
 }
 
@@ -821,6 +823,205 @@ class ResendEmailService implements EmailService {
       return false;
     }
   }
+
+  async sendSocioCreatedEmail(email: string, nombre: string, tempPassword: string, porcentaje: string): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send socio created email');
+      return false;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a GruaRD</h1>
+          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Portal de Socios e Inversores</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Estimado/a ${nombre},</p>
+          
+          <p style="font-size: 16px;">
+            Es un placer darle la bienvenida como socio inversor de GruaRD. Su cuenta ha sido creada exitosamente.
+          </p>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Credenciales de Acceso:</h3>
+            <p style="margin: 8px 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 8px 0;"><strong>Contrasena temporal:</strong> <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px;">${tempPassword}</code></p>
+          </div>
+          
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #856404; margin: 0 0 10px 0;">Importante:</h4>
+            <p style="margin: 0; font-size: 14px; color: #856404;">
+              Por seguridad, le recomendamos cambiar su contrasena en su primer inicio de sesion.
+            </p>
+          </div>
+          
+          <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #155724; margin: 0 0 10px 0;">Su Participacion:</h4>
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #155724;">
+              ${porcentaje}% de las utilidades de la empresa
+            </p>
+          </div>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">En su Dashboard podra:</h3>
+            <ul style="margin: 0; padding-left: 20px; color: #555;">
+              <li style="margin-bottom: 8px;">Ver el resumen de sus distribuciones</li>
+              <li style="margin-bottom: 8px;">Consultar el historial de pagos</li>
+              <li style="margin-bottom: 8px;">Revisar los ingresos del periodo actual</li>
+              <li style="margin-bottom: 8px;">Descargar reportes financieros</li>
+            </ul>
+          </div>
+          
+          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Calendario de Distribuciones:</h4>
+            <p style="margin: 0; font-size: 14px; color: #555;">
+              Las distribuciones se calculan mensualmente y se procesan dentro de los primeros 15 dias del mes siguiente.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://gruard.com" style="background: #1e3a5f; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Acceder al Portal</a>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 14px; color: #666; text-align: center;">
+            <strong>Contacto para Socios:</strong><br>
+            Email: socios@gruard.com<br>
+            Telefono: +1 (809) 555-GRUA
+          </p>
+          
+          <p style="font-size: 12px; color: #999; text-align: center; margin-top: 20px;">
+            GruaRD - Gracias por su confianza e inversion
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Estimado/a ${nombre},\n\nBienvenido como socio inversor de GruaRD.\n\nCredenciales de acceso:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nSu participacion: ${porcentaje}% de las utilidades\n\nImportante: Cambie su contrasena en el primer inicio de sesion.\n\nContacto: socios@gruard.com\n\nGruaRD - Gracias por su confianza`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD <${resend.fromEmail}>`,
+        to: [email],
+        subject: 'Bienvenido al Portal de Socios GruaRD - Credenciales de Acceso',
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send socio created email:', error);
+        return false;
+      }
+
+      logger.info(`Socio created email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending socio created email:', error);
+      return false;
+    }
+  }
+
+  async sendSocioFirstLoginEmail(email: string, nombre: string): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send socio first login email');
+      return false;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">GruaRD - Portal de Socios</h1>
+          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Primer Inicio de Sesion</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Estimado/a ${nombre},</p>
+          
+          <p style="font-size: 16px;">
+            Gracias por ser parte del equipo inversor de GruaRD. Hemos registrado su primer inicio de sesion en el portal.
+          </p>
+          
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #856404; margin: 0 0 10px 0;">Recordatorio de Seguridad:</h4>
+            <p style="margin: 0; font-size: 14px; color: #856404;">
+              Si aun no ha cambiado su contrasena temporal, le recomendamos hacerlo desde la seccion "Mi Perfil" para mayor seguridad.
+            </p>
+          </div>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Guia rapida del Dashboard:</h3>
+            <ul style="margin: 0; padding-left: 20px; color: #555;">
+              <li style="margin-bottom: 10px;"><strong>Resumen:</strong> Vista general de sus distribuciones y participacion</li>
+              <li style="margin-bottom: 10px;"><strong>Distribuciones:</strong> Historial detallado de pagos recibidos</li>
+              <li style="margin-bottom: 10px;"><strong>Reportes:</strong> Descargue informes financieros en PDF</li>
+              <li style="margin-bottom: 10px;"><strong>Perfil:</strong> Actualice sus datos bancarios y contrasena</li>
+            </ul>
+          </div>
+          
+          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Proxima Distribucion:</h4>
+            <p style="margin: 0; font-size: 14px; color: #555;">
+              Las distribuciones se calculan mensualmente. Recibira una notificacion cuando su distribucion este lista.
+            </p>
+          </div>
+          
+          <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+          
+          <p style="font-size: 14px; color: #666; text-align: center;">
+            <strong>Canales de Comunicacion:</strong><br>
+            Email: socios@gruard.com<br>
+            WhatsApp Exclusivo: +1 (809) 555-SOCI
+          </p>
+          
+          <p style="font-size: 12px; color: #999; text-align: center; margin-top: 20px;">
+            GruaRD - Juntos construimos el futuro
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Estimado/a ${nombre},\n\nGracias por ser parte del equipo inversor de GruaRD. Hemos registrado su primer inicio de sesion.\n\nRecordatorio: Si no ha cambiado su contrasena temporal, le recomendamos hacerlo por seguridad.\n\nGuia del Dashboard:\n- Resumen: Vista general de distribuciones\n- Distribuciones: Historial de pagos\n- Reportes: Informes financieros\n- Perfil: Datos bancarios y contrasena\n\nContacto: socios@gruard.com\n\nGruaRD - Juntos construimos el futuro`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `GruaRD <${resend.fromEmail}>`,
+        to: [email],
+        subject: 'Bienvenido al Portal de Socios GruaRD - Primer Inicio de Sesion',
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send socio first login email:', error);
+        return false;
+      }
+
+      logger.info(`Socio first login email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending socio first login email:', error);
+      return false;
+    }
+  }
 }
 
 class MockEmailService implements EmailService {
@@ -880,6 +1081,16 @@ class MockEmailService implements EmailService {
 
   async sendTicketSupportResponseEmail(email: string, userName: string, ticket: TicketEmailData, mensaje: string): Promise<boolean> {
     logger.info(`📧 [MOCK EMAIL] Respuesta a ticket #${ticket.id.slice(-8)} para ${email}`);
+    return true;
+  }
+
+  async sendSocioCreatedEmail(email: string, nombre: string, tempPassword: string, porcentaje: string): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Socio creado para ${email} (${nombre}) - ${porcentaje}%`);
+    return true;
+  }
+
+  async sendSocioFirstLoginEmail(email: string, nombre: string): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Primer inicio sesion socio para ${email} (${nombre})`);
     return true;
   }
 }

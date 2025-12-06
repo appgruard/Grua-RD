@@ -278,11 +278,19 @@ sendAdminCreatedEmail(email, nombre, permisos, tempPassword): Promise<boolean>
 3. ~~Integrar en flujo de registro~~ - HECHO
    - POST /api/auth/register - Envia email segun tipo de usuario (cliente o conductor)
 
-### Fase 3: Sistema de Socios (Prioridad Media)
-1. Agregar campo `primerInicioSesion`
-2. Crear email de creacion de socio
-3. Crear email de primer inicio de sesion
-4. Integrar en flujos existentes
+### Fase 3: Sistema de Socios (Prioridad Media) - COMPLETADA
+1. ~~Agregar campo `primerInicioSesion`~~ - HECHO
+   - Campo agregado a tabla `socios` en `shared/schema.ts` (línea 606)
+   - Migración ejecutada exitosamente
+2. ~~Crear email de creacion de socio~~ - HECHO
+   - `sendSocioCreatedEmail()` implementado en `server/email-service.ts`
+   - Email con credenciales, porcentaje de participación, guía del dashboard
+3. ~~Crear email de primer inicio de sesion~~ - HECHO
+   - `sendSocioFirstLoginEmail()` implementado en `server/email-service.ts`
+   - Email de bienvenida con guía rápida del portal
+4. ~~Integrar en flujos existentes~~ - HECHO
+   - POST /api/admin/socios - Envía email automáticamente al crear socio
+   - POST /api/auth/login - Detecta primer inicio de sesión de socios y envía email
 
 ### Fase 4: Sistema de Administradores (Prioridad Media)
 1. Crear schema de administradores
