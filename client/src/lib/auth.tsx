@@ -73,9 +73,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
-      const res = await apiRequest('POST', '/api/auth/login', data);
+      // Use fetch directly instead of apiRequest to handle 403 verification cases
+      const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+      const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/login` : '/api/auth/login';
       
-      // Try to parse JSON response, handle empty or malformed responses
+      const res = await fetch(fullUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+      
+      // Try to parse JSON response
       let responseData;
       try {
         responseData = await res.json();
@@ -84,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { user: null };
       }
       
-      // Handle 403 with verification required
+      // Handle 403 with verification required - throw special error for redirect
       if (res.status === 403 && responseData?.requiresVerification) {
         const verificationError = new Error(responseData.message) as VerificationError;
         verificationError.requiresVerification = true;
