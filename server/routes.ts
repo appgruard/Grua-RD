@@ -2674,6 +2674,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fetch all documents for this conductor
         const documentos = await storage.getDocumentosByConductor(conductor.id);
         
+        // Get user to check verification flags
+        const userInfo = await storage.getUserById(req.user!.id);
+        
         // Required document types
         const requiredTypes = ['licencia', 'matricula', 'seguro_grua', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
         
@@ -2696,6 +2699,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const now = new Date();
         
         for (const requiredType of requiredTypes) {
+          // Skip cedula documents if user has cedulaVerificada = true (verified via identity scan)
+          if ((requiredType === 'cedula_frontal' || requiredType === 'cedula_trasera') && userInfo?.cedulaVerificada) {
+            continue;
+          }
+          
           const doc = documentos.find(d => d.tipo === requiredType);
           
           if (!doc) {

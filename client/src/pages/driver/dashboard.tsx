@@ -420,6 +420,11 @@ export default function DriverDashboard() {
     let missingCount = 0;
     
     for (const requiredType of requiredTypes) {
+      // Skip cedula documents if user has cedulaVerificada = true (verified via identity scan)
+      if ((requiredType === 'cedula_frontal' || requiredType === 'cedula_trasera') && user?.cedulaVerificada) {
+        continue;
+      }
+      
       const doc = driverDocuments.find(d => d.tipo === requiredType);
       if (!doc || doc.estado !== 'aprobado') {
         missingCount++;
