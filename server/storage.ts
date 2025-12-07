@@ -494,10 +494,11 @@ export interface IStorage {
   updateOperatorBankAccount(id: string, data: Partial<OperatorBankAccount>): Promise<OperatorBankAccount>;
   deleteOperatorBankAccount(id: string): Promise<void>;
 
-  // Operator Withdrawals (dLocal Payouts)
+  // Operator Withdrawals (Payouts)
   createOperatorWithdrawal(data: InsertOperatorWithdrawal): Promise<OperatorWithdrawal>;
   getOperatorWithdrawal(id: string): Promise<OperatorWithdrawal | undefined>;
   getOperatorWithdrawals(conductorId: string): Promise<OperatorWithdrawal[]>;
+  getAllWithdrawals(): Promise<OperatorWithdrawal[]>;
   updateOperatorWithdrawal(id: string, data: Partial<OperatorWithdrawal>): Promise<OperatorWithdrawal>;
   getPendingWithdrawals(): Promise<OperatorWithdrawal[]>;
 
@@ -3392,6 +3393,13 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(operatorWithdrawals)
       .where(eq(operatorWithdrawals.conductorId, conductorId))
+      .orderBy(desc(operatorWithdrawals.createdAt));
+  }
+
+  async getAllWithdrawals(): Promise<OperatorWithdrawal[]> {
+    return db
+      .select()
+      .from(operatorWithdrawals)
       .orderBy(desc(operatorWithdrawals.createdAt));
   }
 

@@ -474,6 +474,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Pagadito Payment Routes
+  
+  // Test Pagadito connection
+  app.get("/api/pagadito/test-connection", async (req: Request, res: Response) => {
+    try {
+      const { pagaditoPaymentService } = await import('./services/pagadito-payment');
+      
+      if (!pagaditoPaymentService.isConfigured()) {
+        return res.status(500).json({ 
+          success: false,
+          message: "Pagadito no está configurado. Configure PAGADITO_UID y PAGADITO_WSK.",
+        });
+      }
+
+      const result = await pagaditoPaymentService.connect();
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          message: "Conexión exitosa con Pagadito",
+          sandbox: process.env.PAGADITO_SANDBOX !== "false",
+          token: result.token?.substring(0, 20) + "...",
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.errorMessage,
+          errorCode: result.errorCode,
+        });
+      }
+    } catch (error: any) {
+      logSystem.error('Pagadito test-connection error', error);
+      res.status(500).json({ 
+        success: false,
+        message: `Error de conexión: ${error.message}` 
+      });
+    }
+  });
+
   // Create payment and get redirect URL
   app.post("/api/pagadito/create-payment", express.json(), async (req: Request, res: Response) => {
     try {
@@ -524,7 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pagaditoStatus: "REGISTERED",
       });
 
-      logTransaction.paymentInitiated(servicioId, parseFloat(servicio.costoTotal), 'pagadito');
+      logTransaction.paymentStarted(servicioId, parseFloat(servicio.costoTotal), 'pagadito');
       
       res.json({
         success: true,
@@ -6637,6 +6675,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get scheduled payout details error', error);
       res.status(500).json({ message: "Failed to get scheduled payout details" });
+    }
+  });
+
+  // ==================== ADMIN WITHDRAWALS MANAGEMENT (Manual Payouts) ====================
+
+  // Admin: Get all withdrawals
+  app.get("/api/admin/withdrawals", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { estado } = req.query;
+      let withdrawals = await storage.getAllWithdrawals();
+      
+      if (estado && typeof estado === 'string') {
+        withdrawals = withdrawals.filter(w => w.estado === estado);
+      }
+
+      const withdrawalsWithDetails = await Promise.all(
+        withdrawals.map(async (w) => {
+          const conductor = await storage.getConductorById(w.conductorId);
+          const user = conductor ? await storage.getUserById(conductor.userId) : null;
+          const bankAccount = conductor ? await storage.getOperatorBankAccountByCondutorId(conductor.id) : null;
+          
+          return {
+            id: w.id,
+            conductorId: w.conductorId,
+            conductorName: user ? `${user.nombre} ${user.apellido}` : 'Desconocido',
+            conductorEmail: user?.email,
+            conductorPhone: user?.phone,
+            monto: w.monto,
+            montoNeto: w.montoNeto,
+            comision: w.comision,
+            tipoRetiro: w.tipoRetiro,
+            estado: w.estado,
+            errorMessage: w.errorMessage,
+            procesadoAt: w.procesadoAt,
+            createdAt: w.createdAt,
+            bankAccount: bankAccount ? {
+              banco: bankAccount.banco,
+              tipoCuenta: bankAccount.tipoCuenta,
+              numeroCuenta: bankAccount.numeroCuenta,
+              nombreTitular: bankAccount.nombreTitular,
+              cedula: bankAccount.cedula,
+            } : null,
+          };
+        })
+      );
+
+      res.json({
+        withdrawals: withdrawalsWithDetails,
+        total: withdrawalsWithDetails.length,
+        pendientes: withdrawalsWithDetails.filter(w => w.estado === 'pendiente').length,
+      });
+    } catch (error: any) {
+      logSystem.error('Get all withdrawals error', error);
+      res.status(500).json({ message: "Failed to get withdrawals" });
+    }
+  });
+
+  // Admin: Process withdrawal manually (mark as paid via bank transfer)
+  app.post("/api/admin/withdrawals/:id/process-manual", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { referenciaBancaria, notas } = req.body;
+
+      const withdrawal = await storage.getOperatorWithdrawal(id);
+      if (!withdrawal) {
+        return res.status(404).json({ message: "Retiro no encontrado" });
+      }
+
+      if (withdrawal.estado !== 'pendiente') {
+        return res.status(400).json({ 
+          message: `El retiro ya fue procesado con estado: ${withdrawal.estado}` 
+        });
+      }
+
+      const conductor = await storage.getConductorById(withdrawal.conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      await storage.deductFromOperatorBalance(conductor.id, withdrawal.monto);
+
+      const updatedWithdrawal = await storage.updateOperatorWithdrawal(id, {
+        estado: 'pagado',
+        dlocalPayoutId: referenciaBancaria || `MANUAL-${Date.now()}`,
+        dlocalStatus: 'COMPLETED_MANUAL',
+        errorMessage: notas || 'Procesado manualmente por administrador',
+        procesadoAt: new Date(),
+      });
+
+      const user = await storage.getUserById(conductor.userId);
+      
+      logSystem.info('Manual withdrawal processed', { 
+        withdrawalId: id,
+        conductorId: conductor.id,
+        amount: withdrawal.monto,
+        reference: referenciaBancaria,
+        processedBy: req.user!.id,
+      });
+
+      res.json({
+        success: true,
+        message: "Retiro procesado exitosamente",
+        withdrawal: {
+          id: updatedWithdrawal.id,
+          monto: updatedWithdrawal.monto,
+          montoNeto: updatedWithdrawal.montoNeto,
+          estado: updatedWithdrawal.estado,
+          procesadoAt: updatedWithdrawal.procesadoAt,
+        },
+        conductor: {
+          nombre: user ? `${user.nombre} ${user.apellido}` : 'Desconocido',
+          email: user?.email,
+        },
+      });
+    } catch (error: any) {
+      logSystem.error('Process manual withdrawal error', error);
+      res.status(500).json({ message: "Error al procesar el retiro" });
+    }
+  });
+
+  // Admin: Reject withdrawal
+  app.post("/api/admin/withdrawals/:id/reject", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { id } = req.params;
+      const { motivo } = req.body;
+
+      const withdrawal = await storage.getOperatorWithdrawal(id);
+      if (!withdrawal) {
+        return res.status(404).json({ message: "Retiro no encontrado" });
+      }
+
+      if (withdrawal.estado !== 'pendiente') {
+        return res.status(400).json({ 
+          message: `El retiro ya fue procesado con estado: ${withdrawal.estado}` 
+        });
+      }
+
+      const updatedWithdrawal = await storage.updateOperatorWithdrawal(id, {
+        estado: 'fallido',
+        errorMessage: motivo || 'Rechazado por administrador',
+        procesadoAt: new Date(),
+      });
+
+      logSystem.info('Withdrawal rejected', { 
+        withdrawalId: id,
+        conductorId: withdrawal.conductorId,
+        reason: motivo,
+        rejectedBy: req.user!.id,
+      });
+
+      res.json({
+        success: true,
+        message: "Retiro rechazado",
+        withdrawal: {
+          id: updatedWithdrawal.id,
+          estado: updatedWithdrawal.estado,
+          errorMessage: updatedWithdrawal.errorMessage,
+        },
+      });
+    } catch (error: any) {
+      logSystem.error('Reject withdrawal error', error);
+      res.status(500).json({ message: "Error al rechazar el retiro" });
     }
   });
 
