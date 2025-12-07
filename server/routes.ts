@@ -619,12 +619,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
-        return res.redirect(`/servicio/${servicio.id}?payment=success`);
+        return res.redirect(`/client/tracking/${servicio.id}?payment=success`);
       } else if (pagaditoPaymentService.isPaymentPending(statusResult.status)) {
-        return res.redirect(`/servicio/${servicio.id}?payment=pending&status=${statusResult.status}`);
+        return res.redirect(`/client/tracking/${servicio.id}?payment=pending&status=${statusResult.status}`);
       } else {
         // Payment failed or cancelled
-        return res.redirect(`/servicio/${servicio.id}?payment=failed&status=${statusResult.status}`);
+        return res.redirect(`/client/tracking/${servicio.id}?payment=failed&status=${statusResult.status}`);
       }
     } catch (error: any) {
       logSystem.error('Pagadito return error', error);
@@ -2456,57 +2456,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (validatedData.metodoPago === "tarjeta") {
-        const { dlocalPaymentService } = await import('./services/dlocal-payment');
+        // Pagadito flow: No upfront authorization needed
+        // Payment will be processed after driver accepts the service
+        // Client will be redirected to Pagadito to complete payment
+        const { pagaditoPaymentService } = await import('./services/pagadito-payment');
         
-        if (!dlocalPaymentService.isConfigured()) {
+        if (!pagaditoPaymentService.isConfigured()) {
           return res.status(503).json({ 
             message: "El servicio de pagos con tarjeta no está disponible en este momento",
             paymentServiceUnavailable: true 
           });
         }
 
-        const paymentMethod = await storage.getDefaultPaymentMethodByUserId(req.user!.id);
-        if (!paymentMethod) {
-          return res.status(400).json({ 
-            message: "No tienes un método de pago registrado. Por favor agrega una tarjeta antes de solicitar el servicio.",
-            noPaymentMethod: true 
-          });
-        }
-
-        const serviceAmount = parseFloat(validatedData.costoTotal as string);
-        
-        try {
-          const authResult = await dlocalPaymentService.createAuthorization({
-            servicioId: `PRE-${Date.now()}`,
-            amount: serviceAmount,
-            name: `${req.user!.nombre} ${req.user!.apellido}`,
-            email: req.user!.email,
-            document: req.user!.cedula || '00000000000',
-            cardToken: paymentMethod.dlocalCardId,
-            description: `Autorización - Servicio de grúa: ${validatedData.origenDireccion} a ${validatedData.destinoDireccion}`,
-          });
-
-          if (!authResult.authorized) {
-            return res.status(400).json({ 
-              message: "No se pudo autorizar el pago. Por favor verifica tu método de pago.",
-              paymentAuthorizationFailed: true,
-              statusDetail: authResult.statusDetail
-            });
-          }
-
-          servicioData.dlocalAuthorizationId = authResult.authorizationId;
-          logService.info('Card payment authorized', { 
-            authorizationId: authResult.authorizationId, 
-            amount: serviceAmount,
-            clienteId: req.user!.id 
-          });
-        } catch (authError: any) {
-          logSystem.error('Card authorization failed', authError, { clienteId: req.user!.id });
-          return res.status(400).json({ 
-            message: "Error al procesar la autorización del pago. Por favor intenta de nuevo.",
-            paymentAuthorizationFailed: true 
-          });
-        }
+        // Service will be created with pagaditoStatus = 'pending_payment'
+        // Payment link will be generated when driver accepts
+        servicioData.pagaditoStatus = 'pending_payment';
+        logService.info('Card payment service created (Pagadito flow)', { 
+          amount: validatedData.costoTotal,
+          clienteId: req.user!.id 
+        });
       }
 
       const servicio = await storage.createServicio(servicioData);
@@ -3229,56 +3197,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Servicio no encontrado" });
       }
 
-      if (existingServicio.metodoPago === 'tarjeta' && existingServicio.dlocalAuthorizationId) {
-        const { dlocalPaymentService } = await import('./services/dlocal-payment');
-        
-        if (!dlocalPaymentService.isConfigured()) {
-          return res.status(503).json({ 
-            message: "El servicio de pagos no está disponible. No se puede aceptar el servicio.",
-            paymentServiceUnavailable: true 
-          });
-        }
-
-        try {
-          const captureResult = await dlocalPaymentService.captureAuthorization(
-            existingServicio.dlocalAuthorizationId,
-            parseFloat(existingServicio.costoTotal),
-            `SVC-${existingServicio.id}`
-          );
-
-          if (!captureResult.captured) {
-            logSystem.error('Payment capture failed', { 
-              servicioId: existingServicio.id,
-              authorizationId: existingServicio.dlocalAuthorizationId,
-              status: captureResult.status,
-              statusDetail: captureResult.statusDetail
-            });
-            return res.status(400).json({ 
-              message: "No se pudo capturar el pago. El cliente puede haber cancelado la autorización.",
-              paymentCaptureFailed: true 
-            });
-          }
-
-          await storage.updateServicio(req.params.id, {
-            dlocalPaymentId: captureResult.paymentId,
-            dlocalPaymentStatus: captureResult.status,
-          });
-
-          logService.info('Card payment captured on acceptance', { 
-            servicioId: existingServicio.id,
-            paymentId: captureResult.paymentId,
-            amount: existingServicio.costoTotal 
-          });
-        } catch (captureError: any) {
-          logSystem.error('Payment capture error', captureError, { 
-            servicioId: existingServicio.id,
-            authorizationId: existingServicio.dlocalAuthorizationId 
-          });
-          return res.status(400).json({ 
-            message: "Error al procesar el pago. Por favor intenta de nuevo.",
-            paymentCaptureFailed: true 
-          });
-        }
+      // Pagadito flow: Payment is processed after driver accepts via redirect
+      // No capture needed here - client will be notified to pay via Pagadito redirect
+      if (existingServicio.metodoPago === 'tarjeta' && existingServicio.pagaditoStatus === 'pending_payment') {
+        logService.info('Card payment service accepted (Pagadito flow) - awaiting client payment', { 
+          servicioId: existingServicio.id,
+          amount: existingServicio.costoTotal 
+        });
+        // The service will be accepted, and client will see a "Pay Now" button
+        // to initiate payment via /api/pagadito/create-payment
       }
 
       const conductor = await storage.getConductorByUserId(req.user!.id);
@@ -3316,7 +3243,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const conductorName = `${req.user!.nombre} ${req.user!.apellido}`;
-      await pushService.notifyServiceAccepted(servicio.id, servicio.clienteId, conductorName);
+      
+      // For card payments with pending payment status, send special notification
+      if (servicio.metodoPago === 'tarjeta' && servicio.pagaditoStatus === 'pending_payment') {
+        const monto = parseFloat(servicio.costoTotal);
+        await pushService.notifyPaymentRequired(servicio.id, servicio.clienteId, conductorName, monto);
+      } else {
+        await pushService.notifyServiceAccepted(servicio.id, servicio.clienteId, conductorName);
+      }
 
       res.json(servicio);
     } catch (error: any) {

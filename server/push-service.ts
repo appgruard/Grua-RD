@@ -175,6 +175,15 @@ export class PushNotificationService {
       tag: 'extraction-requests',
     });
   }
+
+  async notifyPaymentRequired(servicioId: string, clienteId: string, conductorName: string, monto: number): Promise<void> {
+    await this.sendToUser(clienteId, {
+      title: 'Pago requerido',
+      body: `${conductorName} aceptó tu solicitud. Completa el pago de RD$ ${monto.toLocaleString('es-DO', { minimumFractionDigits: 2 })} para continuar.`,
+      data: { type: 'payment_required', servicioId },
+      tag: `service-${servicioId}`,
+    });
+  }
 }
 
 export const pushService = new PushNotificationService();

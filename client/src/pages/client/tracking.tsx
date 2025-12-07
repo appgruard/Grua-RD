@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { useRoute } from 'wouter';
+import { useRoute, useSearch } from 'wouter';
 import { MapboxMapWithFastLoad } from '@/components/maps/LazyMapboxMap';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign, Navigation, Clock } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign, Navigation, Clock, CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from '@/lib/auth';
 import { ChatBox } from '@/components/chat/ChatBox';
@@ -16,6 +16,8 @@ import { NegotiationChatBox } from '@/components/chat/NegotiationChatBox';
 import { RatingModal, StarRating } from '@/components/RatingModal';
 import { PaymentConfirmationModal } from '@/components/PaymentConfirmationModal';
 import { getDirections, formatDuration, formatDistance, formatETATime, calculateETATime } from '@/lib/mapbox-directions';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import type { ServicioWithDetails, Calificacion } from '@shared/schema';
 import type { Coordinates } from '@/lib/maps';
 
@@ -34,6 +36,8 @@ export default function ClientTracking() {
   const [, params] = useRoute('/client/tracking/:id');
   const serviceId = params?.id;
   const queryClient = useQueryClient();
+  const searchString = useSearch();
+  const { toast } = useToast();
   const [driverLocation, setDriverLocation] = useState<Coordinates | null>(null);
   const [driverInfo, setDriverInfo] = useState<{
     speed: number;
@@ -47,8 +51,68 @@ export default function ClientTracking() {
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [paymentConfirmationOpen, setPaymentConfirmationOpen] = useState(false);
   const [hasShownCompletionFlow, setHasShownCompletionFlow] = useState(false);
+  const [paymentStatusShown, setPaymentStatusShown] = useState(false);
   const lastRouteCalcRef = useRef<number>(0);
   const { user } = useAuth();
+
+  const searchParams = new URLSearchParams(searchString);
+  const paymentStatus = searchParams.get('payment');
+
+  useEffect(() => {
+    if (paymentStatus && !paymentStatusShown) {
+      setPaymentStatusShown(true);
+      // Invalidate query to refresh service data with new payment status
+      queryClient.invalidateQueries({ queryKey: ['/api/services', serviceId] });
+      
+      if (paymentStatus === 'success') {
+        toast({
+          title: 'Pago exitoso',
+          description: 'Tu pago ha sido procesado correctamente',
+        });
+      } else if (paymentStatus === 'pending') {
+        toast({
+          title: 'Pago en verificacion',
+          description: 'Tu pago esta siendo verificado. Puede tomar hasta 72 horas.',
+        });
+      } else if (paymentStatus === 'failed') {
+        toast({
+          title: 'Pago fallido',
+          description: 'Hubo un error al procesar tu pago. Por favor intenta de nuevo.',
+          variant: 'destructive',
+        });
+      }
+      window.history.replaceState({}, '', `/client/tracking/${serviceId}`);
+    }
+  }, [paymentStatus, paymentStatusShown, serviceId, toast, queryClient]);
+
+  const createPaymentMutation = useMutation({
+    mutationFn: async (servicioId: string) => {
+      const res = await apiRequest('POST', '/api/pagadito/create-payment', { servicioId });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Error al crear pago');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo iniciar el pago',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handlePayNow = () => {
+    if (serviceId) {
+      createPaymentMutation.mutate(serviceId);
+    }
+  };
 
   const { data: service, isLoading } = useQuery<ServicioWithDetails>({
     queryKey: ['/api/services', serviceId],
@@ -322,6 +386,80 @@ export default function ClientTracking() {
               El operador ha propuesto un precio. Abre el chat para ver y responder.
             </AlertDescription>
           </Alert>
+        )}
+
+        {service.metodoPago === 'tarjeta' && service.pagaditoStatus === 'pending_payment' && service.estado === 'aceptado' && (
+          <Card className="p-4 border-primary/50 bg-primary/5" data-testid="card-payment-pending">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/20">
+                <CreditCard className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold">Pago pendiente</p>
+                <p className="text-sm text-muted-foreground">
+                  Completa el pago para continuar con el servicio
+                </p>
+              </div>
+              <Button
+                onClick={handlePayNow}
+                disabled={createPaymentMutation.isPending}
+                data-testid="button-pay-now"
+              >
+                {createPaymentMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CreditCard className="w-4 h-4 mr-2" />
+                )}
+                Pagar ahora
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {service.metodoPago === 'tarjeta' && service.pagaditoStatus === 'COMPLETED' && (
+          <Alert className="bg-green-500/10 border-green-500/30">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <AlertDescription className="text-green-600 dark:text-green-400 text-sm">
+              Pago completado exitosamente
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {service.metodoPago === 'tarjeta' && service.pagaditoStatus === 'VERIFYING' && (
+          <Alert className="bg-amber-500/10 border-amber-500/30">
+            <Clock className="h-4 w-4 text-amber-500" />
+            <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
+              Tu pago esta siendo verificado. Puede tomar hasta 72 horas.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {service.metodoPago === 'tarjeta' && ['FAILED', 'CANCELED', 'EXPIRED', 'REVOKED'].includes(service.pagaditoStatus || '') && (
+          <Card className="p-4 border-destructive/50 bg-destructive/5" data-testid="card-payment-failed">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/20">
+                <XCircle className="w-6 h-6 text-destructive" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-destructive">Pago fallido</p>
+                <p className="text-sm text-muted-foreground">
+                  Hubo un error con tu pago. Intenta de nuevo.
+                </p>
+              </div>
+              <Button
+                onClick={handlePayNow}
+                disabled={createPaymentMutation.isPending}
+                data-testid="button-retry-payment"
+              >
+                {createPaymentMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CreditCard className="w-4 h-4 mr-2" />
+                )}
+                Reintentar
+              </Button>
+            </div>
+          </Card>
         )}
         </div>
       </div>
