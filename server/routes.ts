@@ -4196,12 +4196,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const userId = parseInt(req.params.userId);
-      if (isNaN(userId)) {
+      const userId = req.params.userId;
+      if (!userId) {
         return res.status(400).json({ message: "Invalid user ID" });
       }
 
-      const user = await storage.getUser(userId);
+      const user = await storage.getUserById(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -4242,14 +4242,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const userId = parseInt(req.params.userId);
+      const userId = req.params.userId;
       const { reason } = req.body;
 
-      if (isNaN(userId)) {
+      if (!userId) {
         return res.status(400).json({ message: "Invalid user ID" });
       }
 
-      const user = await storage.getUser(userId);
+      const user = await storage.getUserById(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -4261,7 +4261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUser(userId, {
         fotoVerificada: false,
         fotoVerificadaScore: null,
-        photoUrl: null,
+        fotoUrl: null,
       });
 
       logSystem.info('Admin rejected photo', { 
@@ -4279,6 +4279,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Reject photo error', error);
       res.status(500).json({ message: "Failed to reject photo" });
+    }
+  });
+
+  // Admin manual cédula verification
+  app.post("/api/admin/users/:userId/approve-cedula", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.params.userId;
+      const { cedula } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updateData: any = {
+        cedulaVerificada: true,
+      };
+      
+      if (cedula && typeof cedula === 'string' && cedula.length === 11) {
+        updateData.cedula = cedula;
+      }
+
+      await storage.updateUser(userId, updateData);
+
+      logSystem.info('Admin approved cédula manually', { 
+        adminId: req.user!.id, 
+        userId, 
+        adminEmail: req.user!.email,
+        cedula: user.cedula || cedula || 'not provided'
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Cédula verified successfully",
+        userId,
+      });
+    } catch (error: any) {
+      logSystem.error('Approve cédula error', error);
+      res.status(500).json({ message: "Failed to approve cédula" });
+    }
+  });
+
+  app.post("/api/admin/users/:userId/reject-cedula", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.params.userId;
+      const { reason } = req.body;
+
+      if (!userId) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.updateUser(userId, {
+        cedulaVerificada: false,
+        cedula: null,
+      });
+
+      logSystem.info('Admin rejected cédula', { 
+        adminId: req.user!.id, 
+        userId, 
+        adminEmail: req.user!.email,
+        reason: reason || 'No reason provided'
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Cédula rejected. User will need to re-verify.",
+        userId,
+      });
+    } catch (error: any) {
+      logSystem.error('Reject cédula error', error);
+      res.status(500).json({ message: "Failed to reject cédula" });
+    }
+  });
+
+  // Get pending cédula verifications for admin
+  app.get("/api/admin/pending-cedula-verifications", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allUsers = await storage.getAllUsers();
+      const usersWithPendingCedula = allUsers.filter(user => 
+        (user.userType === 'conductor' || user.userType === 'cliente') && 
+        !user.cedulaVerificada
+      );
+
+      const pendingCedulas = usersWithPendingCedula.map(user => ({
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        cedula: user.cedula,
+        phone: user.phone,
+        photoUrl: user.fotoUrl,
+        userType: user.userType,
+        cedulaVerificada: user.cedulaVerificada,
+        telefonoVerificado: user.telefonoVerificado,
+        createdAt: user.createdAt,
+      }));
+
+      const stats = {
+        totalPending: pendingCedulas.length,
+        totalDrivers: allUsers.filter(u => u.userType === 'conductor').length,
+        totalClients: allUsers.filter(u => u.userType === 'cliente').length,
+        totalVerified: allUsers.filter(u => u.cedulaVerificada).length,
+      };
+
+      res.json({
+        pendingCedulas,
+        stats,
+      });
+    } catch (error: any) {
+      logSystem.error('Get pending cédula verifications error', error);
+      res.status(500).json({ message: "Failed to get pending cédula verifications" });
     }
   });
 

@@ -116,6 +116,32 @@ interface PendingPhotoResponse {
   stats: PendingPhotoStats;
 }
 
+interface PendingCedulaUser {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  cedula: string | null;
+  phone: string | null;
+  photoUrl: string | null;
+  userType: string;
+  cedulaVerificada: boolean;
+  telefonoVerificado: boolean;
+  createdAt: string;
+}
+
+interface PendingCedulaStats {
+  totalPending: number;
+  totalDrivers: number;
+  totalClients: number;
+  totalVerified: number;
+}
+
+interface PendingCedulaResponse {
+  pendingCedulas: PendingCedulaUser[];
+  stats: PendingCedulaStats;
+}
+
 type StatusFilter = 'all' | 'verified' | 'pending-phone' | 'pending-cedula' | 'unverified';
 
 export default function AdminVerifications() {
@@ -131,6 +157,11 @@ export default function AdminVerifications() {
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [selectedCedulaUser, setSelectedCedulaUser] = useState<PendingCedulaUser | null>(null);
+  const [isCedulaDialogOpen, setIsCedulaDialogOpen] = useState(false);
+  const [isCedulaRejectDialogOpen, setIsCedulaRejectDialogOpen] = useState(false);
+  const [cedulaRejectReason, setCedulaRejectReason] = useState('');
+  const [cedulaInput, setCedulaInput] = useState('');
 
   const queryParams = new URLSearchParams();
   if (searchTerm) queryParams.set('search', searchTerm);
@@ -153,6 +184,15 @@ export default function AdminVerifications() {
     queryFn: async () => {
       const res = await fetch('/api/admin/pending-photo-verifications', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch pending photos');
+      return res.json();
+    },
+  });
+
+  const { data: pendingCedulasData, isLoading: isPendingCedulasLoading } = useQuery<PendingCedulaResponse>({
+    queryKey: ['/api/admin/pending-cedula-verifications'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/pending-cedula-verifications', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch pending cédulas');
       return res.json();
     },
   });
@@ -216,6 +256,45 @@ export default function AdminVerifications() {
     },
   });
 
+  const approveCedulaMutation = useMutation({
+    mutationFn: async ({ userId, cedula }: { userId: string; cedula?: string }) => {
+      const res = await apiRequest('POST', `/api/admin/users/${userId}/approve-cedula`, { cedula });
+      if (!res.ok) throw new Error('Failed to approve cédula');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Cédula aprobada', description: 'La cédula ha sido verificada manualmente' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-cedula-verifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/verification-status'] });
+      setIsCedulaDialogOpen(false);
+      setSelectedCedulaUser(null);
+      setCedulaInput('');
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const rejectCedulaMutation = useMutation({
+    mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
+      const res = await apiRequest('POST', `/api/admin/users/${userId}/reject-cedula`, { reason });
+      if (!res.ok) throw new Error('Failed to reject cédula');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Cédula rechazada', description: 'El usuario deberá verificar su cédula nuevamente' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-cedula-verifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/verification-status'] });
+      setIsCedulaRejectDialogOpen(false);
+      setIsCedulaDialogOpen(false);
+      setSelectedCedulaUser(null);
+      setCedulaRejectReason('');
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const handleViewHistory = (userId: string) => {
     setSelectedUserId(userId);
     setIsHistoryOpen(true);
@@ -235,6 +314,24 @@ export default function AdminVerifications() {
   const handleRejectPhoto = () => {
     if (selectedPhotoUser) {
       rejectPhotoMutation.mutate({ userId: selectedPhotoUser.id, reason: rejectReason });
+    }
+  };
+
+  const handleViewCedula = (user: PendingCedulaUser) => {
+    setSelectedCedulaUser(user);
+    setCedulaInput(user.cedula || '');
+    setIsCedulaDialogOpen(true);
+  };
+
+  const handleApproveCedula = () => {
+    if (selectedCedulaUser) {
+      approveCedulaMutation.mutate({ userId: selectedCedulaUser.id, cedula: cedulaInput || undefined });
+    }
+  };
+
+  const handleRejectCedula = () => {
+    if (selectedCedulaUser) {
+      rejectCedulaMutation.mutate({ userId: selectedCedulaUser.id, reason: cedulaRejectReason });
     }
   };
 
@@ -372,6 +469,15 @@ export default function AdminVerifications() {
             {pendingPhotosData?.stats.totalPending ? (
               <Badge variant="destructive" className="ml-2">
                 {pendingPhotosData.stats.totalPending}
+              </Badge>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="cedulas" data-testid="tab-cedulas">
+            <IdCard className="w-4 h-4 mr-2" />
+            Cédulas Pendientes
+            {pendingCedulasData?.stats.totalPending ? (
+              <Badge variant="destructive" className="ml-2">
+                {pendingCedulasData.stats.totalPending}
               </Badge>
             ) : null}
           </TabsTrigger>
@@ -673,6 +779,110 @@ export default function AdminVerifications() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="cedulas">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IdCard className="w-5 h-5" />
+                Cédulas Pendientes de Verificación Manual
+              </CardTitle>
+              <CardDescription>
+                Usuarios que requieren verificación manual de su cédula
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isPendingCedulasLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <Card key={i} className="p-4">
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="w-12 h-12 rounded-full" />
+                        <div className="flex-1">
+                          <Skeleton className="h-4 w-24 mb-2" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : pendingCedulasData?.pendingCedulas.length === 0 ? (
+                <div className="text-center py-12" data-testid="empty-cedulas-state">
+                  <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Todo al día</h3>
+                  <p className="text-muted-foreground">
+                    No hay cédulas pendientes de verificación manual
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingCedulasData?.pendingCedulas.map((user) => (
+                    <Card 
+                      key={user.id} 
+                      className="p-4 hover-elevate cursor-pointer transition-all"
+                      onClick={() => handleViewCedula(user)}
+                      data-testid={`card-pending-cedula-${user.id}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <Avatar className="w-12 h-12 border-2 border-muted">
+                          <AvatarImage src={user.photoUrl || ''} alt={`${user.nombre} ${user.apellido}`} />
+                          <AvatarFallback className="text-sm">
+                            {user.nombre?.[0]}{user.apellido?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold truncate">{user.nombre} {user.apellido}</h4>
+                          <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {user.userType}
+                            </Badge>
+                            {user.cedula && (
+                              <span className="text-xs text-muted-foreground">{user.cedula}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <Badge variant="secondary" className="gap-1">
+                          <Clock className="w-3 h-3" />
+                          Pendiente verificación
+                        </Badge>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {pendingCedulasData && pendingCedulasData.stats.totalPending > 0 && (
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                  <h4 className="font-medium mb-2">Estadísticas de Cédulas</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total Conductores</p>
+                      <p className="font-semibold">{pendingCedulasData.stats.totalDrivers}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Total Clientes</p>
+                      <p className="font-semibold">{pendingCedulasData.stats.totalClients}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Cédulas Verificadas</p>
+                      <p className="font-semibold text-green-600 dark:text-green-400">{pendingCedulasData.stats.totalVerified}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Pendientes</p>
+                      <p className="font-semibold text-orange-600 dark:text-orange-400">{pendingCedulasData.stats.totalPending}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
@@ -796,6 +1006,138 @@ export default function AdminVerifications() {
               data-testid="button-confirm-reject"
             >
               {rejectPhotoMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <XCircle className="w-4 h-4" />
+              )}
+              Confirmar Rechazo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCedulaDialogOpen} onOpenChange={setIsCedulaDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Verificar Cédula Manualmente</DialogTitle>
+            <DialogDescription>
+              Ingresa o confirma el número de cédula para verificar al usuario
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCedulaUser && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Avatar className="w-16 h-16 border-2 border-muted">
+                  <AvatarImage src={selectedCedulaUser.photoUrl || ''} alt={`${selectedCedulaUser.nombre} ${selectedCedulaUser.apellido}`} />
+                  <AvatarFallback className="text-lg">
+                    {selectedCedulaUser.nombre?.[0]}{selectedCedulaUser.apellido?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-semibold text-lg">{selectedCedulaUser.nombre} {selectedCedulaUser.apellido}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedCedulaUser.email}</p>
+                  <Badge variant="outline" className="mt-1">{selectedCedulaUser.userType}</Badge>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Teléfono</p>
+                  <p className="font-medium">{selectedCedulaUser.phone || 'No disponible'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Teléfono Verificado</p>
+                  <Badge variant={selectedCedulaUser.telefonoVerificado ? "default" : "secondary"}>
+                    {selectedCedulaUser.telefonoVerificado ? 'Sí' : 'No'}
+                  </Badge>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Número de Cédula</label>
+                <Input
+                  value={cedulaInput}
+                  onChange={(e) => setCedulaInput(e.target.value)}
+                  placeholder="Ingresa el número de cédula..."
+                  data-testid="input-cedula-number"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ingresa o modifica el número de cédula antes de aprobar
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCedulaRejectDialogOpen(true);
+              }}
+              disabled={rejectCedulaMutation.isPending}
+              className="gap-2"
+              data-testid="button-reject-cedula"
+            >
+              <XCircle className="w-4 h-4" />
+              Rechazar
+            </Button>
+            <Button
+              onClick={handleApproveCedula}
+              disabled={approveCedulaMutation.isPending || !cedulaInput.trim()}
+              className="gap-2"
+              data-testid="button-approve-cedula"
+            >
+              {approveCedulaMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              Aprobar Cédula
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCedulaRejectDialogOpen} onOpenChange={setIsCedulaRejectDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rechazar Cédula</DialogTitle>
+            <DialogDescription>
+              Proporciona una razón para rechazar la verificación. El usuario deberá verificar su cédula nuevamente.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Razón del rechazo (opcional)..."
+              value={cedulaRejectReason}
+              onChange={(e) => setCedulaRejectReason(e.target.value)}
+              className="min-h-[100px]"
+              data-testid="input-cedula-reject-reason"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsCedulaRejectDialogOpen(false)}
+              disabled={rejectCedulaMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectCedula}
+              disabled={rejectCedulaMutation.isPending}
+              className="gap-2"
+              data-testid="button-confirm-cedula-reject"
+            >
+              {rejectCedulaMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <XCircle className="w-4 h-4" />

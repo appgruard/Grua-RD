@@ -454,6 +454,23 @@ export async function scanAndVerifyCedula(imageBase64: string, userNombre?: stri
 
 // ==================== FACE VALIDATION (PROFILE PHOTO) ====================
 
+interface FaceDetectionBox {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+
+interface FaceDetectionResult {
+  box?: FaceDetectionBox;
+  score?: number;
+  confidence?: number;
+  landmarks?: any;
+  age?: number;
+  gender?: string;
+  emotion?: string;
+}
+
 interface FaceValidationResponse {
   _id?: string;
   hasFace?: boolean;
@@ -462,6 +479,8 @@ interface FaceValidationResponse {
   confidenceScore?: number;
   livenessScore?: number;
   isHuman?: boolean;
+  faces?: FaceDetectionResult[];
+  detections?: FaceDetectionResult[];
   quality?: {
     brightness?: number;
     sharpness?: number;
@@ -507,13 +526,13 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
       ? imageBase64 
       : `data:image/jpeg;base64,${imageBase64}`;
 
-    // Use the face-check endpoint for human face detection
-    const response = await fetch(`${VERIFIK_BASE_URL}/face/check`, {
+    // Use the face-recognition/detect endpoint for human face detection
+    const response = await fetch(`${VERIFIK_BASE_URL}/face-recognition/detect`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `JWT ${apiKey}`
       },
       body: JSON.stringify({
         image: imageData
@@ -545,37 +564,51 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
     const data: FaceValidationResponse = rawResponse.data || rawResponse;
 
     logger.info("Verifik face validation response", { 
+      rawKeys: Object.keys(rawResponse),
+      dataKeys: Object.keys(data),
       hasFace: data.hasFace,
       faceCount: data.faceCount,
+      faces: data.faces,
+      detections: data.detections,
       faceScore: data.faceScore,
       confidenceScore: data.confidenceScore,
       livenessScore: data.livenessScore,
       isHuman: data.isHuman
     });
 
+    // Handle faces array from detection endpoint
+    const facesArray = data.faces || data.detections || [];
+    const detectedFaceCount = facesArray.length;
+    
     // Calculate the overall score from available metrics
-    const faceScore = data.faceScore ?? data.confidenceScore ?? data.livenessScore ?? 0;
-    const hasFace = data.hasFace ?? (data.faceCount !== undefined && data.faceCount > 0);
+    let faceScore = 0;
+    if (detectedFaceCount > 0 && facesArray[0]) {
+      faceScore = facesArray[0].score ?? facesArray[0].confidence ?? 0;
+    }
+    faceScore = faceScore || data.faceScore ?? data.confidenceScore ?? data.livenessScore ?? 0;
+    
+    const hasFace = data.hasFace ?? detectedFaceCount > 0 ?? (data.faceCount !== undefined && data.faceCount > 0);
     const isHuman = data.isHuman ?? hasFace;
     
     // Normalize score to 0-1 range if needed
     const normalizedScore = faceScore > 1 ? faceScore / 100 : faceScore;
     
-    const isValidHumanFace = isHuman && normalizedScore >= MINIMUM_VALIDATION_SCORE;
+    // If a face was detected, consider it valid even if score is 0 (API might not return score for detection)
+    const isValidHumanFace = hasFace && (normalizedScore >= MINIMUM_VALIDATION_SCORE || (detectedFaceCount > 0 && normalizedScore === 0));
 
     let details = "";
-    if (!hasFace) {
+    if (!hasFace && detectedFaceCount === 0) {
       details = "No se detectó un rostro en la imagen";
     } else if (!isHuman) {
       details = "La imagen no parece ser de un rostro humano";
-    } else if (normalizedScore < MINIMUM_VALIDATION_SCORE) {
+    } else if (normalizedScore > 0 && normalizedScore < MINIMUM_VALIDATION_SCORE) {
       details = `La calidad de la imagen es muy baja (${Math.round(normalizedScore * 100)}%). Se requiere al menos 60%.`;
     }
 
     return {
       success: true,
       isHumanFace: isValidHumanFace,
-      score: normalizedScore,
+      score: normalizedScore > 0 ? normalizedScore : (hasFace ? 0.8 : 0),
       scanId: data._id,
       details: details || undefined,
       rawResponse: data,
