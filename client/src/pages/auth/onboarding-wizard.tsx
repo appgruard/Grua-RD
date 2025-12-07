@@ -66,6 +66,7 @@ export default function OnboardingWizard() {
   const [otpTimer, setOtpTimer] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [licenseBackFile, setLicenseBackFile] = useState<File | null>(null);
   const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
@@ -388,7 +389,7 @@ export default function OnboardingWizard() {
 
   const uploadDocsMutation = useMutation({
     mutationFn: async () => {
-      if (!licenseFile && !insuranceFile) {
+      if (!licenseFile && !insuranceFile && !licenseBackFile) {
         throw new Error('Debe cargar al menos un documento');
       }
 
@@ -396,13 +397,25 @@ export default function OnboardingWizard() {
       if (licenseFile) {
         const formDataLicense = new FormData();
         formDataLicense.append('document', licenseFile);
-        formDataLicense.append('tipoDocumento', formData.userType === 'conductor' ? 'licencia_conducir' : 'seguro_cliente');
+        formDataLicense.append('tipoDocumento', formData.userType === 'conductor' ? 'licencia' : 'seguro_cliente');
         const licRes = await fetch('/api/documents/upload', {
           method: 'POST',
           body: formDataLicense,
         });
-        if (!licRes.ok) throw new Error('Error al subir licencia');
+        if (!licRes.ok) throw new Error('Error al subir licencia (frente)');
         filesUploaded.push(licRes.json());
+      }
+
+      if (licenseBackFile && formData.userType === 'conductor') {
+        const formDataLicenseBack = new FormData();
+        formDataLicenseBack.append('document', licenseBackFile);
+        formDataLicenseBack.append('tipoDocumento', 'licencia_trasera');
+        const licBackRes = await fetch('/api/documents/upload', {
+          method: 'POST',
+          body: formDataLicenseBack,
+        });
+        if (!licBackRes.ok) throw new Error('Error al subir licencia (reverso)');
+        filesUploaded.push(licBackRes.json());
       }
 
       if (insuranceFile) {
@@ -643,12 +656,17 @@ export default function OnboardingWizard() {
   };
 
   const validateStep4 = (): boolean => {
-    if (formData.userType === 'conductor' && !licenseFile) {
-      setErrors({ licenseFile: 'La licencia es obligatoria' });
-      return false;
+    const newErrors: StepErrors = {};
+    if (formData.userType === 'conductor') {
+      if (!licenseFile) {
+        newErrors.licenseFile = 'La licencia (frente) es obligatoria';
+      }
+      if (!licenseBackFile) {
+        newErrors.licenseBackFile = 'La licencia (reverso) es obligatoria';
+      }
     }
-    setErrors({});
-    return true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validateStep5 = (): boolean => {
@@ -878,7 +896,10 @@ export default function OnboardingWizard() {
     <div className="space-y-4">
       {errors.documents && (<Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errors.documents}</AlertDescription></Alert>)}
       {formData.userType === 'conductor' && (
-        <FileUpload label="Licencia de Conducir" required onFileSelect={setLicenseFile} fileName={licenseFile?.name} error={errors.licenseFile} testId="input-license-file" />
+        <>
+          <FileUpload label="Licencia de Conducir (Frente)" required onFileSelect={setLicenseFile} fileName={licenseFile?.name} error={errors.licenseFile} testId="input-license-file" />
+          <FileUpload label="Licencia de Conducir (Reverso)" required onFileSelect={setLicenseBackFile} fileName={licenseBackFile?.name} error={errors.licenseBackFile} testId="input-license-back-file" />
+        </>
       )}
       <FileUpload label={formData.userType === 'conductor' ? 'Documento de Seguro de Grúa' : 'Documento de Seguro'} onFileSelect={setInsuranceFile} fileName={insuranceFile?.name} required={formData.userType === 'conductor'} testId="input-insurance-file" />
       <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
