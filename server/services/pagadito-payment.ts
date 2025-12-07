@@ -1,8 +1,9 @@
 import { logger } from "../logger";
 
-// Pagadito API Response Codes
 const PAGADITO_CODES: Record<string, string> = {
   "PG1001": "Conexión exitosa",
+  "PG1002": "Transacción registrada exitosamente",
+  "PG1003": "Estado de transacción obtenido",
   "PG2001": "Datos de conexión incompletos",
   "PG2002": "Formato de datos incorrecto",
   "PG3001": "No se pudo establecer conexión",
@@ -16,15 +17,14 @@ const PAGADITO_CODES: Record<string, string> = {
   "PG4001": "Token de transacción no encontrado",
 };
 
-// Pagadito Transaction Status
 export type PagaditoStatus = 
-  | "REGISTERED"   // Transacción registrada, pago en proceso
-  | "COMPLETED"    // Pago exitoso
-  | "VERIFYING"    // En revisión (hasta 72 horas)
-  | "REVOKED"      // Pago denegado después de verificación
-  | "FAILED"       // Error en procesamiento
-  | "CANCELED"     // Cancelado por usuario
-  | "EXPIRED";     // Expirado (10 minutos sin pago)
+  | "REGISTERED"
+  | "COMPLETED"
+  | "VERIFYING"
+  | "REVOKED"
+  | "FAILED"
+  | "CANCELED"
+  | "EXPIRED";
 
 export interface PagaditoPaymentItem {
   quantity: number;
@@ -33,15 +33,15 @@ export interface PagaditoPaymentItem {
 }
 
 export interface PagaditoPaymentRequest {
-  ern: string;              // External Reference Number (ID único del servicio)
+  ern: string;
   items: PagaditoPaymentItem[];
-  currency?: string;        // Default: USD
+  currency?: string;
 }
 
 export interface PagaditoCreateResponse {
   success: boolean;
-  redirectUrl: string;      // URL para redirigir al usuario a Pagadito
-  token: string;            // Token de la transacción
+  redirectUrl: string;
+  token: string;
   errorCode?: string;
   errorMessage?: string;
 }
@@ -49,18 +49,17 @@ export interface PagaditoCreateResponse {
 export interface PagaditoStatusResponse {
   success: boolean;
   status: PagaditoStatus;
-  reference?: string;       // Número de aprobación de Pagadito
-  dateTransaction?: string; // Fecha de la transacción
-  ern?: string;             // ERN original
-  amount?: number;          // Monto total
+  reference?: string;
+  dateTransaction?: string;
+  ern?: string;
+  amount?: number;
   errorCode?: string;
   errorMessage?: string;
 }
 
-// Pagadito API URLs
-const PAGADITO_URLS = {
-  sandbox: "https://sandbox.pagadito.com/comercios/apipg/charges.php",
-  production: "https://comercios.pagadito.com/apipg/charges.php",
+const PAGADITO_SOAP_URLS = {
+  sandbox: "https://sandbox.pagadito.com/comercios/wspg/charges.php",
+  production: "https://comercios.pagadito.com/wspg/charges.php",
 };
 
 const PAGADITO_REDIRECT_URLS = {
@@ -71,17 +70,16 @@ const PAGADITO_REDIRECT_URLS = {
 export class PagaditoPaymentService {
   private uid: string;
   private wsk: string;
-  private apiUrl: string;
+  private soapUrl: string;
   private redirectBaseUrl: string;
   private isSandbox: boolean;
-  private connectionToken: string | null = null;
 
   constructor() {
     this.uid = process.env.PAGADITO_UID || "";
     this.wsk = process.env.PAGADITO_WSK || "";
     this.isSandbox = process.env.PAGADITO_SANDBOX !== "false";
     
-    this.apiUrl = this.isSandbox ? PAGADITO_URLS.sandbox : PAGADITO_URLS.production;
+    this.soapUrl = this.isSandbox ? PAGADITO_SOAP_URLS.sandbox : PAGADITO_SOAP_URLS.production;
     this.redirectBaseUrl = this.isSandbox ? PAGADITO_REDIRECT_URLS.sandbox : PAGADITO_REDIRECT_URLS.production;
   }
 
@@ -94,14 +92,88 @@ export class PagaditoPaymentService {
   }
 
   private getReturnUrl(): string {
-    const baseUrl = process.env.ALLOWED_ORIGINS?.split(',')[0] || process.env.APP_URL || 'http://localhost:5000';
+    const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : 'http://localhost:5000';
     return `${baseUrl}/api/pagadito/return`;
   }
 
-  /**
-   * Connect to Pagadito API and get connection token
-   * This must be called before any other API operation
-   */
+  private buildSoapEnvelope(method: string, params: Record<string, string>): string {
+    const namespace = this.isSandbox 
+      ? "urn:https://sandbox.pagadito.com/comercios/wspg/charges"
+      : "urn:https://comercios.pagadito.com/wspg/charges";
+    
+    let paramsXml = "";
+    for (const [key, value] of Object.entries(params)) {
+      const escapedValue = value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+      paramsXml += `<${key} xsi:type="xsd:string">${escapedValue}</${key}>`;
+    }
+    
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope 
+  xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:tns="${namespace}"
+  xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
+  SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+  <SOAP-ENV:Body>
+    <tns:${method}>${paramsXml}</tns:${method}>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`;
+  }
+
+  private async callSoap(method: string, params: Record<string, string>): Promise<any> {
+    const soapEnvelope = this.buildSoapEnvelope(method, params);
+    const namespace = this.isSandbox 
+      ? "urn:https://sandbox.pagadito.com/comercios/wspg/charges"
+      : "urn:https://comercios.pagadito.com/wspg/charges";
+    
+    logger.info(`Pagadito SOAP call: ${method}`, { 
+      url: this.soapUrl,
+      sandbox: this.isSandbox,
+    });
+
+    const response = await fetch(this.soapUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        "SOAPAction": `${namespace}#${method}`,
+      },
+      body: soapEnvelope,
+    });
+
+    const responseText = await response.text();
+    
+    const returnMatch = responseText.match(/<return[^>]*>([\s\S]*?)<\/return>/);
+    if (!returnMatch) {
+      logger.error("Pagadito SOAP response parse error", { 
+        responseText: responseText.substring(0, 500),
+      });
+      throw new Error("No se pudo parsear la respuesta de Pagadito");
+    }
+
+    let returnValue = returnMatch[1]
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'");
+    
+    try {
+      return JSON.parse(returnValue);
+    } catch {
+      return returnValue;
+    }
+  }
+
   async connect(): Promise<{ success: boolean; token?: string; errorCode?: string; errorMessage?: string }> {
     if (!this.isConfigured()) {
       return {
@@ -112,24 +184,13 @@ export class PagaditoPaymentService {
     }
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("operation", "f3f191ce3326905ff4ea20b6efe7d732"); // connect operation hash
-      formData.append("uid", this.uid);
-      formData.append("wsk", this.wsk);
-      formData.append("format_return", "json");
-
-      const response = await fetch(this.apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData.toString(),
+      const data = await this.callSoap("connect", {
+        uid: this.uid,
+        wsk: this.wsk,
+        format_return: "json",
       });
 
-      const data = await response.json();
-
       if (data.code === "PG1001") {
-        this.connectionToken = data.value;
         logger.info("Pagadito connection successful", {
           sandbox: this.isSandbox,
         });
@@ -160,10 +221,6 @@ export class PagaditoPaymentService {
     }
   }
 
-  /**
-   * Create a payment transaction and get redirect URL
-   * User will be redirected to Pagadito to complete payment
-   */
   async createPayment(request: PagaditoPaymentRequest): Promise<PagaditoCreateResponse> {
     if (!this.isConfigured()) {
       return {
@@ -175,7 +232,6 @@ export class PagaditoPaymentService {
       };
     }
 
-    // First, connect to get a fresh token
     const connectResult = await this.connect();
     if (!connectResult.success || !connectResult.token) {
       return {
@@ -188,53 +244,41 @@ export class PagaditoPaymentService {
     }
 
     try {
-      // Calculate total amount
       const totalAmount = request.items.reduce(
         (sum, item) => sum + (item.quantity * item.price),
         0
       );
 
-      // Build transaction details
-      const details = request.items.map((item, index) => ({
-        quantity: item.quantity,
-        description: item.description.substring(0, 250), // Max 250 chars
+      const details = request.items.map((item) => ({
+        quantity: item.quantity.toString(),
+        description: item.description.substring(0, 250),
         price: item.price.toFixed(2),
+        url_product: "",
       }));
 
-      const formData = new URLSearchParams();
-      formData.append("operation", "41216f8caf94aaa598db137e36f81cd8"); // exec_trans operation hash
-      formData.append("token", connectResult.token);
-      formData.append("ern", request.ern);
-      formData.append("currency", request.currency || "USD");
-      formData.append("format_return", "json");
-      formData.append("custom_params", JSON.stringify({
-        return_url: this.getReturnUrl(),
-      }));
-
-      // Add transaction details
-      details.forEach((detail, index) => {
-        formData.append(`details[${index}][quantity]`, detail.quantity.toString());
-        formData.append(`details[${index}][description]`, detail.description);
-        formData.append(`details[${index}][price]`, detail.price);
+      const customParams = JSON.stringify({
+        param1: this.getReturnUrl(),
       });
 
-      const response = await fetch(this.apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData.toString(),
+      const data = await this.callSoap("exec_trans", {
+        token: connectResult.token,
+        ern: request.ern,
+        amount: totalAmount.toFixed(2),
+        details: JSON.stringify(details),
+        format_return: "json",
+        currency: request.currency || "USD",
+        custom_params: customParams,
+        allow_pending_payments: "false",
       });
 
-      const data = await response.json();
-
-      if (data.code === "PG1002") { // Transaction created successfully
+      if (data.code === "PG1002") {
         const redirectUrl = data.value || `${this.redirectBaseUrl}${connectResult.token}`;
         
         logger.info("Pagadito payment created", {
           ern: request.ern,
           amount: totalAmount,
           token: connectResult.token,
+          redirectUrl,
         });
 
         return {
@@ -271,11 +315,7 @@ export class PagaditoPaymentService {
     }
   }
 
-  /**
-   * Check the status of a payment transaction
-   * Called after user returns from Pagadito
-   */
-  async getPaymentStatus(token: string): Promise<PagaditoStatusResponse> {
+  async getPaymentStatus(tokenTrans: string): Promise<PagaditoStatusResponse> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -285,9 +325,8 @@ export class PagaditoPaymentService {
       };
     }
 
-    // Connect first to establish session
     const connectResult = await this.connect();
-    if (!connectResult.success) {
+    if (!connectResult.success || !connectResult.token) {
       return {
         success: false,
         status: "FAILED",
@@ -297,41 +336,32 @@ export class PagaditoPaymentService {
     }
 
     try {
-      const formData = new URLSearchParams();
-      formData.append("operation", "ebb4943d95e83a9a2a7e59f25cf09c40"); // get_status operation hash
-      formData.append("token", token);
-      formData.append("format_return", "json");
-
-      const response = await fetch(this.apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData.toString(),
+      const data = await this.callSoap("get_status", {
+        token: connectResult.token,
+        token_trans: tokenTrans,
+        format_return: "json",
       });
 
-      const data = await response.json();
-
-      if (data.code === "PG1003") { // Status retrieved successfully
-        const status = data.status as PagaditoStatus;
+      if (data.code === "PG1003") {
+        const status = (data.value?.status || data.status) as PagaditoStatus;
         
         logger.info("Pagadito status retrieved", {
-          token,
+          tokenTrans,
           status,
-          reference: data.reference,
+          reference: data.value?.reference || data.reference,
         });
 
         return {
           success: true,
           status: status,
-          reference: data.reference,
-          dateTransaction: data.date_trans,
-          ern: data.ern,
-          amount: data.amount ? parseFloat(data.amount) : undefined,
+          reference: data.value?.reference || data.reference,
+          dateTransaction: data.value?.date_trans || data.date_trans,
+          ern: data.value?.ern || data.ern,
+          amount: data.value?.amount ? parseFloat(data.value.amount) : undefined,
         };
       } else {
         logger.error("Pagadito status retrieval failed", {
-          token,
+          tokenTrans,
           code: data.code,
           message: data.message,
         });
@@ -344,7 +374,7 @@ export class PagaditoPaymentService {
       }
     } catch (error: any) {
       logger.error("Pagadito status error", {
-        token,
+        tokenTrans,
         error: error.message,
       });
       return {
@@ -356,30 +386,18 @@ export class PagaditoPaymentService {
     }
   }
 
-  /**
-   * Check if a payment was successful
-   */
   isPaymentSuccessful(status: PagaditoStatus): boolean {
     return status === "COMPLETED";
   }
 
-  /**
-   * Check if a payment is still pending/in progress
-   */
   isPaymentPending(status: PagaditoStatus): boolean {
     return status === "REGISTERED" || status === "VERIFYING";
   }
 
-  /**
-   * Check if a payment failed or was cancelled
-   */
   isPaymentFailed(status: PagaditoStatus): boolean {
     return ["FAILED", "CANCELED", "EXPIRED", "REVOKED"].includes(status);
   }
 
-  /**
-   * Get user-friendly status message in Spanish
-   */
   getStatusMessage(status: PagaditoStatus): string {
     const messages: Record<PagaditoStatus, string> = {
       REGISTERED: "Pago en proceso",
@@ -393,9 +411,6 @@ export class PagaditoPaymentService {
     return messages[status] || "Estado desconocido";
   }
 
-  /**
-   * Calculate commission split (80% operator, 20% company)
-   */
   calculateCommission(totalAmount: number): { operatorAmount: number; companyAmount: number } {
     const operatorPercentage = 0.80;
     const companyPercentage = 0.20;
@@ -406,11 +421,8 @@ export class PagaditoPaymentService {
     return { operatorAmount, companyAmount };
   }
 
-  /**
-   * Validate payout request (for manual payouts)
-   */
   validatePayoutRequest(amount: number, balanceDisponible: number): { valid: boolean; error?: string } {
-    const minPayout = 500; // RD$500 minimum
+    const minPayout = 500;
     
     if (amount < minPayout) {
       return { valid: false, error: `El monto mínimo de retiro es RD$${minPayout}` };
@@ -423,9 +435,6 @@ export class PagaditoPaymentService {
     return { valid: true };
   }
 
-  /**
-   * Get list of Dominican Republic banks for manual payouts
-   */
   getDRBanks(): Record<string, string> {
     return {
       "BPD": "Banco Popular Dominicano",
@@ -445,5 +454,4 @@ export class PagaditoPaymentService {
   }
 }
 
-// Singleton instance
 export const pagaditoPaymentService = new PagaditoPaymentService();
