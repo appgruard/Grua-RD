@@ -11,6 +11,7 @@ import { useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
+import ClientPaymentMethods from '@/components/ClientPaymentMethods';
 import { EditProfileModal } from '@/components/EditProfileModal';
 import { CedulaScanner } from '@/components/CedulaScanner';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
@@ -289,6 +290,8 @@ export default function ClientProfile() {
             )}
           </div>
         </Card>
+
+        <ClientPaymentMethods />
 
         <div className="space-y-4">
           <ClientInsuranceManager />
