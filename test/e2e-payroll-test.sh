@@ -15,7 +15,7 @@ NC='\033[0m'
 echo -e "${BLUE}"
 echo "╔════════════════════════════════════════════════════╗"
 echo "║     E2E Testing: Payment & Payroll System          ║"
-echo "║     dLocal Integration - Dominican Republic        ║"
+echo "║     Payment Integration - Dominican Republic       ║"
 echo "╚════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -176,8 +176,8 @@ schema_tests() {
   echo -e "\n${YELLOW}Key Fields${NC}"
   echo "  ✓ balanceDisponible (available for withdrawal)"
   echo "  ✓ balancePendiente (pending in scheduled payout)"
-  echo "  ✓ dlocalPayoutId (dLocal transaction ID)"
-  echo "  ✓ dlocalStatus (payment status from dLocal)"
+  echo "  ✓ payoutId (payment transaction ID)"
+  echo "  ✓ payoutStatus (payment status)"
 }
 
 # Security Tests

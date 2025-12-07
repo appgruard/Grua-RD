@@ -35,8 +35,8 @@ async function checkEnvironmentVariables() {
     'TWILIO_ACCOUNT_SID',
     'TWILIO_AUTH_TOKEN',
     'TWILIO_PHONE_NUMBER',
-    'DLOCAL_API_KEY',
-    'DLOCAL_SECRET_KEY',
+    'AZUL_MERCHANT_ID',
+    'AZUL_AUTH_KEY',
     'ALLOWED_ORIGINS'
   ];
 
@@ -171,25 +171,25 @@ async function checkDatabaseConnection() {
   }
 }
 
-async function checkDLocalConfiguration() {
-  console.log('\n💳 Checking dLocal Configuration...\n');
+async function checkAzulConfiguration() {
+  console.log('\n💳 Checking Azul Configuration...\n');
   
-  const apiKey = process.env.DLOCAL_API_KEY;
-  const secretKey = process.env.DLOCAL_SECRET_KEY;
+  const merchantId = process.env.AZUL_MERCHANT_ID;
+  const authKey = process.env.AZUL_AUTH_KEY;
   
-  if (!apiKey || !secretKey) {
+  if (!merchantId || !authKey) {
     addResult({
-      name: 'dLocal Keys',
+      name: 'Azul Keys',
       status: 'warn',
-      message: 'dLocal keys not configured (optional for payment processing)'
+      message: 'Azul keys not configured (optional for payment processing)'
     });
     return;
   }
   
   addResult({
-    name: 'dLocal Configuration',
+    name: 'Azul Configuration',
     status: 'pass',
-    message: 'dLocal keys configured'
+    message: 'Azul keys configured'
   });
 }
 
@@ -343,7 +343,7 @@ async function main() {
   
   await checkEnvironmentVariables();
   await checkDatabaseConnection();
-  await checkDLocalConfiguration();
+  await checkAzulConfiguration();
   await checkGoogleMapsAPI();
   await checkWebPushConfiguration();
   await checkSecuritySettings();

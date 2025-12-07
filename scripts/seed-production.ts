@@ -307,7 +307,7 @@ async function generateSummaryReport() {
     console.log('  1. Change the admin password after first login');
     console.log('  2. Configure insurance company passwords');
     console.log('  3. Review and adjust tariffs as needed');
-    console.log('  4. Set up webhooks in dLocal Dashboard');
+    console.log('  4. Set up Azul payment integration (see PLAN_INTEGRACION_AZUL.md)');
     console.log('  5. Configure VAPID keys for push notifications\n');
     
     process.exit(0);

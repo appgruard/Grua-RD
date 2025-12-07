@@ -941,7 +941,7 @@ Notifica de un cambio en el estado del servicio.
 
 ### Método de Pago
 - `efectivo`: Pago en efectivo al completar
-- `tarjeta`: Pago con tarjeta vía dLocal (requiere configuración)
+- `tarjeta`: Pago con tarjeta vía Azul API (migración pendiente)
 - `aseguradora`: Pago cubierto por aseguradora
 
 ---
@@ -978,9 +978,9 @@ Configurar según el dominio de producción.
 - `DATABASE_URL`: Connection string de PostgreSQL
 - `SESSION_SECRET`: Secret para sesiones de Express
 - `VITE_MAPBOX_ACCESS_TOKEN`: API key de Mapbox
-- `DLOCAL_X_LOGIN`: (Opcional) Login de dLocal
-- `DLOCAL_X_TRANS_KEY`: (Opcional) Trans key de dLocal
-- `DLOCAL_SECRET_KEY`: (Opcional) Secret key de dLocal
+- `AZUL_MERCHANT_ID`: (Opcional) Merchant ID de Azul
+- `AZUL_AUTH1`: (Opcional) Auth1 de Azul
+- `AZUL_AUTH2`: (Opcional) Auth2 de Azul
 
 ---
 

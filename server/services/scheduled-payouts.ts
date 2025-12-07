@@ -1,6 +1,8 @@
 import { storage } from '../storage';
 import { logSystem } from '../logger';
-import { dlocalPaymentService } from './dlocal-payment';
+
+// TODO: Integrar servicio de pagos Azul cuando esté disponible
+// import { azulPaymentService } from './azul-payment';
 
 const SAME_DAY_WITHDRAWAL_COMMISSION = 100;
 const SCHEDULED_PAYOUT_DAYS = [1, 5];
@@ -100,30 +102,20 @@ export async function processScheduledPayouts(): Promise<{ processed: number; fa
           monto: balance.toString(),
         });
 
-        if (!dlocalPaymentService.isConfigured()) {
-          logSystem.warn('dLocal not configured, skipping payout processing');
-          continue;
-        }
+        // TODO: Integrar servicio de pagos Azul cuando esté disponible
+        // if (!azulPaymentService.isConfigured()) {
+        //   logSystem.warn('Azul not configured, skipping payout processing');
+        //   continue;
+        // }
+        logSystem.warn('Payment service not configured, marking payout as pending manual processing');
 
-        const payoutResult = await dlocalPaymentService.createPayout({
-          amount: balance,
-          currency: 'DOP',
-          country: 'DO',
-          externalId: `SCHED-${scheduledPayout.id}-${conductor.id}`,
-          beneficiaryName: bankAccount.nombreTitular,
-          beneficiaryDocument: bankAccount.cedula,
-          bankCode: getBankCode(bankAccount.banco),
-          bankAccountNumber: bankAccount.numeroCuenta,
-          accountType: bankAccount.tipoCuenta === 'ahorro' ? 'S' : 'C',
-          beneficiaryEmail: user.email,
-        });
+        // TODO: Implementar llamada a Azul para procesar pago
+        // const payoutResult = await azulPaymentService.createPayout({...});
 
         await storage.updateConductorBalance(conductor.id, 0, 0, true);
 
         await storage.updateScheduledPayoutItem(conductor.id, scheduledPayout.id, {
-          estado: 'pagado',
-          dlocalPayoutId: payoutResult.payoutId,
-          dlocalStatus: payoutResult.status,
+          estado: 'pendiente', // TODO: Cambiar a 'pagado' cuando Azul esté integrado
           procesadoAt: new Date(),
         });
 
@@ -207,64 +199,31 @@ export async function requestImmediateWithdrawal(
       tipoRetiro: 'inmediato',
     });
 
-    if (!dlocalPaymentService.isConfigured()) {
-      await storage.updateOperatorWithdrawal(withdrawal.id, {
-        estado: 'pendiente',
-        errorMessage: 'Servicio de pagos no configurado. Se procesará manualmente.',
-      });
-      return { success: true, withdrawalId: withdrawal.id };
-    }
+    // TODO: Integrar servicio de pagos Azul cuando esté disponible
+    // if (!azulPaymentService.isConfigured()) { ... }
+    
+    // Por ahora, marcar como pendiente para procesamiento manual
+    await storage.updateOperatorWithdrawal(withdrawal.id, {
+      estado: 'pendiente',
+      errorMessage: 'Servicio de pagos pendiente de integración. Se procesará manualmente.',
+    });
 
-    try {
-      const payoutResult = await dlocalPaymentService.createPayout({
-        amount: netAmount,
-        currency: 'DOP',
-        country: 'DO',
-        externalId: `IMMED-${withdrawal.id}`,
-        beneficiaryName: bankAccount.nombreTitular,
-        beneficiaryDocument: bankAccount.cedula,
-        bankCode: getBankCode(bankAccount.banco),
-        bankAccountNumber: bankAccount.numeroCuenta,
-        accountType: bankAccount.tipoCuenta === 'ahorro' ? 'S' : 'C',
-        beneficiaryEmail: user.email,
-      });
+    await storage.updateConductorBalance(
+      conductorId, 
+      -amount, 
+      0, 
+      false
+    );
 
-      await storage.updateOperatorWithdrawal(withdrawal.id, {
-        estado: 'procesando',
-        dlocalPayoutId: payoutResult.payoutId,
-        dlocalStatus: payoutResult.status,
-      });
+    logSystem.info('Immediate withdrawal created (pending manual processing)', { 
+      conductorId,
+      withdrawalId: withdrawal.id,
+      amount,
+      netAmount,
+      commission: SAME_DAY_WITHDRAWAL_COMMISSION
+    });
 
-      await storage.updateConductorBalance(
-        conductorId, 
-        -amount, 
-        0, 
-        false
-      );
-
-      logSystem.info('Immediate withdrawal processed', { 
-        conductorId,
-        withdrawalId: withdrawal.id,
-        amount,
-        netAmount,
-        commission: SAME_DAY_WITHDRAWAL_COMMISSION,
-        payoutId: payoutResult.payoutId
-      });
-
-      return { success: true, withdrawalId: withdrawal.id };
-    } catch (payoutError: any) {
-      await storage.updateOperatorWithdrawal(withdrawal.id, {
-        estado: 'fallido',
-        errorMessage: payoutError.message,
-      });
-
-      logSystem.error('Immediate withdrawal payout failed', payoutError, { 
-        conductorId,
-        withdrawalId: withdrawal.id 
-      });
-
-      return { success: false, error: 'Error al procesar el pago. Por favor intenta más tarde.' };
-    }
+    return { success: true, withdrawalId: withdrawal.id };
   } catch (error: any) {
     logSystem.error('Error in requestImmediateWithdrawal', error, { conductorId });
     return { success: false, error: 'Error interno. Por favor intenta más tarde.' };

@@ -200,7 +200,7 @@ export interface IStorage {
   // Servicios
   createServicio(servicio: InsertServicio): Promise<Servicio>;
   getServicioById(id: string): Promise<ServicioWithDetails | undefined>;
-  getServicioByPagaditoToken(token: string): Promise<Servicio | undefined>;
+  getServicioByPaymentToken(token: string): Promise<Servicio | undefined>;
   getServiciosByClientId(clientId: string): Promise<ServicioWithDetails[]>;
   getServiciosByConductorId(conductorId: string): Promise<ServicioWithDetails[]>;
   getActiveServiceByConductorId(conductorId: string): Promise<ServicioWithDetails | null>;
@@ -314,10 +314,10 @@ export interface IStorage {
   getAllComisiones(): Promise<ComisionWithDetails[]>;
   updateComision(id: string, data: Partial<Comision>): Promise<Comision>;
   updateComisionNotas(id: string, notas: string): Promise<Comision>;
-  marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', dlocalPayoutId?: string): Promise<Comision>;
+  marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', referenciaPago?: string): Promise<Comision>;
 
-  // dLocal Payment Methods - Client payment methods use clientPaymentMethods table
-  // Driver bank accounts are stored in the conductores table via dLocal fields
+  // Payment Gateway Methods - Client payment methods use clientPaymentMethods table
+  // Driver bank accounts are stored in the conductores table
   deletePaymentMethodById(id: string): Promise<void>;
   setDefaultPaymentMethod(userId: string, paymentMethodId: string): Promise<void>;
 
@@ -488,7 +488,7 @@ export interface IStorage {
   setDefaultOperatorPaymentMethod(id: string, conductorId: string): Promise<OperatorPaymentMethod>;
   deleteOperatorPaymentMethod(id: string): Promise<void>;
 
-  // Operator Bank Accounts (dLocal Payouts)
+  // Operator Bank Accounts (Payment Gateway Payouts)
   createOperatorBankAccount(data: InsertOperatorBankAccount): Promise<OperatorBankAccount>;
   getOperatorBankAccount(conductorId: string): Promise<OperatorBankAccount | undefined>;
   updateOperatorBankAccount(id: string, data: Partial<OperatorBankAccount>): Promise<OperatorBankAccount>;
@@ -507,7 +507,7 @@ export interface IStorage {
   addToOperatorBalance(conductorId: string, amount: string): Promise<Conductor>;
   deductFromOperatorBalance(conductorId: string, amount: string): Promise<Conductor>;
 
-  // Scheduled Payouts (dLocal Nómina)
+  // Scheduled Payouts (Payment Gateway Payroll)
   getConductoresWithPositiveBalance(): Promise<Conductor[]>;
   getOperatorBankAccountByCondutorId(conductorId: string): Promise<OperatorBankAccount | undefined>;
   createScheduledPayout(data: InsertScheduledPayout): Promise<ScheduledPayout>;
@@ -899,7 +899,7 @@ export class DatabaseStorage implements IStorage {
     return result as any;
   }
 
-  async getServicioByPagaditoToken(token: string): Promise<Servicio | undefined> {
+  async getServicioByPaymentToken(token: string): Promise<Servicio | undefined> {
     const result = await db.query.servicios.findFirst({
       where: eq(servicios.pagaditoToken, token),
     });
@@ -1974,8 +1974,8 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // dLocal Payment Methods - Using clientPaymentMethods table from shared schema
-  // Driver bank accounts are stored in the conductores table via dLocal fields
+  // Payment Gateway Methods - Using clientPaymentMethods table from shared schema
+  // Driver bank accounts are stored in the conductores table
   // Client payment methods use the clientPaymentMethods table
 
   async deletePaymentMethodById(id: string): Promise<void> {
@@ -3340,7 +3340,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(operatorPaymentMethods).where(eq(operatorPaymentMethods.id, id));
   }
 
-  // ==================== OPERATOR BANK ACCOUNTS (dLocal Payouts) ====================
+  // ==================== OPERATOR BANK ACCOUNTS (Payment Gateway Payouts) ====================
 
   async createOperatorBankAccount(data: InsertOperatorBankAccount): Promise<OperatorBankAccount> {
     const [account] = await db.insert(operatorBankAccounts).values({
@@ -3372,7 +3372,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(operatorBankAccounts).where(eq(operatorBankAccounts.id, id));
   }
 
-  // ==================== OPERATOR WITHDRAWALS (dLocal Payouts) ====================
+  // ==================== OPERATOR WITHDRAWALS (Payment Gateway Payouts) ====================
 
   async createOperatorWithdrawal(data: InsertOperatorWithdrawal): Promise<OperatorWithdrawal> {
     const [withdrawal] = await db.insert(operatorWithdrawals).values(data).returning();
@@ -3453,7 +3453,7 @@ export class DatabaseStorage implements IStorage {
     return conductor;
   }
 
-  // ==================== SCHEDULED PAYOUTS (dLocal Nómina) ====================
+  // ==================== SCHEDULED PAYOUTS (Payment Gateway Payroll) ====================
 
   async getConductoresWithPositiveBalance(): Promise<Conductor[]> {
     return db

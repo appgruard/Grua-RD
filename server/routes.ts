@@ -353,362 +353,8 @@ export const getSafeDrivers = (drivers: any[]) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // dLocal Payment Webhook Handler
-  app.post("/api/dlocal/webhook", express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
-    try {
-      const data = JSON.parse(req.body.toString());
-      
-      if (!data.id || !data.status) {
-        return res.status(400).json({ message: "Invalid webhook data" });
-      }
-
-      logSystem.info('dLocal webhook received', { paymentId: data.id, status: data.status });
-
-      // If it's a successful transaction
-      if (data.status === 'PAID' || data.status === 'AUTHORIZED') {
-        const orderId = data.order_id;
-        const paymentId = data.id;
-        
-        // Extract servicioId from order_id format: SRV-{servicioId}-{timestamp}
-        const servicioIdMatch = orderId?.match(/^SRV-([^-]+)-/);
-        const servicioId = servicioIdMatch ? servicioIdMatch[1] : orderId;
-        
-        const servicio = await storage.getServicioById(servicioId);
-        if (!servicio) {
-          logSystem.warn('Webhook: Service not found', { servicioId, orderId });
-          return res.json({ received: true });
-        }
-
-        if (servicio.dlocalPaymentId === paymentId) {
-          logSystem.info('Webhook: Payment already processed (idempotent)', { paymentId, servicioId });
-          return res.json({ received: true });
-        }
-
-        const existingComision = await storage.getComisionByServicioId(servicioId);
-        if (existingComision) {
-          logSystem.warn('Webhook: Commission already exists', { servicioId });
-          return res.json({ received: true });
-        }
-
-        // Update servicio with dLocal payment ID
-        await storage.updateServicio(servicioId, {
-          dlocalPaymentId: paymentId,
-          dlocalPaymentStatus: data.status,
-        });
-
-        // Create commission (80/20 split)
-        const { dlocalPaymentService } = await import('./services/dlocal-payment');
-        const montoTotal = parseFloat(servicio.costoTotal);
-        const { operatorAmount, companyAmount } = dlocalPaymentService.calculateCommission(montoTotal);
-
-        const comision = await storage.createComision({
-          servicioId,
-          montoTotal: servicio.costoTotal,
-          montoOperador: operatorAmount.toFixed(2),
-          montoEmpresa: companyAmount.toFixed(2),
-        });
-
-        logTransaction.paymentSuccess(servicioId, parseFloat(servicio.costoTotal), paymentId);
-        logTransaction.commissionCreated(comision.id, servicioId, operatorAmount, companyAmount);
-
-        // Note: dLocal payouts to operators are processed via bank transfers when operator requests withdrawal
-        // The balance is added to the conductor's account for later withdrawal
-        if (servicio.conductorId) {
-          try {
-            const conductor = await storage.getConductorByUserId(servicio.conductorId);
-            if (conductor) {
-              // Update conductor balance - funds available for withdrawal
-              const currentBalance = parseFloat(conductor.balanceDisponible || "0");
-              const newBalance = currentBalance + operatorAmount;
-              await storage.updateConductor(conductor.id, {
-                balanceDisponible: newBalance.toFixed(2),
-              });
-              
-              logSystem.info('Conductor balance updated', {
-                conductorId: conductor.id,
-                addedAmount: operatorAmount,
-                newBalance: newBalance.toFixed(2),
-              });
-            }
-          } catch (error: any) {
-            logSystem.error('Error updating conductor balance', error, { servicioId, conductorId: servicio.conductorId });
-          }
-        }
-      }
-
-      res.json({ received: true });
-    } catch (error: any) {
-      logSystem.error('dLocal Webhook error', error);
-      res.status(400).json({ message: `Webhook Error: ${error.message}` });
-    }
-  });
-
-  // dLocal Payout Webhook Handler
-  app.post("/api/dlocal/payout-webhook", express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
-    try {
-      const data = JSON.parse(req.body.toString());
-      
-      if (!data.id || !data.status) {
-        return res.status(400).json({ message: "Invalid payout webhook data" });
-      }
-
-      logSystem.info('dLocal payout webhook received', { payoutId: data.id, status: data.status });
-
-      // Handle payout status updates
-      if (data.status === 'COMPLETED') {
-        const externalId = data.external_id;
-        
-        // Update commission payout status if linked to a commission
-        if (externalId?.startsWith('COM-')) {
-          const comisionId = externalId.replace('COM-', '');
-          await storage.marcarComisionPagada(comisionId, 'operador', data.id);
-          logSystem.info('Commission payout marked as paid', { comisionId, payoutId: data.id });
-        }
-      }
-
-      res.json({ received: true });
-    } catch (error: any) {
-      logSystem.error('dLocal Payout Webhook error', error);
-      res.status(400).json({ message: `Webhook Error: ${error.message}` });
-    }
-  });
-
-  // Pagadito Payment Routes
-  
-  // Test Pagadito connection
-  app.get("/api/pagadito/test-connection", async (req: Request, res: Response) => {
-    try {
-      const { pagaditoPaymentService } = await import('./services/pagadito-payment');
-      
-      if (!pagaditoPaymentService.isConfigured()) {
-        return res.status(500).json({ 
-          success: false,
-          message: "Pagadito no está configurado. Configure PAGADITO_UID y PAGADITO_WSK.",
-        });
-      }
-
-      const result = await pagaditoPaymentService.connect();
-      
-      if (result.success) {
-        res.json({
-          success: true,
-          message: "Conexión exitosa con Pagadito",
-          sandbox: process.env.PAGADITO_SANDBOX !== "false",
-          token: result.token?.substring(0, 20) + "...",
-        });
-      } else {
-        res.status(400).json({
-          success: false,
-          message: result.errorMessage,
-          errorCode: result.errorCode,
-        });
-      }
-    } catch (error: any) {
-      logSystem.error('Pagadito test-connection error', error);
-      res.status(500).json({ 
-        success: false,
-        message: `Error de conexión: ${error.message}` 
-      });
-    }
-  });
-
-  // Create payment and get redirect URL
-  app.post("/api/pagadito/create-payment", express.json(), async (req: Request, res: Response) => {
-    try {
-      const { servicioId } = req.body;
-      
-      if (!servicioId) {
-        return res.status(400).json({ message: "servicioId es requerido" });
-      }
-
-      const servicio = await storage.getServicioById(servicioId);
-      if (!servicio) {
-        return res.status(404).json({ message: "Servicio no encontrado" });
-      }
-
-      // Import Pagadito service
-      const { pagaditoPaymentService } = await import('./services/pagadito-payment');
-
-      if (!pagaditoPaymentService.isConfigured()) {
-        logSystem.error('Pagadito not configured');
-        return res.status(500).json({ message: "Sistema de pagos no configurado" });
-      }
-
-      // Create payment with Pagadito
-      const paymentResult = await pagaditoPaymentService.createPayment({
-        ern: `SRV-${servicioId}-${Date.now()}`,
-        items: [{
-          quantity: 1,
-          description: `Servicio de grúa - ${servicio.servicioCategoria || 'remolque_estandar'}`,
-          price: parseFloat(servicio.costoTotal),
-        }],
-        currency: "USD",
-      });
-
-      if (!paymentResult.success) {
-        logSystem.error('Pagadito payment creation failed', {
-          servicioId,
-          error: paymentResult.errorMessage,
-        });
-        return res.status(400).json({ 
-          message: paymentResult.errorMessage || "Error al crear pago",
-          errorCode: paymentResult.errorCode,
-        });
-      }
-
-      // Save Pagadito token to servicio
-      await storage.updateServicio(servicioId, {
-        pagaditoToken: paymentResult.token,
-        pagaditoStatus: "REGISTERED",
-      });
-
-      logTransaction.paymentStarted(servicioId, parseFloat(servicio.costoTotal), 'pagadito');
-      
-      res.json({
-        success: true,
-        redirectUrl: paymentResult.redirectUrl,
-        token: paymentResult.token,
-      });
-    } catch (error: any) {
-      logSystem.error('Pagadito create-payment error', error);
-      res.status(500).json({ message: `Error al crear pago: ${error.message}` });
-    }
-  });
-
-  // Handle return from Pagadito after payment
-  app.get("/api/pagadito/return", async (req: Request, res: Response) => {
-    try {
-      const token = req.query.token as string;
-      
-      if (!token) {
-        logSystem.warn('Pagadito return: No token provided');
-        return res.redirect('/?payment=error&message=token_missing');
-      }
-
-      // Import Pagadito service
-      const { pagaditoPaymentService } = await import('./services/pagadito-payment');
-
-      // Get payment status
-      const statusResult = await pagaditoPaymentService.getPaymentStatus(token);
-
-      if (!statusResult.success) {
-        logSystem.error('Pagadito status check failed', {
-          token,
-          error: statusResult.errorMessage,
-        });
-        return res.redirect(`/?payment=error&message=${encodeURIComponent(statusResult.errorMessage || 'status_error')}`);
-      }
-
-      // Find servicio by pagaditoToken
-      const servicio = await storage.getServicioByPagaditoToken(token);
-      
-      if (!servicio) {
-        logSystem.warn('Pagadito return: Service not found for token', { token });
-        return res.redirect('/?payment=error&message=service_not_found');
-      }
-
-      // Update servicio with payment status
-      await storage.updateServicio(servicio.id, {
-        pagaditoStatus: statusResult.status,
-        pagaditoReference: statusResult.reference || undefined,
-      });
-
-      if (pagaditoPaymentService.isPaymentSuccessful(statusResult.status)) {
-        // Payment successful - create commission
-        const existingComision = await storage.getComisionByServicioId(servicio.id);
-        
-        if (!existingComision) {
-          const montoTotal = parseFloat(servicio.costoTotal);
-          const { operatorAmount, companyAmount } = pagaditoPaymentService.calculateCommission(montoTotal);
-
-          const comision = await storage.createComision({
-            servicioId: servicio.id,
-            montoTotal: servicio.costoTotal,
-            montoOperador: operatorAmount.toFixed(2),
-            montoEmpresa: companyAmount.toFixed(2),
-          });
-
-          logTransaction.paymentSuccess(servicio.id, montoTotal, token);
-          logTransaction.commissionCreated(comision.id, servicio.id, operatorAmount, companyAmount);
-
-          // Update conductor balance
-          if (servicio.conductorId) {
-            try {
-              const conductor = await storage.getConductorByUserId(servicio.conductorId);
-              if (conductor) {
-                const currentBalance = parseFloat(conductor.balanceDisponible || "0");
-                const newBalance = currentBalance + operatorAmount;
-                await storage.updateConductor(conductor.id, {
-                  balanceDisponible: newBalance.toFixed(2),
-                });
-                
-                logSystem.info('Conductor balance updated via Pagadito', {
-                  conductorId: conductor.id,
-                  addedAmount: operatorAmount,
-                  newBalance: newBalance.toFixed(2),
-                });
-              }
-            } catch (error: any) {
-              logSystem.error('Error updating conductor balance', error, { 
-                servicioId: servicio.id, 
-                conductorId: servicio.conductorId 
-              });
-            }
-          }
-        }
-
-        return res.redirect(`/client/tracking/${servicio.id}?payment=success`);
-      } else if (pagaditoPaymentService.isPaymentPending(statusResult.status)) {
-        return res.redirect(`/client/tracking/${servicio.id}?payment=pending&status=${statusResult.status}`);
-      } else {
-        // Payment failed or cancelled
-        return res.redirect(`/client/tracking/${servicio.id}?payment=failed&status=${statusResult.status}`);
-      }
-    } catch (error: any) {
-      logSystem.error('Pagadito return error', error);
-      return res.redirect(`/?payment=error&message=${encodeURIComponent(error.message)}`);
-    }
-  });
-
-  // Check payment status
-  app.get("/api/pagadito/status/:token", async (req: Request, res: Response) => {
-    try {
-      const { token } = req.params;
-      
-      if (!token) {
-        return res.status(400).json({ message: "Token es requerido" });
-      }
-
-      // Import Pagadito service
-      const { pagaditoPaymentService } = await import('./services/pagadito-payment');
-
-      const statusResult = await pagaditoPaymentService.getPaymentStatus(token);
-
-      if (!statusResult.success) {
-        return res.status(400).json({
-          success: false,
-          message: statusResult.errorMessage,
-          errorCode: statusResult.errorCode,
-        });
-      }
-
-      res.json({
-        success: true,
-        status: statusResult.status,
-        statusMessage: pagaditoPaymentService.getStatusMessage(statusResult.status),
-        reference: statusResult.reference,
-        ern: statusResult.ern,
-        amount: statusResult.amount,
-        dateTransaction: statusResult.dateTransaction,
-        isSuccessful: pagaditoPaymentService.isPaymentSuccessful(statusResult.status),
-        isPending: pagaditoPaymentService.isPaymentPending(statusResult.status),
-        isFailed: pagaditoPaymentService.isPaymentFailed(statusResult.status),
-      });
-    } catch (error: any) {
-      logSystem.error('Pagadito status check error', error);
-      res.status(500).json({ message: `Error al consultar estado: ${error.message}` });
-    }
-  });
+  // TODO: Implementar con Azul API - Payment Webhook Handler
+  // Los webhooks de pago serán implementados cuando se integre Azul API
 
   app.use(express.json());
 
@@ -1169,49 +815,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Health Check - Payment Gateway (dLocal)
+  // Health Check - Payment Gateway
+  // TODO: Implementar con Azul API
   app.get("/api/health/payments", async (_req: Request, res: Response) => {
     try {
-      // Check if dLocal keys are configured
-      const apiKey = process.env.DLOCAL_API_KEY;
-      const secretKey = process.env.DLOCAL_SECRET_KEY;
-      
-      const keysConfigured = !!(apiKey && secretKey);
-      const mode = process.env.DLOCAL_ENVIRONMENT === 'production' ? 'live' : 'sandbox';
-      
-      if (!keysConfigured) {
-        return res.status(200).json({
-          status: 'not_configured',
-          timestamp: new Date().toISOString(),
-          message: 'dLocal Payment Gateway keys not configured',
-          gateway: 'dlocal',
-          keysPresent: {
-            apiKey: !!apiKey,
-            secretKey: !!secretKey,
-          },
-        });
-      }
-      
-      res.json({
-        status: 'configured',
+      // TODO: Implementar verificación de configuración con Azul API
+      res.status(200).json({
+        status: 'not_configured',
         timestamp: new Date().toISOString(),
-        gateway: 'dlocal',
-        mode,
-        keysConfigured: true,
-        features: {
-          cardPayments: true,
-          bankTransfers: true,
-          payouts: true,
-          refunds: true,
+        message: 'Payment Gateway pending migration to Azul API',
+        gateway: 'azul',
+        keysPresent: {
+          apiKey: false,
+          secretKey: false,
         },
       });
-      
     } catch (error: any) {
       logSystem.error('Health check Payments: Failed', error);
       res.status(503).json({
         status: 'error',
         timestamp: new Date().toISOString(),
-        gateway: 'dlocal',
+        gateway: 'azul',
         error: error.message,
       });
     }
@@ -2494,24 +2118,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (validatedData.metodoPago === "tarjeta") {
-        // Pagadito flow: No upfront authorization needed
-        // Payment will be processed after driver accepts the service
-        // Client will be redirected to Pagadito to complete payment
-        const { pagaditoPaymentService } = await import('./services/pagadito-payment');
-        
-        if (!pagaditoPaymentService.isConfigured()) {
-          return res.status(503).json({ 
-            message: "El servicio de pagos con tarjeta no está disponible en este momento",
-            paymentServiceUnavailable: true 
-          });
-        }
-
-        // Service will be created with pagaditoStatus = 'pending_payment'
-        // Payment link will be generated when driver accepts
-        servicioData.pagaditoStatus = 'pending_payment';
-        logService.info('Card payment service created (Pagadito flow)', { 
-          amount: validatedData.costoTotal,
-          clienteId: req.user!.id 
+        // TODO: Implementar con Azul API
+        // Por ahora, los pagos con tarjeta no están disponibles
+        return res.status(503).json({ 
+          message: "El servicio de pagos con tarjeta no está disponible en este momento. Estamos migrando a un nuevo proveedor.",
+          paymentServiceUnavailable: true 
         });
       }
 
@@ -3235,16 +2846,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Servicio no encontrado" });
       }
 
-      // Pagadito flow: Payment is processed after driver accepts via redirect
-      // No capture needed here - client will be notified to pay via Pagadito redirect
-      if (existingServicio.metodoPago === 'tarjeta' && existingServicio.pagaditoStatus === 'pending_payment') {
-        logService.info('Card payment service accepted (Pagadito flow) - awaiting client payment', { 
-          servicioId: existingServicio.id,
-          amount: existingServicio.costoTotal 
-        });
-        // The service will be accepted, and client will see a "Pay Now" button
-        // to initiate payment via /api/pagadito/create-payment
-      }
+      // TODO: Implementar flujo de pago con tarjeta con Azul API
 
       const conductor = await storage.getConductorByUserId(req.user!.id);
       if (!conductor) {
@@ -3282,13 +2884,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const conductorName = `${req.user!.nombre} ${req.user!.apellido}`;
       
-      // For card payments with pending payment status, send special notification
-      if (servicio.metodoPago === 'tarjeta' && servicio.pagaditoStatus === 'pending_payment') {
-        const monto = parseFloat(servicio.costoTotal);
-        await pushService.notifyPaymentRequired(servicio.id, servicio.clienteId, conductorName, monto);
-      } else {
-        await pushService.notifyServiceAccepted(servicio.id, servicio.clienteId, conductorName);
-      }
+      // Send notification to client about accepted service
+      await pushService.notifyServiceAccepted(servicio.id, servicio.clienteId, conductorName);
 
       res.json(servicio);
     } catch (error: any) {
@@ -3565,44 +3162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No se puede cancelar un servicio completado" });
       }
 
-      if (servicio.metodoPago === 'tarjeta') {
-        const { dlocalPaymentService } = await import('./services/dlocal-payment');
-        
-        if (dlocalPaymentService.isConfigured()) {
-          if (servicio.dlocalAuthorizationId && !servicio.dlocalPaymentId) {
-            try {
-              const cancelResult = await dlocalPaymentService.cancelAuthorization(servicio.dlocalAuthorizationId);
-              logService.info('Payment authorization cancelled', { 
-                servicioId,
-                authorizationId: servicio.dlocalAuthorizationId,
-                cancelled: cancelResult.cancelled,
-                status: cancelResult.status
-              });
-            } catch (cancelError: any) {
-              logSystem.error('Failed to cancel payment authorization', cancelError, { servicioId });
-            }
-          } else if (servicio.dlocalPaymentId) {
-            try {
-              const refundResult = await dlocalPaymentService.refundPayment(
-                servicio.dlocalPaymentId,
-                parseFloat(servicio.costoTotal)
-              );
-              logService.info('Payment refunded', { 
-                servicioId,
-                paymentId: servicio.dlocalPaymentId,
-                refundId: refundResult.refundId,
-                status: refundResult.status
-              });
-            } catch (refundError: any) {
-              logSystem.error('Failed to refund payment', refundError, { servicioId });
-              return res.status(400).json({ 
-                message: "No se pudo procesar el reembolso. Por favor contacta a soporte.",
-                refundFailed: true 
-              });
-            }
-          }
-        }
-      }
+      // TODO: Implementar reembolso con Azul API si el servicio fue pagado con tarjeta
 
       const cancelledService = await storage.updateServicio(servicioId, {
         estado: 'cancelado',
@@ -4119,6 +3679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // TODO: Actualizar cuando se integre Azul API para calcular fees reales
   app.get("/api/admin/payment-fees", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
       return res.status(401).json({ message: "Not authorized" });
@@ -4128,7 +3689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allComisiones = await storage.getAllComisiones();
       
       let totalCollected = 0;
-      let totalDLocalFees = 0;
+      let totalGatewayFees = 0;
       let totalOperatorShare = 0;
       let totalCompanyShare = 0;
       
@@ -4136,12 +3697,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const comision of allComisiones) {
         const montoTotal = parseFloat(comision.montoTotal || '0');
-        const dlocalFee = parseFloat(comision.dlocalFeeAmount || '0');
+        const gatewayFee = parseFloat(comision.gatewayFeeAmount || '0');
         const montoOperador = parseFloat(comision.montoOperador || '0');
         const montoEmpresa = parseFloat(comision.montoEmpresa || '0');
         
         totalCollected += montoTotal;
-        totalDLocalFees += dlocalFee;
+        totalGatewayFees += gatewayFee;
         totalOperatorShare += montoOperador;
         totalCompanyShare += montoEmpresa;
         
@@ -4153,12 +3714,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           byPeriodMap[dateKey] = { collected: 0, fees: 0, net: 0 };
         }
         byPeriodMap[dateKey].collected += montoTotal;
-        byPeriodMap[dateKey].fees += dlocalFee;
-        byPeriodMap[dateKey].net += montoTotal - dlocalFee;
+        byPeriodMap[dateKey].fees += gatewayFee;
+        byPeriodMap[dateKey].net += montoTotal - gatewayFee;
       }
       
-      const netReceived = totalCollected - totalDLocalFees;
-      const feePercentage = totalCollected > 0 ? (totalDLocalFees / totalCollected) * 100 : 0;
+      const netReceived = totalCollected - totalGatewayFees;
+      const feePercentage = totalCollected > 0 ? (totalGatewayFees / totalCollected) * 100 : 0;
       
       const byPeriod = Object.entries(byPeriodMap)
         .map(([date, data]) => ({
@@ -4180,17 +3741,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .slice(0, 50)
         .map((c) => {
           const montoTotal = parseFloat(c.montoTotal || '0');
-          const dlocalFee = parseFloat(c.dlocalFeeAmount || '0');
-          // Calculate net consistently: if dlocalNetAmount exists use it, otherwise compute montoTotal - dlocalFee
-          const netAmount = c.dlocalNetAmount 
-            ? parseFloat(c.dlocalNetAmount) 
-            : montoTotal - dlocalFee;
+          const gatewayFee = parseFloat(c.gatewayFeeAmount || '0');
+          const netAmount = c.gatewayNetAmount 
+            ? parseFloat(c.gatewayNetAmount) 
+            : montoTotal - gatewayFee;
           
           return {
             id: c.id,
             servicioId: c.servicioId,
             amount: montoTotal,
-            dlocalFee: dlocalFee,
+            gatewayFee: gatewayFee,
             netAmount: netAmount,
             operatorShare: parseFloat(c.montoOperador || '0'),
             companyShare: parseFloat(c.montoEmpresa || '0'),
@@ -4201,7 +3761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         summary: {
           totalCollected,
-          totalDLocalFees,
+          totalGatewayFees,
           netReceived,
           feePercentage,
           totalOperatorShare,
@@ -6044,134 +5604,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // TODO: Implementar con Azul API
   app.post("/api/payments/create-intent", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    try {
-      const { servicioId, paymentMethodId } = req.body;
-
-      if (!servicioId) {
-        return res.status(400).json({ message: "servicioId is required" });
-      }
-
-      const servicio = await storage.getServicioById(servicioId);
-
-      if (!servicio) {
-        return res.status(404).json({ message: "Service not found" });
-      }
-
-      if (servicio.clienteId !== req.user!.id) {
-        return res.status(403).json({ message: "Not authorized to pay for this service" });
-      }
-
-      if (servicio.estado !== 'pendiente') {
-        return res.status(400).json({ message: "Service is not in pending state" });
-      }
-
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "Payment service not configured. Please contact administrator.",
-          configured: false 
-        });
-      }
-
-      const user = await storage.getUserById(req.user!.id);
-      
-      // Create payment with dLocal
-      const paymentResult = await dlocalPaymentService.createPayment({
-        amount: parseFloat(servicio.costoTotal),
-        currency: 'DOP',
-        orderId: `SRV-${servicioId}-${Date.now()}`,
-        description: `GruaRD Service - ${servicio.origenDireccion} to ${servicio.destinoDireccion}`,
-        payerEmail: user?.email || 'cliente@gruard.do',
-        payerName: user?.nombre || 'Cliente',
-        payerPhone: user?.telefono || '',
-        paymentMethodId,
-        callbackUrl: `${process.env.APP_URL || ''}/api/dlocal/webhook`,
-      });
-
-      if (!paymentResult.success) {
-        logTransaction.paymentFailed(servicioId, parseFloat(servicio.costoTotal), paymentResult.errorMessage || 'Payment failed');
-        return res.status(400).json({ 
-          message: "Payment creation failed",
-          errorCode: paymentResult.errorCode,
-          errorMessage: paymentResult.errorMessage
-        });
-      }
-
-      // Update servicio with dLocal payment ID
-      await storage.updateServicio(servicioId, {
-        dlocalPaymentId: paymentResult.paymentId,
-        dlocalPaymentStatus: paymentResult.status,
-      });
-
-      logTransaction.paymentStarted(servicioId, parseFloat(servicio.costoTotal), 'tarjeta');
-
-      res.json({
-        paymentId: paymentResult.paymentId,
-        amount: servicio.costoTotal,
-        status: paymentResult.status,
-        redirectUrl: paymentResult.redirectUrl,
-      });
-    } catch (error: any) {
-      logTransaction.paymentFailed(req.body.servicioId || 'unknown', 0, error.message);
-      logSystem.error('Create payment intent error', error, { servicioId: req.body.servicioId });
-      res.status(500).json({ message: "Failed to create payment intent" });
-    }
+    // Endpoint deshabilitado durante migración a Azul API
+    return res.status(503).json({ 
+      message: "El servicio de pagos está en proceso de migración. Por favor intente más tarde.",
+      configured: false 
+    });
   });
 
+  // TODO: Implementar con Azul API
   app.post("/api/payments/create-setup-intent", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    try {
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "Payment service not configured. Please contact administrator.",
-          configured: false 
-        });
-      }
-
-      // For conductores - setup bank account for payouts
-      if (req.user!.userType === 'conductor') {
-        const conductor = await storage.getConductorByUserId(req.user!.id);
-        
-        if (!conductor) {
-          return res.status(404).json({ message: "Conductor profile not found" });
-        }
-
-        logSystem.info('Setup intent created for conductor', { conductorId: conductor.id, userId: req.user!.id });
-
-        res.json({
-          setupRequired: true,
-          message: "Conductor needs to register a bank account for payouts",
-          conductorId: conductor.id,
-        });
-      } else {
-        // For clients - just acknowledge payment capability
-        res.json({
-          setupRequired: false,
-          message: "Client can proceed with dLocal payments",
-        });
-      }
-    } catch (error: any) {
-      logSystem.error('Create setup intent error', error, { userId: req.user!.id });
-      res.status(500).json({ message: "Failed to create setup intent" });
-    }
+    // Endpoint deshabilitado durante migración a Azul API
+    return res.status(503).json({ 
+      message: "El servicio de pagos está en proceso de migración. Por favor intente más tarde.",
+      configured: false 
+    });
   });
 
   // ========================================
-  // DRIVER BANK ACCOUNT ENDPOINTS (dLocal Payouts)
+  // DRIVER BANK ACCOUNT ENDPOINTS
+  // TODO: Implementar con Azul API para payouts
   // ========================================
 
   // Get list of available banks in Dominican Republic
+  // TODO: Implementar con Azul API
   app.get("/api/drivers/banks", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -6181,18 +5638,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Only drivers can access this endpoint" });
     }
 
-    try {
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      const banksRecord = dlocalPaymentService.getDRBanks();
-      const banksArray = Object.entries(banksRecord).map(([code, name]) => ({ code, name }));
-      res.json(banksArray);
-    } catch (error: any) {
-      logSystem.error('Get banks error', error, { userId: req.user!.id });
-      res.status(500).json({ message: "Failed to get bank list" });
-    }
+    // TODO: Implementar lista de bancos con Azul API
+    return res.status(503).json({ 
+      message: "El servicio de cuentas bancarias está en proceso de migración.",
+      configured: false 
+    });
   });
 
   // Register conductor bank account for payouts
+  // TODO: Implementar con Azul API
   app.post("/api/drivers/bank-account", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -6202,63 +5656,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Only drivers can register bank accounts" });
     }
 
-    try {
-      const { bankCode, accountNumber, accountType, accountHolderName, documentId } = req.body;
-
-      if (!bankCode || !accountNumber || !accountType || !accountHolderName || !documentId) {
-        return res.status(400).json({ 
-          message: "Bank account details (bankCode, accountNumber, accountType, accountHolderName, documentId) are required" 
-        });
-      }
-
-      const conductor = await storage.getConductorByUserId(req.user!.id);
-      if (!conductor) {
-        return res.status(404).json({ message: "Conductor profile not found" });
-      }
-
-      // Validate account type
-      if (!['checking', 'savings'].includes(accountType)) {
-        return res.status(400).json({ message: "Account type must be 'checking' or 'savings'" });
-      }
-
-      // Validate bank code
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      const validBanks = dlocalPaymentService.getDRBanks();
-      const bank = validBanks.find(b => b.code === bankCode);
-      if (!bank) {
-        return res.status(400).json({ message: "Invalid bank code" });
-      }
-
-      // Store bank account info (we'll encrypt sensitive data in production)
-      await storage.updateConductor(conductor.id, {
-        dlocalBankCode: bankCode,
-        dlocalBankName: bank.name,
-        dlocalAccountNumber: accountNumber.slice(-4), // Store only last 4 digits for display
-        dlocalAccountType: accountType,
-        dlocalAccountHolder: accountHolderName,
-        dlocalDocumentId: documentId,
-        dlocalPayoutEnabled: true,
-      });
-
-      logSystem.info('Conductor bank account registered', { 
-        conductorId: conductor.id,
-        bankCode,
-        accountType,
-      });
-
-      res.json({
-        success: true,
-        message: "Bank account registered successfully",
-        bankAccount: {
-          bankName: bank.name,
-          accountType,
-          last4: accountNumber.slice(-4),
-        },
-      });
-    } catch (error: any) {
-      logSystem.error('Register bank account error', error, { userId: req.user!.id });
-      res.status(500).json({ message: error.message || "Failed to register bank account" });
-    }
+    // TODO: Implementar registro de cuenta bancaria con Azul API
+    return res.status(503).json({ 
+      message: "El servicio de cuentas bancarias está en proceso de migración.",
+      configured: false 
+    });
   });
 
   // Get conductor's bank account status
@@ -6277,15 +5679,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conductor profile not found" });
       }
 
+      // TODO: Actualizar cuando se integre Azul API
       res.json({
-        hasBankAccount: !!conductor.dlocalBankCode,
-        payoutEnabled: conductor.dlocalPayoutEnabled || false,
-        bankAccount: conductor.dlocalBankCode ? {
-          bankName: conductor.dlocalBankName,
-          accountType: conductor.dlocalAccountType,
-          last4: conductor.dlocalAccountNumber,
-          accountHolder: conductor.dlocalAccountHolder,
-        } : null,
+        hasBankAccount: false,
+        payoutEnabled: false,
+        bankAccount: null,
         balance: {
           available: conductor.balanceDisponible || "0.00",
           pending: conductor.balancePendiente || "0.00",
@@ -6298,149 +5696,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Request withdrawal (payout) to bank account
+  // TODO: Implementar con Azul API
   app.post("/api/drivers/request-withdrawal", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    if (req.user!.userType !== 'conductor') {
-      return res.status(403).json({ message: "Only drivers can request withdrawals" });
-    }
-
-    try {
-      const { amount } = req.body;
-
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ message: "Valid amount is required" });
-      }
-
-      const conductor = await storage.getConductorByUserId(req.user!.id);
-      if (!conductor) {
-        return res.status(404).json({ message: "Conductor profile not found" });
-      }
-
-      if (!conductor.dlocalBankCode || !conductor.dlocalPayoutEnabled) {
-        return res.status(400).json({ 
-          message: "No bank account registered. Please register a bank account first.",
-          requiresBankSetup: true 
-        });
-      }
-
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "Payment service not configured. Please contact administrator.",
-          configured: false 
-        });
-      }
-
-      // Validate withdrawal amount
-      const validation = dlocalPaymentService.validatePayoutRequest(
-        parseFloat(amount),
-        parseFloat(conductor.balanceDisponible || "0")
-      );
-
-      if (!validation.valid) {
-        return res.status(400).json({ message: validation.error });
-      }
-
-      const user = await storage.getUserById(req.user!.id);
-
-      // Create payout with dLocal
-      const payoutResult = await dlocalPaymentService.createPayout({
-        amount: parseFloat(amount),
-        currency: 'DOP',
-        country: 'DO',
-        externalId: `WD-${conductor.id}-${Date.now()}`,
-        beneficiaryName: conductor.dlocalAccountHolder || user?.nombre || 'Conductor',
-        beneficiaryDocument: conductor.dlocalDocumentId || '',
-        bankCode: conductor.dlocalBankCode!,
-        bankAccount: conductor.dlocalAccountNumber || '',
-        accountType: conductor.dlocalAccountType as 'checking' | 'savings' || 'checking',
-        notificationUrl: `${process.env.APP_URL || ''}/api/dlocal/payout-webhook`,
-      });
-
-      if (!payoutResult.success) {
-        return res.status(400).json({
-          message: "Withdrawal request failed",
-          errorCode: payoutResult.errorCode,
-          errorMessage: payoutResult.errorMessage,
-        });
-      }
-
-      // Update conductor balance
-      const newBalance = parseFloat(conductor.balanceDisponible || "0") - parseFloat(amount);
-      const newPending = parseFloat(conductor.balancePendiente || "0") + parseFloat(amount);
-      
-      await storage.updateConductor(conductor.id, {
-        balanceDisponible: newBalance.toFixed(2),
-        balancePendiente: newPending.toFixed(2),
-      });
-
-      logTransaction.info('Conductor withdrawal requested', {
-        conductorId: conductor.id,
-        amount,
-        payoutId: payoutResult.payoutId,
-      });
-
-      res.json({
-        success: true,
-        message: "Withdrawal request submitted successfully",
-        payoutId: payoutResult.payoutId,
-        status: payoutResult.status,
-        amount,
-        estimatedArrival: "1-3 business days",
-      });
-    } catch (error: any) {
-      logSystem.error('Request withdrawal error', error, { userId: req.user!.id });
-      res.status(500).json({ message: error.message || "Failed to request withdrawal" });
-    }
+    // Endpoint deshabilitado durante migración a Azul API
+    return res.status(503).json({ 
+      message: "El servicio de retiros está en proceso de migración. Por favor intente más tarde.",
+      configured: false 
+    });
   });
 
   // Delete conductor's bank account
+  // TODO: Implementar con Azul API
   app.delete("/api/drivers/bank-account", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    if (req.user!.userType !== 'conductor') {
-      return res.status(403).json({ message: "Only drivers can delete bank accounts" });
-    }
-
-    try {
-      const conductor = await storage.getConductorByUserId(req.user!.id);
-      if (!conductor) {
-        return res.status(404).json({ message: "Conductor profile not found" });
-      }
-
-      // Check for pending withdrawals before allowing deletion
-      if (parseFloat(conductor.balancePendiente || "0") > 0) {
-        return res.status(400).json({ 
-          message: "Cannot delete bank account while there are pending withdrawals" 
-        });
-      }
-
-      await storage.updateConductor(conductor.id, {
-        dlocalBankCode: null,
-        dlocalBankName: null,
-        dlocalAccountNumber: null,
-        dlocalAccountType: null,
-        dlocalAccountHolder: null,
-        dlocalDocumentId: null,
-        dlocalPayoutEnabled: false,
-      });
-
-      logSystem.info('Conductor bank account deleted', { conductorId: conductor.id });
-
-      res.json({
-        success: true,
-        message: "Bank account deleted successfully",
-      });
-    } catch (error: any) {
-      logSystem.error('Delete bank account error', error, { userId: req.user!.id });
-      res.status(500).json({ message: "Failed to delete bank account" });
-    }
+    // Endpoint deshabilitado durante migración a Azul API
+    return res.status(503).json({ 
+      message: "El servicio de cuentas bancarias está en proceso de migración.",
+      configured: false 
+    });
   });
 
   // Get conductor's withdrawal history
@@ -6766,8 +6038,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedWithdrawal = await storage.updateOperatorWithdrawal(id, {
         estado: 'pagado',
-        dlocalPayoutId: referenciaBancaria || `MANUAL-${Date.now()}`,
-        dlocalStatus: 'COMPLETED_MANUAL',
+        referenciaPago: referenciaBancaria || `MANUAL-${Date.now()}`,
+        estadoPago: 'COMPLETED_MANUAL',
         errorMessage: notas || 'Procesado manualmente por administrador',
         procesadoAt: new Date(),
       });
@@ -6922,79 +6194,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "El servicio de pagos no está configurado. Por favor, contacta al administrador.",
-          configured: false 
-        });
-      }
-
-      // Get user data for dLocal tokenization
-      const user = req.user!;
-
-      // Use real dLocal tokenization via saveCardWithValidation
-      let tokenResult;
-      try {
-        tokenResult = await dlocalPaymentService.saveCardWithValidation({
-          cardNumber: cleanNumber,
-          cardExpiry: cardExpiry,
-          cardCVV: cardCVV,
-          cardholderName: cardholderName || `${user.nombre} ${user.apellido}`,
-          email: user.email,
-          name: `${user.nombre} ${user.apellido}`,
-          document: user.cedula || '00000000000',
-        });
-      } catch (dlocalError: any) {
-        logTransaction.error('dLocal card tokenization failed for client', {
-          userId: user.id,
-          error: dlocalError.message,
-        });
-        
-        return res.status(400).json({
-          success: false,
-          message: dlocalError.message || "Error al validar la tarjeta con el procesador de pagos. Verifique los datos e intente nuevamente.",
-        });
-      }
-
-      // Use real dLocal token data
-      const cardToken = tokenResult.cardId;
-      const cardBrand = tokenResult.brand;
-      const last4 = tokenResult.last4;
-      const expiryMonth = tokenResult.expiryMonth;
-      const expiryYear = tokenResult.expiryYear;
-
-      // Save payment method with real dLocal token
-      const paymentMethod = await storage.createClientPaymentMethod({
-        userId: req.user!.id,
-        dlocalToken: cardToken,
-        cardBrand,
-        last4,
-        expiryMonth,
-        expiryYear,
-        cardholderName: cardholderName || null,
-      });
-
-      logTransaction.info('Client payment method created with real dLocal tokenization', { 
-        userId: req.user!.id,
-        paymentMethodId: paymentMethod.id,
-        cardBrand,
-        last4,
-        tokenized: true,
-      });
-
-      res.json({
-        success: true,
-        message: "Tarjeta guardada correctamente",
-        paymentMethod: {
-          id: paymentMethod.id,
-          cardBrand: paymentMethod.cardBrand,
-          last4: paymentMethod.last4,
-          expiryMonth: paymentMethod.expiryMonth,
-          expiryYear: paymentMethod.expiryYear,
-          isDefault: paymentMethod.isDefault,
-        },
+      // TODO: Implementar con Azul API - tokenización de tarjetas de clientes
+      // Este endpoint guardará la tarjeta tokenizada cuando se integre Azul API
+      return res.status(503).json({ 
+        message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
+        configured: false 
       });
     } catch (error: any) {
       logSystem.error('Create client payment method error', error, { userId: req.user!.id });
@@ -7083,18 +6287,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check dLocal payment service status
+  // TODO: Implementar con Azul API - Check payment service status
   app.get("/api/client/payment-service-status", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
     try {
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
+      // TODO: Verificar configuración de Azul API cuando esté implementado
       res.json({
-        configured: dlocalPaymentService.isConfigured(),
-        gateway: 'dlocal',
+        configured: false,
+        gateway: 'azul',
+        message: 'Servicio de pagos en proceso de actualización',
       });
     } catch (error: any) {
       logSystem.error('Get payment service status error', error);
@@ -7184,79 +6388,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "El servicio de pagos no está configurado. Por favor, contacta al administrador.",
-          configured: false 
-        });
-      }
-
-      // Get user data for dLocal tokenization
-      const user = req.user!;
-
-      // Use real dLocal tokenization via saveCardWithValidation
-      let tokenResult;
-      try {
-        tokenResult = await dlocalPaymentService.saveCardWithValidation({
-          cardNumber: cleanNumber,
-          cardExpiry: cardExpiry,
-          cardCVV: cardCVV,
-          cardholderName: cardholderName || `${user.nombre} ${user.apellido}`,
-          email: user.email,
-          name: `${user.nombre} ${user.apellido}`,
-          document: conductor.cedula || user.cedula || '00000000000',
-        });
-      } catch (dlocalError: any) {
-        logTransaction.error('dLocal card tokenization failed', {
-          conductorId: conductor.id,
-          error: dlocalError.message,
-        });
-        
-        return res.status(400).json({
-          success: false,
-          message: dlocalError.message || "Error al validar la tarjeta con el procesador de pagos. Verifique los datos e intente nuevamente.",
-        });
-      }
-
-      // Use real dLocal token data
-      const cardToken = tokenResult.cardId;
-      const cardBrand = tokenResult.brand;
-      const last4 = tokenResult.last4;
-      const expiryMonth = tokenResult.expiryMonth;
-      const expiryYear = tokenResult.expiryYear;
-
-      // Save payment method with real dLocal token
-      const paymentMethod = await storage.createOperatorPaymentMethod({
-        conductorId: conductor.id,
-        dlocalCardId: cardToken,
-        cardBrand,
-        last4,
-        expiryMonth,
-        expiryYear,
-        cardholderName: cardholderName || null,
-      });
-
-      logTransaction.info('Operator payment method created with real dLocal tokenization', { 
-        conductorId: conductor.id,
-        paymentMethodId: paymentMethod.id,
-        cardBrand,
-        last4,
-        tokenized: true,
-      });
-
-      res.json({
-        success: true,
-        message: "Tarjeta guardada correctamente",
-        paymentMethod: {
-          id: paymentMethod.id,
-          cardBrand: paymentMethod.cardBrand,
-          last4: paymentMethod.last4,
-          expiryMonth: paymentMethod.expiryMonth,
-          expiryYear: paymentMethod.expiryYear,
-          isDefault: paymentMethod.isDefault,
-        },
+      // TODO: Implementar con Azul API - tokenización de tarjetas de operadores
+      // Este endpoint guardará la tarjeta tokenizada cuando se integre Azul API
+      return res.status(503).json({ 
+        message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
+        configured: false 
       });
     } catch (error: any) {
       logSystem.error('Create operator payment method error', error, { userId: req.user!.id });
@@ -7405,78 +6541,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const paymentAmount = Math.min(parsedAmount, totalDebt);
 
-      // Import dLocal service for real payment processing
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "El servicio de pagos no está configurado. Por favor, contacta al administrador.",
-        });
-      }
-
-      // Get the real dLocal card ID
-      const cardId = paymentMethod.dlocalCardId;
-      if (!cardId) {
-        return res.status(400).json({ 
-          message: "Esta tarjeta no tiene un token válido. Por favor, elimínela y agregue la tarjeta nuevamente." 
-        });
-      }
-
-      // Get user data for the charge
-      const user = req.user!;
-
-      // Charge the saved card via dLocal
-      let chargeResult;
-      try {
-        chargeResult = await dlocalPaymentService.chargeWithSavedCard({
-          cardId: cardId,
-          amount: paymentAmount,
-          description: `Pago de deuda - Operador ${conductor.id}`,
-          orderId: `DEBT-${wallet.id}-${Date.now()}`,
-          email: user.email,
-          name: `${user.nombre} ${user.apellido}`,
-          document: conductor.cedula || user.cedula || '00000000000',
-        });
-      } catch (dlocalError: any) {
-        logTransaction.error('dLocal debt payment charge failed', {
-          conductorId: conductor.id,
-          error: dlocalError.message,
-        });
-        
-        return res.status(400).json({
-          success: false,
-          message: dlocalError.message || "Error al procesar el pago. Verifique su tarjeta e intente nuevamente.",
-        });
-      }
-
-      // Charge successful - complete the debt payment with dLocal transaction ID
-      const result = await WalletService.completeDebtPayment(
-        wallet.id,
-        paymentAmount.toFixed(2),
-        `dlocal:${chargeResult.paymentId}`
-      );
-
-      logTransaction.info('Operator debt paid with real dLocal charge', { 
-        conductorId: conductor.id,
-        paymentMethodId,
-        dlocalPaymentId: chargeResult.paymentId,
-        amount: paymentAmount,
-        feeAmount: chargeResult.feeAmount,
-        netAmount: chargeResult.netAmount,
-        remainingDebt: parseFloat(wallet.totalDebt) - paymentAmount,
-      });
-
-      res.json({
-        success: true,
-        message: `Pago de RD$${paymentAmount.toFixed(2)} procesado correctamente`,
-        remainingDebt: (totalDebt - paymentAmount).toFixed(2),
-        wallet: result,
-        dlocalPaymentId: chargeResult.paymentId,
-        feeInfo: {
-          feeAmount: chargeResult.feeAmount,
-          feeCurrency: chargeResult.feeCurrency,
-          netAmount: chargeResult.netAmount,
-        },
+      // TODO: Implementar con Azul API - cobro de deuda con tarjeta guardada
+      // Este endpoint procesará el pago cuando se integre Azul API
+      return res.status(503).json({ 
+        message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
+        configured: false 
       });
     } catch (error: any) {
       logSystem.error('Pay debt with card error', error, { userId: req.user!.id });
@@ -7510,10 +6579,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let paymentStatus = 'unknown';
       if (servicio.metodoPago === 'efectivo') {
         paymentStatus = servicio.estado === 'completado' ? 'paid_cash' : 'pending_cash';
-      } else if (servicio.dlocalPaymentId) {
-        paymentStatus = comision ? 'paid_card' : 'processing';
       } else if (servicio.metodoPago === 'tarjeta') {
-        paymentStatus = 'awaiting_payment';
+        // TODO: Actualizar cuando se integre Azul API
+        paymentStatus = comision ? 'paid_card' : 'awaiting_payment';
       } else if (servicio.metodoPago === 'aseguradora') {
         paymentStatus = servicio.aseguradoraEstado === 'aprobado' ? 'approved_insurance' : 
                         servicio.aseguradoraEstado === 'rechazado' ? 'rejected_insurance' : 'pending_insurance';
@@ -7525,8 +6593,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: servicio.estado,
         costoTotal: servicio.costoTotal,
         paymentStatus,
-        dlocalPaymentId: servicio.dlocalPaymentId,
-        dlocalPaymentStatus: servicio.dlocalPaymentStatus,
         comision: comision ? {
           id: comision.id,
           montoTotal: comision.montoTotal,
@@ -7542,98 +6608,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Manual payout to conductor using dLocal
-  app.post("/api/admin/comisiones/:id/payout-dlocal", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    
-    if (req.user!.userType !== 'admin') {
-      return res.status(403).json({ message: "Forbidden: admin access required" });
-    }
-
-    try {
-      const comision = await storage.getComisionById(req.params.id);
-      
-      if (!comision) {
-        return res.status(404).json({ message: "Commission not found" });
-      }
-
-      if (comision.estadoPagoOperador === 'pagado') {
-        return res.status(400).json({ message: "Commission already paid to operator" });
-      }
-
-      const servicio = await storage.getServicioById(comision.servicioId);
-      if (!servicio || !servicio.conductorId) {
-        return res.status(404).json({ message: "Service or conductor not found" });
-      }
-
-      const conductor = await storage.getConductorByUserId(servicio.conductorId);
-      if (!conductor) {
-        return res.status(404).json({ message: "Conductor profile not found" });
-      }
-
-      if (!conductor.dlocalBankCode || !conductor.dlocalPayoutEnabled) {
-        return res.status(400).json({ 
-          message: "Conductor does not have a registered bank account. Manual transfer required.",
-          requiresManualTransfer: true 
-        });
-      }
-
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "Payment service not configured",
-          configured: false 
-        });
-      }
-
-      const user = await storage.getUserById(servicio.conductorId);
-      
-      // Create payout with dLocal
-      const payoutResult = await dlocalPaymentService.createPayout({
-        amount: parseFloat(comision.montoOperador),
-        currency: 'DOP',
-        country: 'DO',
-        externalId: `COM-${comision.id}`,
-        beneficiaryName: conductor.dlocalAccountHolder || user?.nombre || 'Conductor',
-        beneficiaryDocument: conductor.dlocalDocumentId || '',
-        bankCode: conductor.dlocalBankCode!,
-        bankAccount: conductor.dlocalAccountNumber || '',
-        accountType: conductor.dlocalAccountType as 'checking' | 'savings' || 'checking',
-        notificationUrl: `${process.env.APP_URL || ''}/api/dlocal/payout-webhook`,
-      });
-
-      if (!payoutResult.success) {
-        logTransaction.paymentFailed(comision.servicioId, parseFloat(comision.montoOperador), payoutResult.errorMessage || 'Payout failed');
-        return res.status(400).json({
-          message: "Payout failed",
-          errorCode: payoutResult.errorCode,
-          errorMessage: payoutResult.errorMessage,
-        });
-      }
-
-      await storage.marcarComisionPagada(comision.id, 'operador', payoutResult.payoutId);
-
-      logTransaction.info('Admin processed dLocal payout to conductor', {
-        comisionId: comision.id,
-        conductorId: conductor.id,
-        amount: comision.montoOperador,
-        payoutId: payoutResult.payoutId,
-      });
-
-      res.json({
-        success: true,
-        message: "Payout processed successfully",
-        transactionId: payoutResult.transactionId,
-        amount: comision.montoOperador,
-      });
-    } catch (error: any) {
-      logSystem.error('Admin payout error', error, { comisionId: req.params.id });
-      res.status(500).json({ message: error.message || "Failed to process payout" });
-    }
-  });
+  // TODO: Implementar payout automático con Azul API
+  // Por ahora usar el endpoint mark-paid para pagos manuales
 
   // Admin: Mark commission as paid manually (for cash or bank transfers)
   app.post("/api/admin/comisiones/:id/mark-paid", async (req: Request, res: Response) => {
@@ -7769,13 +6745,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { tipo, dlocalPayoutId } = req.body;
+      const { tipo, referenciaPago } = req.body;
       
       if (!tipo || (tipo !== 'operador' && tipo !== 'empresa')) {
         return res.status(400).json({ message: "Valid tipo (operador/empresa) is required" });
       }
 
-      const comision = await storage.marcarComisionPagada(req.params.id, tipo, dlocalPayoutId);
+      const comision = await storage.marcarComisionPagada(req.params.id, tipo, referenciaPago);
       res.json(comision);
     } catch (error: any) {
       logSystem.error('Mark commission paid error', error);
@@ -7830,8 +6806,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       doc.fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`, { bold: true });
       doc.fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
-      if (servicio.dlocalPaymentId) {
-        doc.text(`ID de Transacción: ${servicio.dlocalPaymentId}`);
+      if (servicio.transactionId) {
+        doc.text(`ID de Transacción: ${servicio.transactionId}`);
       }
       doc.moveDown();
 
@@ -7848,7 +6824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // DLOCAL PAYOUT ACCOUNT ENDPOINTS
+  // TODO: Implementar con Azul API - PAYOUT ACCOUNT ENDPOINTS
   // ========================================
   // Note: Driver bank account registration and payout functionality has been moved to:
   // - POST /api/drivers/bank-account - Register bank account
@@ -7857,7 +6833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // - DELETE /api/drivers/bank-account - Delete bank account
   // - GET /api/drivers/banks - Get list of available banks
 
-  // Legacy endpoint redirect for backwards compatibility
+  // Legacy endpoint - returns 503 until Azul API is implemented
   app.post("/api/drivers/payout-onboarding", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -7867,38 +6843,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Only drivers can access this endpoint" });
     }
 
-    try {
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "dLocal Payment Service not configured",
-          configured: false 
-        });
-      }
-
-      const conductor = await storage.getConductorByUserId(req.user!.id);
-      if (!conductor) {
-        return res.status(404).json({ message: "Driver profile not found" });
-      }
-
-      // Return info about how to complete payout setup
-      logSystem.info('dLocal payout onboarding requested', { 
-        conductorId: conductor.id,
-        userId: req.user!.id 
-      });
-
-      res.json({
-        success: true,
-        message: "Please register your bank account for payouts",
-        redirectTo: "/api/drivers/bank-account",
-        hasBankAccount: !!conductor.dlocalBankCode,
-        banks: dlocalPaymentService.getDRBanks(),
-      });
-    } catch (error: any) {
-      logSystem.error('dLocal payout onboarding error', error, { userId: req.user!.id });
-      res.status(500).json({ message: error.message || "Failed to start payout onboarding" });
-    }
+    // TODO: Implementar con Azul API
+    return res.status(503).json({ 
+      message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
+      configured: false 
+    });
   });
 
   app.get("/api/drivers/payout-account-status", async (req: Request, res: Response) => {
@@ -7916,14 +6865,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Driver profile not found" });
       }
 
+      // TODO: Actualizar con campos de Azul API cuando esté implementado
       res.json({
-        hasBankAccount: !!conductor.dlocalBankCode,
-        payoutEnabled: conductor.dlocalPayoutEnabled || false,
-        bankAccount: conductor.dlocalBankCode ? {
-          bankName: conductor.dlocalBankName,
-          accountType: conductor.dlocalAccountType,
-          last4: conductor.dlocalAccountNumber,
-          accountHolder: conductor.dlocalAccountHolder,
+        hasBankAccount: !!conductor.bankCode,
+        payoutEnabled: conductor.payoutEnabled || false,
+        bankAccount: conductor.bankCode ? {
+          bankName: conductor.bankName,
+          accountType: conductor.accountType,
+          last4: conductor.accountNumber,
+          accountHolder: conductor.accountHolder,
         } : null,
         balance: {
           available: conductor.balanceDisponible || "0.00",
@@ -7931,13 +6881,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (error: any) {
-      logSystem.error('Get dLocal payout account status error', error, { userId: req.user!.id });
+      logSystem.error('Get payout account status error', error, { userId: req.user!.id });
       res.status(500).json({ message: "Failed to get account status" });
     }
   });
 
   // ========================================
-  // PAYMENT METHODS ENDPOINTS (dLocal)
+  // TODO: Implementar con Azul API - PAYMENT METHODS ENDPOINTS
   // ========================================
   // Note: Primary client payment methods are managed via /api/client/payment-methods
   // These endpoints provide a secondary interface for payment method management
@@ -7947,71 +6897,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
-    try {
-      const { cardNumber, cardExpiry, cardCVV, cardholderName } = req.body;
-
-      if (!cardNumber || !cardExpiry) {
-        return res.status(400).json({ message: "Card details are required" });
-      }
-
-      const { dlocalPaymentService } = await import('./services/dlocal-payment');
-      
-      if (!dlocalPaymentService.isConfigured()) {
-        return res.status(503).json({ 
-          message: "Payment service not configured",
-          configured: false 
-        });
-      }
-
-      const cleanNumber = cardNumber.replace(/\s/g, '');
-      const cleanExpiry = cardExpiry.replace('/', '');
-
-      // Determine card brand
-      let brand = 'unknown';
-      if (cleanNumber.startsWith('4')) {
-        brand = 'visa';
-      } else if (cleanNumber.startsWith('5')) {
-        brand = 'mastercard';
-      } else if (cleanNumber.startsWith('3')) {
-        brand = 'amex';
-      }
-
-      const last4 = cleanNumber.slice(-4);
-      const expiryMonth = parseInt(cleanExpiry.substring(0, 2), 10);
-      const expiryYear = 2000 + parseInt(cleanExpiry.substring(2, 4), 10);
-
-      const { db } = await import('./db');
-      const { paymentMethods } = await import('./schema-extensions');
-      const { eq } = await import('drizzle-orm');
-
-      const existingMethods = await db.query.paymentMethods.findMany({
-        where: eq(paymentMethods.userId, req.user!.id),
-      });
-
-      const isFirst = existingMethods.length === 0;
-      const dlocalToken = `DLOCAL_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-      const savedMethod = await db.insert(paymentMethods).values({
-        userId: req.user!.id,
-        dlocalPaymentMethodId: dlocalToken,
-        brand,
-        last4,
-        expiryMonth,
-        expiryYear,
-        isDefault: isFirst,
-      }).returning();
-
-      logSystem.info('Payment method added (dLocal)', { 
-        userId: req.user!.id,
-        brand,
-        last4,
-      });
-
-      res.json(savedMethod[0]);
-    } catch (error: any) {
-      logSystem.error('Add payment method error', error, { userId: req.user!.id });
-      res.status(500).json({ message: "Failed to add payment method" });
-    }
+    // TODO: Implementar con Azul API - tokenización de tarjetas
+    return res.status(503).json({ 
+      message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
+      configured: false 
+    });
   });
 
   app.get("/api/payment-methods", async (req: Request, res: Response) => {

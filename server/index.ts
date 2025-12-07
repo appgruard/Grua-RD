@@ -155,7 +155,7 @@ app.use(
           "https://maps.googleapis.com",
           "https://api.mapbox.com",
           "https://events.mapbox.com",
-          "https://api.dlocal.com",
+          "https://api.azul.com.do",
           "wss:", 
           "ws:"
         ],

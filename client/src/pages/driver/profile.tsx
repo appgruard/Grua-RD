@@ -19,7 +19,6 @@ import { DocumentExpirationAlerts } from '@/components/DocumentExpirationAlerts'
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
-import DLocalOperatorBankAccountManager from '@/components/DLocalOperatorBankAccountManager';
 import { WalletSection } from '@/components/wallet';
 import type { Conductor, Documento, ConductorVehiculo } from '@shared/schema';
 
@@ -968,7 +967,6 @@ export default function DriverProfile() {
             </div>
           </Card>
 
-          <DLocalOperatorBankAccountManager />
         </>
       )}
 

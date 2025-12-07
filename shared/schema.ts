@@ -1032,9 +1032,9 @@ export const documentoRecordatoriosRelations = relations(documentoRecordatorios,
   }),
 }));
 
-// ==================== CLIENT PAYMENT METHODS (dLocal) ====================
+// ==================== CLIENT PAYMENT METHODS (Payment Gateway - Azul) ====================
 
-// Client Payment Methods Table (dLocal card tokens for clients)
+// Client Payment Methods Table (card tokens for clients)
 export const clientPaymentMethods = pgTable("client_payment_methods", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -1056,9 +1056,9 @@ export const clientPaymentMethodsRelations = relations(clientPaymentMethods, ({ 
   }),
 }));
 
-// ==================== OPERATOR PAYMENT METHODS (dLocal) ====================
+// ==================== OPERATOR PAYMENT METHODS (Payment Gateway) ====================
 
-// Operator Payment Methods Table (dLocal card tokens for operators to pay debts)
+// Operator Payment Methods Table (card tokens for operators to pay debts)
 export const operatorPaymentMethods = pgTable("operator_payment_methods", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
@@ -1082,7 +1082,7 @@ export const operatorPaymentMethodsRelations = relations(operatorPaymentMethods,
 
 // ==================== END OPERATOR PAYMENT METHODS ====================
 
-// ==================== OPERATOR BANK ACCOUNTS (dLocal Payouts) ====================
+// ==================== OPERATOR BANK ACCOUNTS (Payment Gateway Payouts) ====================
 
 // Estado de cuenta bancaria del operador
 export const estadoCuentaBancariaEnum = pgEnum("estado_cuenta_bancaria", [
@@ -1091,7 +1091,7 @@ export const estadoCuentaBancariaEnum = pgEnum("estado_cuenta_bancaria", [
   "rechazada"
 ]);
 
-// Operator Bank Accounts Table (for dLocal payouts)
+// Operator Bank Accounts Table (for payouts)
 export const operatorBankAccounts = pgTable("operator_bank_accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conductorId: varchar("conductor_id").notNull().unique().references(() => conductores.id, { onDelete: "cascade" }),

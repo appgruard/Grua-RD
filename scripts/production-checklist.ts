@@ -84,10 +84,10 @@ async function checkEnvironment() {
     }
   }
   
-  // Payment Variables (dLocal)
+  // Payment Variables (Azul)
   const paymentVars = [
-    { name: 'DLOCAL_API_KEY', description: 'dLocal API key' },
-    { name: 'DLOCAL_SECRET_KEY', description: 'dLocal secret key' },
+    { name: 'AZUL_MERCHANT_ID', description: 'Azul Merchant ID' },
+    { name: 'AZUL_AUTH_KEY', description: 'Azul Auth Key' },
   ];
   
   for (const v of paymentVars) {

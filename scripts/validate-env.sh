@@ -34,8 +34,8 @@ echo "Optional Variables:"
 check_var "TWILIO_ACCOUNT_SID" false
 check_var "TWILIO_AUTH_TOKEN" false
 check_var "TWILIO_PHONE_NUMBER" false
-check_var "DLOCAL_API_KEY" false
-check_var "DLOCAL_SECRET_KEY" false
+check_var "AZUL_MERCHANT_ID" false
+check_var "AZUL_AUTH_KEY" false
 check_var "ALLOWED_ORIGINS" false
 check_var "NODE_ENV" false
 check_var "PORT" false

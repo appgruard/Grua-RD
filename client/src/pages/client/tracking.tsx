@@ -85,35 +85,6 @@ export default function ClientTracking() {
     }
   }, [paymentStatus, paymentStatusShown, serviceId, toast, queryClient]);
 
-  const createPaymentMutation = useMutation({
-    mutationFn: async (servicioId: string) => {
-      const res = await apiRequest('POST', '/api/pagadito/create-payment', { servicioId });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Error al crear pago');
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      if (data.redirectUrl) {
-        window.location.href = data.redirectUrl;
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudo iniciar el pago',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const handlePayNow = () => {
-    if (serviceId) {
-      createPaymentMutation.mutate(serviceId);
-    }
-  };
-
   const { data: service, isLoading } = useQuery<ServicioWithDetails>({
     queryKey: ['/api/services', serviceId],
     enabled: !!serviceId,
@@ -388,79 +359,6 @@ export default function ClientTracking() {
           </Alert>
         )}
 
-        {service.metodoPago === 'tarjeta' && service.pagaditoStatus === 'pending_payment' && service.estado === 'aceptado' && (
-          <Card className="p-4 border-primary/50 bg-primary/5" data-testid="card-payment-pending">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/20">
-                <CreditCard className="w-6 h-6 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold">Pago pendiente</p>
-                <p className="text-sm text-muted-foreground">
-                  Completa el pago para continuar con el servicio
-                </p>
-              </div>
-              <Button
-                onClick={handlePayNow}
-                disabled={createPaymentMutation.isPending}
-                data-testid="button-pay-now"
-              >
-                {createPaymentMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <CreditCard className="w-4 h-4 mr-2" />
-                )}
-                Pagar ahora
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {service.metodoPago === 'tarjeta' && service.pagaditoStatus === 'COMPLETED' && (
-          <Alert className="bg-green-500/10 border-green-500/30">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            <AlertDescription className="text-green-600 dark:text-green-400 text-sm">
-              Pago completado exitosamente
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {service.metodoPago === 'tarjeta' && service.pagaditoStatus === 'VERIFYING' && (
-          <Alert className="bg-amber-500/10 border-amber-500/30">
-            <Clock className="h-4 w-4 text-amber-500" />
-            <AlertDescription className="text-amber-600 dark:text-amber-400 text-sm">
-              Tu pago esta siendo verificado. Puede tomar hasta 72 horas.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {service.metodoPago === 'tarjeta' && ['FAILED', 'CANCELED', 'EXPIRED', 'REVOKED'].includes(service.pagaditoStatus || '') && (
-          <Card className="p-4 border-destructive/50 bg-destructive/5" data-testid="card-payment-failed">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/20">
-                <XCircle className="w-6 h-6 text-destructive" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-destructive">Pago fallido</p>
-                <p className="text-sm text-muted-foreground">
-                  Hubo un error con tu pago. Intenta de nuevo.
-                </p>
-              </div>
-              <Button
-                onClick={handlePayNow}
-                disabled={createPaymentMutation.isPending}
-                data-testid="button-retry-payment"
-              >
-                {createPaymentMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <CreditCard className="w-4 h-4 mr-2" />
-                )}
-                Reintentar
-              </Button>
-            </div>
-          </Card>
-        )}
         </div>
       </div>
 

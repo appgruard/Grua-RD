@@ -212,8 +212,8 @@ const config: CapacitorConfig = {
       'events.mapbox.com',
       'fonts.googleapis.com',
       'fonts.gstatic.com',
-      'api.dlocal.com',
-      '*.dlocal.com',
+      'api.azul.com.do',
+      '*.azul.com.do',
       '*.waze.com',
       'waze.com'
     ]

@@ -55,50 +55,70 @@ Las siguientes variables son configuradas automáticamente por Replit Database:
 
 ## Variables de Servicios Externos
 
-### 💳 dLocal (Pagos)
+### 💳 Azul API (Pagos) - Migración Pendiente
 
-#### `DLOCAL_X_LOGIN`
+#### `AZUL_MERCHANT_ID`
 - **Tipo**: Secret (Confidencial)
 - **Ambiente**: Shared
 - **Requerido**: ✅ Sí
-- **Descripción**: X-Login para autenticación con API de dLocal
-- **Obtención**: https://dashboard.dlocal.com/
+- **Descripción**: Merchant ID proporcionado por Azul
+- **Obtención**: Portal de comercios Azul
 - **Uso**: 
-  - `server/services/dlocal-payment.ts` - Procesamiento de pagos
+  - `server/services/azul-payment.ts` - Procesamiento de pagos
 - **Seguridad**: ⚠️ NUNCA exponer en frontend
 
-#### `DLOCAL_X_TRANS_KEY`
+#### `AZUL_MERCHANT_NAME`
 - **Tipo**: Secret (Confidencial)
 - **Ambiente**: Shared
 - **Requerido**: ✅ Sí
-- **Descripción**: X-Trans-Key para autenticación con API de dLocal
-- **Obtención**: https://dashboard.dlocal.com/
+- **Descripción**: Nombre del comercio registrado en Azul
+- **Obtención**: Portal de comercios Azul
 - **Uso**: 
-  - `server/services/dlocal-payment.ts` - Autenticación de transacciones
+  - `server/services/azul-payment.ts` - Identificación del comercio
 - **Seguridad**: ⚠️ NUNCA exponer en frontend
 
-#### `DLOCAL_SECRET_KEY`
+#### `AZUL_MERCHANT_TYPE`
 - **Tipo**: Secret (Confidencial)
 - **Ambiente**: Shared
 - **Requerido**: ✅ Sí
-- **Descripción**: Clave secreta para firmar peticiones a dLocal
-- **Obtención**: https://dashboard.dlocal.com/
+- **Descripción**: Tipo de comercio (ej: "E-Commerce")
+- **Obtención**: Portal de comercios Azul
 - **Uso**: 
-  - `server/services/dlocal-payment.ts` - Firma de peticiones
+  - `server/services/azul-payment.ts` - Configuración de transacciones
 - **Seguridad**: ⚠️ NUNCA exponer en frontend
 
-#### `DLOCAL_API_KEY` (Opcional)
+#### `AZUL_AUTH1`
 - **Tipo**: Secret (Confidencial)
 - **Ambiente**: Shared
-- **Requerido**: ⚠️ Opcional
-- **Descripción**: API Key adicional para algunas operaciones de dLocal
-- **Obtención**: https://dashboard.dlocal.com/
+- **Requerido**: ✅ Sí
+- **Descripción**: Primera clave de autenticación de Azul
+- **Obtención**: Portal de comercios Azul
 - **Uso**: 
-  - `server/services/dlocal-payment.ts` - Operaciones adicionales
+  - `server/services/azul-payment.ts` - Autenticación de transacciones
+- **Seguridad**: ⚠️ NUNCA exponer en frontend
 
-**Endpoints webhook dLocal:**
-- `/api/dlocal/webhook` - Notificaciones de pagos
-- `/api/dlocal/payout-webhook` - Notificaciones de pagos a operadores
+#### `AZUL_AUTH2`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: Segunda clave de autenticación de Azul
+- **Obtención**: Portal de comercios Azul
+- **Uso**: 
+  - `server/services/azul-payment.ts` - Autenticación de transacciones
+- **Seguridad**: ⚠️ NUNCA exponer en frontend
+
+#### `AZUL_ENVIRONMENT`
+- **Tipo**: Environment Variable
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: Ambiente de Azul (dev/prod)
+- **Valores**: `dev` | `prod`
+- **Default**: `dev`
+- **Uso**: 
+  - `server/services/azul-payment.ts` - Selección de endpoint
+
+**Endpoints webhook Azul (pendiente implementación):**
+- `/api/azul/webhook` - Notificaciones de pagos
 
 ---
 
@@ -257,7 +277,7 @@ Las siguientes variables son configuradas automáticamente por Replit Database:
 - **Ejemplo**: `https://gruard.com,https://www.gruard.com,https://gruard.replit.app`
 - **Uso**: 
   - `server/index.ts` - Configuración CORS
-  - `server/services/dlocal-payment.ts` - Return URLs
+  - `server/services/azul-payment.ts` - Return URLs (cuando se complete la migración)
 - **Default desarrollo**: `http://localhost:5000`
 
 #### `LOG_LEVEL`
@@ -306,10 +326,13 @@ SESSION_SECRET=dev-secret-change-in-production
 MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 
-# dLocal (usar claves de sandbox)
-DLOCAL_X_LOGIN=sandbox_login
-DLOCAL_X_TRANS_KEY=sandbox_trans_key
-DLOCAL_SECRET_KEY=sandbox_secret
+# Azul API (usar ambiente dev)
+AZUL_MERCHANT_ID=test_merchant_id
+AZUL_MERCHANT_NAME=Test Merchant
+AZUL_MERCHANT_TYPE=E-Commerce
+AZUL_AUTH1=test_auth1
+AZUL_AUTH2=test_auth2
+AZUL_ENVIRONMENT=dev
 
 # Web Push (generar con web-push)
 VITE_VAPID_PUBLIC_KEY=BC...
@@ -348,10 +371,13 @@ ALLOWED_ORIGINS=https://gruard.com,https://www.gruard.com
 MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 VITE_MAPBOX_ACCESS_TOKEN=pk.eyJ1Ijo...
 
-# dLocal (usar claves de producción)
-DLOCAL_X_LOGIN=production_login
-DLOCAL_X_TRANS_KEY=production_trans_key
-DLOCAL_SECRET_KEY=production_secret
+# Azul API (usar ambiente prod)
+AZUL_MERCHANT_ID=production_merchant_id
+AZUL_MERCHANT_NAME=Grua RD
+AZUL_MERCHANT_TYPE=E-Commerce
+AZUL_AUTH1=production_auth1
+AZUL_AUTH2=production_auth2
+AZUL_ENVIRONMENT=prod
 
 # Twilio (REQUERIDO en producción)
 TWILIO_ACCOUNT_SID=AC...
@@ -371,7 +397,7 @@ LOG_LEVEL=info
 - Session secret único y fuerte
 - CORS estrictamente configurado
 - Rate limiting activo
-- dLocal webhooks configurados
+- Azul webhooks configurados (cuando se complete la migración)
 - Twilio account con créditos
 
 ---
@@ -393,8 +419,8 @@ LOG_LEVEL=info
 
 - [ ] `SESSION_SECRET` generado con 32+ caracteres aleatorios
 - [ ] `DATABASE_URL` apunta a base de datos de producción
-- [ ] dLocal keys son claves de producción
-- [ ] dLocal webhooks configurados y endpoints verificados
+- [ ] Azul API keys son claves de producción
+- [ ] Azul webhooks configurados y endpoints verificados (cuando se complete la migración)
 - [ ] Twilio configurado con número verificado y créditos
 - [ ] `MAPBOX_ACCESS_TOKEN` y `VITE_MAPBOX_ACCESS_TOKEN` configurados
 - [ ] VAPID keys generadas y guardadas de forma segura
@@ -433,7 +459,7 @@ Respuesta esperada:
 - ❌ Usar valores por defecto en producción
 - ❌ Compartir secrets en canales inseguros
 - ❌ Usar claves de desarrollo en producción
-- ❌ Exponer VAPID private key o dLocal secret keys
+- ❌ Exponer VAPID private key o Azul auth keys
 
 **SIEMPRE:**
 - ✅ Usar Replit Secrets para datos confidenciales
@@ -441,7 +467,7 @@ Respuesta esperada:
 - ✅ Generar SESSION_SECRET único por ambiente
 - ✅ Configurar restricciones en Mapbox API
 - ✅ Usar HTTPS en producción
-- ✅ Verificar webhooks de dLocal con signature
+- ✅ Verificar webhooks de Azul con signature (cuando se complete la migración)
 
 ---
 

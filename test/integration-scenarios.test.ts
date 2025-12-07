@@ -20,7 +20,7 @@ describe('Integration Scenarios - Complete Payment Flow', () => {
     });
 
     it('2. Card is pre-authorized (hold placed, no capture)', () => {
-      // dLocal createAuthorization is called
+      // Payment service createAuthorization is called
       const auth = {
         authorizationId: 'AUTH-123',
         status: 'authorized',
@@ -43,7 +43,7 @@ describe('Integration Scenarios - Complete Payment Flow', () => {
     });
 
     it('4. Payment is captured from authorization', () => {
-      // dLocal captureAuthorization is called
+      // Payment service captureAuthorization is called
       const capture = {
         paymentId: 'PAY-123',
         authorizationId: 'AUTH-123',
@@ -129,13 +129,13 @@ describe('Integration Scenarios - Complete Payment Flow', () => {
       expect(batch.totalAmount).toBe(7000);
     });
 
-    it('4. Processes each operator payout through dLocal', () => {
+    it('4. Processes each operator payout through payment service', () => {
       const payout1 = {
         batchId: 'BATCH-001',
         operatorId: 'op1',
         amount: 5000,
         status: 'procesando',
-        dlocalPayoutId: 'PAYOUT-001',
+        payoutId: 'PAYOUT-001',
       };
       expect(payout1.status).toBe('procesando');
     });
@@ -224,10 +224,10 @@ describe('Integration Scenarios - Complete Payment Flow', () => {
       expect(error).toBe(true);
     });
 
-    it('dLocal service unavailable', () => {
-      const dlocalStatus = 'unavailable';
+    it('Payment service unavailable', () => {
+      const paymentServiceStatus = 'unavailable';
       const fallback = 'pending_manual_processing';
-      expect(dlocalStatus !== 'available').toBe(true);
+      expect(paymentServiceStatus !== 'available').toBe(true);
     });
   });
 
@@ -270,9 +270,9 @@ describe('Integration Scenarios - Complete Payment Flow', () => {
         type: 'inmediato',
         status: 'completado',
         timestamp: new Date(),
-        dlocalPayoutId: 'PAYOUT-123',
+        payoutId: 'PAYOUT-123',
       };
-      expect(transaction.dlocalPayoutId).toBeDefined();
+      expect(transaction.payoutId).toBeDefined();
     });
 
     it('Maintains operator balance audit log', () => {

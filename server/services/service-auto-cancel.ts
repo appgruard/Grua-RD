@@ -35,32 +35,26 @@ export function stopServiceAutoCancellation() {
 }
 
 async function cancelPaymentAuthorization(service: any): Promise<void> {
-  if (service.metodoPago !== 'tarjeta' || !service.dlocalAuthorizationId) {
+  // TODO: Integrar cancelación de autorización con Azul cuando esté disponible
+  // Por ahora, solo para pagos con tarjeta que tengan una autorización
+  if (service.metodoPago !== 'tarjeta' || !service.azulAuthorizationId) {
     return;
   }
 
   try {
-    const { dlocalPaymentService } = await import('./dlocal-payment');
+    // TODO: Implementar cancelación de autorización con servicio Azul
+    // const { azulPaymentService } = await import('./azul-payment');
+    // if (!azulPaymentService.isConfigured()) { ... }
+    // const result = await azulPaymentService.cancelAuthorization(service.azulAuthorizationId);
     
-    if (!dlocalPaymentService.isConfigured()) {
-      logSystem.warn('dLocal not configured, cannot cancel authorization', { 
-        servicioId: service.id 
-      });
-      return;
-    }
-
-    const result = await dlocalPaymentService.cancelAuthorization(service.dlocalAuthorizationId);
-    
-    logSystem.info('Payment authorization cancelled for auto-cancelled service', { 
+    logSystem.warn('Payment authorization cancellation pending Azul integration', { 
       servicioId: service.id,
-      authorizationId: service.dlocalAuthorizationId,
-      cancelled: result.cancelled,
-      status: result.status
+      authorizationId: service.azulAuthorizationId
     });
   } catch (error) {
     logSystem.error('Failed to cancel payment authorization', error, { 
       servicioId: service.id,
-      authorizationId: service.dlocalAuthorizationId 
+      authorizationId: service.azulAuthorizationId 
     });
   }
 }

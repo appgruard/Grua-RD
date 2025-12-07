@@ -56,23 +56,19 @@ Después de una revisión exhaustiva de toda la aplicación Grúa RD, se han ide
   ```
 - **Tiempo Estimado:** 5 minutos
 
-#### 2.3 Proveedor de Pagos
-- **Estado:** Configuración mixta/incompleta
+#### 2.3 Proveedor de Pagos (Azul API)
+- **Estado:** Migración en progreso
 - **Análisis:**
-  - Schema tiene campos para dLocal (dlocalPaymentId, etc.)
-  - Variables de entorno tienen: `DLOCAL_X_LOGIN`, `DLOCAL_X_TRANS_KEY`, `DLOCAL_SECRET_KEY`
-  - Script pre-deploy busca Stripe (obsoleto)
-  - Componente `DLocalPaymentManager.tsx` existe
-- **Decisión Requerida:** Confirmar si usar dLocal o Stripe
-- **Secrets Requeridos (si dLocal):**
-  - ✅ `DLOCAL_X_LOGIN` - Ya configurado
-  - ✅ `DLOCAL_X_TRANS_KEY` - Ya configurado
-  - ✅ `DLOCAL_SECRET_KEY` - Ya configurado
-- **Secrets Requeridos (si Stripe):**
-  - ❌ `STRIPE_SECRET_KEY`
-  - ❌ `VITE_STRIPE_PUBLIC_KEY`
-  - ❌ `STRIPE_WEBHOOK_SECRET`
-- **Tiempo Estimado:** 30-60 minutos (depende del proveedor)
+  - Se está migrando a Azul API como proveedor de pagos
+  - Ver `PLAN_INTEGRACION_AZUL.md` para detalles de la migración
+- **Secrets Requeridos (Azul API):**
+  - ⏳ `AZUL_MERCHANT_ID` - Pendiente configuración
+  - ⏳ `AZUL_MERCHANT_NAME` - Pendiente configuración
+  - ⏳ `AZUL_MERCHANT_TYPE` - Pendiente configuración
+  - ⏳ `AZUL_AUTH1` - Pendiente configuración
+  - ⏳ `AZUL_AUTH2` - Pendiente configuración
+  - ⏳ `AZUL_ENVIRONMENT` - Pendiente configuración
+- **Tiempo Estimado:** Ver plan de integración Azul
 
 #### 2.4 Variable SESSION_SECRET
 - **Estado:** Ya existe en secrets
@@ -95,7 +91,7 @@ Después de una revisión exhaustiva de toda la aplicación Grúa RD, se han ide
 - **Problemas Identificados:**
   1. Línea 29: Busca `VITE_GOOGLE_MAPS_API_KEY` pero app usa Mapbox
   2. Función `checkGoogleMapsAPI()` debe cambiarse a `checkMapboxAPI()`
-  3. Debe agregar verificación de dLocal si es el proveedor elegido
+  3. Debe agregar verificación de Azul API cuando se complete la migración
 - **Tiempo Estimado:** 30 minutos
 
 #### 2.7 Actualizar CSP (Content Security Policy)
@@ -154,9 +150,9 @@ Después de una revisión exhaustiva de toda la aplicación Grúa RD, se han ide
 | `MAPBOX_ACCESS_TOKEN` | ✅ Existe | ✅ Sí | Backend |
 | `VITE_MAPBOX_ACCESS_TOKEN` | ✅ Existe | ✅ Sí | Frontend |
 | `VERIFIK_API_KEY` | ✅ Existe | ✅ Sí | Validación de cédula |
-| `DLOCAL_X_LOGIN` | ✅ Existe | ⚠️ Si dLocal | Pagos |
-| `DLOCAL_X_TRANS_KEY` | ✅ Existe | ⚠️ Si dLocal | Pagos |
-| `DLOCAL_SECRET_KEY` | ✅ Existe | ⚠️ Si dLocal | Pagos |
+| `AZUL_MERCHANT_ID` | ⏳ Pendiente | ✅ Sí | Pagos (Azul) |
+| `AZUL_AUTH1` | ⏳ Pendiente | ✅ Sí | Pagos (Azul) |
+| `AZUL_AUTH2` | ⏳ Pendiente | ✅ Sí | Pagos (Azul) |
 | `VITE_VAPID_PUBLIC_KEY` | ❌ Falta | ✅ Sí | Push notifications |
 | `VAPID_PRIVATE_KEY` | ❌ Falta | ✅ Sí | Push notifications |
 
@@ -180,8 +176,8 @@ Después de una revisión exhaustiva de toda la aplicación Grúa RD, se han ide
 
 ### Fase 2: Secrets y Configuración (30 min)
 - [ ] Generar claves VAPID y agregarlas como secrets
-- [ ] Confirmar proveedor de pagos (dLocal vs Stripe)
-- [ ] Configurar credenciales del proveedor de pagos elegido
+- [ ] Completar migración a Azul API (ver PLAN_INTEGRACION_AZUL.md)
+- [ ] Configurar credenciales de Azul API
 - [ ] Verificar SESSION_SECRET tiene 32+ caracteres
 - [ ] Configurar ALLOWED_ORIGINS para producción
 
@@ -215,10 +211,10 @@ Después de una revisión exhaustiva de toda la aplicación Grúa RD, se han ide
 
 ## 5. Decisiones Pendientes del Usuario
 
-1. **¿Usar dLocal o Stripe como proveedor de pagos?**
-   - dLocal ya tiene credenciales configuradas
-   - Stripe requiere configuración adicional
-   - El código soporta ambos
+1. **Migración a Azul API como proveedor de pagos**
+   - Migración en progreso (ver PLAN_INTEGRACION_AZUL.md)
+   - Azul API es el proveedor seleccionado para República Dominicana
+   - Pendiente completar integración
 
 2. **¿Crear iconos PWA en múltiples tamaños?**
    - Mejora la experiencia de instalación
@@ -265,7 +261,7 @@ Después de una revisión exhaustiva de toda la aplicación Grúa RD, se han ide
 ## 8. Próximos Pasos Recomendados
 
 1. **Inmediato:** Revisar este plan y aprobar el enfoque
-2. **Decidir:** Confirmar proveedor de pagos (dLocal recomendado - ya tiene credenciales)
+2. **Pagos:** Completar migración a Azul API (ver PLAN_INTEGRACION_AZUL.md)
 3. **Ejecutar:** Fases 1-6 en orden
 4. **Verificar:** Pruebas completas antes de anunciar producción
 

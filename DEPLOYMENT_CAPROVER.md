@@ -92,10 +92,13 @@ VITE_MAPBOX_ACCESS_TOKEN=pk.xxx
 # Email (Resend)
 RESEND_API_KEY=re_xxx
 
-# dLocal (Pagos)
-DLOCAL_X_LOGIN=xxx
-DLOCAL_X_TRANS_KEY=xxx
-DLOCAL_SECRET_KEY=xxx
+# Azul API (Pagos) - Migración pendiente
+AZUL_MERCHANT_ID=xxx
+AZUL_MERCHANT_NAME=xxx
+AZUL_MERCHANT_TYPE=xxx
+AZUL_AUTH1=xxx
+AZUL_AUTH2=xxx
+AZUL_ENVIRONMENT=dev
 
 # Verificación de identidad (Verifik)
 VERIFIK_API_KEY=xxx
@@ -253,7 +256,7 @@ https://app.gruard.com/api/...
 - [ ] VITE_API_URL configurado para apps móviles
 - [ ] VAPID keys configuradas (VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VITE_VAPID_PUBLIC_KEY)
 - [ ] Resend API key configurada (RESEND_API_KEY)
-- [ ] dLocal keys configuradas (DLOCAL_X_LOGIN, DLOCAL_X_TRANS_KEY, DLOCAL_SECRET_KEY)
+- [ ] Azul API keys configuradas (AZUL_MERCHANT_ID, AZUL_AUTH1, AZUL_AUTH2)
 - [ ] Certificado SSL habilitado en CapRover
 - [ ] Health check pasando (verifica logs)
 - [ ] Dominio apuntando a tu VPS
@@ -333,7 +336,7 @@ En CapRover → Logs & Monitoring → Backup:
 2. **Monitoring**: Sentry para error tracking
 3. **Emails transaccionales**: Resend configurado (14 plantillas disponibles)
 4. **SMS**: Twilio configurado para OTP
-5. **Pagos**: dLocal configurado para República Dominicana
+5. **Pagos**: Azul API para República Dominicana (migración pendiente)
 5. **Analytics**: Agregrega tu herramienta de analytics
 
 ---
