@@ -1646,7 +1646,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const isDriver = user.userType === 'conductor';
       const cedulaVerificada = user.cedulaVerificada === true;
-      const telefonoVerificado = user.telefonoVerificado === true;
+      // Either telefonoVerificado OR emailVerificado counts as contact verified
+      const contactoVerificado = user.telefonoVerificado === true || user.emailVerificado === true;
       const fotoVerificada = user.fotoVerificada === true;
       const fotoVerificadaScore = user.fotoVerificadaScore ? parseFloat(user.fotoVerificadaScore) : null;
 
@@ -1660,9 +1661,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         {
           id: 'phone',
-          name: 'Verificación de Teléfono',
-          description: 'Verifica tu número con código SMS',
-          completed: telefonoVerificado,
+          name: 'Verificación de Correo',
+          description: 'Verifica tu correo electrónico con código',
+          completed: contactoVerificado,
           required: true
         }
       ];

@@ -597,7 +597,9 @@ export default function OnboardingWizard() {
         return;
       }
       const status = await statusRes.json();
-      if (!status.cedulaVerificada || !status.telefonoVerificado) {
+      // Either telefonoVerificado OR emailVerificado counts as contact verified
+      const contactoVerificado = status.telefonoVerificado || status.emailVerificado;
+      if (!status.cedulaVerificada || !contactoVerificado) {
         toast({ title: 'Verificación incompleta', description: 'Completa todas las verificaciones', variant: 'destructive' });
         return;
       }

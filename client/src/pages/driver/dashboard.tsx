@@ -524,7 +524,9 @@ export default function DriverDashboard() {
     }
   };
 
-  const needsVerification = user && (!user.cedulaVerificada || !user.telefonoVerificado);
+  // Either telefonoVerificado OR emailVerificado counts as contact verified
+  const contactoVerificado = user?.telefonoVerificado || (user as any)?.emailVerificado;
+  const needsVerification = user && (!user.cedulaVerificada || !contactoVerificado);
 
   return (
     <div className="flex flex-col h-full relative overflow-hidden">

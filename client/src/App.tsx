@@ -115,7 +115,9 @@ function ProtectedRoute({
 
   // For conductors, check if verification is complete using authoritative server data
   if (user.userType === 'conductor') {
-    const needsVerification = !user.cedulaVerificada || !user.telefonoVerificado;
+    // Either telefonoVerificado OR emailVerificado counts as contact verified
+    const contactoVerificado = user.telefonoVerificado || (user as any).emailVerificado;
+    const needsVerification = !user.cedulaVerificada || !contactoVerificado;
     if (needsVerification) {
       return <Redirect to="/verify-pending" />;
     }
