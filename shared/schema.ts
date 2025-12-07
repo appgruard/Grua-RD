@@ -114,6 +114,7 @@ export const servicioSubtipoEnum = pgEnum("servicio_subtipo", [
 export const aseguradoraEstadoEnum = pgEnum("aseguradora_estado", ["pendiente", "aprobado", "rechazado"]);
 export const documentoTipoEnum = pgEnum("documento_tipo", [
   "licencia",
+  "licencia_trasera",
   "matricula",
   "poliza",
   "seguro_grua",
@@ -197,6 +198,10 @@ export const conductores = pgTable("conductores", {
   ultimaUbicacionUpdate: timestamp("ultima_ubicacion_update"),
   balanceDisponible: decimal("balance_disponible", { precision: 12, scale: 2 }).default("0.00").notNull(),
   balancePendiente: decimal("balance_pendiente", { precision: 12, scale: 2 }).default("0.00").notNull(),
+  licenciaCategoria: text("licencia_categoria"),
+  licenciaRestricciones: text("licencia_restricciones"),
+  licenciaCategoriaVerificada: boolean("licencia_categoria_verificada").default(false),
+  licenciaFechaVencimiento: timestamp("licencia_fecha_vencimiento"),
 });
 
 // Conductor Service Categories Table (driver can offer multiple service categories)

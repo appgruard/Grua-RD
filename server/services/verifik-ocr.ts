@@ -920,9 +920,153 @@ export async function scanAndVerifyLicense(
   };
 }
 
+// ==================== LICENSE BACK VALIDATION (CATEGORY & RESTRICTIONS) ====================
+
+export interface LicenseBackValidationResult {
+  success: boolean;
+  isValid: boolean;
+  score: number;
+  scanId?: string;
+  category?: string;
+  restrictions?: string;
+  expirationDate?: string;
+  details?: string;
+  rawResponse?: any;
+  error?: string;
+}
+
+export async function validateDriverLicenseBack(imageBase64: string): Promise<LicenseBackValidationResult> {
+  if (!VERIFIK_API_KEY) {
+    logger.warn("Verifik API key not configured for license back validation");
+    return {
+      success: false,
+      isValid: false,
+      score: 0,
+      error: "El servicio de verificación no está configurado"
+    };
+  }
+
+  const apiKey = VERIFIK_API_KEY.trim();
+  logger.info("Starting Verifik license back validation");
+
+  try {
+    const imageData = imageBase64.startsWith('data:') 
+      ? imageBase64 
+      : `data:image/jpeg;base64,${imageBase64}`;
+
+    const response = await fetch(`${VERIFIK_BASE_URL}/ocr/scan-prompt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        image: imageData,
+        documentType: "DL"
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error("Verifik license back validation API error", { status: response.status, error: errorText });
+      
+      if (response.status === 401) {
+        return {
+          success: false,
+          isValid: false,
+          score: 0,
+          error: "Error de autenticación con el servicio de verificación"
+        };
+      }
+      
+      return {
+        success: false,
+        isValid: false,
+        score: 0,
+        error: "Error al procesar la licencia trasera. Intenta de nuevo."
+      };
+    }
+
+    const rawResponse = await response.json();
+    const data: LicenseValidationResponse = rawResponse.data || rawResponse;
+    const ocrData = data.OCRExtraction;
+
+    logger.info("Verifik license back validation response", { 
+      documentType: ocrData?.documentType || data.documentType,
+      category: ocrData?.category || ocrData?.licenseClass,
+      restrictions: ocrData?.restrictions,
+      expirationDate: ocrData?.expirationDate,
+      confidenceScore: ocrData?.confidenceScore || data.confidenceScore
+    });
+
+    const rawConfidence = ocrData?.confidenceScore ?? data.confidenceScore ?? 0;
+    const confidenceScore = (typeof rawConfidence === 'number' && rawConfidence > 0)
+      ? (rawConfidence > 1 ? rawConfidence / 100 : rawConfidence)
+      : ((ocrData?.category || ocrData?.licenseClass) ? 0.8 : 0);
+
+    const category = ocrData?.category || ocrData?.licenseClass || '';
+    const restrictions = ocrData?.restrictions || '';
+    const expirationDate = ocrData?.expirationDate || '';
+
+    const normalizedCategory = normalizeCategory(category);
+    
+    const isValid = confidenceScore >= MINIMUM_VALIDATION_SCORE;
+
+    let details = "";
+    if (!isValid) {
+      if (confidenceScore < MINIMUM_VALIDATION_SCORE && confidenceScore > 0) {
+        details = `La calidad del escaneo es muy baja (${Math.round(confidenceScore * 100)}%). Se requiere al menos 60%.`;
+      } else {
+        details = "No se pudo extraer información de la parte trasera de la licencia";
+      }
+    }
+
+    return {
+      success: true,
+      isValid: isValid,
+      score: confidenceScore,
+      scanId: data._id,
+      category: normalizedCategory || undefined,
+      restrictions: restrictions || undefined,
+      expirationDate: expirationDate || undefined,
+      details: details || undefined,
+      rawResponse: data,
+      error: isValid ? undefined : details
+    };
+
+  } catch (error: any) {
+    logger.error("Error in Verifik license back validation", error);
+    return {
+      success: false,
+      isValid: false,
+      score: 0,
+      error: "Error al conectar con el servicio de verificación"
+    };
+  }
+}
+
+function normalizeCategory(category: string): string {
+  if (!category) return '';
+  
+  const upperCategory = category.toUpperCase().trim();
+  
+  const validCategories = ['A', 'B', 'C', 'D', 'E', 'F'];
+  for (const valid of validCategories) {
+    if (upperCategory.includes(valid)) {
+      const matches = upperCategory.match(/[A-F]/g);
+      if (matches) {
+        return matches.join(', ');
+      }
+    }
+  }
+  
+  return upperCategory;
+}
+
 // ==================== UNIFIED DOCUMENT VALIDATION ====================
 
-export type ValidationType = 'face' | 'license' | 'cedula';
+export type ValidationType = 'face' | 'license' | 'license_back' | 'cedula';
 
 export interface UnifiedValidationResult {
   success: boolean;
@@ -960,6 +1104,19 @@ export async function validateDocument(
         isValid: result.isValidLicense,
         score: result.score,
         validationType: 'license',
+        scanId: result.scanId,
+        details: result.details,
+        rawResponse: result.rawResponse,
+        error: result.error
+      };
+    }
+    case 'license_back': {
+      const result = await validateDriverLicenseBack(imageBase64);
+      return {
+        success: result.success,
+        isValid: result.isValid,
+        score: result.score,
+        validationType: 'license_back',
         scanId: result.scanId,
         details: result.details,
         rawResponse: result.rawResponse,
