@@ -1784,10 +1784,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verifik succeeded - check if it's a valid human face
       if (result.isHumanFace && result.score >= 0.6) {
+        // Normalize image to data URL format and extract mime type
+        let photoDataUrl: string;
+        let mimeType: string;
+        
+        if (image.startsWith('data:')) {
+          photoDataUrl = image;
+          // Extract mime type from data URL (data:image/jpeg;base64,...)
+          const mimeMatch = image.match(/^data:([^;]+);/);
+          mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        } else {
+          // Default to JPEG for raw base64
+          mimeType = 'image/jpeg';
+          photoDataUrl = `data:${mimeType};base64,${image}`;
+        }
+        
+        // Calculate approximate file size from base64 (base64 is ~33% larger than binary)
+        const base64Data = photoDataUrl.split(',')[1] || image;
+        const estimatedSize = Math.round((base64Data.length * 3) / 4);
+        
+        // Save the base64 image to user's fotoUrl and mark as verified
         await storage.updateUser(req.user!.id, {
+          fotoUrl: photoDataUrl,
           fotoVerificada: true,
           fotoVerificadaScore: result.score.toString()
         });
+        
+        // If conductor, also create/update the foto_perfil document as 'aprobado'
+        if (req.user!.userType === 'conductor') {
+          const conductor = await storage.getConductorByUserId(req.user!.id);
+          if (conductor) {
+            const existingDocs = await storage.getDocumentosByConductorId(conductor.id);
+            const existingPhoto = existingDocs.find(d => d.tipo === 'foto_perfil');
+            
+            if (existingPhoto) {
+              // Update existing document
+              await storage.updateDocumento(existingPhoto.id, {
+                url: photoDataUrl,
+                nombreArchivo: 'profile_photo_verified.jpg',
+                tamanoArchivo: estimatedSize,
+                mimeType: mimeType,
+                estado: 'aprobado',
+              });
+            } else {
+              // Create new document as aprobado (already validated by Verifik)
+              await storage.createDocumento({
+                tipo: 'foto_perfil',
+                conductorId: conductor.id,
+                url: photoDataUrl,
+                nombreArchivo: 'profile_photo_verified.jpg',
+                tamanoArchivo: estimatedSize,
+                mimeType: mimeType,
+                estado: 'aprobado',
+              });
+            }
+            logSystem.info("Profile photo document created/updated for conductor", {
+              conductorId: conductor.id,
+              estado: 'aprobado'
+            });
+          }
+        }
+        
         logSystem.info("Profile photo verified automatically", {
           userId: req.user!.id,
           score: result.score
