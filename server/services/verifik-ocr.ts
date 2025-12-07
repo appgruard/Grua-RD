@@ -522,9 +522,10 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
   logger.info("Starting Verifik face validation");
 
   try {
-    const imageData = imageBase64.startsWith('data:') 
-      ? imageBase64 
-      : `data:image/jpeg;base64,${imageBase64}`;
+    // Remove the data URI prefix if present - API expects raw base64
+    const imageData = imageBase64.includes('base64,') 
+      ? imageBase64.split('base64,')[1] 
+      : imageBase64;
 
     // Use the face-recognition/search endpoint for human face detection
     const response = await fetch(`${VERIFIK_BASE_URL}/face-recognition/search`, {
