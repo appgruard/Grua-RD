@@ -25,6 +25,7 @@ import { initServiceAutoCancellation, SERVICE_TIMEOUT_MINUTES } from "./services
 import { calculateHaversineDistance, GEOFENCE_RADIUS_METERS, type Coordinates } from "./utils/geo";
 import { calculateDriverStatus } from "./utils/driver-status";
 import { WalletService, initWalletService } from "./services/wallet";
+import { AzulPaymentService } from "./services/azul-payment";
 
 // Zod validation schemas for aseguradora/admin endpoints
 const updateAseguradoraPerfilSchema = z.object({
@@ -6194,11 +6195,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // TODO: Implementar con Azul API - tokenización de tarjetas de clientes
-      // Este endpoint guardará la tarjeta tokenizada cuando se integre Azul API
-      return res.status(503).json({ 
-        message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
-        configured: false 
+      // Check if Azul is configured
+      if (!AzulPaymentService.isConfigured()) {
+        logSystem.warn('Azul API not configured for client payment method creation', { userId: req.user!.id });
+        return res.status(503).json({ 
+          message: "El servicio de pagos no está configurado. Contacte al administrador.",
+          configured: false 
+        });
+      }
+
+      // Convert expiry to Azul format (YYYYMM)
+      const azulExpiration = `${year}${month.toString().padStart(2, '0')}`;
+
+      // Tokenize card with Azul DataVault
+      const tokenResult = await AzulPaymentService.createToken({
+        cardNumber: cleanNumber,
+        expiration: azulExpiration,
+        cvc: cardCVV,
+        cardHolderName: cardholderName || undefined,
+      });
+
+      if (!tokenResult.success || !tokenResult.tokenData) {
+        logSystem.warn('Azul token creation failed for client', { 
+          userId: req.user!.id, 
+          isoCode: tokenResult.isoCode,
+          message: tokenResult.responseMessage 
+        });
+        return res.status(400).json({ 
+          message: tokenResult.responseMessage || "No se pudo tokenizar la tarjeta",
+          errorCode: tokenResult.isoCode,
+        });
+      }
+
+      // Save tokenized card to database
+      const paymentMethod = await storage.createClientPaymentMethod({
+        userId: req.user!.id,
+        azulDataVaultToken: tokenResult.tokenData.dataVaultToken,
+        cardBrand: tokenResult.tokenData.cardBrand,
+        last4: tokenResult.tokenData.last4,
+        expiryMonth: tokenResult.tokenData.expiryMonth,
+        expiryYear: tokenResult.tokenData.expiryYear,
+        cardholderName: cardholderName || null,
+      });
+
+      logTransaction.success('Client payment method created with Azul', {
+        userId: req.user!.id,
+        paymentMethodId: paymentMethod.id,
+        cardBrand: tokenResult.tokenData.cardBrand,
+        last4: tokenResult.tokenData.last4,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Tarjeta guardada correctamente",
+        paymentMethod: {
+          id: paymentMethod.id,
+          cardBrand: paymentMethod.cardBrand,
+          last4: paymentMethod.last4,
+          expiryMonth: paymentMethod.expiryMonth,
+          expiryYear: paymentMethod.expiryYear,
+          isDefault: paymentMethod.isDefault,
+        },
       });
     } catch (error: any) {
       logSystem.error('Create client payment method error', error, { userId: req.user!.id });
@@ -6262,6 +6319,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No autorizado" });
       }
 
+      // Delete token from Azul DataVault if configured
+      if (method.azulDataVaultToken && AzulPaymentService.isConfigured()) {
+        try {
+          await AzulPaymentService.deleteToken(method.azulDataVaultToken);
+        } catch (azulError) {
+          logSystem.warn('Failed to delete Azul token, continuing with local deletion', { 
+            userId: req.user!.id, 
+            paymentMethodId: id,
+            error: azulError 
+          });
+        }
+      }
+
       await storage.deleteClientPaymentMethod(id);
 
       // If this was the default, set another one as default
@@ -6287,18 +6357,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // TODO: Implementar con Azul API - Check payment service status
+  // Check payment service status (Azul API)
   app.get("/api/client/payment-service-status", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
     try {
-      // TODO: Verificar configuración de Azul API cuando esté implementado
+      const isConfigured = AzulPaymentService.isConfigured();
       res.json({
-        configured: false,
+        configured: isConfigured,
         gateway: 'azul',
-        message: 'Servicio de pagos en proceso de actualización',
+        message: isConfigured 
+          ? 'Servicio de pagos disponible' 
+          : 'Servicio de pagos no configurado. Contacte al administrador.',
       });
     } catch (error: any) {
       logSystem.error('Get payment service status error', error);
@@ -6388,11 +6460,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // TODO: Implementar con Azul API - tokenización de tarjetas de operadores
-      // Este endpoint guardará la tarjeta tokenizada cuando se integre Azul API
-      return res.status(503).json({ 
-        message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
-        configured: false 
+      // Check if Azul is configured
+      if (!AzulPaymentService.isConfigured()) {
+        logSystem.warn('Azul API not configured for operator payment method creation', { conductorId: conductor.id });
+        return res.status(503).json({ 
+          message: "El servicio de pagos no está configurado. Contacte al administrador.",
+          configured: false 
+        });
+      }
+
+      // Convert expiry to Azul format (YYYYMM)
+      const azulExpiration = `${year}${month.toString().padStart(2, '0')}`;
+
+      // Tokenize card with Azul DataVault
+      const tokenResult = await AzulPaymentService.createToken({
+        cardNumber: cleanNumber,
+        expiration: azulExpiration,
+        cvc: cardCVV,
+        cardHolderName: cardholderName || undefined,
+      });
+
+      if (!tokenResult.success || !tokenResult.tokenData) {
+        logSystem.warn('Azul token creation failed for operator', { 
+          conductorId: conductor.id, 
+          isoCode: tokenResult.isoCode,
+          message: tokenResult.responseMessage 
+        });
+        return res.status(400).json({ 
+          message: tokenResult.responseMessage || "No se pudo tokenizar la tarjeta",
+          errorCode: tokenResult.isoCode,
+        });
+      }
+
+      // Save tokenized card to database
+      const paymentMethod = await storage.createOperatorPaymentMethod({
+        conductorId: conductor.id,
+        azulDataVaultToken: tokenResult.tokenData.dataVaultToken,
+        cardBrand: tokenResult.tokenData.cardBrand,
+        last4: tokenResult.tokenData.last4,
+        expiryMonth: tokenResult.tokenData.expiryMonth,
+        expiryYear: tokenResult.tokenData.expiryYear,
+        cardholderName: cardholderName || null,
+      });
+
+      logTransaction.success('Operator payment method created with Azul', {
+        conductorId: conductor.id,
+        paymentMethodId: paymentMethod.id,
+        cardBrand: tokenResult.tokenData.cardBrand,
+        last4: tokenResult.tokenData.last4,
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Tarjeta guardada correctamente",
+        paymentMethod: {
+          id: paymentMethod.id,
+          cardBrand: paymentMethod.cardBrand,
+          last4: paymentMethod.last4,
+          expiryMonth: paymentMethod.expiryMonth,
+          expiryYear: paymentMethod.expiryYear,
+          isDefault: paymentMethod.isDefault,
+        },
       });
     } catch (error: any) {
       logSystem.error('Create operator payment method error', error, { userId: req.user!.id });
@@ -6466,6 +6594,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No autorizado" });
       }
 
+      // Delete token from Azul DataVault if configured
+      if (method.azulDataVaultToken && AzulPaymentService.isConfigured()) {
+        try {
+          await AzulPaymentService.deleteToken(method.azulDataVaultToken);
+        } catch (azulError) {
+          logSystem.warn('Failed to delete Azul token for operator, continuing with local deletion', { 
+            conductorId: conductor.id, 
+            paymentMethodId: id,
+            error: azulError 
+          });
+        }
+      }
+
       await storage.deleteOperatorPaymentMethod(id);
 
       // If this was the default, set another one as default
@@ -6491,7 +6632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Pay debt with saved card
+  // Pay debt with saved card using Azul
   app.post("/api/operator/pay-debt-with-card", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -6518,6 +6659,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Check if Azul is configured
+      if (!AzulPaymentService.isConfigured()) {
+        logSystem.warn('Azul API not configured for debt payment', { conductorId: conductor.id });
+        return res.status(503).json({ 
+          message: "El servicio de pagos no está configurado. Contacte al administrador.",
+          configured: false 
+        });
+      }
+
       // Verify payment method ownership
       const paymentMethod = await storage.getOperatorPaymentMethodById(paymentMethodId);
       if (!paymentMethod) {
@@ -6540,12 +6690,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const paymentAmount = Math.min(parsedAmount, totalDebt);
+      const customOrderId = `DEBT-${conductor.id}-${Date.now()}`;
 
-      // TODO: Implementar con Azul API - cobro de deuda con tarjeta guardada
-      // Este endpoint procesará el pago cuando se integre Azul API
-      return res.status(503).json({ 
-        message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
-        configured: false 
+      // Process payment with Azul
+      const paymentResult = await AzulPaymentService.processPaymentWithToken(
+        paymentMethod.azulDataVaultToken,
+        {
+          amount: AzulPaymentService.toAzulAmount(paymentAmount),
+          customOrderId,
+          orderDescription: `Pago de deuda - Operador ${conductor.id}`,
+        }
+      );
+
+      if (!paymentResult.success) {
+        logTransaction.failed('Operator debt payment failed', {
+          conductorId: conductor.id,
+          amount: paymentAmount,
+          isoCode: paymentResult.isoCode,
+          message: paymentResult.responseMessage,
+        });
+        return res.status(400).json({ 
+          message: paymentResult.responseMessage || "Error al procesar el pago",
+          errorCode: paymentResult.isoCode,
+        });
+      }
+
+      // Update wallet to reduce debt
+      await WalletService.payDebt(conductor.id, paymentAmount, {
+        paymentMethod: 'azul_card',
+        azulOrderId: paymentResult.azulOrderId,
+        authorizationCode: paymentResult.authorizationCode,
+        customOrderId,
+      });
+
+      logTransaction.success('Operator debt paid with Azul', {
+        conductorId: conductor.id,
+        amount: paymentAmount,
+        azulOrderId: paymentResult.azulOrderId,
+        remainingDebt: totalDebt - paymentAmount,
+      });
+
+      res.json({
+        success: true,
+        message: "Pago procesado exitosamente",
+        payment: {
+          amount: paymentAmount,
+          azulOrderId: paymentResult.azulOrderId,
+          authorizationCode: paymentResult.authorizationCode,
+          remainingDebt: Math.max(0, totalDebt - paymentAmount),
+        },
       });
     } catch (error: any) {
       logSystem.error('Pay debt with card error', error, { userId: req.user!.id });

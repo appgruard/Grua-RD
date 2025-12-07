@@ -528,6 +528,130 @@ export class WalletService {
   }
 
   /**
+   * Pay debt directly with Azul payment
+   * Used for operator debt payments processed via Azul API
+   */
+  static async payDebt(
+    conductorId: string,
+    amount: number,
+    options: {
+      paymentMethod: string;
+      azulOrderId?: string;
+      authorizationCode?: string;
+      customOrderId?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    amountPaid: number;
+    remainingDebt: number;
+    message: string;
+  }> {
+    const wallet = await storage.getWalletByConductorId(conductorId);
+    if (!wallet) {
+      throw new Error('Billetera no encontrada');
+    }
+
+    if (amount <= 0) {
+      throw new Error('El monto debe ser mayor a cero');
+    }
+
+    const currentDebt = parseFloat(wallet.totalDebt);
+    if (currentDebt <= 0) {
+      throw new Error('No hay deuda pendiente para pagar');
+    }
+
+    const cappedAmount = Math.min(amount, currentDebt);
+
+    const debts = await storage.getOperatorDebts(wallet.id);
+    const pendingDebts = debts
+      .filter(d => d.status !== 'paid')
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    
+    let remainingPayment = cappedAmount;
+    let totalPaid = 0;
+
+    for (const debt of pendingDebts) {
+      if (remainingPayment <= 0) break;
+
+      const debtRemaining = parseFloat(debt.remainingAmount);
+      if (debtRemaining <= 0) continue;
+      
+      const paymentAmount = Math.min(remainingPayment, debtRemaining);
+
+      const newRemaining = Math.max(0, debtRemaining - paymentAmount);
+      const newStatus = newRemaining <= 0.01 ? 'paid' : 'partial';
+
+      await storage.updateOperatorDebt(debt.id, {
+        remainingAmount: newRemaining.toFixed(2),
+        status: newStatus,
+        paidAt: newStatus === 'paid' ? new Date() : undefined
+      });
+
+      remainingPayment -= paymentAmount;
+      totalPaid += paymentAmount;
+    }
+
+    await storage.createWalletTransaction({
+      walletId: wallet.id,
+      type: 'direct_payment',
+      amount: totalPaid.toFixed(2),
+      azulOrderId: options.azulOrderId,
+      azulAuthorizationCode: options.authorizationCode,
+      azulReferenceNumber: options.customOrderId,
+      description: `Pago de deuda con ${options.paymentMethod}${options.azulOrderId ? ` - Azul: ${options.azulOrderId}` : ''}`
+    });
+
+    const newDebt = Math.max(0, currentDebt - totalPaid);
+
+    const updateData: Partial<OperatorWallet> = {
+      totalDebt: newDebt.toFixed(2)
+    };
+
+    const shouldUnblock = newDebt <= 0.01 && wallet.cashServicesBlocked;
+    
+    if (shouldUnblock) {
+      updateData.cashServicesBlocked = false;
+    }
+
+    await storage.updateWallet(wallet.id, updateData);
+
+    const conductor = await storage.getConductorById(conductorId);
+    if (conductor) {
+      if (newDebt <= 0) {
+        await this.sendNotification(
+          conductor.userId,
+          '¡Deuda saldada!',
+          'Tu deuda ha sido pagada completamente. Los servicios en efectivo están disponibles.'
+        );
+      } else {
+        await this.sendNotification(
+          conductor.userId,
+          'Pago recibido',
+          `Tu pago de RD$${totalPaid.toFixed(2)} ha sido procesado. Deuda restante: RD$${newDebt.toFixed(2)}`
+        );
+      }
+    }
+
+    logSystem.info('Debt payment completed via Azul', {
+      conductorId,
+      walletId: wallet.id,
+      amountPaid: totalPaid,
+      remainingDebt: newDebt,
+      azulOrderId: options.azulOrderId,
+      paymentMethod: options.paymentMethod
+    });
+
+    return {
+      success: true,
+      amountPaid: totalPaid,
+      remainingDebt: newDebt,
+      message: newDebt <= 0 
+        ? '¡Tu deuda ha sido saldada completamente!'
+        : `Pago procesado. Deuda restante: RD$${newDebt.toFixed(2)}`
+    };
+  }
+
+  /**
    * Check for overdue debts and block cash services
    */
   static async checkOverdueDebts(): Promise<void> {
