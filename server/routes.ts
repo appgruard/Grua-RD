@@ -10378,6 +10378,215 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Get operator statement (earnings, services, debts for a period)
+  app.get("/api/admin/operators/:id/statement", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductorId = req.params.id;
+      
+      // Parse optional date filters
+      let periodStart: Date | undefined;
+      let periodEnd: Date | undefined;
+      
+      if (req.query.startDate && typeof req.query.startDate === 'string') {
+        periodStart = new Date(req.query.startDate);
+        if (isNaN(periodStart.getTime())) {
+          return res.status(400).json({ message: "Fecha de inicio inválida" });
+        }
+      }
+      
+      if (req.query.endDate && typeof req.query.endDate === 'string') {
+        periodEnd = new Date(req.query.endDate);
+        if (isNaN(periodEnd.getTime())) {
+          return res.status(400).json({ message: "Fecha de fin inválida" });
+        }
+      }
+      
+      if (periodStart && periodEnd && periodStart > periodEnd) {
+        return res.status(400).json({ message: "La fecha de inicio no puede ser posterior a la fecha de fin" });
+      }
+      
+      const statement = await storage.getOperatorStatement(conductorId, periodStart, periodEnd);
+      
+      if (!statement) {
+        return res.status(404).json({ message: "Conductor no encontrado o sin billetera" });
+      }
+      
+      logSystem.info('Admin retrieved operator statement', { 
+        adminId: req.user!.id, 
+        conductorId,
+        periodStart: periodStart?.toISOString(),
+        periodEnd: periodEnd?.toISOString()
+      });
+      
+      res.json(statement);
+    } catch (error: any) {
+      logSystem.error('Get operator statement error', error);
+      res.status(500).json({ message: "Error al obtener estado de cuenta" });
+    }
+  });
+
+  // Admin: Record manual payout to operator
+  app.post("/api/admin/operators/:id/manual-payout", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductorId = req.params.id;
+      const { amount, notes, evidenceUrl } = req.body;
+      
+      // Validate amount is a positive number string
+      if (!amount || typeof amount !== 'string') {
+        return res.status(400).json({ message: "Monto es requerido y debe ser un string" });
+      }
+      
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ message: "Monto debe ser un número positivo" });
+      }
+      
+      // Get wallet by conductorId to get walletId
+      const wallet = await storage.getWalletByConductorId(conductorId);
+      if (!wallet) {
+        return res.status(404).json({ message: "Billetera del conductor no encontrada" });
+      }
+      
+      // Record manual payout
+      const transaction = await storage.recordManualPayout(
+        wallet.id,
+        amount,
+        req.user!.id,
+        notes || undefined,
+        evidenceUrl || undefined
+      );
+      
+      logSystem.info('Admin recorded manual payout', { 
+        adminId: req.user!.id, 
+        conductorId,
+        walletId: wallet.id,
+        amount,
+        transactionId: transaction.id
+      });
+      
+      res.json(transaction);
+    } catch (error: any) {
+      logSystem.error('Record manual payout error', error);
+      res.status(500).json({ message: error.message || "Error al registrar pago manual" });
+    }
+  });
+
+  // Admin: Generate operator statement PDF
+  app.get("/api/admin/operators/:id/statement.pdf", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const conductorId = req.params.id;
+      
+      // Parse query params for period (support both startDate/endDate and periodStart/periodEnd)
+      let periodStart: Date | undefined;
+      let periodEnd: Date | undefined;
+      
+      const startDateParam = req.query.startDate || req.query.periodStart;
+      const endDateParam = req.query.endDate || req.query.periodEnd;
+      
+      if (startDateParam && typeof startDateParam === 'string') {
+        periodStart = new Date(startDateParam);
+        if (isNaN(periodStart.getTime())) {
+          return res.status(400).json({ message: "Fecha de inicio inválida" });
+        }
+      }
+      
+      if (endDateParam && typeof endDateParam === 'string') {
+        periodEnd = new Date(endDateParam);
+        if (isNaN(periodEnd.getTime())) {
+          return res.status(400).json({ message: "Fecha de fin inválida" });
+        }
+      }
+      
+      if (periodStart && periodEnd && periodStart > periodEnd) {
+        return res.status(400).json({ message: "La fecha de inicio no puede ser posterior a la fecha de fin" });
+      }
+      
+      // Get operator statement data
+      const statement = await storage.getOperatorStatement(conductorId, periodStart, periodEnd);
+      
+      if (!statement) {
+        return res.status(404).json({ message: "Conductor no encontrado o sin billetera" });
+      }
+      
+      // Generate statement number
+      const statementNumber = pdfService.generateStatementNumber();
+      
+      // Transform data to OperatorStatementPDFData format
+      const pdfData = {
+        statementNumber,
+        operatorName: statement.operatorName,
+        operatorId: statement.operatorId,
+        periodStart: statement.periodStart,
+        periodEnd: statement.periodEnd,
+        generatedDate: new Date(),
+        openingBalance: statement.openingBalance,
+        currentBalance: statement.currentBalance,
+        totalDebt: statement.totalDebt,
+        totalCredits: statement.totalCredits,
+        totalDebits: statement.totalDebits,
+        completedServices: statement.completedServices,
+        transactions: statement.transactions.map(tx => ({
+          date: tx.createdAt,
+          type: tx.type,
+          description: tx.description || '',
+          amount: tx.amount,
+          servicioId: tx.servicioId || undefined,
+        })),
+        pendingDebts: statement.pendingDebts.map(debt => ({
+          id: debt.id,
+          originalAmount: debt.originalAmount,
+          remainingAmount: debt.remainingAmount,
+          dueDate: debt.dueDate,
+          status: debt.status,
+          daysRemaining: debt.daysRemaining,
+        })),
+        manualPayouts: statement.manualPayouts.map(payout => ({
+          date: payout.createdAt,
+          amount: payout.amount,
+          notes: payout.notes || undefined,
+          evidenceUrl: payout.evidenceUrl || undefined,
+          adminName: payout.recordedByAdmin?.nombre || undefined,
+        })),
+      };
+      
+      // Generate PDF
+      const pdfBuffer = await pdfService.generateOperatorStatement(pdfData);
+      
+      // Generate filename
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `estado_cuenta_${conductorId.substring(0, 8)}_${dateStr}.pdf`;
+      
+      logSystem.info('Admin generated operator statement PDF', { 
+        adminId: req.user!.id, 
+        conductorId,
+        statementNumber,
+        periodStart: statement.periodStart.toISOString(),
+        periodEnd: statement.periodEnd.toISOString()
+      });
+      
+      // Return PDF with proper headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      logSystem.error('Generate operator statement PDF error', error);
+      res.status(500).json({ message: "Error al generar PDF del estado de cuenta" });
+    }
+  });
+
   // ==================== END OPERATOR WALLET SYSTEM ====================
 
   // ==================== TEST EMAIL ENDPOINT (Admin Only) ====================

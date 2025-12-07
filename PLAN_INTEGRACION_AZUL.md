@@ -46,17 +46,29 @@ Migrar el sistema de pagos a Azul API con tokenización (DataVault) y crear un s
   - Clientes: `/api/client/payment-methods` (CRUD completo)
   - Operadores: `/api/operator/payment-methods` (CRUD completo)
 
-### Fase 4: Actualizar Frontend
-- [ ] Actualizar componente de agregar tarjeta para Azul
-- [ ] Actualizar flujo de pago de servicios
-- [ ] Manejar respuestas de 3D Secure si aplica
+### Fase 4: Actualizar Frontend ✅ (Completada)
+- [x] Actualizar componente de agregar tarjeta para Azul
+- [x] Actualizar flujo de pago de servicios
+- [x] Manejar respuestas de 3D Secure si aplica
 
-### Fase 5: Sistema de Payouts Manuales
-- [ ] Crear modelo de datos para tracking de pagos a operadores
-- [ ] Crear endpoint para generar estado de cuenta por operador
-- [ ] Vista admin para ver pagos pendientes por operador
-- [ ] Exportación de estados de cuenta (PDF/Excel)
-- [ ] Registro de pagos realizados manualmente
+### Fase 5: Sistema de Payouts Manuales ✅ (Completada)
+- [x] Crear modelo de datos para tracking de pagos a operadores
+  - Agregado tipo `manual_payout` al enum de tipos de transacción
+  - Campos `recordedByAdminId`, `notes`, `evidenceUrl` en walletTransactions
+- [x] Crear endpoint para generar estado de cuenta por operador
+  - GET `/api/admin/operators/:id/statement` con filtros de fecha
+  - Retorna: balance inicial, balance actual, deudas, transacciones, pagos manuales
+- [x] Vista admin para ver pagos pendientes por operador
+  - Nueva pestaña "Estado de Cuenta" en drawer de billeteras
+  - Filtros de fecha (inicio/fin del período)
+  - Vista de transacciones, deudas pendientes, pagos manuales
+- [x] Exportación de estados de cuenta (PDF)
+  - GET `/api/admin/operators/:id/statement.pdf`
+  - PDF profesional con todos los datos del período
+- [x] Registro de pagos realizados manualmente
+  - POST `/api/admin/operators/:id/manual-payout`
+  - Drawer para registrar pago con monto, notas, URL de evidencia
+  - Actualiza balance de billetera automáticamente
 
 ---
 

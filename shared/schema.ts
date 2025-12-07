@@ -2038,7 +2038,8 @@ export const tipoTransaccionBilleteraEnum = pgEnum("tipo_transaccion_billetera",
   "debt_payment",         // Pago automático de deuda desde servicio con tarjeta
   "direct_payment",       // Pago directo de deuda con tarjeta del operador
   "withdrawal",           // Retiro de fondos
-  "adjustment"            // Ajuste manual por admin
+  "adjustment",           // Ajuste manual por admin
+  "manual_payout"         // Pago manual a operador (transferencia bancaria, etc.)
 ]);
 
 // Enum for debt status
@@ -2077,6 +2078,9 @@ export const walletTransactions = pgTable("wallet_transactions", {
   azulReferenceNumber: text("azul_reference_number"),
   azulFeeAmount: decimal("azul_fee_amount", { precision: 12, scale: 2 }),
   description: text("description"),
+  recordedByAdminId: varchar("recorded_by_admin_id").references(() => users.id, { onDelete: "set null" }),
+  evidenceUrl: text("evidence_url"),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -2112,6 +2116,10 @@ export const walletTransactionsRelations = relations(walletTransactions, ({ one 
   servicio: one(servicios, {
     fields: [walletTransactions.servicioId],
     references: [servicios.id],
+  }),
+  recordedByAdmin: one(users, {
+    fields: [walletTransactions.recordedByAdminId],
+    references: [users.id],
   }),
 }));
 
@@ -2284,7 +2292,8 @@ export const insertWalletTransactionSchema = createInsertSchema(walletTransactio
     "debt_payment",
     "direct_payment",
     "withdrawal",
-    "adjustment"
+    "adjustment",
+    "manual_payout"
   ]),
   amount: z.string().min(1, "Monto es requerido"),
   commissionAmount: z.string().optional(),
@@ -2295,6 +2304,9 @@ export const insertWalletTransactionSchema = createInsertSchema(walletTransactio
   azulAuthorizationCode: z.string().optional(),
   azulReferenceNumber: z.string().optional(),
   azulFeeAmount: z.string().optional(),
+  recordedByAdminId: z.string().optional(),
+  evidenceUrl: z.string().optional(),
+  notes: z.string().optional(),
 }).omit({
   id: true,
   createdAt: true,
@@ -2339,6 +2351,28 @@ export type OperatorDebtWithDaysRemaining = OperatorDebt & {
 
 export type WalletTransactionWithService = WalletTransaction & {
   servicio?: Servicio;
+};
+
+export type WalletTransactionWithDetails = WalletTransaction & {
+  servicio?: Servicio;
+  recordedByAdmin?: User;
+};
+
+export type OperatorStatementSummary = {
+  operatorId: string;
+  operatorName: string;
+  walletId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  openingBalance: string;
+  currentBalance: string;
+  totalDebt: string;
+  totalCredits: string;
+  totalDebits: string;
+  transactions: WalletTransactionWithDetails[];
+  pendingDebts: OperatorDebtWithDaysRemaining[];
+  completedServices: number;
+  manualPayouts: WalletTransactionWithDetails[];
 };
 
 // ==================== END OPERATOR WALLET TYPES ====================

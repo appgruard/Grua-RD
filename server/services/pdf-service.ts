@@ -33,6 +33,43 @@ export interface ReceiptData {
   transactionId?: string;
 }
 
+export interface OperatorStatementPDFData {
+  statementNumber: string;
+  operatorName: string;
+  operatorId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  generatedDate: Date;
+  openingBalance: string;
+  currentBalance: string;
+  totalDebt: string;
+  totalCredits: string;
+  totalDebits: string;
+  completedServices: number;
+  transactions: Array<{
+    date: Date;
+    type: string;
+    description: string;
+    amount: string;
+    servicioId?: string;
+  }>;
+  pendingDebts: Array<{
+    id: string;
+    originalAmount: string;
+    remainingAmount: string;
+    dueDate: Date;
+    status: string;
+    daysRemaining: number;
+  }>;
+  manualPayouts: Array<{
+    date: Date;
+    amount: string;
+    notes?: string;
+    evidenceUrl?: string;
+    adminName?: string;
+  }>;
+}
+
 export class PDFService {
   private readonly BRAND_PRIMARY = "#0b2545";
   private readonly BRAND_SECONDARY = "#1e40af";
@@ -417,6 +454,360 @@ export class PDFService {
       .toString()
       .padStart(4, "0");
     return `GRD-${timestamp}-${random}`;
+  }
+
+  generateStatementNumber(): string {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, "0");
+    return `EC-${timestamp}-${random}`;
+  }
+
+  async generateOperatorStatement(data: OperatorStatementPDFData): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          size: "LETTER",
+          margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        });
+
+        const buffers: Buffer[] = [];
+        const stream = new Writable({
+          write(chunk, encoding, callback) {
+            buffers.push(chunk);
+            callback();
+          },
+        });
+
+        doc.pipe(stream);
+
+        this.addOperatorStatementHeader(doc, data);
+        this.addOperatorInfo(doc, data);
+        this.addOperatorSummary(doc, data);
+        this.addOperatorTransactions(doc, data);
+        this.addOperatorPendingDebts(doc, data);
+        this.addOperatorManualPayouts(doc, data);
+        this.addBrandedFooter(doc);
+
+        doc.end();
+
+        stream.on("finish", () => {
+          const pdfBuffer = Buffer.concat(buffers);
+          logger.info("Operator statement PDF generated successfully", {
+            statementNumber: data.statementNumber,
+            operatorId: data.operatorId,
+            size: pdfBuffer.length,
+          });
+          resolve(pdfBuffer);
+        });
+
+        stream.on("error", (error) => {
+          logger.error("Error generating operator statement PDF", { error });
+          reject(error);
+        });
+      } catch (error) {
+        logger.error("Error creating operator statement PDF document", { error });
+        reject(error);
+      }
+    });
+  }
+
+  private addOperatorStatementHeader(doc: PDFKit.PDFDocument, data: OperatorStatementPDFData): void {
+    this.addBrandedHeader(doc, "ESTADO DE CUENTA - OPERADOR");
+    
+    const formatDate = (date: Date) => {
+      return new Date(date).toLocaleDateString("es-DO", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    };
+
+    doc
+      .fontSize(10)
+      .fillColor(this.TEXT_SECONDARY)
+      .font("Helvetica")
+      .text(`Periodo: ${formatDate(data.periodStart)} - ${formatDate(data.periodEnd)}`, 50, 115);
+    
+    doc
+      .fontSize(9)
+      .text(`No. Estado: ${data.statementNumber}`, 350, 115, { align: "right", width: 200 });
+    
+    doc
+      .fontSize(9)
+      .text(`Generado: ${formatDate(data.generatedDate)}`, 350, 130, { align: "right", width: 200 });
+  }
+
+  private addOperatorInfo(doc: PDFKit.PDFDocument, data: OperatorStatementPDFData): void {
+    const startY = 155;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Informacion del Operador", 50, startY);
+
+    doc.fontSize(10).fillColor("#000000").font("Helvetica-Bold");
+    doc.text("Nombre:", 50, startY + 25);
+    doc.text("ID Operador:", 50, startY + 45);
+    doc.text("Servicios Completados:", 300, startY + 25);
+
+    doc.font("Helvetica").fillColor(this.SECONDARY_COLOR);
+    doc.text(data.operatorName, 130, startY + 25);
+    doc.text(data.operatorId.substring(0, 18) + "...", 130, startY + 45);
+    doc.text(data.completedServices.toString(), 450, startY + 25);
+
+    doc
+      .moveTo(50, startY + 70)
+      .lineTo(550, startY + 70)
+      .strokeColor(this.BORDER_COLOR)
+      .lineWidth(1)
+      .stroke();
+  }
+
+  private addOperatorSummary(doc: PDFKit.PDFDocument, data: OperatorStatementPDFData): void {
+    const startY = 235;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Resumen Financiero", 50, startY);
+
+    const kpiY = startY + 25;
+    const kpiWidth = 160;
+    const kpiHeight = 55;
+
+    const kpis = [
+      { label: "Balance Inicial", value: `RD$ ${data.openingBalance}` },
+      { label: "Balance Actual", value: `RD$ ${data.currentBalance}` },
+      { label: "Deuda Total", value: `RD$ ${data.totalDebt}`, color: parseFloat(data.totalDebt) > 0 ? "#ef4444" : this.SUCCESS_COLOR },
+    ];
+
+    kpis.forEach((kpi, index) => {
+      const x = 50 + (index * (kpiWidth + 10));
+      
+      doc.fillColor("#f8fafc").roundedRect(x, kpiY, kpiWidth, kpiHeight, 5).fill();
+      
+      doc
+        .fontSize(9)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(kpi.label, x + 10, kpiY + 10, { width: kpiWidth - 20 });
+      
+      doc
+        .fontSize(14)
+        .fillColor(kpi.color || "#000000")
+        .font("Helvetica-Bold")
+        .text(kpi.value, x + 10, kpiY + 30, { width: kpiWidth - 20 });
+    });
+
+    const summaryY = kpiY + kpiHeight + 10;
+    doc
+      .fontSize(10)
+      .fillColor(this.SECONDARY_COLOR)
+      .font("Helvetica")
+      .text(`Total Creditos: RD$ ${data.totalCredits}  |  Total Debitos: RD$ ${data.totalDebits}`, 50, summaryY);
+  }
+
+  private addOperatorTransactions(doc: PDFKit.PDFDocument, data: OperatorStatementPDFData): void {
+    if (data.transactions.length === 0) return;
+
+    const startY = 355;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Transacciones del Periodo", 50, startY);
+
+    let currentY = startY + 25;
+    const rowHeight = 20;
+
+    doc
+      .fillColor("#f8fafc")
+      .rect(50, currentY, 500, rowHeight)
+      .fill();
+    
+    doc
+      .fontSize(9)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("Fecha", 60, currentY + 5)
+      .text("Tipo", 140, currentY + 5)
+      .text("Descripcion", 230, currentY + 5)
+      .text("Monto", 480, currentY + 5, { align: "right", width: 60 });
+
+    currentY += rowHeight + 5;
+
+    const typeLabels: Record<string, string> = {
+      service_commission: "Comision",
+      cash_advance: "Adelanto Efect.",
+      manual_payout: "Pago Manual",
+      debt_payment: "Pago Deuda",
+      adjustment: "Ajuste",
+    };
+
+    const maxTransactions = Math.min(data.transactions.length, 8);
+    data.transactions.slice(0, maxTransactions).forEach((tx, index) => {
+      if (index % 2 === 0) {
+        doc.fillColor("#ffffff").rect(50, currentY - 3, 500, rowHeight).fill();
+      }
+
+      const dateStr = new Date(tx.date).toLocaleDateString("es-DO", {
+        month: "short",
+        day: "numeric",
+      });
+      
+      const amountColor = tx.amount.startsWith("-") ? "#ef4444" : this.SUCCESS_COLOR;
+      
+      doc
+        .fontSize(8)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(dateStr, 60, currentY)
+        .text(typeLabels[tx.type] || tx.type, 140, currentY)
+        .text(tx.description.substring(0, 30), 230, currentY);
+      
+      doc
+        .fillColor(amountColor)
+        .font("Helvetica-Bold")
+        .text(`RD$ ${tx.amount}`, 480, currentY, { align: "right", width: 60 });
+      
+      currentY += rowHeight;
+    });
+
+    if (data.transactions.length > maxTransactions) {
+      doc
+        .fontSize(8)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica-Oblique")
+        .text(`... y ${data.transactions.length - maxTransactions} transacciones mas`, 60, currentY + 5);
+    }
+  }
+
+  private addOperatorPendingDebts(doc: PDFKit.PDFDocument, data: OperatorStatementPDFData): void {
+    if (data.pendingDebts.length === 0) return;
+
+    doc.addPage();
+    const startY = 50;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Deudas Pendientes", 50, startY);
+
+    let currentY = startY + 25;
+    const rowHeight = 25;
+
+    doc
+      .fillColor("#f8fafc")
+      .rect(50, currentY, 500, rowHeight)
+      .fill();
+    
+    doc
+      .fontSize(9)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("ID", 60, currentY + 7)
+      .text("Monto Original", 150, currentY + 7)
+      .text("Monto Restante", 260, currentY + 7)
+      .text("Vencimiento", 370, currentY + 7)
+      .text("Dias Rest.", 470, currentY + 7);
+
+    currentY += rowHeight + 5;
+
+    data.pendingDebts.forEach((debt, index) => {
+      if (index % 2 === 0) {
+        doc.fillColor("#ffffff").rect(50, currentY - 3, 500, rowHeight).fill();
+      }
+
+      const dueDate = new Date(debt.dueDate).toLocaleDateString("es-DO", {
+        month: "short",
+        day: "numeric",
+      });
+
+      const daysColor = debt.daysRemaining <= 0 ? "#ef4444" : 
+                        debt.daysRemaining <= 3 ? "#f59e0b" : 
+                        this.SUCCESS_COLOR;
+      
+      doc
+        .fontSize(8)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(debt.id.substring(0, 8) + "...", 60, currentY + 2)
+        .text(`RD$ ${debt.originalAmount}`, 150, currentY + 2)
+        .text(`RD$ ${debt.remainingAmount}`, 260, currentY + 2)
+        .text(dueDate, 370, currentY + 2);
+      
+      doc
+        .fillColor(daysColor)
+        .font("Helvetica-Bold")
+        .text(debt.daysRemaining.toString(), 470, currentY + 2);
+      
+      currentY += rowHeight;
+    });
+  }
+
+  private addOperatorManualPayouts(doc: PDFKit.PDFDocument, data: OperatorStatementPDFData): void {
+    if (data.manualPayouts.length === 0) return;
+
+    const needsNewPage = data.pendingDebts.length === 0;
+    if (needsNewPage) {
+      doc.addPage();
+    }
+    
+    const startY = data.pendingDebts.length === 0 ? 50 : 50 + (data.pendingDebts.length * 25) + 100;
+
+    doc
+      .fontSize(14)
+      .fillColor(this.BRAND_COLOR)
+      .font("Helvetica-Bold")
+      .text("Pagos Manuales Realizados", 50, startY);
+
+    let currentY = startY + 25;
+    const rowHeight = 25;
+
+    doc
+      .fillColor("#f8fafc")
+      .rect(50, currentY, 500, rowHeight)
+      .fill();
+    
+    doc
+      .fontSize(9)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("Fecha", 60, currentY + 7)
+      .text("Monto", 150, currentY + 7)
+      .text("Registrado por", 250, currentY + 7)
+      .text("Notas", 380, currentY + 7);
+
+    currentY += rowHeight + 5;
+
+    data.manualPayouts.forEach((payout, index) => {
+      if (index % 2 === 0) {
+        doc.fillColor("#ffffff").rect(50, currentY - 3, 500, rowHeight).fill();
+      }
+
+      const payoutDate = new Date(payout.date).toLocaleDateString("es-DO", {
+        month: "short",
+        day: "numeric",
+        year: "2-digit",
+      });
+      
+      doc
+        .fontSize(8)
+        .fillColor(this.SECONDARY_COLOR)
+        .font("Helvetica")
+        .text(payoutDate, 60, currentY + 2)
+        .text(`RD$ ${payout.amount}`, 150, currentY + 2)
+        .text(payout.adminName || "Admin", 250, currentY + 2)
+        .text((payout.notes || "-").substring(0, 25), 380, currentY + 2);
+      
+      currentY += rowHeight;
+    });
   }
 
   async generateAnalyticsReport(data: AnalyticsReportData): Promise<Buffer> {

@@ -143,6 +143,8 @@ import {
   type WalletWithDetails,
   type OperatorDebtWithDaysRemaining,
   type WalletTransactionWithService,
+  type WalletTransactionWithDetails,
+  type OperatorStatementSummary,
   administradores,
   type Administrador,
   type InsertAdministrador,
@@ -616,6 +618,10 @@ export interface IStorage {
 
   // Mark service commission as processed
   markServiceCommissionProcessed(servicioId: string): Promise<void>;
+
+  // Operator Statement for Manual Payouts
+  getOperatorStatement(conductorId: string, periodStart?: Date, periodEnd?: Date): Promise<OperatorStatementSummary | null>;
+  recordManualPayout(walletId: string, amount: string, adminId: string, notes?: string, evidenceUrl?: string): Promise<WalletTransaction>;
 
   // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
   
@@ -4332,6 +4338,163 @@ export class DatabaseStorage implements IStorage {
     await db.update(servicios)
       .set({ commissionProcessed: true })
       .where(eq(servicios.id, servicioId));
+  }
+
+  // Get operator statement for a period
+  async getOperatorStatement(conductorId: string, periodStart?: Date, periodEnd?: Date): Promise<OperatorStatementSummary | null> {
+    // 1. Get conductor user info
+    const conductor = await db.query.conductores.findFirst({
+      where: eq(conductores.id, conductorId),
+      with: {
+        user: true,
+      },
+    });
+
+    if (!conductor || !conductor.user) {
+      return null;
+    }
+
+    // 2. Get operator's wallet
+    const wallet = await db.query.operatorWallets.findFirst({
+      where: eq(operatorWallets.conductorId, conductorId),
+    });
+
+    // 3. If no wallet exists, return null
+    if (!wallet) {
+      return null;
+    }
+
+    // 4. Set default period (last 30 days if not provided)
+    const now = new Date();
+    const defaultPeriodStart = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const effectivePeriodStart = periodStart || defaultPeriodStart;
+    const effectivePeriodEnd = periodEnd || now;
+
+    // 5. Get all wallet transactions within the period with relations
+    const transactions = await db.query.walletTransactions.findMany({
+      where: and(
+        eq(walletTransactions.walletId, wallet.id),
+        gte(walletTransactions.createdAt, effectivePeriodStart),
+        lte(walletTransactions.createdAt, effectivePeriodEnd)
+      ),
+      with: {
+        servicio: true,
+        recordedByAdmin: true,
+      },
+      orderBy: desc(walletTransactions.createdAt),
+    }) as WalletTransactionWithDetails[];
+
+    // 6. Get pending debts (status != 'paid')
+    const debts = await db.select().from(operatorDebts)
+      .where(and(
+        eq(operatorDebts.walletId, wallet.id),
+        ne(operatorDebts.status, 'paid')
+      ))
+      .orderBy(operatorDebts.dueDate);
+
+    const pendingDebts: OperatorDebtWithDaysRemaining[] = debts.map(debt => ({
+      ...debt,
+      daysRemaining: Math.ceil((new Date(debt.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+    }));
+
+    // 7. Calculate totals
+    const currentBalance = wallet.balance;
+    const totalDebt = wallet.totalDebt;
+
+    // Calculate total credits (positive amounts: card_payment, manual_payout, adjustment with positive amount)
+    let totalCredits = 0;
+    let totalDebits = 0;
+    let periodTransactionSum = 0;
+
+    for (const tx of transactions) {
+      const amount = parseFloat(tx.amount);
+      periodTransactionSum += amount;
+
+      if (tx.type === 'card_payment' || tx.type === 'manual_payout') {
+        totalCredits += Math.abs(amount);
+      } else if (tx.type === 'adjustment' && amount > 0) {
+        totalCredits += amount;
+      } else if (tx.type === 'cash_commission' || tx.type === 'debt_payment' || tx.type === 'direct_payment' || tx.type === 'withdrawal') {
+        totalDebits += Math.abs(amount);
+      } else if (tx.type === 'adjustment' && amount < 0) {
+        totalDebits += Math.abs(amount);
+      }
+    }
+
+    // Opening balance = current balance minus all period changes
+    const openingBalance = (parseFloat(currentBalance) - periodTransactionSum).toFixed(2);
+
+    // 8. Count completed services in period
+    const completedServicesResult = await db.select({ count: sql<number>`count(*)` })
+      .from(servicios)
+      .where(and(
+        eq(servicios.conductorId, conductor.userId),
+        eq(servicios.estado, 'completado'),
+        gte(servicios.completadoAt, effectivePeriodStart),
+        lte(servicios.completadoAt, effectivePeriodEnd)
+      ));
+    
+    const completedServices = Number(completedServicesResult[0]?.count || 0);
+
+    // 9. Filter manual payouts from transactions
+    const manualPayouts = transactions.filter(tx => tx.type === 'manual_payout');
+
+    // 10. Return OperatorStatementSummary
+    return {
+      operatorId: conductorId,
+      operatorName: `${conductor.user.nombre} ${conductor.user.apellido}`,
+      walletId: wallet.id,
+      periodStart: effectivePeriodStart,
+      periodEnd: effectivePeriodEnd,
+      openingBalance,
+      currentBalance,
+      totalDebt,
+      totalCredits: totalCredits.toFixed(2),
+      totalDebits: totalDebits.toFixed(2),
+      transactions,
+      pendingDebts,
+      completedServices,
+      manualPayouts,
+    };
+  }
+
+  // Record a manual payout to operator
+  async recordManualPayout(walletId: string, amount: string, adminId: string, notes?: string, evidenceUrl?: string): Promise<WalletTransaction> {
+    // Get the wallet to update its balance
+    const [wallet] = await db.select().from(operatorWallets)
+      .where(eq(operatorWallets.id, walletId));
+
+    if (!wallet) {
+      throw new Error('Wallet not found');
+    }
+
+    // Manual payout amount should be negative (money going out to operator)
+    // The amount is passed as a positive number, so we negate it
+    const payoutAmount = `-${Math.abs(parseFloat(amount)).toFixed(2)}`;
+
+    // Calculate new balance before transaction
+    const newBalance = (parseFloat(wallet.balance) + parseFloat(payoutAmount)).toFixed(2);
+
+    // Use a database transaction to ensure both insert and update succeed or fail together
+    return await db.transaction(async (tx) => {
+      // 1. Create wallet transaction
+      const [transaction] = await tx.insert(walletTransactions).values({
+        walletId,
+        type: 'manual_payout',
+        amount: payoutAmount,
+        recordedByAdminId: adminId,
+        evidenceUrl: evidenceUrl || null,
+        notes: notes || null,
+        description: 'Pago manual a operador',
+      }).returning();
+
+      // 2. Update wallet balance (reduce by the amount since this is payment to operator)
+      await tx.update(operatorWallets)
+        .set({ balance: newBalance })
+        .where(eq(operatorWallets.id, walletId));
+
+      return transaction;
+    });
   }
 
   // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================

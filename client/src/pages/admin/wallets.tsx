@@ -12,6 +12,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, Dr
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Search, 
   Wallet, 
@@ -28,11 +29,15 @@ import {
   TrendingUp,
   TrendingDown,
   Users,
-  Filter
+  Filter,
+  FileText,
+  Download,
+  Calendar,
+  Banknote
 } from 'lucide-react';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface WalletStats {
@@ -76,6 +81,40 @@ interface OperatorWallet {
   recentTransactions?: WalletTransaction[];
 }
 
+interface OperatorStatementSummary {
+  operatorId: number;
+  operatorName: string;
+  operatorEmail: string;
+  periodStart: string;
+  periodEnd: string;
+  totalEarnings: string;
+  totalCommissions: string;
+  totalPayouts: string;
+  pendingBalance: string;
+  transactions: StatementTransaction[];
+  pendingDebts: WalletDebt[];
+  manualPayouts: ManualPayout[];
+}
+
+interface StatementTransaction {
+  id: number;
+  type: string;
+  amount: string;
+  description: string;
+  createdAt: string;
+  serviceId?: number;
+}
+
+interface ManualPayout {
+  id: number;
+  amount: string;
+  notes: string | null;
+  evidenceUrl: string | null;
+  createdAt: string;
+  recordedByAdminId: number | null;
+  recordedByAdmin?: { nombre: string };
+}
+
 type FilterType = 'all' | 'with_debt' | 'blocked' | 'no_debt';
 
 export default function AdminWallets() {
@@ -88,6 +127,14 @@ export default function AdminWallets() {
   const [adjustmentType, setAdjustmentType] = useState<'add_balance' | 'subtract_balance' | 'add_debt' | 'subtract_debt'>('subtract_debt');
   const [adjustmentAmount, setAdjustmentAmount] = useState('');
   const [adjustmentReason, setAdjustmentReason] = useState('');
+  const [manualPayoutDrawerOpen, setManualPayoutDrawerOpen] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutNotes, setPayoutNotes] = useState('');
+  const [payoutEvidenceUrl, setPayoutEvidenceUrl] = useState('');
+  const [statementStartDate, setStatementStartDate] = useState(() => format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd'));
+  const [statementEndDate, setStatementEndDate] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [activeTab, setActiveTab] = useState('details');
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<WalletStats>({
     queryKey: ['/api/admin/wallets-stats'],
@@ -100,6 +147,50 @@ export default function AdminWallets() {
   const { data: walletDetails, isLoading: detailsLoading } = useQuery<OperatorWallet>({
     queryKey: ['/api/admin/wallets', selectedWallet?.conductorId],
     enabled: !!selectedWallet?.conductorId && drawerOpen,
+  });
+
+  const { data: operatorStatement, isLoading: statementLoading } = useQuery<OperatorStatementSummary>({
+    queryKey: ['/api/admin/operators', selectedWallet?.conductorId, 'statement', statementStartDate, statementEndDate],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (statementStartDate) params.append('startDate', statementStartDate);
+      if (statementEndDate) params.append('endDate', statementEndDate);
+      const res = await fetch(`/api/admin/operators/${selectedWallet?.conductorId}/statement?${params}`);
+      if (!res.ok) throw new Error('Error al cargar estado de cuenta');
+      return res.json();
+    },
+    enabled: !!selectedWallet?.conductorId && drawerOpen && activeTab === 'statement',
+  });
+
+  const manualPayoutMutation = useMutation({
+    mutationFn: async (data: { operatorId: number; amount: string; notes?: string; evidenceUrl?: string }) => {
+      const res = await apiRequest('POST', `/api/admin/operators/${data.operatorId}/manual-payout`, {
+        amount: data.amount,
+        notes: data.notes || undefined,
+        evidenceUrl: data.evidenceUrl || undefined,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Error al registrar pago');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/wallets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/wallets-stats'] });
+      if (selectedWallet) {
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/wallets', selectedWallet.conductorId] });
+        queryClient.invalidateQueries({ queryKey: ['/api/admin/operators', selectedWallet.conductorId, 'statement'] });
+      }
+      toast({ title: 'Pago registrado', description: 'El pago manual ha sido registrado correctamente' });
+      setManualPayoutDrawerOpen(false);
+      setPayoutAmount('');
+      setPayoutNotes('');
+      setPayoutEvidenceUrl('');
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
   });
 
   const adjustMutation = useMutation({
@@ -176,7 +267,58 @@ export default function AdminWallets() {
 
   const handleViewDetails = (wallet: OperatorWallet) => {
     setSelectedWallet(wallet);
+    setActiveTab('details');
     setDrawerOpen(true);
+  };
+
+  const handleManualPayout = () => {
+    if (!selectedWallet || !payoutAmount) {
+      toast({ title: 'Error', description: 'Ingrese el monto del pago', variant: 'destructive' });
+      return;
+    }
+    
+    const parsedAmount = parseFloat(payoutAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast({ title: 'Error', description: 'Ingrese un monto válido mayor a cero', variant: 'destructive' });
+      return;
+    }
+    
+    manualPayoutMutation.mutate({
+      operatorId: selectedWallet.conductorId,
+      amount: parsedAmount.toFixed(2),
+      notes: payoutNotes || undefined,
+      evidenceUrl: payoutEvidenceUrl || undefined,
+    });
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!selectedWallet) return;
+    
+    setDownloadingPdf(true);
+    try {
+      const params = new URLSearchParams();
+      if (statementStartDate) params.append('startDate', statementStartDate);
+      if (statementEndDate) params.append('endDate', statementEndDate);
+      
+      const res = await fetch(`/api/admin/operators/${selectedWallet.conductorId}/statement.pdf?${params}`);
+      if (!res.ok) throw new Error('Error al generar PDF');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `estado-cuenta-${selectedWallet.conductorNombre.replace(/\s+/g, '-')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({ title: 'PDF descargado', description: 'El estado de cuenta ha sido descargado' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'No se pudo descargar el PDF', variant: 'destructive' });
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const handleAdjustment = () => {
@@ -480,133 +622,323 @@ export default function AdminWallets() {
             </DrawerDescription>
           </DrawerHeader>
           
-          <ScrollArea className="px-4 max-h-[60vh]">
-            {detailsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : walletDetails ? (
-              <div className="space-y-6 pb-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Card className="p-4" data-testid="detail-card-balance">
-                    <p className="text-sm text-muted-foreground">Balance</p>
-                    <p className="text-xl font-bold text-green-600" data-testid="detail-text-balance">
-                      {formatCurrency(walletDetails.balance)}
-                    </p>
-                  </Card>
-                  <Card className="p-4" data-testid="detail-card-debt">
-                    <p className="text-sm text-muted-foreground">Deuda Total</p>
-                    <p className="text-xl font-bold text-destructive" data-testid="detail-text-debt">
-                      {formatCurrency(walletDetails.totalDebt)}
-                    </p>
-                  </Card>
-                  <Card className="p-4" data-testid="detail-card-cash-earnings">
-                    <p className="text-sm text-muted-foreground">Ganancia Efectivo</p>
-                    <p className="text-xl font-bold text-amber-600" data-testid="detail-text-cash-earnings">
-                      {formatCurrency(walletDetails.totalCashEarnings || '0')}
-                    </p>
-                  </Card>
-                  <Card className="p-4" data-testid="detail-card-card-earnings">
-                    <p className="text-sm text-muted-foreground">Ganancia Tarjeta</p>
-                    <p className="text-xl font-bold text-blue-600" data-testid="detail-text-card-earnings">
-                      {formatCurrency(walletDetails.totalCardEarnings || '0')}
-                    </p>
-                  </Card>
-                </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="px-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="details" data-testid="tab-details">
+                <Wallet className="w-4 h-4 mr-2" />
+                Detalles
+              </TabsTrigger>
+              <TabsTrigger value="statement" data-testid="tab-statement">
+                <FileText className="w-4 h-4 mr-2" />
+                Estado de Cuenta
+              </TabsTrigger>
+            </TabsList>
 
-                {walletDetails.cashServicesBlocked && (
-                  <Alert variant="destructive" data-testid="detail-alert-blocked">
-                    <Ban className="h-4 w-4" />
-                    <AlertDescription>
-                      Este operador tiene los servicios en efectivo bloqueados por deuda vencida.
-                    </AlertDescription>
-                  </Alert>
-                )}
+            <TabsContent value="details">
+              <ScrollArea className="max-h-[50vh]">
+                {detailsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : walletDetails ? (
+                  <div className="space-y-6 pb-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card className="p-4" data-testid="detail-card-balance">
+                        <p className="text-sm text-muted-foreground">Balance</p>
+                        <p className="text-xl font-bold text-green-600" data-testid="detail-text-balance">
+                          {formatCurrency(walletDetails.balance)}
+                        </p>
+                      </Card>
+                      <Card className="p-4" data-testid="detail-card-debt">
+                        <p className="text-sm text-muted-foreground">Deuda Total</p>
+                        <p className="text-xl font-bold text-destructive" data-testid="detail-text-debt">
+                          {formatCurrency(walletDetails.totalDebt)}
+                        </p>
+                      </Card>
+                      <Card className="p-4" data-testid="detail-card-cash-earnings">
+                        <p className="text-sm text-muted-foreground">Ganancia Efectivo</p>
+                        <p className="text-xl font-bold text-amber-600" data-testid="detail-text-cash-earnings">
+                          {formatCurrency(walletDetails.totalCashEarnings || '0')}
+                        </p>
+                      </Card>
+                      <Card className="p-4" data-testid="detail-card-card-earnings">
+                        <p className="text-sm text-muted-foreground">Ganancia Tarjeta</p>
+                        <p className="text-xl font-bold text-blue-600" data-testid="detail-text-card-earnings">
+                          {formatCurrency(walletDetails.totalCardEarnings || '0')}
+                        </p>
+                      </Card>
+                    </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setAdjustmentDrawerOpen(true)}
-                    className="flex-1"
-                    data-testid="button-open-adjustment"
-                  >
-                    <PlusCircle className="w-4 h-4 mr-2" />
-                    Realizar Ajuste
-                  </Button>
-                  {walletDetails.cashServicesBlocked && (
-                    <Button
-                      variant="outline"
-                      onClick={() => unblockMutation.mutate(walletDetails.id)}
-                      disabled={unblockMutation.isPending}
-                      data-testid="button-unblock-details"
-                    >
-                      {unblockMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Unlock className="w-4 h-4 mr-2" />
+                    {walletDetails.cashServicesBlocked && (
+                      <Alert variant="destructive" data-testid="detail-alert-blocked">
+                        <Ban className="h-4 w-4" />
+                        <AlertDescription>
+                          Este operador tiene los servicios en efectivo bloqueados por deuda vencida.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setAdjustmentDrawerOpen(true)}
+                        className="flex-1"
+                        data-testid="button-open-adjustment"
+                      >
+                        <PlusCircle className="w-4 h-4 mr-2" />
+                        Realizar Ajuste
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setManualPayoutDrawerOpen(true)}
+                        className="flex-1"
+                        data-testid="button-open-manual-payout"
+                      >
+                        <Banknote className="w-4 h-4 mr-2" />
+                        Registrar Pago
+                      </Button>
+                      {walletDetails.cashServicesBlocked && (
+                        <Button
+                          variant="outline"
+                          onClick={() => unblockMutation.mutate(walletDetails.id)}
+                          disabled={unblockMutation.isPending}
+                          data-testid="button-unblock-details"
+                        >
+                          {unblockMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Unlock className="w-4 h-4 mr-2" />
+                          )}
+                          Desbloquear
+                        </Button>
                       )}
-                      Desbloquear
-                    </Button>
+                    </div>
+
+                    <Separator />
+
+                    {walletDetails.pendingDebts && walletDetails.pendingDebts.length > 0 && (
+                      <div data-testid="section-pending-debts">
+                        <h4 className="font-semibold mb-3">Deudas Pendientes</h4>
+                        <div className="space-y-2">
+                          {walletDetails.pendingDebts.map((debt) => (
+                            <Card key={debt.id} className="p-3" data-testid={`card-debt-${debt.id}`}>
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div>
+                                  <p className="font-medium" data-testid={`text-debt-remaining-${debt.id}`}>{formatCurrency(debt.remainingAmount)}</p>
+                                  <p className="text-xs text-muted-foreground" data-testid={`text-debt-original-${debt.id}`}>
+                                    Original: {formatCurrency(debt.originalAmount)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground" data-testid={`text-debt-due-${debt.id}`}>
+                                    Vence: {format(new Date(debt.dueDate), "d 'de' MMMM, yyyy", { locale: es })}
+                                  </p>
+                                </div>
+                                {getDebtStatusBadge(debt.status)}
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    {walletDetails.recentTransactions && walletDetails.recentTransactions.length > 0 && (
+                      <div data-testid="section-transactions">
+                        <h4 className="font-semibold mb-3">Transacciones Recientes</h4>
+                        <div className="space-y-2">
+                          {walletDetails.recentTransactions.map((transaction) => (
+                            <Card key={transaction.id} className="p-3" data-testid={`card-transaction-${transaction.id}`}>
+                              <div className="flex items-center gap-3">
+                                {getTransactionIcon(transaction.type)}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm" data-testid={`text-transaction-type-${transaction.id}`}>{getTransactionLabel(transaction.type)}</p>
+                                  <p className="text-xs text-muted-foreground truncate" data-testid={`text-transaction-desc-${transaction.id}`}>
+                                    {transaction.description}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-medium" data-testid={`text-transaction-amount-${transaction.id}`}>{formatCurrency(transaction.amount)}</p>
+                                  <p className="text-xs text-muted-foreground" data-testid={`text-transaction-date-${transaction.id}`}>
+                                    {format(new Date(transaction.createdAt), 'dd/MM/yy HH:mm')}
+                                  </p>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="statement">
+              <ScrollArea className="max-h-[50vh]">
+                <div className="space-y-4 pb-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs">Fecha Inicio</Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          value={statementStartDate}
+                          onChange={(e) => setStatementStartDate(e.target.value)}
+                          className="pl-9"
+                          data-testid="input-statement-start-date"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs">Fecha Fin</Label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          value={statementEndDate}
+                          onChange={(e) => setStatementEndDate(e.target.value)}
+                          className="pl-9"
+                          data-testid="input-statement-end-date"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        variant="outline"
+                        onClick={handleDownloadPdf}
+                        disabled={downloadingPdf}
+                        data-testid="button-download-pdf"
+                      >
+                        {downloadingPdf ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <Download className="w-4 h-4 mr-2" />
+                        )}
+                        PDF
+                      </Button>
+                    </div>
+                  </div>
+
+                  {statementLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    </div>
+                  ) : operatorStatement ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <Card className="p-3" data-testid="statement-card-earnings">
+                          <p className="text-xs text-muted-foreground">Ganancias</p>
+                          <p className="text-lg font-bold text-green-600" data-testid="statement-text-earnings">
+                            {formatCurrency(operatorStatement.totalEarnings)}
+                          </p>
+                        </Card>
+                        <Card className="p-3" data-testid="statement-card-commissions">
+                          <p className="text-xs text-muted-foreground">Comisiones</p>
+                          <p className="text-lg font-bold text-amber-600" data-testid="statement-text-commissions">
+                            {formatCurrency(operatorStatement.totalCommissions)}
+                          </p>
+                        </Card>
+                        <Card className="p-3" data-testid="statement-card-payouts">
+                          <p className="text-xs text-muted-foreground">Pagos Realizados</p>
+                          <p className="text-lg font-bold text-blue-600" data-testid="statement-text-payouts">
+                            {formatCurrency(operatorStatement.totalPayouts)}
+                          </p>
+                        </Card>
+                        <Card className="p-3" data-testid="statement-card-pending">
+                          <p className="text-xs text-muted-foreground">Balance Pendiente</p>
+                          <p className={`text-lg font-bold ${parseFloat(operatorStatement.pendingBalance) > 0 ? 'text-destructive' : 'text-green-600'}`} data-testid="statement-text-pending">
+                            {formatCurrency(operatorStatement.pendingBalance)}
+                          </p>
+                        </Card>
+                      </div>
+
+                      {operatorStatement.manualPayouts && operatorStatement.manualPayouts.length > 0 && (
+                        <div data-testid="section-manual-payouts">
+                          <h4 className="font-semibold mb-3 flex items-center gap-2">
+                            <Banknote className="w-4 h-4" />
+                            Pagos Manuales Registrados
+                          </h4>
+                          <div className="space-y-2">
+                            {operatorStatement.manualPayouts.map((payout) => (
+                              <Card key={payout.id} className="p-3" data-testid={`card-payout-${payout.id}`}>
+                                <div className="flex items-center gap-3">
+                                  <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-lg">
+                                    <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm" data-testid={`text-payout-amount-${payout.id}`}>
+                                      {formatCurrency(payout.amount)}
+                                    </p>
+                                    {payout.notes && (
+                                      <p className="text-xs text-muted-foreground truncate" data-testid={`text-payout-notes-${payout.id}`}>
+                                        {payout.notes}
+                                      </p>
+                                    )}
+                                    <p className="text-xs text-muted-foreground" data-testid={`text-payout-date-${payout.id}`}>
+                                      {format(new Date(payout.createdAt), "d 'de' MMMM, yyyy HH:mm", { locale: es })}
+                                      {payout.recordedByAdmin && ` - por ${payout.recordedByAdmin.nombre}`}
+                                    </p>
+                                  </div>
+                                  {payout.evidenceUrl && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => window.open(payout.evidenceUrl!, '_blank')}
+                                      data-testid={`button-view-evidence-${payout.id}`}
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {operatorStatement.transactions && operatorStatement.transactions.length > 0 && (
+                        <div data-testid="section-statement-transactions">
+                          <h4 className="font-semibold mb-3">Transacciones del Período</h4>
+                          <div className="space-y-2">
+                            {operatorStatement.transactions.slice(0, 10).map((transaction) => (
+                              <Card key={transaction.id} className="p-3" data-testid={`card-statement-transaction-${transaction.id}`}>
+                                <div className="flex items-center gap-3">
+                                  {getTransactionIcon(transaction.type)}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm" data-testid={`text-st-type-${transaction.id}`}>{getTransactionLabel(transaction.type)}</p>
+                                    <p className="text-xs text-muted-foreground truncate" data-testid={`text-st-desc-${transaction.id}`}>
+                                      {transaction.description}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-medium" data-testid={`text-st-amount-${transaction.id}`}>{formatCurrency(transaction.amount)}</p>
+                                    <p className="text-xs text-muted-foreground" data-testid={`text-st-date-${transaction.id}`}>
+                                      {format(new Date(transaction.createdAt), 'dd/MM/yy')}
+                                    </p>
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                            {operatorStatement.transactions.length > 10 && (
+                              <p className="text-sm text-muted-foreground text-center py-2">
+                                +{operatorStatement.transactions.length - 10} transacciones más...
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="w-10 h-10 mx-auto mb-2 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">Seleccione un período para ver el estado de cuenta</p>
+                    </div>
                   )}
                 </div>
-
-                <Separator />
-
-                {walletDetails.pendingDebts && walletDetails.pendingDebts.length > 0 && (
-                  <div data-testid="section-pending-debts">
-                    <h4 className="font-semibold mb-3">Deudas Pendientes</h4>
-                    <div className="space-y-2">
-                      {walletDetails.pendingDebts.map((debt) => (
-                        <Card key={debt.id} className="p-3" data-testid={`card-debt-${debt.id}`}>
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div>
-                              <p className="font-medium" data-testid={`text-debt-remaining-${debt.id}`}>{formatCurrency(debt.remainingAmount)}</p>
-                              <p className="text-xs text-muted-foreground" data-testid={`text-debt-original-${debt.id}`}>
-                                Original: {formatCurrency(debt.originalAmount)}
-                              </p>
-                              <p className="text-xs text-muted-foreground" data-testid={`text-debt-due-${debt.id}`}>
-                                Vence: {format(new Date(debt.dueDate), "d 'de' MMMM, yyyy", { locale: es })}
-                              </p>
-                            </div>
-                            {getDebtStatusBadge(debt.status)}
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <Separator />
-
-                {walletDetails.recentTransactions && walletDetails.recentTransactions.length > 0 && (
-                  <div data-testid="section-transactions">
-                    <h4 className="font-semibold mb-3">Transacciones Recientes</h4>
-                    <div className="space-y-2">
-                      {walletDetails.recentTransactions.map((transaction) => (
-                        <Card key={transaction.id} className="p-3" data-testid={`card-transaction-${transaction.id}`}>
-                          <div className="flex items-center gap-3">
-                            {getTransactionIcon(transaction.type)}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm" data-testid={`text-transaction-type-${transaction.id}`}>{getTransactionLabel(transaction.type)}</p>
-                              <p className="text-xs text-muted-foreground truncate" data-testid={`text-transaction-desc-${transaction.id}`}>
-                                {transaction.description}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-medium" data-testid={`text-transaction-amount-${transaction.id}`}>{formatCurrency(transaction.amount)}</p>
-                              <p className="text-xs text-muted-foreground" data-testid={`text-transaction-date-${transaction.id}`}>
-                                {format(new Date(transaction.createdAt), 'dd/MM/yy HH:mm')}
-                              </p>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </ScrollArea>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
 
           <DrawerFooter>
             <DrawerClose asChild>
@@ -679,6 +1011,82 @@ export default function AdminWallets() {
             </Button>
             <DrawerClose asChild>
               <Button variant="outline" data-testid="button-cancel-adjustment">Cancelar</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={manualPayoutDrawerOpen} onOpenChange={setManualPayoutDrawerOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Registrar Pago Manual</DrawerTitle>
+            <DrawerDescription>
+              Registre un pago realizado a {selectedWallet?.conductorNombre}
+            </DrawerDescription>
+          </DrawerHeader>
+          
+          <div className="px-4 space-y-4">
+            <Alert>
+              <Banknote className="h-4 w-4" />
+              <AlertDescription>
+                Use este formulario para registrar pagos realizados fuera del sistema (transferencias bancarias, efectivo, etc.)
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2">
+              <Label>Monto del Pago (RD$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={payoutAmount}
+                onChange={(e) => setPayoutAmount(e.target.value)}
+                data-testid="input-payout-amount"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notas (opcional)</Label>
+              <Textarea
+                placeholder="Ej: Transferencia bancaria, número de referencia..."
+                value={payoutNotes}
+                onChange={(e) => setPayoutNotes(e.target.value)}
+                rows={2}
+                data-testid="input-payout-notes"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>URL de Evidencia (opcional)</Label>
+              <Input
+                type="url"
+                placeholder="https://..."
+                value={payoutEvidenceUrl}
+                onChange={(e) => setPayoutEvidenceUrl(e.target.value)}
+                data-testid="input-payout-evidence"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enlace a comprobante de pago o captura de pantalla
+              </p>
+            </div>
+          </div>
+
+          <DrawerFooter>
+            <Button
+              onClick={handleManualPayout}
+              disabled={manualPayoutMutation.isPending || !payoutAmount}
+              data-testid="button-confirm-payout"
+            >
+              {manualPayoutMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4 mr-2" />
+              )}
+              Registrar Pago
+            </Button>
+            <DrawerClose asChild>
+              <Button variant="outline" data-testid="button-cancel-payout">Cancelar</Button>
             </DrawerClose>
           </DrawerFooter>
         </DrawerContent>
