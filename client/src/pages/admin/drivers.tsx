@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Truck, ShieldCheck, ShieldAlert, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Truck, ShieldCheck, ShieldAlert, Wrench, ChevronDown, ChevronUp, CreditCard, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { SERVICE_CATEGORIES } from '@/components/ServiceCategoryMultiSelect';
 import type { Conductor, User } from '@shared/schema';
@@ -142,6 +142,7 @@ export default function AdminDrivers() {
             <TableRow>
               <TableHead>Conductor</TableHead>
               <TableHead>Licencia</TableHead>
+              <TableHead>Categoría</TableHead>
               <TableHead>Grúa</TableHead>
               <TableHead>Servicios</TableHead>
               <TableHead>Verificación</TableHead>
@@ -153,7 +154,7 @@ export default function AdminDrivers() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <div className="h-6 bg-muted rounded animate-pulse" />
                   </TableCell>
                 </TableRow>
@@ -172,6 +173,31 @@ export default function AdminDrivers() {
                       </div>
                     </TableCell>
                     <TableCell>{driver.licencia}</TableCell>
+                    <TableCell>
+                      {driver.licenciaCategoria ? (
+                        <div className="space-y-1">
+                          <Badge variant="default" className="gap-1" data-testid={`badge-license-category-${driver.id}`}>
+                            <CreditCard className="w-3 h-3" />
+                            {driver.licenciaCategoria}
+                          </Badge>
+                          {driver.licenciaRestricciones && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="gap-1 cursor-help text-xs" data-testid={`badge-license-restrictions-${driver.id}`}>
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Restricciones
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">{driver.licenciaRestricciones}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Sin verificar</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Truck className="w-4 h-4 text-muted-foreground" />
@@ -262,7 +288,7 @@ export default function AdminDrivers() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No se encontraron conductores
                 </TableCell>
               </TableRow>
