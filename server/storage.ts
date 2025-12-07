@@ -200,6 +200,7 @@ export interface IStorage {
   // Servicios
   createServicio(servicio: InsertServicio): Promise<Servicio>;
   getServicioById(id: string): Promise<ServicioWithDetails | undefined>;
+  getServicioByPagaditoToken(token: string): Promise<Servicio | undefined>;
   getServiciosByClientId(clientId: string): Promise<ServicioWithDetails[]>;
   getServiciosByConductorId(conductorId: string): Promise<ServicioWithDetails[]>;
   getActiveServiceByConductorId(conductorId: string): Promise<ServicioWithDetails | null>;
@@ -895,6 +896,13 @@ export class DatabaseStorage implements IStorage {
       },
     });
     return result as any;
+  }
+
+  async getServicioByPagaditoToken(token: string): Promise<Servicio | undefined> {
+    const result = await db.query.servicios.findFirst({
+      where: eq(servicios.pagaditoToken, token),
+    });
+    return result;
   }
 
   async getServiciosByClientId(clientId: string): Promise<ServicioWithDetails[]> {

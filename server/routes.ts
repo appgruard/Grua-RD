@@ -473,6 +473,205 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Pagadito Payment Routes
+  // Create payment and get redirect URL
+  app.post("/api/pagadito/create-payment", express.json(), async (req: Request, res: Response) => {
+    try {
+      const { servicioId } = req.body;
+      
+      if (!servicioId) {
+        return res.status(400).json({ message: "servicioId es requerido" });
+      }
+
+      const servicio = await storage.getServicioById(servicioId);
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      // Import Pagadito service
+      const { pagaditoPaymentService } = await import('./services/pagadito-payment');
+
+      if (!pagaditoPaymentService.isConfigured()) {
+        logSystem.error('Pagadito not configured');
+        return res.status(500).json({ message: "Sistema de pagos no configurado" });
+      }
+
+      // Create payment with Pagadito
+      const paymentResult = await pagaditoPaymentService.createPayment({
+        ern: `SRV-${servicioId}-${Date.now()}`,
+        items: [{
+          quantity: 1,
+          description: `Servicio de grúa - ${servicio.servicioCategoria || 'remolque_estandar'}`,
+          price: parseFloat(servicio.costoTotal),
+        }],
+        currency: "USD",
+      });
+
+      if (!paymentResult.success) {
+        logSystem.error('Pagadito payment creation failed', {
+          servicioId,
+          error: paymentResult.errorMessage,
+        });
+        return res.status(400).json({ 
+          message: paymentResult.errorMessage || "Error al crear pago",
+          errorCode: paymentResult.errorCode,
+        });
+      }
+
+      // Save Pagadito token to servicio
+      await storage.updateServicio(servicioId, {
+        pagaditoToken: paymentResult.token,
+        pagaditoStatus: "REGISTERED",
+      });
+
+      logTransaction.paymentInitiated(servicioId, parseFloat(servicio.costoTotal), 'pagadito');
+      
+      res.json({
+        success: true,
+        redirectUrl: paymentResult.redirectUrl,
+        token: paymentResult.token,
+      });
+    } catch (error: any) {
+      logSystem.error('Pagadito create-payment error', error);
+      res.status(500).json({ message: `Error al crear pago: ${error.message}` });
+    }
+  });
+
+  // Handle return from Pagadito after payment
+  app.get("/api/pagadito/return", async (req: Request, res: Response) => {
+    try {
+      const token = req.query.token as string;
+      
+      if (!token) {
+        logSystem.warn('Pagadito return: No token provided');
+        return res.redirect('/?payment=error&message=token_missing');
+      }
+
+      // Import Pagadito service
+      const { pagaditoPaymentService } = await import('./services/pagadito-payment');
+
+      // Get payment status
+      const statusResult = await pagaditoPaymentService.getPaymentStatus(token);
+
+      if (!statusResult.success) {
+        logSystem.error('Pagadito status check failed', {
+          token,
+          error: statusResult.errorMessage,
+        });
+        return res.redirect(`/?payment=error&message=${encodeURIComponent(statusResult.errorMessage || 'status_error')}`);
+      }
+
+      // Find servicio by pagaditoToken
+      const servicio = await storage.getServicioByPagaditoToken(token);
+      
+      if (!servicio) {
+        logSystem.warn('Pagadito return: Service not found for token', { token });
+        return res.redirect('/?payment=error&message=service_not_found');
+      }
+
+      // Update servicio with payment status
+      await storage.updateServicio(servicio.id, {
+        pagaditoStatus: statusResult.status,
+        pagaditoReference: statusResult.reference || undefined,
+      });
+
+      if (pagaditoPaymentService.isPaymentSuccessful(statusResult.status)) {
+        // Payment successful - create commission
+        const existingComision = await storage.getComisionByServicioId(servicio.id);
+        
+        if (!existingComision) {
+          const montoTotal = parseFloat(servicio.costoTotal);
+          const { operatorAmount, companyAmount } = pagaditoPaymentService.calculateCommission(montoTotal);
+
+          const comision = await storage.createComision({
+            servicioId: servicio.id,
+            montoTotal: servicio.costoTotal,
+            montoOperador: operatorAmount.toFixed(2),
+            montoEmpresa: companyAmount.toFixed(2),
+          });
+
+          logTransaction.paymentSuccess(servicio.id, montoTotal, token);
+          logTransaction.commissionCreated(comision.id, servicio.id, operatorAmount, companyAmount);
+
+          // Update conductor balance
+          if (servicio.conductorId) {
+            try {
+              const conductor = await storage.getConductorByUserId(servicio.conductorId);
+              if (conductor) {
+                const currentBalance = parseFloat(conductor.balanceDisponible || "0");
+                const newBalance = currentBalance + operatorAmount;
+                await storage.updateConductor(conductor.id, {
+                  balanceDisponible: newBalance.toFixed(2),
+                });
+                
+                logSystem.info('Conductor balance updated via Pagadito', {
+                  conductorId: conductor.id,
+                  addedAmount: operatorAmount,
+                  newBalance: newBalance.toFixed(2),
+                });
+              }
+            } catch (error: any) {
+              logSystem.error('Error updating conductor balance', error, { 
+                servicioId: servicio.id, 
+                conductorId: servicio.conductorId 
+              });
+            }
+          }
+        }
+
+        return res.redirect(`/servicio/${servicio.id}?payment=success`);
+      } else if (pagaditoPaymentService.isPaymentPending(statusResult.status)) {
+        return res.redirect(`/servicio/${servicio.id}?payment=pending&status=${statusResult.status}`);
+      } else {
+        // Payment failed or cancelled
+        return res.redirect(`/servicio/${servicio.id}?payment=failed&status=${statusResult.status}`);
+      }
+    } catch (error: any) {
+      logSystem.error('Pagadito return error', error);
+      return res.redirect(`/?payment=error&message=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  // Check payment status
+  app.get("/api/pagadito/status/:token", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      
+      if (!token) {
+        return res.status(400).json({ message: "Token es requerido" });
+      }
+
+      // Import Pagadito service
+      const { pagaditoPaymentService } = await import('./services/pagadito-payment');
+
+      const statusResult = await pagaditoPaymentService.getPaymentStatus(token);
+
+      if (!statusResult.success) {
+        return res.status(400).json({
+          success: false,
+          message: statusResult.errorMessage,
+          errorCode: statusResult.errorCode,
+        });
+      }
+
+      res.json({
+        success: true,
+        status: statusResult.status,
+        statusMessage: pagaditoPaymentService.getStatusMessage(statusResult.status),
+        reference: statusResult.reference,
+        ern: statusResult.ern,
+        amount: statusResult.amount,
+        dateTransaction: statusResult.dateTransaction,
+        isSuccessful: pagaditoPaymentService.isPaymentSuccessful(statusResult.status),
+        isPending: pagaditoPaymentService.isPaymentPending(statusResult.status),
+        isFailed: pagaditoPaymentService.isPaymentFailed(statusResult.status),
+      });
+    } catch (error: any) {
+      logSystem.error('Pagadito status check error', error);
+      res.status(500).json({ message: `Error al consultar estado: ${error.message}` });
+    }
+  });
+
   app.use(express.json());
 
   const sessionParser = session({
