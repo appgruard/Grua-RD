@@ -181,7 +181,7 @@ function restoreFiles() {
 }
 
 function generateCapacitorConfig() {
-  const apiUrl = process.env.VITE_API_URL || 'https://gruard.app';
+  const apiUrl = process.env.VITE_API_URL || 'https://app.gruard.com';
   const isProduction = process.env.NODE_ENV === 'production';
   
   const configContent = `import type { CapacitorConfig } from '@capacitor/cli';
@@ -199,15 +199,14 @@ const config: CapacitorConfig = {
   
   server: {
     androidScheme: 'https',
-    hostname: 'gruard.app',
+    hostname: 'app.gruard.com',
     iosScheme: 'capacitor',
     url: ${isProduction ? `'${apiUrl}'` : 'undefined'},
     cleartext: false,
     allowNavigation: [
       'gruard.com',
       '*.gruard.com',
-      'gruard.app',
-      '*.gruard.app',
+      'app.gruard.com',
       'api.mapbox.com',
       '*.tiles.mapbox.com',
       'events.mapbox.com',

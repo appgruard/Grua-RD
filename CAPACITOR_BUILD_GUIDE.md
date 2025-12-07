@@ -364,7 +364,7 @@ Antes de compilar para producción, asegúrate de configurar:
 VITE_MAPBOX_ACCESS_TOKEN=pk.xxx
 
 # API Backend
-VITE_API_URL=https://api.gruard.com
+VITE_API_URL=https://app.gruard.com
 
 # Push Notifications
 VITE_VAPID_PUBLIC_KEY=xxx
@@ -473,7 +473,7 @@ cd android && ./gradlew bundleRelease
 
 2. **Entitlements configurados:**
    - Push Notifications (aps-environment: production)
-   - Associated Domains (gruard.app)
+   - Associated Domains (app.gruard.com)
 
 3. **Generar Archive:**
    - Selecciona "Any iOS Device (arm64)"

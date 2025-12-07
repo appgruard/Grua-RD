@@ -22,7 +22,7 @@ Esta guía cubre todo lo necesario para desplegar el servidor en CapRover y comp
 - Mínimo 2GB RAM, 2 vCPU
 - Docker instalado
 - CapRover instalado
-- Un dominio configurado (ej: gruard.app)
+- Un dominio configurado (ej: app.gruard.com)
 
 ### Para Apps Android (APK)
 - Node.js 18+
@@ -76,7 +76,7 @@ DATABASE_URL=postgresql://usuario:password@host:5432/gruard_db
 NODE_ENV=production
 
 # CORS - Dominios permitidos (separados por coma)
-ALLOWED_ORIGINS=https://gruard.app,https://www.gruard.app
+ALLOWED_ORIGINS=https://app.gruard.com,https://www.gruard.com
 
 # Sesión (genera un string aleatorio de 32+ caracteres)
 SESSION_SECRET=tu_secret_muy_largo_y_seguro_32_chars
@@ -97,7 +97,7 @@ TWILIO_AUTH_TOKEN=xxxxx
 TWILIO_PHONE_NUMBER=+1234567890
 
 # URL de la API (CRÍTICO para apps móviles)
-VITE_API_URL=https://gruard.app
+VITE_API_URL=https://app.gruard.com
 
 # Object Storage (Replit - opcional si no usas)
 REPLIT_OBJECT_STORAGE_PROJECT_ID=xxxxx

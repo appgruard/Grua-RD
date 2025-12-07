@@ -75,7 +75,7 @@ DATABASE_URL=postgresql://...
 NODE_ENV=production
 
 # CORS - Dominios permitidos (separados por coma)
-ALLOWED_ORIGINS=https://gruard.app,https://www.gruard.app
+ALLOWED_ORIGINS=https://app.gruard.com,https://www.gruard.com
 
 # Sesión
 SESSION_SECRET=your_generated_secret_32_chars_min
@@ -101,7 +101,7 @@ DLOCAL_SECRET_KEY=xxx
 VERIFIK_API_KEY=xxx
 
 # API URL para apps móviles (IMPORTANTE para iOS/Android)
-VITE_API_URL=https://gruard.app
+VITE_API_URL=https://app.gruard.com
 ```
 
 **IMPORTANTE**: 
@@ -215,14 +215,14 @@ Antes de compilar las apps, asegúrate de que `VITE_API_URL` esté configurado:
 
 ```bash
 # En tu .env o al compilar
-VITE_API_URL=https://tu-dominio-en-caprover.com
+VITE_API_URL=https://app.gruard.com
 ```
 
 ### 2. Compilar con la URL correcta
 
 ```bash
 # Establecer la variable y compilar
-export VITE_API_URL=https://tu-dominio.com
+export VITE_API_URL=https://app.gruard.com
 npm run build
 npx cap sync
 ```
@@ -240,7 +240,7 @@ No necesitas agregar estos orígenes a `ALLOWED_ORIGINS`.
 
 En la app móvil, las peticiones API se harán a:
 ```
-https://tu-dominio.com/api/...
+https://app.gruard.com/api/...
 ```
 
 ---

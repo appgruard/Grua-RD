@@ -7,7 +7,7 @@ Guía completa para desplegar Grúa RD en CapRover y configurar las apps móvile
 ## 📋 Requisitos Previos
 
 1. **VPS con CapRover instalado** - Si no lo tienes, instala CapRover en tu VPS siguiendo su documentación oficial
-2. **Dominio apuntando a tu VPS** - Por ejemplo: `gruard.app`
+2. **Dominio apuntando a tu VPS** - Por ejemplo: `app.gruard.com`
 3. **Acceso al dashboard de CapRover** - Típicamente en `https://tudominio.com:3000`
 4. **Certificado SSL** - CapRover lo genera automáticamente con Let's Encrypt
 5. **Git remoto configurado** - Tu repositorio debe estar en GitHub
@@ -73,7 +73,7 @@ NODE_ENV=production
 
 ### CORS - Dominios Permitidos (IMPORTANTE)
 ```bash
-ALLOWED_ORIGINS=https://gruard.app,https://app.gruard.app,https://www.gruard.app
+ALLOWED_ORIGINS=https://app.gruard.com,https://www.gruard.com
 ```
 
 ### Sesión
@@ -103,7 +103,7 @@ VITE_STRIPE_PUBLIC_KEY=pk_live_your_stripe_public
 ### API URL para Apps Móviles (CRÍTICO)
 ```bash
 # Esta URL es lo que usan iOS/Android para conectarse
-VITE_API_URL=https://gruard.app
+VITE_API_URL=https://app.gruard.com
 ```
 
 ### Otras Variables
@@ -140,7 +140,7 @@ Antes de compilar, asegúrate de que:
 
 ```bash
 # 1. Configura la URL de API
-export VITE_API_URL=https://gruard.app
+export VITE_API_URL=https://app.gruard.com
 
 # 2. Construye la web app
 npm run build
@@ -162,7 +162,7 @@ npx cap open ios
 
 ```bash
 # 1. Configura la URL de API
-export VITE_API_URL=https://gruard.app
+export VITE_API_URL=https://app.gruard.com
 
 # 2. Construye la web app
 npm run build
@@ -185,8 +185,8 @@ npx cap open android
 
 ### En CapRover
 
-1. Abre `https://gruard.app/health` - Debe retornar status 200
-2. Abre `https://gruard.app` - Debe cargar la app web
+1. Abre `https://app.gruard.com/health` - Debe retornar status 200
+2. Abre `https://app.gruard.com` - Debe cargar la app web
 3. Ve a **Apps** → `gruard-rd` → **Logs** para revisar errores
 
 ### En las Apps Móviles
@@ -257,7 +257,7 @@ npx cap open android
 
 ```bash
 # Verifica que el servidor está online
-curl https://gruard.app/health
+curl https://app.gruard.com/health
 ```
 
 ### Logs

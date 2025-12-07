@@ -2,13 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>aps-environment</key>
-	<string>production</string>
-	<key>com.apple.developer.associated-domains</key>
-	<array>
-		<string>applinks:gruard.app</string>
-		<string>applinks:www.gruard.app</string>
-		<string>webcredentials:gruard.app</string>
-	</array>
+        <key>aps-environment</key>
+        <string>production</string>
+        <key>com.apple.developer.associated-domains</key>
+        <array>
+                <string>applinks:app.gruard.com</string>
+                <string>applinks:www.gruard.com</string>
+                <string>webcredentials:app.gruard.com</string>
+        </array>
 </dict>
 </plist>
