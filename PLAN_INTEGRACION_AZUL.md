@@ -32,11 +32,19 @@ Migrar el sistema de pagos a Azul API con tokenización (DataVault) y crear un s
 - `verifyPayment()` - Verificar estado de pago
 - `init3DSecure()` / `complete3DSecure()` - Flujo 3D Secure 2.0
 
-### Fase 3: Actualizar Backend (Routes y Storage) 🔄 (En Progreso)
-- [ ] Actualizar endpoints de payment-methods para usar Azul
-- [ ] Actualizar lógica de cobro de servicios
-- [ ] Actualizar endpoints de wallet/recarga
-- [ ] Crear endpoints para gestión de tokens
+### Fase 3: Actualizar Backend (Routes y Storage) ✅ (Completada)
+- [x] Actualizar endpoints de payment-methods para usar Azul
+  - POST/GET/DELETE/PUT `/api/payment-methods` ahora delegan a endpoints específicos por tipo de usuario
+  - Clientes: `/api/client/payment-methods`
+  - Operadores: `/api/operator/payment-methods`
+- [x] Actualizar lógica de cobro de servicios
+  - `/api/services/:id/complete` usa Azul cuando `metodoPago === 'tarjeta'`
+- [x] Actualizar endpoints de wallet/recarga
+  - `/api/wallet/pay-debt` ahora usa Azul API directamente
+  - `/api/operator/pay-debt-with-card` funciona con Azul
+- [x] Endpoints para gestión de tokens ya implementados
+  - Clientes: `/api/client/payment-methods` (CRUD completo)
+  - Operadores: `/api/operator/payment-methods` (CRUD completo)
 
 ### Fase 4: Actualizar Frontend
 - [ ] Actualizar componente de agregar tarjeta para Azul

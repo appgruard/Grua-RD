@@ -7176,21 +7176,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
-  // TODO: Implementar con Azul API - PAYMENT METHODS ENDPOINTS
+  // PAYMENT METHODS ENDPOINTS - Delegated to user-type specific endpoints
   // ========================================
-  // Note: Primary client payment methods are managed via /api/client/payment-methods
-  // These endpoints provide a secondary interface for payment method management
+  // Clients should use /api/client/payment-methods
+  // Operators should use /api/operator/payment-methods
 
   app.post("/api/payment-methods", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
-    // TODO: Implementar con Azul API - tokenización de tarjetas
-    return res.status(503).json({ 
-      message: "El servicio de pagos está en proceso de actualización. Por favor, intente más tarde.",
-      configured: false 
-    });
+    const userType = req.user!.userType;
+    if (userType === 'cliente') {
+      return res.status(308).json({ 
+        message: "Use el endpoint /api/client/payment-methods para agregar tarjetas",
+        redirectTo: "/api/client/payment-methods"
+      });
+    } else if (userType === 'conductor') {
+      return res.status(308).json({ 
+        message: "Use el endpoint /api/operator/payment-methods para agregar tarjetas",
+        redirectTo: "/api/operator/payment-methods"
+      });
+    }
+    
+    return res.status(403).json({ message: "Tipo de usuario no válido para métodos de pago" });
   });
 
   app.get("/api/payment-methods", async (req: Request, res: Response) => {
@@ -7199,15 +7208,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { db } = await import('./db');
-      const { paymentMethods } = await import('./schema-extensions');
-      const { eq } = await import('drizzle-orm');
-
-      const methods = await db.query.paymentMethods.findMany({
-        where: eq(paymentMethods.userId, req.user!.id),
-      });
-
-      res.json(methods);
+      const userType = req.user!.userType;
+      
+      if (userType === 'cliente') {
+        const methods = await storage.getClientPaymentMethodsByUserId(req.user!.id);
+        res.json(methods.map(m => ({
+          id: m.id,
+          cardBrand: m.cardBrand,
+          lastFourDigits: m.lastFourDigits,
+          expirationMonth: m.expirationMonth,
+          expirationYear: m.expirationYear,
+          isDefault: m.isDefault,
+          createdAt: m.createdAt,
+        })));
+      } else if (userType === 'conductor') {
+        const conductor = await storage.getConductorByUserId(req.user!.id);
+        if (!conductor) {
+          return res.status(404).json({ message: "Conductor profile not found" });
+        }
+        const methods = await storage.getOperatorPaymentMethodsByConductorId(conductor.id);
+        res.json(methods.map(m => ({
+          id: m.id,
+          cardBrand: m.cardBrand,
+          lastFourDigits: m.lastFourDigits,
+          expirationMonth: m.expirationMonth,
+          expirationYear: m.expirationYear,
+          isDefault: m.isDefault,
+          createdAt: m.createdAt,
+        })));
+      } else {
+        return res.status(403).json({ message: "Tipo de usuario no válido para métodos de pago" });
+      }
     } catch (error: any) {
       logSystem.error('Get payment methods error', error, { userId: req.user!.id });
       res.status(500).json({ message: "Failed to get payment methods" });
@@ -7220,37 +7251,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { db } = await import('./db');
-      const { paymentMethods } = await import('./schema-extensions');
-      const { eq, and } = await import('drizzle-orm');
-
-      const method = await db.query.paymentMethods.findFirst({
-        where: and(
-          eq(paymentMethods.id, req.params.id),
-          eq(paymentMethods.userId, req.user!.id)
-        ),
-      });
-
-      if (!method) {
-        return res.status(404).json({ message: "Payment method not found" });
-      }
-
-      await db.delete(paymentMethods).where(eq(paymentMethods.id, req.params.id));
-
-      if (method.isDefault) {
-        const remainingMethods = await db.query.paymentMethods.findMany({
-          where: eq(paymentMethods.userId, req.user!.id),
-        });
-
-        if (remainingMethods.length > 0) {
-          await db
-            .update(paymentMethods)
-            .set({ isDefault: true })
-            .where(eq(paymentMethods.id, remainingMethods[0].id));
+      const userType = req.user!.userType;
+      
+      if (userType === 'cliente') {
+        const method = await storage.getClientPaymentMethodById(req.params.id);
+        if (!method || method.userId !== req.user!.id) {
+          return res.status(404).json({ message: "Payment method not found" });
         }
+        await storage.deleteClientPaymentMethod(req.params.id);
+        if (method.isDefault) {
+          const remainingMethods = await storage.getClientPaymentMethodsByUserId(req.user!.id);
+          if (remainingMethods.length > 0) {
+            await storage.setDefaultClientPaymentMethod(remainingMethods[0].id, req.user!.id);
+          }
+        }
+      } else if (userType === 'conductor') {
+        const conductor = await storage.getConductorByUserId(req.user!.id);
+        if (!conductor) {
+          return res.status(404).json({ message: "Conductor profile not found" });
+        }
+        const method = await storage.getOperatorPaymentMethodById(req.params.id);
+        if (!method || method.conductorId !== conductor.id) {
+          return res.status(404).json({ message: "Payment method not found" });
+        }
+        await storage.deleteOperatorPaymentMethod(req.params.id);
+        if (method.isDefault) {
+          const remainingMethods = await storage.getOperatorPaymentMethodsByConductorId(conductor.id);
+          if (remainingMethods.length > 0) {
+            await storage.setDefaultOperatorPaymentMethod(remainingMethods[0].id, conductor.id);
+          }
+        }
+      } else {
+        return res.status(403).json({ message: "Tipo de usuario no válido para métodos de pago" });
       }
 
-      logSystem.info('Payment method deleted', { 
+      logSystem.info('Payment method deleted via generic endpoint', { 
         userId: req.user!.id,
         methodId: req.params.id 
       });
@@ -7268,32 +7303,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { db } = await import('./db');
-      const { paymentMethods } = await import('./schema-extensions');
-      const { eq, and } = await import('drizzle-orm');
-
-      const method = await db.query.paymentMethods.findFirst({
-        where: and(
-          eq(paymentMethods.id, req.params.id),
-          eq(paymentMethods.userId, req.user!.id)
-        ),
-      });
-
-      if (!method) {
-        return res.status(404).json({ message: "Payment method not found" });
+      const userType = req.user!.userType;
+      
+      if (userType === 'cliente') {
+        const method = await storage.getClientPaymentMethodById(req.params.id);
+        if (!method || method.userId !== req.user!.id) {
+          return res.status(404).json({ message: "Payment method not found" });
+        }
+        await storage.setDefaultClientPaymentMethod(req.params.id, req.user!.id);
+      } else if (userType === 'conductor') {
+        const conductor = await storage.getConductorByUserId(req.user!.id);
+        if (!conductor) {
+          return res.status(404).json({ message: "Conductor profile not found" });
+        }
+        const method = await storage.getOperatorPaymentMethodById(req.params.id);
+        if (!method || method.conductorId !== conductor.id) {
+          return res.status(404).json({ message: "Payment method not found" });
+        }
+        await storage.setDefaultOperatorPaymentMethod(req.params.id, conductor.id);
+      } else {
+        return res.status(403).json({ message: "Tipo de usuario no válido para métodos de pago" });
       }
 
-      await db
-        .update(paymentMethods)
-        .set({ isDefault: false })
-        .where(eq(paymentMethods.userId, req.user!.id));
-
-      await db
-        .update(paymentMethods)
-        .set({ isDefault: true })
-        .where(eq(paymentMethods.id, req.params.id));
-
-      logSystem.info('Payment method set as default', { 
+      logSystem.info('Payment method set as default via generic endpoint', { 
         userId: req.user!.id,
         methodId: req.params.id 
       });
@@ -9837,11 +9869,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const completeDebtPaymentSchema = z.object({
-    walletId: z.string().min(1, "ID de billetera es requerido"),
+    paymentMethodId: z.string().min(1, "ID del método de pago es requerido"),
     amount: z.number()
       .positive("El monto debe ser mayor a cero")
       .max(1000000, "El monto excede el límite permitido"),
-    paymentIntentId: z.string().min(1, "ID de pago es requerido"),
   });
 
   const adminAdjustmentSchema = z.object({
@@ -10026,10 +10057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Complete debt payment (after Stripe confirmation)
-  // SECURITY NOTE: In production, paymentIntentId MUST be verified with Stripe API
-  // to confirm the payment was actually successful before applying to debt.
-  // Current implementation includes idempotency check but requires Stripe verification.
+  // Pay debt with saved card using Azul API
   app.post("/api/wallet/pay-debt", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
       return res.status(401).json({ message: "No autorizado" });
@@ -10041,25 +10069,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: validation.error.errors[0].message });
       }
 
-      const { walletId, amount, paymentIntentId } = validation.data;
-
-      // Idempotency check - prevent double-application of same payment
-      const existingTransaction = await storage.getTransactionByPaymentIntentId(paymentIntentId);
-      if (existingTransaction) {
-        return res.status(409).json({ 
-          message: "Este pago ya fue procesado anteriormente",
-          transactionId: existingTransaction.id
-        });
-      }
+      const { paymentMethodId, amount } = validation.data;
 
       const conductor = await storage.getConductorByUserId(req.user!.id);
       if (!conductor) {
         return res.status(404).json({ message: "Conductor no encontrado" });
       }
 
-      const wallet = await storage.getWalletByConductorId(conductor.id);
-      if (!wallet || wallet.id !== walletId) {
-        return res.status(403).json({ message: "Billetera no autorizada" });
+      // Check if Azul is configured
+      if (!AzulPaymentService.isConfigured()) {
+        logSystem.warn('Azul API not configured for wallet debt payment', { conductorId: conductor.id });
+        return res.status(503).json({ 
+          message: "El servicio de pagos no está configurado. Contacte al administrador.",
+          configured: false 
+        });
+      }
+
+      // Verify payment method ownership
+      const paymentMethod = await storage.getOperatorPaymentMethodById(paymentMethodId);
+      if (!paymentMethod) {
+        return res.status(404).json({ message: "Método de pago no encontrado" });
+      }
+      
+      if (paymentMethod.conductorId !== conductor.id) {
+        return res.status(403).json({ message: "No autorizado para usar este método de pago" });
+      }
+
+      // Get wallet and verify debt
+      const wallet = await WalletService.getWallet(conductor.id);
+      if (!wallet) {
+        return res.status(404).json({ message: "Billetera no encontrada" });
       }
 
       const totalDebt = parseFloat(wallet.totalDebt);
@@ -10067,32 +10106,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No tienes deuda pendiente" });
       }
 
-      if (amount > totalDebt) {
+      // Cap payment to actual debt amount
+      const paymentAmount = Math.min(amount, totalDebt);
+      const customOrderId = `WALLET-DEBT-${conductor.id}-${Date.now()}`;
+
+      // Process payment with Azul
+      const paymentResult = await AzulPaymentService.processPaymentWithToken(
+        paymentMethod.azulDataVaultToken,
+        {
+          amount: AzulPaymentService.toAzulAmount(paymentAmount),
+          customOrderId,
+          orderDescription: `Pago de deuda wallet - Operador ${conductor.id}`,
+        }
+      );
+
+      if (!paymentResult.success) {
+        logTransaction.failed('Wallet debt payment failed', {
+          conductorId: conductor.id,
+          amount: paymentAmount,
+          isoCode: paymentResult.isoCode,
+          message: paymentResult.responseMessage,
+        });
         return res.status(400).json({ 
-          message: `El monto excede la deuda pendiente. Máximo permitido: RD$${totalDebt.toFixed(2)}`,
-          maxAmount: totalDebt
+          message: paymentResult.responseMessage || "Error al procesar el pago",
+          errorCode: paymentResult.isoCode,
         });
       }
 
-      // PRODUCTION REQUIREMENT: Verify paymentIntentId with Stripe API
-      // Uncomment and configure when Stripe is set up:
-      // const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      // if (paymentIntent.status !== 'succeeded') {
-      //   return res.status(400).json({ message: "El pago no ha sido confirmado" });
-      // }
-      // if (paymentIntent.amount !== Math.round(amount * 100)) {
-      //   return res.status(400).json({ message: "El monto del pago no coincide" });
-      // }
+      // Update wallet to reduce debt
+      await WalletService.payDebt(conductor.id, paymentAmount, {
+        paymentMethod: 'azul_card',
+        azulOrderId: paymentResult.azulOrderId,
+        authorizationCode: paymentResult.authorizationCode,
+        customOrderId,
+      });
 
-      const result = await WalletService.completeDebtPayment(
-        walletId,
-        amount,
-        paymentIntentId
-      );
+      logTransaction.success('Wallet debt paid with Azul', {
+        conductorId: conductor.id,
+        amount: paymentAmount,
+        azulOrderId: paymentResult.azulOrderId,
+        remainingDebt: totalDebt - paymentAmount,
+      });
 
-      res.json(result);
+      res.json({
+        success: true,
+        message: "Pago procesado exitosamente",
+        payment: {
+          amount: paymentAmount,
+          azulOrderId: paymentResult.azulOrderId,
+          authorizationCode: paymentResult.authorizationCode,
+          remainingDebt: Math.max(0, totalDebt - paymentAmount),
+        },
+      });
     } catch (error: any) {
-      logSystem.error('Pay debt error', error);
+      logSystem.error('Wallet pay debt error', error);
       res.status(400).json({ message: error.message || "Error al procesar pago" });
     }
   });
