@@ -526,8 +526,8 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
       ? imageBase64 
       : `data:image/jpeg;base64,${imageBase64}`;
 
-    // Use the face-recognition/detect endpoint for human face detection
-    const response = await fetch(`${VERIFIK_BASE_URL}/face-recognition/detect`, {
+    // Use the face-recognition/search endpoint for human face detection
+    const response = await fetch(`${VERIFIK_BASE_URL}/face-recognition/search`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -535,7 +535,9 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
         'Authorization': `JWT ${apiKey}`
       },
       body: JSON.stringify({
-        image: imageData
+        images: [imageData],
+        min_score: 0.6,
+        search_mode: "FAST"
       })
     });
 

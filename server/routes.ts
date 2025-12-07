@@ -981,17 +981,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // For clientes and conductores, validate that identity verification is complete
     if (user && !skipVerificationTypes.includes(user.userType)) {
+      // Check email verification (telefonoVerificado OR emailVerificado - either one counts as contact verified)
+      const contactoVerificado = user.telefonoVerificado === true || user.emailVerificado === true;
+      
       const verificationStatus = {
         cedulaVerificada: user.cedulaVerificada === true,
-        telefonoVerificado: user.telefonoVerificado === true,
+        telefonoVerificado: contactoVerificado,
         fotoVerificada: user.fotoVerificada === true,
       };
       
       // Determine what's required based on user type
       const isConductor = user.userType === 'conductor';
       const needsVerification = isConductor 
-        ? (!verificationStatus.cedulaVerificada || !verificationStatus.telefonoVerificado || !verificationStatus.fotoVerificada)
-        : (!verificationStatus.cedulaVerificada || !verificationStatus.telefonoVerificado);
+        ? (!verificationStatus.cedulaVerificada || !contactoVerificado || !verificationStatus.fotoVerificada)
+        : (!verificationStatus.cedulaVerificada || !contactoVerificado);
       
       // If verification is missing, return 403 with minimal safe data and redirect to complete registration
       if (needsVerification) {
