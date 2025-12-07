@@ -2119,11 +2119,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (validatedData.metodoPago === "tarjeta") {
-        // TODO: Implementar con Azul API
-        // Por ahora, los pagos con tarjeta no están disponibles
-        return res.status(503).json({ 
-          message: "El servicio de pagos con tarjeta no está disponible en este momento. Estamos migrando a un nuevo proveedor.",
-          paymentServiceUnavailable: true 
+        if (!AzulPaymentService.isConfigured()) {
+          return res.status(503).json({ 
+            message: "El servicio de pagos con tarjeta no está disponible en este momento.",
+            paymentServiceUnavailable: true 
+          });
+        }
+        
+        const defaultPaymentMethod = await storage.getDefaultClientPaymentMethod(req.user!.id);
+        if (!defaultPaymentMethod) {
+          return res.status(400).json({ 
+            message: "Debe agregar una tarjeta antes de usar este método de pago.",
+            noPaymentMethod: true 
+          });
+        }
+        
+        servicioData.azulDataVaultToken = defaultPaymentMethod.azulDataVaultToken;
+        servicioData.azulPaymentStatus = "pending";
+        
+        logSystem.info('Service created with card payment', {
+          clienteId: req.user!.id,
+          paymentMethodId: defaultPaymentMethod.id,
+          cardBrand: defaultPaymentMethod.cardBrand,
+          last4: defaultPaymentMethod.last4
         });
       }
 
@@ -3043,21 +3061,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const oldService = await storage.getServicioById(req.params.id);
+      if (!oldService) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+      
       const startTime = oldService?.iniciadoAt ? new Date(oldService.iniciadoAt).getTime() : Date.now();
       const duration = Math.floor((Date.now() - startTime) / 1000);
+      
+      if (!oldService.costoTotal) {
+        return res.status(400).json({ message: "El servicio no tiene un costo definido" });
+      }
+      
+      const serviceAmount = parseFloat(oldService.costoTotal);
+      if (isNaN(serviceAmount) || serviceAmount <= 0) {
+        return res.status(400).json({ message: "El costo del servicio es inválido" });
+      }
+      
+      let azulPaymentData: Record<string, any> = {};
+      
+      if (oldService.metodoPago === 'tarjeta' && oldService.azulDataVaultToken) {
+        if (!AzulPaymentService.isConfigured()) {
+          return res.status(503).json({ 
+            message: "El servicio de pagos con tarjeta no está disponible en este momento." 
+          });
+        }
+        
+        const amountInCentavos = Math.round(serviceAmount * 100);
+        const itbis = Math.round(amountInCentavos * 0.18);
+        
+        const azulResult = await AzulPaymentService.processPaymentWithToken(
+          oldService.azulDataVaultToken,
+          {
+            amount: amountInCentavos,
+            itbis: itbis,
+            customOrderId: `SVC-${oldService.id}-${Date.now()}`,
+            orderDescription: `Servicio de grúa #${oldService.id}`,
+          }
+        );
+        
+        if (!azulResult.success) {
+          logTransaction.failed('Azul payment failed on service completion', {
+            servicioId: oldService.id,
+            isoCode: azulResult.isoCode,
+            message: azulResult.responseMessage
+          });
+          
+          await storage.updateServicio(req.params.id, {
+            azulPaymentStatus: 'failed',
+          });
+          
+          return res.status(402).json({ 
+            message: azulResult.responseMessage || "Error al procesar el pago con tarjeta",
+            paymentFailed: true,
+            isoCode: azulResult.isoCode
+          });
+        }
+        
+        azulPaymentData = {
+          azulOrderId: azulResult.azulOrderId,
+          azulPaymentStatus: 'completed',
+          azulAuthorizationCode: azulResult.authorizationCode,
+          azulReferenceNumber: azulResult.rrn,
+        };
+        
+        logTransaction.success('Azul payment processed on service completion', {
+          servicioId: oldService.id,
+          azulOrderId: azulResult.azulOrderId,
+          authorizationCode: azulResult.authorizationCode,
+          amount: serviceAmount
+        });
+      }
 
       const servicio = await storage.updateServicio(req.params.id, {
         estado: 'completado',
         completadoAt: new Date(),
+        ...azulPaymentData,
       });
 
       logService.completed(servicio.id, duration);
 
-      // Process wallet payment/commission for the completed service
       if (servicio.metodoPago && servicio.costoTotal && !servicio.commissionProcessed) {
         try {
           const paymentMethod = servicio.metodoPago as 'efectivo' | 'tarjeta';
-          const serviceAmount = parseFloat(servicio.costoTotal);
           
           const walletResult = await WalletService.processServicePayment(
             servicio.id,
@@ -3065,20 +3150,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             serviceAmount
           );
           
+          if (servicio.metodoPago === 'tarjeta' && azulPaymentData.azulOrderId) {
+            const existingComision = await storage.getComisionByServicioId(servicio.id);
+            if (existingComision) {
+              await storage.updateComision(existingComision.id, {
+                azulPayoutReference: azulPaymentData.azulOrderId,
+                azulPayoutStatus: 'pending_payout',
+                azulNetAmount: walletResult.operatorEarnings.toString(),
+              });
+            }
+          }
+          
           logSystem.info('Wallet processed on service completion', {
             servicioId: servicio.id,
             conductorId: servicio.conductorId,
             paymentMethod,
             serviceAmount,
             commission: walletResult.commission,
-            operatorEarnings: walletResult.operatorEarnings
+            operatorEarnings: walletResult.operatorEarnings,
+            azulOrderId: azulPaymentData.azulOrderId || null
           });
         } catch (walletError: any) {
           logSystem.error('Wallet processing error on service completion', walletError, {
             servicioId: servicio.id,
             conductorId: servicio.conductorId
           });
-          // Don't fail the service completion, just log the wallet error
         }
       }
 
