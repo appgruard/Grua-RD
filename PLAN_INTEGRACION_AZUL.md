@@ -11,16 +11,28 @@ Migrar el sistema de pagos a Azul API con tokenización (DataVault) y crear un s
 - [x] Limpiar archivos de servicios de pago obsoletos
 - [x] Actualizar schema si es necesario
 
-### Fase 2: Servicio Azul API
-- [ ] Crear `server/services/azul-payment.ts` con:
-  - Conexión a Azul Webservices
+### Fase 2: Servicio Azul API ✅ (Completada)
+- [x] Crear `server/services/azul-payment.ts` con:
+  - Conexión a Azul Webservices (JSON API)
   - Tokenización (DataVault) - crear, usar y eliminar tokens
   - Procesamiento de pagos (Sale, Hold, Post, Void, Refund)
   - Manejo de 3D Secure 2.0
   - Verificación de pagos
-- [ ] Configurar variables de entorno necesarias
+- [x] Configurar variables de entorno necesarias (AZUL_ENVIRONMENT, AZUL_CHANNEL, AZUL_POS_INPUT_MODE)
 
-### Fase 3: Actualizar Backend (Routes y Storage)
+**Funciones implementadas en azul-payment.ts:**
+- `createToken()` - Tokenización de tarjetas con DataVault
+- `deleteToken()` - Eliminar tokens
+- `processPaymentWithToken()` - Cobrar usando token
+- `processPaymentWithCard()` - Cobrar con tarjeta (opcionalmente guardar token)
+- `authorizePayment()` - Autorizar (Hold)
+- `capturePayment()` - Capturar (Post)
+- `voidPayment()` - Anular transacción
+- `refundPayment()` - Reembolsar
+- `verifyPayment()` - Verificar estado de pago
+- `init3DSecure()` / `complete3DSecure()` - Flujo 3D Secure 2.0
+
+### Fase 3: Actualizar Backend (Routes y Storage) 🔄 (En Progreso)
 - [ ] Actualizar endpoints de payment-methods para usar Azul
 - [ ] Actualizar lógica de cobro de servicios
 - [ ] Actualizar endpoints de wallet/recarga
@@ -42,19 +54,41 @@ Migrar el sistema de pagos a Azul API con tokenización (DataVault) y crear un s
 
 ## Credenciales Necesarias (Variables de Entorno)
 
+**Ya configuradas:**
+```
+AZUL_ENVIRONMENT=sandbox    # sandbox o production
+AZUL_CHANNEL=EC             # E-Commerce
+AZUL_POS_INPUT_MODE=E-Commerce
+```
+
+**Pendientes (solicitar al usuario):**
 ```
 AZUL_MERCHANT_ID=           # ID del comercio
 AZUL_MERCHANT_NAME=         # Nombre del comercio
 AZUL_MERCHANT_TYPE=         # Tipo de comercio
 AZUL_AUTH1=                 # Credencial Auth1
 AZUL_AUTH2=                 # Credencial Auth2
-AZUL_ENVIRONMENT=sandbox    # sandbox o production
 ```
 
 ## URLs de Azul
 
 - **Sandbox**: https://pruebas.azul.com.do/webservices/JSON/Default.aspx
 - **Producción**: https://pagos.azul.com.do/webservices/JSON/Default.aspx
+
+## Formato de Montos
+
+- Los montos se envían en **centavos** (sin decimales)
+- Ejemplo: RD$1,500.00 = `150000`
+- El servicio incluye helpers: `toAzulAmount()` y `fromAzulAmount()`
+
+## Códigos de Respuesta
+
+- `00` = Aprobada
+- `05` = Declinada
+- `51` = Fondos insuficientes
+- `54` = Tarjeta expirada
+- `82` = CVV incorrecto
+- Ver todos los códigos en `azul-payment.ts`
 
 ## Comisiones a Considerar
 
@@ -67,3 +101,4 @@ AZUL_ENVIRONMENT=sandbox    # sandbox o production
 - La tokenización permite guardar tarjetas de forma segura sin almacenar datos sensibles
 - Cada token es único por comercio y tarjeta
 - Los pagos con token no requieren CVV después de la primera transacción
+- El servicio detecta automáticamente la marca de tarjeta (Visa, Mastercard, Amex, etc.)
