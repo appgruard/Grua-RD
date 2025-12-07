@@ -564,20 +564,47 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
     }
 
     const rawResponse = await response.json();
-    const data: FaceValidationResponse = rawResponse.data || rawResponse;
-
+    
+    // Check if data is an array (search results) or an object (detection response)
+    const dataArray = rawResponse.data;
+    const isSearchResultArray = Array.isArray(dataArray);
+    
     logger.info("Verifik face validation response", { 
       rawKeys: Object.keys(rawResponse),
-      dataKeys: Object.keys(data),
-      hasFace: data.hasFace,
-      faceCount: data.faceCount,
-      faces: data.faces,
-      detections: data.detections,
-      faceScore: data.faceScore,
-      confidenceScore: data.confidenceScore,
-      livenessScore: data.livenessScore,
-      isHuman: data.isHuman
+      isSearchResultArray,
+      resultCount: isSearchResultArray ? dataArray.length : 0,
+      hasSignature: !!rawResponse.signature
     });
+
+    // If we got search results back, it means a face was detected and matched
+    if (isSearchResultArray) {
+      const hasResults = dataArray.length > 0;
+      
+      // Extract score from the first result if available
+      let bestScore = 0;
+      if (hasResults && dataArray[0]) {
+        bestScore = dataArray[0].score ?? dataArray[0].similarity ?? dataArray[0].confidence ?? 0.85;
+      }
+      
+      // Normalize score to 0-1 range
+      const normalizedScore = bestScore > 1 ? bestScore / 100 : bestScore;
+      
+      // If we got search results, a face was definitely detected
+      const isValidHumanFace = hasResults;
+      
+      return {
+        success: true,
+        isHumanFace: isValidHumanFace,
+        score: isValidHumanFace ? (normalizedScore > 0 ? normalizedScore : 0.85) : 0,
+        scanId: rawResponse.id,
+        details: isValidHumanFace ? undefined : "No se detectó un rostro en la imagen",
+        rawResponse: rawResponse,
+        error: isValidHumanFace ? undefined : "No se detectó un rostro en la imagen"
+      };
+    }
+    
+    // Handle object response (detection/validation endpoint)
+    const data: FaceValidationResponse = rawResponse.data || rawResponse;
 
     // Handle faces array from detection endpoint
     const facesArray = data.faces || data.detections || [];
