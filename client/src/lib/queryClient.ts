@@ -38,12 +38,47 @@ export async function apiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
+
+function buildUrlFromQueryKey(queryKey: readonly unknown[]): string {
+  if (queryKey.length === 0) {
+    throw new Error('QueryKey cannot be empty');
+  }
+  
+  const basePath = String(queryKey[0]);
+  
+  if (queryKey.length === 1) {
+    return basePath;
+  }
+  
+  const pathSegments: string[] = [basePath];
+  const searchParams = new URLSearchParams();
+  
+  for (let i = 1; i < queryKey.length; i++) {
+    const segment = queryKey[i];
+    
+    if (segment && typeof segment === 'object' && !Array.isArray(segment)) {
+      for (const [key, value] of Object.entries(segment as Record<string, unknown>)) {
+        if (value !== undefined && value !== null && value !== '') {
+          searchParams.append(key, String(value));
+        }
+      }
+    } else if (segment !== undefined && segment !== null && segment !== '') {
+      pathSegments.push(String(segment));
+    }
+  }
+  
+  const path = pathSegments.join('/').replace(/\/+/g, '/');
+  const queryString = searchParams.toString();
+  
+  return queryString ? `${path}?${queryString}` : path;
+}
+
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const path = queryKey.join("/") as string;
+    const path = buildUrlFromQueryKey(queryKey);
     const fullUrl = getApiUrl(path);
     const res = await fetch(fullUrl, {
       credentials: "include",

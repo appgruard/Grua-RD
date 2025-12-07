@@ -10789,6 +10789,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END OPERATOR WALLET SYSTEM ====================
 
+  // ==================== TEST EMAIL ENDPOINT (Admin Only) ====================
+  
+  app.post("/api/admin/email/test", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const { template, email } = req.body;
+
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ message: "Email es requerido" });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Email inválido" });
+    }
+
+    try {
+      const emailService = await getEmailService();
+      const isConfigured = await emailService.isConfigured();
+      
+      if (!isConfigured) {
+        return res.status(500).json({ 
+          message: "Servicio de email no configurado. Verifique RESEND_API_KEY",
+          configured: false
+        });
+      }
+
+      const results: { template: string; success: boolean; error?: string }[] = [];
+      
+      const mockTicket = {
+        id: 'TEST-12345678-ABCD-EFGH-IJKL-MNOPQRSTUVWX',
+        titulo: 'Ticket de Prueba - Verificación de Plantilla',
+        descripcion: 'Esta es una descripción de prueba para verificar el formato del correo',
+        categoria: 'consulta_servicio',
+        prioridad: 'media',
+        estado: 'abierto'
+      };
+
+      const templates: { name: string; send: () => Promise<boolean> }[] = [
+        {
+          name: 'OTP/Verificación',
+          send: () => emailService.sendOTPEmail(email, '123456', 'Usuario de Prueba')
+        },
+        {
+          name: 'Bienvenida General',
+          send: () => emailService.sendWelcomeEmail(email, 'Usuario de Prueba')
+        },
+        {
+          name: 'Bienvenida Cliente',
+          send: () => emailService.sendClientWelcomeEmail(email, 'Cliente de Prueba')
+        },
+        {
+          name: 'Bienvenida Operador',
+          send: () => emailService.sendOperatorWelcomeEmail(email, 'Operador de Prueba')
+        },
+        {
+          name: 'Notificación de Servicio',
+          send: () => emailService.sendServiceNotification(email, 'Prueba de Servicio', 'Este es un mensaje de prueba para verificar la plantilla de notificación de servicios.')
+        },
+        {
+          name: 'Restablecer Contraseña',
+          send: () => emailService.sendPasswordResetEmail(email, 'https://gruard.com/reset-password?token=test-token-12345', 'Usuario de Prueba')
+        },
+        {
+          name: 'Documento Aprobado',
+          send: () => emailService.sendDocumentApprovalEmail(email, 'Licencia de Conducir', true)
+        },
+        {
+          name: 'Documento Rechazado',
+          send: () => emailService.sendDocumentApprovalEmail(email, 'Seguro del Vehículo', false, 'El documento está vencido o ilegible')
+        },
+        {
+          name: 'Ticket Creado',
+          send: () => emailService.sendTicketCreatedEmail(email, 'Usuario de Prueba', mockTicket)
+        },
+        {
+          name: 'Ticket Estado Cambiado',
+          send: () => emailService.sendTicketStatusChangedEmail(email, 'Usuario de Prueba', mockTicket, 'abierto', 'en_proceso')
+        },
+        {
+          name: 'Respuesta de Soporte',
+          send: () => emailService.sendTicketSupportResponseEmail(email, 'Usuario de Prueba', mockTicket, 'Gracias por contactarnos. Estamos revisando su solicitud y le responderemos a la brevedad.')
+        },
+        {
+          name: 'Socio/Inversor Creado',
+          send: () => emailService.sendSocioCreatedEmail(email, 'Inversor de Prueba', 'TempPass123!', '5.00')
+        },
+        {
+          name: 'Socio Primer Login',
+          send: () => emailService.sendSocioFirstLoginEmail(email, 'Inversor de Prueba')
+        },
+        {
+          name: 'Administrador Creado',
+          send: () => emailService.sendAdminCreatedEmail(email, 'Admin de Prueba', 'AdminPass123!', ['dashboard', 'analytics', 'usuarios'])
+        }
+      ];
+
+      if (template && template !== 'all') {
+        const selectedTemplate = templates.find(t => t.name === template);
+        if (!selectedTemplate) {
+          return res.status(400).json({ 
+            message: `Plantilla "${template}" no encontrada`,
+            availableTemplates: templates.map(t => t.name)
+          });
+        }
+        
+        const success = await selectedTemplate.send();
+        results.push({ template: selectedTemplate.name, success });
+      } else {
+        for (const tmpl of templates) {
+          try {
+            const success = await tmpl.send();
+            results.push({ template: tmpl.name, success });
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (error: any) {
+            results.push({ template: tmpl.name, success: false, error: error.message });
+          }
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const failedCount = results.filter(r => !r.success).length;
+
+      logSystem.info('Test emails sent', { 
+        targetEmail: email,
+        successCount,
+        failedCount,
+        sentBy: req.user!.id
+      });
+
+      res.json({
+        message: `Enviados ${successCount} correos de prueba${failedCount > 0 ? `, ${failedCount} fallidos` : ''}`,
+        email,
+        results
+      });
+    } catch (error: any) {
+      logSystem.error('Send test emails error', error);
+      res.status(500).json({ message: "Error al enviar correos de prueba", error: error.message });
+    }
+  });
+
+  // Get available email templates
+  app.get("/api/admin/email/templates", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const templates = [
+      { name: 'OTP/Verificación', description: 'Código de verificación de 6 dígitos' },
+      { name: 'Bienvenida General', description: 'Email de bienvenida genérico' },
+      { name: 'Bienvenida Cliente', description: 'Bienvenida para nuevos clientes' },
+      { name: 'Bienvenida Operador', description: 'Bienvenida para nuevos operadores' },
+      { name: 'Notificación de Servicio', description: 'Notificaciones de estado de servicio' },
+      { name: 'Restablecer Contraseña', description: 'Link para restablecer contraseña' },
+      { name: 'Documento Aprobado', description: 'Notificación de documento aprobado' },
+      { name: 'Documento Rechazado', description: 'Notificación de documento rechazado' },
+      { name: 'Ticket Creado', description: 'Confirmación de ticket de soporte' },
+      { name: 'Ticket Estado Cambiado', description: 'Cambio de estado de ticket' },
+      { name: 'Respuesta de Soporte', description: 'Respuesta del equipo de soporte' },
+      { name: 'Socio/Inversor Creado', description: 'Credenciales para nuevos socios' },
+      { name: 'Socio Primer Login', description: 'Confirmación de primer acceso' },
+      { name: 'Administrador Creado', description: 'Credenciales para nuevos administradores' }
+    ];
+
+    const emailService = await getEmailService();
+    const isConfigured = await emailService.isConfigured();
+
+    res.json({
+      configured: isConfigured,
+      templates
+    });
+  });
+
+  // ==================== END TEST EMAIL ENDPOINT ====================
+
   initServiceAutoCancellation(serviceSessions);
   initWalletService();
   logSystem.info(`Service auto-cancellation initialized (timeout: ${SERVICE_TIMEOUT_MINUTES} minutes)`);
