@@ -3,7 +3,7 @@ import helmet from "helmet";
 import cors from "cors";
 import compression from "compression";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { serveStatic, log } from "./static";
 import { logger } from "./logger";
 import { pool, initializeTicketTables } from "./db";
 import { checkStorageHealth } from "./services/object-storage";
@@ -360,6 +360,10 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
+    // Use Function wrapper to prevent esbuild from statically bundling vite.ts
+    // This ensures the vite package (devDependency) is not required in production
+    const loadVite = new Function('return import("./vite")') as () => Promise<typeof import("./vite")>;
+    const { setupVite } = await loadVite();
     await setupVite(app, server);
   } else {
     serveStatic(app);
