@@ -846,7 +846,13 @@ export default function DriverProfile() {
             </div>
 
             <div className="space-y-4">
-              {REQUIRED_DOCUMENTS.filter(d => d.tipo !== 'foto_perfil').map((docType) => {
+              {REQUIRED_DOCUMENTS.filter(d => {
+                // Skip foto_perfil - handled separately
+                if (d.tipo === 'foto_perfil') return false;
+                // Skip cedula documents if user has cedulaVerificada = true (verified via identity scan)
+                if ((d.tipo === 'cedula_frontal' || d.tipo === 'cedula_trasera') && user?.cedulaVerificada) return false;
+                return true;
+              }).map((docType) => {
                 const documento = getDocumentStatus(docType.tipo);
                 const isUploading = uploadingDoc === docType.tipo;
                 const hasSelectedFile = !!selectedFiles[docType.tipo];
