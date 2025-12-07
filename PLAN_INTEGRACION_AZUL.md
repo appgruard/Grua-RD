@@ -5,11 +5,11 @@ Migrar el sistema de pagos a Azul API con tokenización (DataVault) y crear un s
 
 ## Fases de Implementación
 
-### Fase 1: Limpieza y Preparación ✅ (En progreso)
-- [ ] Remover referencias a dLocal del código
-- [ ] Remover referencias a Pagadito del código
-- [ ] Limpiar archivos de servicios de pago obsoletos
-- [ ] Actualizar schema si es necesario
+### Fase 1: Limpieza y Preparación ✅ (Completada)
+- [x] Remover referencias a dLocal del código
+- [x] Remover referencias a Pagadito del código
+- [x] Limpiar archivos de servicios de pago obsoletos
+- [x] Actualizar schema si es necesario
 
 ### Fase 2: Servicio Azul API
 - [ ] Crear `server/services/azul-payment.ts` con:

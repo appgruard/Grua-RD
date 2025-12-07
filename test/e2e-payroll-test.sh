@@ -246,7 +246,7 @@ main() {
   echo "  2. Add bank account"
   echo "  3. Create service and payment"
   echo "  4. Test withdrawals"
-  echo "  5. Verify dLocal API integration"
+  echo "  5. Verify Azul API integration"
   
   echo -e "\n${GREEN}All basic tests passed! System is ready for integration testing.${NC}\n"
 }
