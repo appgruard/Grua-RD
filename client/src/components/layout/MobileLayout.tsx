@@ -66,6 +66,7 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
     { path: '/driver', icon: Home, label: 'Inicio', testId: 'tab-home', badgeType: homeBadgeType },
     { path: '/driver/history', icon: History, label: 'Historial', testId: 'tab-history', badgeType: null },
     { path: '/driver/profile', icon: User, label: 'Perfil', testId: 'tab-profile', badgeType: profileBadgeType },
+    { path: '/driver/support', icon: Phone, label: 'Soporte', testId: 'tab-support', badgeType: null },
   ];
 
   const socioTabs = [
