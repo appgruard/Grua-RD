@@ -1520,6 +1520,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Scan license back side (category and restrictions)
+  app.post("/api/identity/scan-license-back", ocrScanLimiter, async (req: Request, res: Response) => {
+    try {
+      const { image } = req.body;
+
+      if (!image) {
+        return res.status(400).json({ message: "Imagen de la parte trasera de la licencia es requerida" });
+      }
+
+      if (image.length > 10 * 1024 * 1024) {
+        return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
+      }
+
+      const { validateDriverLicenseBack, isVerifikConfigured } = await import("./services/verifik-ocr");
+      
+      if (!isVerifikConfigured()) {
+        return res.status(503).json({ 
+          message: "El servicio de verificación OCR no está configurado" 
+        });
+      }
+
+      const result = await validateDriverLicenseBack(image);
+
+      if (!result.success) {
+        logSystem.warn('License back OCR scan failed', { 
+          error: result.error, 
+          userId: req.user?.id 
+        });
+        return res.status(400).json({ 
+          message: result.error || "No se pudo escanear la parte trasera de la licencia"
+        });
+      }
+
+      logSystem.info('License back OCR scan successful', { 
+        category: result.category,
+        restrictions: result.restrictions ? 'yes' : 'no',
+        confidenceScore: result.score,
+        userId: req.user?.id 
+      });
+
+      res.json({
+        success: true,
+        isValid: result.isValid,
+        category: result.category,
+        restrictions: result.restrictions,
+        expirationDate: result.expirationDate,
+        confidenceScore: result.score,
+        message: result.isValid 
+          ? "Parte trasera de licencia escaneada exitosamente"
+          : "No se pudo extraer la información de la licencia. Intenta con otra foto."
+      });
+    } catch (error: any) {
+      logSystem.error('Scan license back error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al escanear parte trasera de la licencia" });
+    }
+  });
+
   app.post("/api/identity/send-phone-otp", sendOTPLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {
@@ -2328,6 +2385,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get driver public profile (for clients to see when service is accepted)
+  app.get("/api/drivers/:id/public-profile", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      // Get driver by user ID
+      const driverUser = await storage.getUserById(id);
+      if (!driverUser || driverUser.userType !== 'conductor') {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      const conductor = await storage.getConductorByUserId(id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Perfil de conductor no encontrado" });
+      }
+
+      // Get driver vehicles
+      const vehiculos = await storage.getConductorVehiculos(conductor.id);
+
+      // Build public profile (only public information)
+      const publicProfile = {
+        id: driverUser.id,
+        nombre: driverUser.nombre,
+        apellido: driverUser.apellido,
+        fotoUrl: driverUser.fotoUrl,
+        calificacionPromedio: driverUser.calificacionPromedio,
+        licenciaCategoria: conductor.licenciaCategoria,
+        licenciaRestricciones: conductor.licenciaRestricciones,
+        licenciaCategoriaVerificada: conductor.licenciaCategoriaVerificada,
+        vehiculos: vehiculos.map(v => ({
+          id: v.id,
+          categoria: v.categoria,
+          placa: v.placa,
+          color: v.color,
+          marca: v.marca,
+          modelo: v.modelo,
+          fotoUrl: v.fotoUrl,
+        })),
+      };
+
+      res.json(publicProfile);
+    } catch (error: any) {
+      logSystem.error('Get driver public profile error', error);
+      res.status(500).json({ message: "Failed to get driver public profile" });
+    }
+  });
+
   // Optimized endpoint for driver dashboard - returns all data in a single call
   // Performance optimizations:
   // 1. Uses getActiveServiceByConductorId instead of fetching all services
@@ -2637,7 +2741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No autorizado para validar este documento" });
       }
 
-      const { validateFacePhoto, validateDriverLicense, isVerifikConfigured } = await import('./services/verifik-ocr');
+      const { validateFacePhoto, validateDriverLicense, validateDriverLicenseBack, isVerifikConfigured } = await import('./services/verifik-ocr');
       
       if (!isVerifikConfigured()) {
         return res.status(503).json({ 
@@ -2647,8 +2751,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Determine validation type based on document type
-      let validationResult;
+      let validationResult: any;
       let validationType: string;
+      let licenseBackData: { category?: string; restrictions?: string; expirationDate?: string } | null = null;
       
       if (documento.tipo === 'foto_perfil') {
         validationType = 'face';
@@ -2670,6 +2775,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const imageData = `data:${mimeType};base64,${base64}`;
         
         validationResult = await validateDriverLicense(imageData);
+      } else if (documento.tipo === 'licencia_trasera') {
+        validationType = 'license_back';
+        // Get base64 from URL or fetch the image
+        const imageResponse = await fetch(documento.url);
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const base64 = Buffer.from(imageBuffer).toString('base64');
+        const mimeType = documento.mimeType || 'image/jpeg';
+        const imageData = `data:${mimeType};base64,${base64}`;
+        
+        validationResult = await validateDriverLicenseBack(imageData);
+        
+        // Store extracted data for conductor update
+        if (validationResult.success && validationResult.isValid) {
+          licenseBackData = {
+            category: validationResult.category,
+            restrictions: validationResult.restrictions,
+            expirationDate: validationResult.expirationDate,
+          };
+        }
       } else {
         return res.status(400).json({ 
           message: "Este tipo de documento no requiere validación Verifik" 
@@ -2689,6 +2813,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verifikFechaValidacion: new Date(),
         estado: isValid ? 'aprobado' : 'rechazado',
       });
+
+      // If license back was validated successfully, update conductor with extracted data
+      if (validationType === 'license_back' && isValid && licenseBackData && documento.conductorId) {
+        const updateData: any = {
+          licenciaCategoriaVerificada: true,
+        };
+        
+        if (licenseBackData.category) {
+          updateData.licenciaCategoria = licenseBackData.category;
+        }
+        if (licenseBackData.restrictions) {
+          updateData.licenciaRestricciones = licenseBackData.restrictions;
+        }
+        if (licenseBackData.expirationDate) {
+          const parsedDate = new Date(licenseBackData.expirationDate);
+          if (!isNaN(parsedDate.getTime())) {
+            updateData.licenciaFechaVencimiento = parsedDate;
+          }
+        }
+        
+        await storage.updateConductor(documento.conductorId, updateData);
+        
+        logSystem.info('Conductor license back data updated', {
+          conductorId: documento.conductorId,
+          category: licenseBackData.category,
+          restrictions: licenseBackData.restrictions,
+        });
+      }
 
       logSystem.info('Document validation completed', { 
         documentoId: id, 
@@ -2960,10 +3112,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       logService.accepted(servicio.id, req.user!.id);
       
+      // Build driver public profile for client notification
+      const vehiculos = await storage.getConductorVehiculos(conductor.id);
+      const vehiculoAsignado = vehiculoId ? vehiculos.find(v => v.id === vehiculoId) : null;
+      
+      const conductorPublicInfo = {
+        id: req.user!.id,
+        nombre: req.user!.nombre,
+        apellido: req.user!.apellido,
+        fotoUrl: req.user!.fotoUrl,
+        calificacionPromedio: req.user!.calificacionPromedio,
+        licenciaCategoria: conductor.licenciaCategoria,
+        licenciaRestricciones: conductor.licenciaRestricciones,
+        licenciaCategoriaVerificada: conductor.licenciaCategoriaVerificada,
+        vehiculo: vehiculoAsignado ? {
+          id: vehiculoAsignado.id,
+          placa: vehiculoAsignado.placa,
+          color: vehiculoAsignado.color,
+          marca: vehiculoAsignado.marca,
+          modelo: vehiculoAsignado.modelo,
+          fotoUrl: vehiculoAsignado.fotoUrl,
+        } : null,
+      };
+      
       if (serviceSessions.has(servicio.id)) {
         const broadcast = JSON.stringify({
           type: 'service_status_change',
-          payload: servicio,
+          payload: {
+            ...servicio,
+            conductorInfo: conductorPublicInfo,
+          },
         });
         serviceSessions.get(servicio.id)!.forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
@@ -2977,7 +3155,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send notification to client about accepted service
       await pushService.notifyServiceAccepted(servicio.id, servicio.clienteId, conductorName);
 
-      res.json(servicio);
+      // Include conductor info in response
+      res.json({
+        ...servicio,
+        conductorInfo: conductorPublicInfo,
+      });
     } catch (error: any) {
       logSystem.error('Accept service error', error, { servicioId: req.params.id, conductorId: req.user!.id });
       res.status(500).json({ message: "Failed to accept service" });
