@@ -901,7 +901,7 @@ export class DatabaseStorage implements IStorage {
 
   async getServicioByPaymentToken(token: string): Promise<Servicio | undefined> {
     const result = await db.query.servicios.findFirst({
-      where: eq(servicios.pagaditoToken, token),
+      where: eq(servicios.azulDataVaultToken, token),
     });
     return result;
   }
@@ -1913,12 +1913,12 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', dlocalPayoutId?: string): Promise<Comision> {
+  async marcarComisionPagada(id: string, tipo: 'operador' | 'empresa', azulPayoutReference?: string): Promise<Comision> {
     const updateData: Partial<Comision> = tipo === 'operador' 
       ? {
           estadoPagoOperador: 'pagado',
           fechaPagoOperador: new Date(),
-          dlocalPayoutId,
+          azulPayoutReference,
         }
       : {
           estadoPagoEmpresa: 'pagado',

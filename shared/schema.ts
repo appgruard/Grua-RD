@@ -247,12 +247,11 @@ export const servicios = pgTable("servicios", {
   costoTotal: decimal("costo_total", { precision: 10, scale: 2 }).notNull(),
   estado: estadoServicioEnum("estado").default("pendiente").notNull(),
   metodoPago: metodoPagoEnum("metodo_pago").default("efectivo").notNull(),
-  dlocalPaymentId: text("dlocal_payment_id"),
-  dlocalPaymentStatus: text("dlocal_payment_status"),
-  dlocalAuthorizationId: text("dlocal_authorization_id"),
-  pagaditoToken: text("pagadito_token"),
-  pagaditoReference: text("pagadito_reference"),
-  pagaditoStatus: text("pagadito_status"),
+  azulOrderId: text("azul_order_id"),
+  azulPaymentStatus: text("azul_payment_status"),
+  azulAuthorizationCode: text("azul_authorization_code"),
+  azulDataVaultToken: text("azul_data_vault_token"),
+  azulReferenceNumber: text("azul_reference_number"),
   tipoVehiculo: tipoVehiculoEnum("tipo_vehiculo"),
   servicioCategoria: servicioCategoriaEnum("servicio_categoria").default("remolque_estandar"),
   servicioSubtipo: servicioSubtipoEnum("servicio_subtipo"),
@@ -398,11 +397,11 @@ export const comisiones = pgTable("comisiones", {
   porcentajeEmpresa: decimal("porcentaje_empresa", { precision: 5, scale: 2 }).default("20.00").notNull(),
   estadoPagoOperador: estadoPagoEnum("estado_pago_operador").default("pendiente").notNull(),
   estadoPagoEmpresa: estadoPagoEnum("estado_pago_empresa").default("pendiente").notNull(),
-  dlocalPayoutId: text("dlocal_payout_id"),
-  dlocalPayoutStatus: text("dlocal_payout_status"),
-  dlocalFeeAmount: decimal("dlocal_fee_amount", { precision: 12, scale: 2 }),
-  dlocalFeeCurrency: varchar("dlocal_fee_currency", { length: 3 }).default("DOP"),
-  dlocalNetAmount: decimal("dlocal_net_amount", { precision: 12, scale: 2 }),
+  azulPayoutReference: text("azul_payout_reference"),
+  azulPayoutStatus: text("azul_payout_status"),
+  azulFeeAmount: decimal("azul_fee_amount", { precision: 12, scale: 2 }),
+  azulFeeCurrency: varchar("azul_fee_currency", { length: 3 }).default("DOP"),
+  azulNetAmount: decimal("azul_net_amount", { precision: 12, scale: 2 }),
   fechaPagoOperador: timestamp("fecha_pago_operador"),
   fechaPagoEmpresa: timestamp("fecha_pago_empresa"),
   notas: text("notas"),
@@ -1034,11 +1033,11 @@ export const documentoRecordatoriosRelations = relations(documentoRecordatorios,
 
 // ==================== CLIENT PAYMENT METHODS (Payment Gateway - Azul) ====================
 
-// Client Payment Methods Table (card tokens for clients)
+// Client Payment Methods Table (card tokens for clients using Azul DataVault)
 export const clientPaymentMethods = pgTable("client_payment_methods", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  dlocalCardId: text("dlocal_card_id").notNull(),
+  azulDataVaultToken: text("azul_data_vault_token").notNull(),
   cardBrand: text("card_brand").notNull(),
   last4: text("last4").notNull(),
   expiryMonth: integer("expiry_month").notNull(),
@@ -1056,13 +1055,13 @@ export const clientPaymentMethodsRelations = relations(clientPaymentMethods, ({ 
   }),
 }));
 
-// ==================== OPERATOR PAYMENT METHODS (Payment Gateway) ====================
+// ==================== OPERATOR PAYMENT METHODS (Payment Gateway - Azul) ====================
 
-// Operator Payment Methods Table (card tokens for operators to pay debts)
+// Operator Payment Methods Table (card tokens for operators using Azul DataVault)
 export const operatorPaymentMethods = pgTable("operator_payment_methods", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
-  dlocalCardId: text("dlocal_card_id").notNull(),
+  azulDataVaultToken: text("azul_data_vault_token").notNull(),
   cardBrand: text("card_brand").notNull(),
   last4: text("last4").notNull(),
   expiryMonth: integer("expiry_month").notNull(),
@@ -1112,7 +1111,7 @@ export const tipoRetiroEnum = pgEnum("tipo_retiro", [
   "inmediato"
 ]);
 
-// Operator Withdrawals Table (payout requests)
+// Operator Withdrawals Table (payout requests via Azul)
 export const operatorWithdrawals = pgTable("operator_withdrawals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
@@ -1121,8 +1120,8 @@ export const operatorWithdrawals = pgTable("operator_withdrawals", {
   comision: decimal("comision", { precision: 12, scale: 2 }).default("0.00").notNull(),
   tipoRetiro: tipoRetiroEnum("tipo_retiro").default("programado").notNull(),
   estado: estadoPagoEnum("estado").default("pendiente").notNull(),
-  dlocalPayoutId: text("dlocal_payout_id"),
-  dlocalStatus: text("dlocal_status"),
+  azulPayoutReference: text("azul_payout_reference"),
+  azulPayoutStatus: text("azul_payout_status"),
   errorMessage: text("error_message"),
   procesadoAt: timestamp("procesado_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1140,15 +1139,15 @@ export const scheduledPayouts = pgTable("scheduled_payouts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Scheduled Payout Items (individual payouts within a scheduled batch)
+// Scheduled Payout Items (individual payouts within a scheduled batch via Azul)
 export const scheduledPayoutItems = pgTable("scheduled_payout_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   scheduledPayoutId: varchar("scheduled_payout_id").notNull().references(() => scheduledPayouts.id, { onDelete: "cascade" }),
   conductorId: varchar("conductor_id").notNull().references(() => conductores.id, { onDelete: "cascade" }),
   monto: decimal("monto", { precision: 12, scale: 2 }).notNull(),
   estado: estadoPagoEnum("estado").default("pendiente").notNull(),
-  dlocalPayoutId: text("dlocal_payout_id"),
-  dlocalStatus: text("dlocal_status"),
+  azulPayoutReference: text("azul_payout_reference"),
+  azulPayoutStatus: text("azul_payout_status"),
   errorMessage: text("error_message"),
   procesadoAt: timestamp("procesado_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1601,7 +1600,7 @@ export const insertDistribucionSocioSchema = createInsertSchema(distribucionesSo
 });
 
 export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentMethods, {
-  dlocalCardId: z.string().min(1, "ID de tarjeta dLocal es requerido"),
+  azulDataVaultToken: z.string().min(1, "Token de Azul DataVault es requerido"),
   cardBrand: z.string().min(1, "Marca de tarjeta es requerida"),
   last4: z.string().length(4, "Los últimos 4 dígitos son requeridos"),
   expiryMonth: z.number().min(1).max(12),
@@ -1614,7 +1613,7 @@ export const insertClientPaymentMethodSchema = createInsertSchema(clientPaymentM
 });
 
 export const insertOperatorPaymentMethodSchema = createInsertSchema(operatorPaymentMethods, {
-  dlocalCardId: z.string().min(1, "ID de tarjeta dLocal es requerido"),
+  azulDataVaultToken: z.string().min(1, "Token de Azul DataVault es requerido"),
   cardBrand: z.string().min(1, "Marca de tarjeta es requerida"),
   last4: z.string().length(4, "Los últimos 4 dígitos son requeridos"),
   expiryMonth: z.number().min(1).max(12),
@@ -1649,8 +1648,8 @@ export const insertOperatorWithdrawalSchema = createInsertSchema(operatorWithdra
   id: true,
   createdAt: true,
   estado: true,
-  dlocalPayoutId: true,
-  dlocalStatus: true,
+  azulPayoutReference: true,
+  azulPayoutStatus: true,
   errorMessage: true,
   procesadoAt: true,
 });
@@ -1672,8 +1671,8 @@ export const insertScheduledPayoutItemSchema = createInsertSchema(scheduledPayou
   id: true,
   createdAt: true,
   estado: true,
-  dlocalPayoutId: true,
-  dlocalStatus: true,
+  azulPayoutReference: true,
+  azulPayoutStatus: true,
   errorMessage: true,
   procesadoAt: true,
 });
@@ -2063,7 +2062,7 @@ export const operatorWallets = pgTable("operator_wallets", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Wallet Transactions Table
+// Wallet Transactions Table (using Azul payment gateway)
 export const walletTransactions = pgTable("wallet_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   walletId: varchar("wallet_id").notNull().references(() => operatorWallets.id, { onDelete: "cascade" }),
@@ -2072,8 +2071,8 @@ export const walletTransactions = pgTable("wallet_transactions", {
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }),
   paymentIntentId: text("payment_intent_id"),
-  dlocalTransactionId: text("dlocal_transaction_id"),
-  dlocalFeeAmount: decimal("dlocal_fee_amount", { precision: 12, scale: 2 }),
+  azulTransactionId: text("azul_transaction_id"),
+  azulFeeAmount: decimal("azul_fee_amount", { precision: 12, scale: 2 }),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
