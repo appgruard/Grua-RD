@@ -75,24 +75,33 @@ DATABASE_URL=postgresql://...
 NODE_ENV=production
 
 # CORS - Dominios permitidos (separados por coma)
-ALLOWED_ORIGINS=https://tu-dominio.com,https://app.tu-dominio.com
+ALLOWED_ORIGINS=https://gruard.app,https://www.gruard.app
 
 # Sesión
 SESSION_SECRET=your_generated_secret_32_chars_min
 
-# Push Notifications
+# Push Notifications (VAPID)
 VAPID_PRIVATE_KEY=your_vapid_private_key
+VAPID_PUBLIC_KEY=your_vapid_public_key
 VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
 
 # Mapbox
+MAPBOX_ACCESS_TOKEN=pk.xxx
 VITE_MAPBOX_ACCESS_TOKEN=pk.xxx
 
-# Stripe
-STRIPE_SECRET_KEY=sk_live_xxx
-VITE_STRIPE_PUBLIC_KEY=pk_live_xxx
+# Email (Resend)
+RESEND_API_KEY=re_xxx
+
+# dLocal (Pagos)
+DLOCAL_X_LOGIN=xxx
+DLOCAL_X_TRANS_KEY=xxx
+DLOCAL_SECRET_KEY=xxx
+
+# Verificación de identidad (Verifik)
+VERIFIK_API_KEY=xxx
 
 # API URL para apps móviles (IMPORTANTE para iOS/Android)
-VITE_API_URL=https://tu-dominio.com
+VITE_API_URL=https://gruard.app
 ```
 
 **IMPORTANTE**: 
@@ -242,7 +251,9 @@ https://tu-dominio.com/api/...
 - [ ] Todas las variables de entorno definidas
 - [ ] ALLOWED_ORIGINS contiene tu dominio de producción
 - [ ] VITE_API_URL configurado para apps móviles
-- [ ] VAPID keys generadas: `npx web-push generate-vapid-keys`
+- [ ] VAPID keys configuradas (VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VITE_VAPID_PUBLIC_KEY)
+- [ ] Resend API key configurada (RESEND_API_KEY)
+- [ ] dLocal keys configuradas (DLOCAL_X_LOGIN, DLOCAL_X_TRANS_KEY, DLOCAL_SECRET_KEY)
 - [ ] Certificado SSL habilitado en CapRover
 - [ ] Health check pasando (verifica logs)
 - [ ] Dominio apuntando a tu VPS
@@ -320,8 +331,9 @@ En CapRover → Logs & Monitoring → Backup:
 
 1. **Configurar CI/CD**: GitHub Actions para tests antes de deploy
 2. **Monitoring**: Sentry para error tracking
-3. **Emails transaccionales**: Resend ya configurado
-4. **SMS**: Twilio ya configurado
+3. **Emails transaccionales**: Resend configurado (14 plantillas disponibles)
+4. **SMS**: Twilio configurado para OTP
+5. **Pagos**: dLocal configurado para República Dominicana
 5. **Analytics**: Agregrega tu herramienta de analytics
 
 ---

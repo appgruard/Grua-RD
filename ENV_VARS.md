@@ -102,6 +102,32 @@ Las siguientes variables son configuradas automáticamente por Replit Database:
 
 ---
 
+### 📧 Resend (Email)
+
+#### `RESEND_API_KEY`
+- **Tipo**: Secret (Confidencial)
+- **Ambiente**: Shared
+- **Requerido**: ✅ Sí
+- **Descripción**: API Key de Resend para envío de emails transaccionales
+- **Formato**: `re_...`
+- **Obtención**: https://resend.com/api-keys
+- **Uso**: 
+  - `server/email-service.ts` - Envío de todos los emails
+- **Plantillas disponibles** (14 en total):
+  - OTP/Verificación
+  - Bienvenida General
+  - Bienvenida Cliente
+  - Bienvenida Operador
+  - Notificación de Servicio
+  - Restablecer Contraseña
+  - Documento Aprobado/Rechazado
+  - Ticket Creado/Estado Cambiado/Respuesta
+  - Socio Creado/Primer Login
+  - Admin Creado
+- **Seguridad**: ⚠️ NUNCA exponer en frontend
+
+---
+
 ### 📱 Twilio (SMS/OTP)
 
 #### `TWILIO_ACCOUNT_SID`
@@ -428,5 +454,5 @@ Si tienes dudas sobre la configuración de variables de entorno:
 
 ---
 
-**Última actualización**: Diciembre 3, 2025  
-**Versión**: 1.2.0 - Migración de Stripe a dLocal
+**Última actualización**: Diciembre 7, 2025  
+**Versión**: 1.3.0 - Agregado Resend para emails transaccionales
