@@ -19,9 +19,6 @@ export default defineConfig({
         ]
       : []),
   ],
-  optimizeDeps: {
-    include: ['react-map-gl', 'mapbox-gl'],
-  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -33,10 +30,6 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    commonjsOptions: {
-      include: [/react-map-gl/, /node_modules/],
-      transformMixedEsModules: true,
-    },
     rollupOptions: {
       output: {
         manualChunks: {
@@ -53,7 +46,6 @@ export default defineConfig({
             '@radix-ui/react-popover',
             '@radix-ui/react-accordion',
           ],
-          'vendor-maps': ['mapbox-gl', 'react-map-gl'],
           'vendor-charts': ['recharts'],
           'vendor-forms': ['react-hook-form', '@hookform/resolvers'],
           'vendor-animations': ['framer-motion'],
