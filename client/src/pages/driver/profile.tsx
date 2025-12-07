@@ -35,10 +35,21 @@ interface VerifikValidation {
 
 const REQUIRED_DOCUMENTS = [
   { tipo: 'foto_perfil', label: 'Foto de Perfil', requiereVencimiento: false, obligatorio: true, descripcion: 'Debe mostrar claramente tu rostro' },
-  { tipo: 'licencia', label: 'Licencia de Conducir', requiereVencimiento: true, obligatorio: true },
+  { tipo: 'licencia', label: 'Licencia de Conducir (Frente)', requiereVencimiento: true, obligatorio: true },
+  { tipo: 'licencia_trasera', label: 'Licencia de Conducir (Reverso)', requiereVencimiento: false, obligatorio: true, descripcion: 'Muestra el reverso de tu licencia para extraer categoría y restricciones' },
   { tipo: 'cedula_frontal', label: 'Cédula (Frente)', requiereVencimiento: false, obligatorio: true },
   { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false, obligatorio: true },
 ];
+
+// License category descriptions for Dominican Republic
+const LICENSE_CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  'A': 'Motocicletas',
+  'B': 'Vehículos livianos (hasta 3,500 kg)',
+  'C': 'Vehículos pesados (camiones)',
+  'D': 'Transporte de pasajeros',
+  'E': 'Vehículos articulados/con remolque',
+  'F': 'Vehículos agrícolas/industriales',
+};
 
 const DOCUMENTOS_CON_VENCIMIENTO = ['licencia'];
 
@@ -831,6 +842,72 @@ export default function DriverProfile() {
               {!verifikStatus?.cedulaVerificada && (
                 <p className="text-xs text-muted-foreground">
                   Tu identidad será verificada automáticamente durante el proceso de registro.
+                </p>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-6 mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <CreditCard className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Categoría de Licencia</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-sm text-muted-foreground">Categoría</span>
+                {driverData.licenciaCategoria ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default" data-testid="badge-license-category">
+                      Categoría {driverData.licenciaCategoria}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {LICENSE_CATEGORY_DESCRIPTIONS[driverData.licenciaCategoria] || ''}
+                    </span>
+                  </div>
+                ) : (
+                  <Badge variant="secondary" data-testid="badge-license-category-pending">
+                    No verificada
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-sm text-muted-foreground">Estado de Verificación</span>
+                {driverData.licenciaCategoriaVerificada ? (
+                  <Badge variant="default" className="gap-1" data-testid="badge-license-verified">
+                    <ShieldCheck className="w-3 h-3" />
+                    Verificada
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="gap-1" data-testid="badge-license-unverified">
+                    <ShieldAlert className="w-3 h-3" />
+                    Pendiente
+                  </Badge>
+                )}
+              </div>
+
+              {driverData.licenciaRestricciones && (
+                <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Restricciones</span>
+                  <span className="text-sm font-medium text-amber-600 dark:text-amber-400" data-testid="text-license-restrictions">
+                    {driverData.licenciaRestricciones}
+                  </span>
+                </div>
+              )}
+
+              {driverData.licenciaFechaVencimiento && (
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Vencimiento de Licencia</span>
+                  <span className="text-sm font-medium" data-testid="text-license-expiration">
+                    {formatDate(driverData.licenciaFechaVencimiento as unknown as string)}
+                  </span>
+                </div>
+              )}
+
+              {!driverData.licenciaCategoriaVerificada && (
+                <p className="text-xs text-muted-foreground">
+                  Sube el reverso de tu licencia de conducir en la sección de documentos para verificar tu categoría.
                 </p>
               )}
             </div>
