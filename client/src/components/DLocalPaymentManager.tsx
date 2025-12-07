@@ -52,10 +52,7 @@ export default function DLocalPaymentManager() {
 
   const addCardMutation = useMutation({
     mutationFn: async (cardData: { cardNumber: string; cardExpiry: string; cardCVV: string; cardholderName?: string }) => {
-      return apiRequest('/api/client/payment-methods', {
-        method: 'POST',
-        body: JSON.stringify(cardData),
-      });
+      return apiRequest('POST', '/api/client/payment-methods', cardData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/client/payment-methods'] });
@@ -77,9 +74,7 @@ export default function DLocalPaymentManager() {
 
   const deleteCardMutation = useMutation({
     mutationFn: async (methodId: string) => {
-      return apiRequest(`/api/client/payment-methods/${methodId}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/client/payment-methods/${methodId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/client/payment-methods'] });
@@ -99,9 +94,7 @@ export default function DLocalPaymentManager() {
 
   const setDefaultMutation = useMutation({
     mutationFn: async (methodId: string) => {
-      return apiRequest(`/api/client/payment-methods/${methodId}/set-default`, {
-        method: 'POST',
-      });
+      return apiRequest('POST', `/api/client/payment-methods/${methodId}/set-default`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/client/payment-methods'] });
