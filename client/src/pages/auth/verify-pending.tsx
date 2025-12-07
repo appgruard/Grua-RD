@@ -39,9 +39,12 @@ export default function VerifyPending() {
   
   const currentUser = user || pendingVerificationUser;
   const isDriver = currentUser?.userType === 'conductor';
+  // Either telefonoVerificado OR emailVerificado counts as contact verified
+  const contactoVerificado = currentUser?.telefonoVerificado || (currentUser as any)?.emailVerificado || false;
+  
   const verificationStatus = pendingVerification || {
     cedulaVerificada: currentUser?.cedulaVerificada || false,
-    telefonoVerificado: currentUser?.telefonoVerificado || false,
+    telefonoVerificado: contactoVerificado,
     fotoVerificada: (currentUser as any)?.fotoVerificada || false,
   };
 

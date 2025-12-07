@@ -29,7 +29,9 @@ export default function Login() {
     if (user && !isLoading) {
       // Check if conductor needs verification using server data
       if (user.userType === 'conductor') {
-        const needsVerification = !user.cedulaVerificada || !user.telefonoVerificado;
+        // Either telefonoVerificado OR emailVerificado counts as contact verified
+        const contactoVerificado = user.telefonoVerificado || (user as any).emailVerificado;
+        const needsVerification = !user.cedulaVerificada || !contactoVerificado || !user.fotoVerificada;
         if (needsVerification) {
           setLocation('/verify-pending');
           return;
