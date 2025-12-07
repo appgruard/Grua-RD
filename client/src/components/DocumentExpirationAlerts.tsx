@@ -12,10 +12,7 @@ interface DocumentExpirationAlertsProps {
 
 const DOCUMENT_TYPE_NAMES: Record<string, string> = {
   'licencia': 'Licencia de Conducir',
-  'matricula': 'Matrícula del Vehículo',
-  'seguro_grua': 'Seguro de la Grúa',
   'poliza': 'Póliza de Seguro',
-  'foto_vehiculo': 'Foto del Vehículo',
   'foto_perfil': 'Foto de Perfil',
   'cedula_frontal': 'Cédula (Frente)',
   'cedula_trasera': 'Cédula (Reverso)',

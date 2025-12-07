@@ -171,7 +171,7 @@ export interface IStorage {
   updateDriverLocation(userId: string, lat: number, lng: number): Promise<Conductor>;
   getAvailableDrivers(): Promise<Array<Conductor & { user: User }>>;
   getAvailableDriversForCategory(categoria: string): Promise<Array<Conductor & { user: User; vehiculo: ConductorVehiculo }>>;
-  getAllDrivers(): Promise<Array<Conductor & { user: User }>>;
+  getAllDrivers(): Promise<Array<Conductor & { user: User; vehiculos: ConductorVehiculo[] }>>;
 
   // Conductor Services (Service Categories and Subtypes)
   getConductorServicios(conductorId: string): Promise<Array<ConductorServicio & { subtipos: ConductorServicioSubtipo[] }>>;
@@ -751,10 +751,11 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getAllDrivers(): Promise<Array<Conductor & { user: User }>> {
+  async getAllDrivers(): Promise<Array<Conductor & { user: User; vehiculos: ConductorVehiculo[] }>> {
     const results = await db.query.conductores.findMany({
       with: {
         user: true,
+        vehiculos: true,
       },
     });
     return results as any;

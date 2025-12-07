@@ -39,14 +39,11 @@ interface DocumentStatusSummary {
 
 const REQUIRED_DOCUMENTS = [
   { tipo: 'licencia', label: 'Licencia de Conducir', requiereVencimiento: true, descripcion: 'Licencia de conducir vigente' },
-  { tipo: 'matricula', label: 'Matrícula del Vehículo', requiereVencimiento: true, descripcion: 'Matrícula de la grúa' },
-  { tipo: 'seguro_grua', label: 'Seguro de la Grúa', requiereVencimiento: true, descripcion: 'Póliza de seguro del vehículo' },
-  { tipo: 'foto_vehiculo', label: 'Foto del Vehículo', requiereVencimiento: false, descripcion: 'Foto frontal de la grúa' },
   { tipo: 'cedula_frontal', label: 'Cédula (Frente)', requiereVencimiento: false, descripcion: 'Parte frontal de su cédula' },
   { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false, descripcion: 'Parte trasera de su cédula' },
 ];
 
-const DOCUMENTOS_CON_VENCIMIENTO = ['seguro_grua', 'licencia', 'matricula'];
+const DOCUMENTOS_CON_VENCIMIENTO = ['licencia'];
 
 export default function DocumentRenewal() {
   const { user } = useAuth();

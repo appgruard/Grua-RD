@@ -462,6 +462,14 @@ export const conductoresRelations = relations(conductores, ({ one, many }) => ({
   servicios: many(servicios),
   ubicacionesTracking: many(ubicacionesTracking),
   serviciosOfrecidos: many(conductorServicios),
+  vehiculos: many(conductorVehiculos),
+}));
+
+export const conductorVehiculosRelations = relations(conductorVehiculos, ({ one }) => ({
+  conductor: one(conductores, {
+    fields: [conductorVehiculos.conductorId],
+    references: [conductores.id],
+  }),
 }));
 
 export const conductorServiciosRelations = relations(conductorServicios, ({ one, many }) => ({

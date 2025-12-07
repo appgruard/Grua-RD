@@ -47,6 +47,14 @@ Grúa RD uses a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js)
 ### System Design Choices
 The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage uses Replit Object Storage with strict authorization. Azul API payment integration (migración pendiente) will use server-side processing with webhook verification. Insurance API integrations use an Adapter pattern. Driver profile API is optimized for single-call data retrieval. Service auto-cancellation uses atomic updates and real-time notifications. The vehicle-per-category system enforces unique constraints for driver and category. Performance optimizations include smart location tracking with movement thresholds, lazy loading of map components, and consolidated API endpoint `/api/drivers/init` for fast driver dashboard loading. Loading optimizations include self-hosted fonts, an enhanced service worker, role-based preloading, AuthProvider cookie optimization, specialized skeleton screens, React Query optimizations, an `OptimizedImage` component, and dynamic preconnect by role. Web Vitals tracking and custom page load metrics are implemented, with an analytics API endpoint for data reception. TTFB optimizations include aggressive cache headers for static assets (fonts: 1 year immutable, hashed JS/CSS: 1 year immutable), X-Response-Time header for monitoring, Early Hints via Link headers for font preloading and Mapbox preconnect, and fast-path middleware to skip logging for static assets. These optimizations improved TTFB from 814ms to 13ms (-98%).
 
+## Recent Changes
+
+### December 2025 - Multi-Vehicle Operator Support
+- **Removed Vehicle-Specific Document Requirements**: Operators can now manage multiple tow trucks without needing to upload vehicle-specific documents (Matrícula del vehículo, Seguro de la grúa, Foto del vehículo) at the operator level. Vehicle documentation is managed per-vehicle in the `conductorVehiculos` table.
+- **Dynamic Map Marker Colors**: Admin monitoring page now displays tow truck markers with colors based on the operator's vehicle color input. The first active vehicle's color is used for map representation.
+- **Schema Updates**: Added `vehiculos` relation to `conductoresRelations` and `conductorVehiculosRelations` for proper one-to-many relationship between operators and vehicles.
+- **Required Documents Simplified**: Driver onboarding and document renewal now only require: Licencia de Conducir, Cédula (Frente/Reverso). Vehicle-specific documents are managed separately.
+
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
 - **Mapbox**: Maps (Mapbox GL JS via react-map-gl), Directions API, Geocoding API.

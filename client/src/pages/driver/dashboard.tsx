@@ -416,11 +416,10 @@ export default function DriverDashboard() {
   const checkDocumentsComplete = () => {
     if (!driverDocuments) return { complete: false, missing: 0 };
     
-    const requiredTypes = ['licencia', 'matricula', 'seguro_grua', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
+    const requiredTypes = ['licencia', 'cedula_frontal', 'cedula_trasera'];
     let missingCount = 0;
     
     for (const requiredType of requiredTypes) {
-      // Skip cedula documents if user has cedulaVerificada = true (verified via identity scan)
       if ((requiredType === 'cedula_frontal' || requiredType === 'cedula_trasera') && user?.cedulaVerificada) {
         continue;
       }

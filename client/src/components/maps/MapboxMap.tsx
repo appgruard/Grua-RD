@@ -140,9 +140,17 @@ function LocationPinIcon({ className }: { className?: string }) {
   );
 }
 
-function TowTruckIcon({ className, isActive = true }: { className?: string; isActive?: boolean }) {
-  const mainColor = isActive ? "currentColor" : "#64748b";
-  const detailColor = isActive ? "#0F2947" : "#475569";
+function darkenColor(hex: string, amount: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.max(0, Math.floor((num >> 16) * (1 - amount)));
+  const g = Math.max(0, Math.floor(((num >> 8) & 0x00FF) * (1 - amount)));
+  const b = Math.max(0, Math.floor((num & 0x0000FF) * (1 - amount)));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
+function TowTruckIcon({ className, isActive = true, customColor }: { className?: string; isActive?: boolean; customColor?: string }) {
+  const mainColor = customColor || (isActive ? "currentColor" : "#64748b");
+  const detailColor = customColor ? darkenColor(customColor, 0.4) : (isActive ? "#0F2947" : "#475569");
   const windowColor = isActive ? "#87CEEB" : "#94a3b8";
   
   return (
@@ -636,6 +644,7 @@ export function MapboxMap({
           const { Component, size, color } = iconConfig;
           const isActive = 'isActive' in iconConfig ? iconConfig.isActive : true;
           const isInactiveDriver = markerType === 'driver_inactive';
+          const hasCustomColor = marker.color && (markerType === 'driver' || markerType === 'driver_inactive');
           
           return (
             <Marker
@@ -653,8 +662,9 @@ export function MapboxMap({
               >
                 {markerType === 'driver' || markerType === 'driver_inactive' ? (
                   <TowTruckIcon 
-                    className={`${size} ${color}`}
+                    className={`${size} ${hasCustomColor ? '' : color}`}
                     isActive={isActive}
+                    customColor={hasCustomColor ? marker.color : undefined}
                   />
                 ) : (
                   <Component className={`${size} ${color}`} />

@@ -65,13 +65,11 @@ type StatusFilter = 'all' | 'pendiente' | 'aprobado' | 'rechazado';
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   licencia: 'Licencia de Conducir',
-  matricula: 'Matrícula del Vehículo',
   poliza: 'Póliza de Seguro',
-  seguro_grua: 'Seguro de la Grúa',
-  foto_vehiculo: 'Foto del Vehículo',
   foto_perfil: 'Foto de Perfil',
   cedula_frontal: 'Cédula (Frente)',
   cedula_trasera: 'Cédula (Reverso)',
+  seguro_cliente: 'Seguro del Cliente',
 };
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {

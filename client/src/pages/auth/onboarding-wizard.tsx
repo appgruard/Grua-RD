@@ -408,7 +408,7 @@ export default function OnboardingWizard() {
       if (insuranceFile) {
         const formDataIns = new FormData();
         formDataIns.append('document', insuranceFile);
-        formDataIns.append('tipoDocumento', formData.userType === 'conductor' ? 'seguro_grua' : 'seguro_cliente');
+        formDataIns.append('tipoDocumento', formData.userType === 'conductor' ? 'poliza' : 'seguro_cliente');
         const insRes = await fetch('/api/documents/upload', {
           method: 'POST',
           body: formDataIns,

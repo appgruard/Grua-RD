@@ -6,13 +6,19 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CircleOff, Circle, MapPinOff } from 'lucide-react';
-import type { Conductor, User } from '@shared/schema';
+import type { Conductor, User, ConductorVehiculo } from '@shared/schema';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-type ConductorWithUser = Conductor & { user: User };
+type ConductorWithUser = Conductor & { user: User; vehiculos?: ConductorVehiculo[] };
 
 const DEFAULT_CENTER = { lat: 18.4861, lng: -69.9312 };
+
+function getDriverVehicleColor(driver: ConductorWithUser): string | undefined {
+  if (!driver.vehiculos || driver.vehiculos.length === 0) return undefined;
+  const activeVehicle = driver.vehiculos.find(v => v.activo);
+  return activeVehicle?.color || driver.vehiculos[0]?.color;
+}
 
 function calculateOperatorsCentroid(
   drivers: Array<{ lat: number; lng: number }>
@@ -96,10 +102,12 @@ export default function AdminMonitoring() {
       position: { lat: number; lng: number };
       title: string;
       type: MarkerType;
+      color?: string;
     }> = [];
 
     if (viewFilter === 'all' || viewFilter === 'active') {
       activeDriversWithLocation.forEach((driver) => {
+        const vehicleColor = getDriverVehicleColor(driver);
         allMarkers.push({
           position: {
             lat: parseFloat(driver.ubicacionLat as string),
@@ -107,6 +115,7 @@ export default function AdminMonitoring() {
           },
           title: `${driver.user.nombre} ${driver.user.apellido}`,
           type: 'driver' as const,
+          color: vehicleColor,
         });
       });
     }
@@ -192,6 +201,7 @@ export default function AdminMonitoring() {
               {driversToShow.map((driver) => {
                 const isActive = driver.disponible;
                 const driverHasLocation = hasLocation(driver);
+                const vehicleColor = getDriverVehicleColor(driver);
                 return (
                   <div
                     key={driver.id}
@@ -200,9 +210,18 @@ export default function AdminMonitoring() {
                   >
                     <div className="flex items-start justify-between mb-2 gap-1">
                       <div className="min-w-0 flex-1">
-                        <p className={`font-medium text-sm truncate ${!isActive ? 'text-muted-foreground' : ''}`}>
-                          {driver.user.nombre} {driver.user.apellido}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          {vehicleColor && isActive && (
+                            <div 
+                              className="w-3 h-3 rounded-full border border-foreground/20 shrink-0" 
+                              style={{ backgroundColor: vehicleColor }}
+                              title={`Color del vehículo: ${vehicleColor}`}
+                            />
+                          )}
+                          <p className={`font-medium text-sm truncate ${!isActive ? 'text-muted-foreground' : ''}`}>
+                            {driver.user.nombre} {driver.user.apellido}
+                          </p>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {driver.placaGrua}
                         </p>

@@ -36,14 +36,11 @@ interface VerifikValidation {
 const REQUIRED_DOCUMENTS = [
   { tipo: 'foto_perfil', label: 'Foto de Perfil', requiereVencimiento: false, obligatorio: true, descripcion: 'Debe mostrar claramente tu rostro' },
   { tipo: 'licencia', label: 'Licencia de Conducir', requiereVencimiento: true, obligatorio: true },
-  { tipo: 'matricula', label: 'Matrícula del Vehículo', requiereVencimiento: true, obligatorio: true },
-  { tipo: 'seguro_grua', label: 'Seguro de la Grúa', requiereVencimiento: true, obligatorio: true },
-  { tipo: 'foto_vehiculo', label: 'Foto del Vehículo', requiereVencimiento: false, obligatorio: true },
   { tipo: 'cedula_frontal', label: 'Cédula (Frente)', requiereVencimiento: false, obligatorio: true },
   { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false, obligatorio: true },
 ];
 
-const DOCUMENTOS_CON_VENCIMIENTO = ['seguro_grua', 'licencia', 'matricula'];
+const DOCUMENTOS_CON_VENCIMIENTO = ['licencia'];
 
 interface PayoutAccountStatus {
   configured: boolean;
