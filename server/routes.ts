@@ -266,6 +266,8 @@ export const getSafeUser = (user: any) => {
     fotoUrl: user.fotoUrl,
     calificacionPromedio: user.calificacionPromedio,
     telefonoVerificado: user.telefonoVerificado,
+    emailVerificado: user.emailVerificado,
+    fotoVerificada: user.fotoVerificada,
     createdAt: user.createdAt,
   };
   
