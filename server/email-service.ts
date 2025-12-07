@@ -197,8 +197,8 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Código de Verificación</p>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0;">Código de Verificación</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -220,19 +220,19 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.seguridad)}
           
-          ${generateFooterHTML('Este es un correo automático de GruaRD. Por favor no respondas a este mensaje.')}
+          ${generateFooterHTML('Este es un correo automático de Grúa RD. Por favor no respondas a este mensaje.')}
         </div>
       </body>
       </html>
     `;
 
-    const text = `${greeting},\n\nTu código de verificación GruaRD es: ${code}\n\nEste código es válido por 10 minutos.\n\nSi no solicitaste este código, puedes ignorar este correo.\n\n---\nGrúa RD\nDepartamento de Seguridad\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `${greeting},\n\nTu código de verificación Grúa RD es: ${code}\n\nEste código es válido por 10 minutos.\n\nSi no solicitaste este código, puedes ignorar este correo.\n\n---\nGrúa RD\nDepartamento de Seguridad\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD Verificación <${resend.fromEmail}>`,
+        from: `Grúa RD Verificación <${resend.fromEmail}>`,
         to: [email],
-        subject: `Tu código de verificación GruaRD: ${code}`,
+        subject: `Tu código de verificación Grúa RD: ${code}`,
         html,
         text,
       });
@@ -260,18 +260,18 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">¡Bienvenido a GruaRD!</h1>
+          <h1 style="color: white; margin: 0; font-size: 24px;">¡Bienvenido a Grúa RD!</h1>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px;">Hola ${userName},</p>
           
           <p style="font-size: 16px;">
-            ¡Gracias por registrarte en GruaRD! Estamos emocionados de tenerte con nosotros.
+            ¡Gracias por registrarte en Grúa RD! Estamos emocionados de tenerte con nosotros.
           </p>
           
           <p style="font-size: 16px;">
-            Con GruaRD puedes:
+            Con Grúa RD puedes:
           </p>
           
           <ul style="font-size: 14px; color: #555;">
@@ -293,11 +293,11 @@ class ResendEmailService implements EmailService {
       </html>
     `;
 
-    const text = `Hola ${userName},\n\n¡Bienvenido a GruaRD!\n\nGracias por registrarte. Ahora puedes solicitar servicios de grúa en tiempo real, seguir la ubicación de tu grúa, y más.\n\nSi tienes preguntas, contáctanos en info@gruard.com\n\n---\nGrúa RD\nDepartamento de Atención al Cliente\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `Hola ${userName},\n\n¡Bienvenido a Grúa RD!\n\nGracias por registrarte. Ahora puedes solicitar servicios de grúa en tiempo real, seguir la ubicación de tu grúa, y más.\n\nSi tienes preguntas, contáctanos en info@gruard.com\n\n---\nGrúa RD\nDepartamento de Atención al Cliente\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     return this.sendEmail({
       to: email,
-      subject: '¡Bienvenido a GruaRD!',
+      subject: '¡Bienvenido a Grúa RD!',
       html,
       text,
     });
@@ -319,21 +319,21 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a GruaRD</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Tu servicio de gruas de confianza</p>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a Grúa RD</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Tu servicio de gruas de confianza</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px;">Hola ${userName},</p>
           
           <p style="font-size: 16px;">
-            Gracias por registrarte en GruaRD. Estamos comprometidos a brindarte el mejor servicio de asistencia vial en Republica Dominicana.
+            Gracias por registrarte en Grúa RD. Estamos comprometidos a brindarte el mejor servicio de asistencia vial en Republica Dominicana.
           </p>
           
           <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
             <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Como solicitar un servicio:</h3>
             <ol style="margin: 0; padding-left: 20px; color: #555;">
-              <li style="margin-bottom: 8px;">Ingresa a tu cuenta en GruaRD</li>
+              <li style="margin-bottom: 8px;">Ingresa a tu cuenta en Grúa RD</li>
               <li style="margin-bottom: 8px;">Indica tu ubicacion actual</li>
               <li style="margin-bottom: 8px;">Selecciona el tipo de servicio que necesitas</li>
               <li style="margin-bottom: 8px;">Confirma y espera a tu operador</li>
@@ -355,24 +355,24 @@ class ResendEmailService implements EmailService {
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="https://gruard.com" style="background: #1e3a5f; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Ir a GruaRD</a>
+            <a href="https://gruard.com" style="background: #1e3a5f; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Ir a Grúa RD</a>
           </div>
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.atencionCliente)}
           
-          ${generateFooterHTML('GruaRD - Tu servicio de gruas de confianza')}
+          ${generateFooterHTML('Grúa RD - Tu servicio de gruas de confianza')}
         </div>
       </body>
       </html>
     `;
 
-    const text = `Hola ${userName},\n\nGracias por registrarte en GruaRD. Estamos comprometidos a brindarte el mejor servicio de asistencia vial.\n\nComo solicitar un servicio:\n1. Ingresa a tu cuenta en GruaRD\n2. Indica tu ubicacion actual\n3. Selecciona el tipo de servicio\n4. Confirma y espera a tu operador\n\nMetodos de pago: Efectivo, Tarjeta, Transferencia\n\nLinea de emergencias 24/7: +1 (809) 555-GRUA\n\n---\nGrúa RD\nDepartamento de Atención al Cliente\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `Hola ${userName},\n\nGracias por registrarte en Grúa RD. Estamos comprometidos a brindarte el mejor servicio de asistencia vial.\n\nComo solicitar un servicio:\n1. Ingresa a tu cuenta en Grúa RD\n2. Indica tu ubicacion actual\n3. Selecciona el tipo de servicio\n4. Confirma y espera a tu operador\n\nMetodos de pago: Efectivo, Tarjeta, Transferencia\n\nLinea de emergencias 24/7: +1 (809) 555-GRUA\n\n---\nGrúa RD\nDepartamento de Atención al Cliente\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD <${resend.fromEmail}>`,
+        from: `Grúa RD <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido a GruaRD - Tu servicio de gruas de confianza',
+        subject: 'Bienvenido a Grúa RD - Tu servicio de gruas de confianza',
         html,
         text,
       });
@@ -406,15 +406,15 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido al Equipo GruaRD</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Gracias por unirte como operador</p>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido al Equipo Grúa RD</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Gracias por unirte como operador</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px;">Hola ${userName},</p>
           
           <p style="font-size: 16px;">
-            Gracias por registrarte como operador en GruaRD. Estamos emocionados de tenerte en nuestro equipo de profesionales.
+            Gracias por registrarte como operador en Grúa RD. Estamos emocionados de tenerte en nuestro equipo de profesionales.
           </p>
           
           <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px 20px; margin: 20px 0;">
@@ -428,7 +428,7 @@ class ResendEmailService implements EmailService {
           </div>
           
           <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Beneficios de ser operador GruaRD:</h3>
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Beneficios de ser operador Grúa RD:</h3>
             <ul style="margin: 0; padding-left: 20px; color: #555;">
               <li style="margin-bottom: 8px;"><strong>80% de comision</strong> - Tu te quedas con el 80% de cada servicio</li>
               <li style="margin-bottom: 8px;"><strong>Flexibilidad total</strong> - Trabaja cuando quieras</li>
@@ -462,19 +462,19 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.operadores)}
           
-          ${generateFooterHTML('GruaRD - Juntos hacemos la diferencia')}
+          ${generateFooterHTML('Grúa RD - Juntos hacemos la diferencia')}
         </div>
       </body>
       </html>
     `;
 
-    const text = `Hola ${userName},\n\nGracias por registrarte como operador en GruaRD. Estamos emocionados de tenerte en nuestro equipo.\n\nProximos pasos:\n1. Completa la verificacion de tus documentos\n2. Espera la aprobacion de nuestro equipo\n3. Configura tu perfil y disponibilidad\n4. Comienza a recibir solicitudes\n\nBeneficios:\n- 80% de comision por servicio\n- Flexibilidad total\n- Pagos semanales\n- Soporte 24/7\n\nImportante: Debes completar la verificacion de documentos antes de poder recibir solicitudes.\n\n---\nGrúa RD\nDepartamento de Operadores\noperadores@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `Hola ${userName},\n\nGracias por registrarte como operador en Grúa RD. Estamos emocionados de tenerte en nuestro equipo.\n\nProximos pasos:\n1. Completa la verificacion de tus documentos\n2. Espera la aprobacion de nuestro equipo\n3. Configura tu perfil y disponibilidad\n4. Comienza a recibir solicitudes\n\nBeneficios:\n- 80% de comision por servicio\n- Flexibilidad total\n- Pagos semanales\n- Soporte 24/7\n\nImportante: Debes completar la verificacion de documentos antes de poder recibir solicitudes.\n\n---\nGrúa RD\nDepartamento de Operadores\noperadores@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD <${resend.fromEmail}>`,
+        from: `Grúa RD <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido al Equipo GruaRD - Proximos pasos',
+        subject: 'Bienvenido al Equipo Grúa RD - Proximos pasos',
         html,
         text,
       });
@@ -502,8 +502,8 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Notificación de Servicio</p>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0;">Notificación de Servicio</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -511,7 +511,7 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.servicios)}
           
-          ${generateFooterHTML('Este es un correo automático de GruaRD.')}
+          ${generateFooterHTML('Este es un correo automático de Grúa RD.')}
         </div>
       </body>
       </html>
@@ -519,7 +519,7 @@ class ResendEmailService implements EmailService {
 
     return this.sendEmail({
       to: email,
-      subject: `GruaRD: ${subject}`,
+      subject: `Grúa RD: ${subject}`,
       html,
       text: `${message}\n\n---\nGrúa RD\nDepartamento de Servicios\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`,
     });
@@ -537,15 +537,15 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Restablecer Contraseña</p>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0;">Restablecer Contraseña</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px;">${greeting},</p>
           
           <p style="font-size: 16px;">
-            Recibimos una solicitud para restablecer la contraseña de tu cuenta GruaRD.
+            Recibimos una solicitud para restablecer la contraseña de tu cuenta Grúa RD.
           </p>
           
           <div style="text-align: center; margin: 30px 0;">
@@ -562,17 +562,17 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.seguridad)}
           
-          ${generateFooterHTML('Este es un correo automático de GruaRD. Por favor no respondas a este mensaje.')}
+          ${generateFooterHTML('Este es un correo automático de Grúa RD. Por favor no respondas a este mensaje.')}
         </div>
       </body>
       </html>
     `;
 
-    const text = `${greeting},\n\nRecibimos una solicitud para restablecer tu contraseña GruaRD.\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n${resetLink}\n\nEste enlace expirará en 1 hora.\n\nSi no solicitaste esto, ignora este correo.\n\n---\nGrúa RD\nDepartamento de Seguridad\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `${greeting},\n\nRecibimos una solicitud para restablecer tu contraseña Grúa RD.\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n${resetLink}\n\nEste enlace expirará en 1 hora.\n\nSi no solicitaste esto, ignora este correo.\n\n---\nGrúa RD\nDepartamento de Seguridad\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     return this.sendEmail({
       to: email,
-      subject: 'Restablecer tu contraseña de GruaRD',
+      subject: 'Restablecer tu contraseña de Grúa RD',
       html,
       text,
     });
@@ -591,8 +591,8 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Actualización de Documento</p>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0;">Actualización de Documento</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -616,7 +616,7 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.verificaciones)}
           
-          ${generateFooterHTML('Este es un correo automático de GruaRD.')}
+          ${generateFooterHTML('Este es un correo automático de Grúa RD.')}
         </div>
       </body>
       </html>
@@ -626,7 +626,7 @@ class ResendEmailService implements EmailService {
 
     return this.sendEmail({
       to: email,
-      subject: `GruaRD: Tu documento ha sido ${status}`,
+      subject: `Grúa RD: Tu documento ha sido ${status}`,
       html,
       text,
     });
@@ -664,8 +664,8 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD Soporte</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Ticket Creado</p>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD Soporte</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0;">Ticket Creado</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -691,7 +691,7 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.soporte)}
           
-          ${generateFooterHTML('GruaRD Soporte - Estamos para ayudarte')}
+          ${generateFooterHTML('Grúa RD Soporte - Estamos para ayudarte')}
         </div>
       </body>
       </html>
@@ -701,7 +701,7 @@ class ResendEmailService implements EmailService {
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD Soporte <${resend.fromEmail}>`,
+        from: `Grúa RD Soporte <${resend.fromEmail}>`,
         to: [email],
         subject: `Ticket #${ticket.id.slice(-8).toUpperCase()} creado - ${ticket.titulo}`,
         html,
@@ -746,8 +746,8 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD Soporte</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Actualizacion de Ticket</p>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD Soporte</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0;">Actualizacion de Ticket</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -765,7 +765,7 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.soporte)}
           
-          ${generateFooterHTML('GruaRD Soporte - Estamos para ayudarte')}
+          ${generateFooterHTML('Grúa RD Soporte - Estamos para ayudarte')}
         </div>
       </body>
       </html>
@@ -775,7 +775,7 @@ class ResendEmailService implements EmailService {
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD Soporte <${resend.fromEmail}>`,
+        from: `Grúa RD Soporte <${resend.fromEmail}>`,
         to: [email],
         subject: `Ticket #${ticket.id.slice(-8).toUpperCase()} - Estado: ${estado.label}`,
         html,
@@ -811,8 +811,8 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">GruaRD Soporte</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0;">Nueva Respuesta</p>
+          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD Soporte</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0;">Nueva Respuesta</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -827,22 +827,22 @@ class ResendEmailService implements EmailService {
           </div>
           
           <p style="font-size: 14px; color: #666;">
-            Puedes responder a este ticket desde tu cuenta en GruaRD.
+            Puedes responder a este ticket desde tu cuenta en Grúa RD.
           </p>
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.soporte)}
           
-          ${generateFooterHTML('GruaRD Soporte - Estamos para ayudarte')}
+          ${generateFooterHTML('Grúa RD Soporte - Estamos para ayudarte')}
         </div>
       </body>
       </html>
     `;
 
-    const text = `Hola ${userName},\n\nNuestro equipo de soporte ha respondido a tu ticket #${ticket.id.slice(-8).toUpperCase()}.\n\nMensaje:\n${mensaje}\n\nPuedes responder desde tu cuenta en GruaRD.\n\n---\nGrúa RD\nDepartamento de Soporte\nsupport@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `Hola ${userName},\n\nNuestro equipo de soporte ha respondido a tu ticket #${ticket.id.slice(-8).toUpperCase()}.\n\nMensaje:\n${mensaje}\n\nPuedes responder desde tu cuenta en Grúa RD.\n\n---\nGrúa RD\nDepartamento de Soporte\nsupport@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD Soporte <${resend.fromEmail}>`,
+        from: `Grúa RD Soporte <${resend.fromEmail}>`,
         to: [email],
         subject: `Respuesta a Ticket #${ticket.id.slice(-8).toUpperCase()} - ${ticket.titulo}`,
         html,
@@ -878,15 +878,15 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a GruaRD</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Portal de Socios e Inversores</p>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a Grúa RD</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Portal de Socios e Inversores</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px;">Estimado/a ${nombre},</p>
           
           <p style="font-size: 16px;">
-            Es un placer darle la bienvenida como socio inversor de GruaRD. Su cuenta ha sido creada exitosamente.
+            Es un placer darle la bienvenida como socio inversor de Grúa RD. Su cuenta ha sido creada exitosamente.
           </p>
           
           <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
@@ -932,19 +932,19 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.inversores)}
           
-          ${generateFooterHTML('GruaRD - Gracias por su confianza e inversión')}
+          ${generateFooterHTML('Grúa RD - Gracias por su confianza e inversión')}
         </div>
       </body>
       </html>
     `;
 
-    const text = `Estimado/a ${nombre},\n\nBienvenido como socio inversor de GruaRD.\n\nCredenciales de acceso:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nSu participacion: ${porcentaje}% de las utilidades\n\nImportante: Cambie su contrasena en el primer inicio de sesion.\n\n---\nGrúa RD\nDepartamento de Relaciones con Inversores\nsocios@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `Estimado/a ${nombre},\n\nBienvenido como socio inversor de Grúa RD.\n\nCredenciales de acceso:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nSu participacion: ${porcentaje}% de las utilidades\n\nImportante: Cambie su contrasena en el primer inicio de sesion.\n\n---\nGrúa RD\nDepartamento de Relaciones con Inversores\nsocios@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD <${resend.fromEmail}>`,
+        from: `Grúa RD <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido al Portal de Socios GruaRD - Credenciales de Acceso',
+        subject: 'Bienvenido al Portal de Socios Grúa RD - Credenciales de Acceso',
         html,
         text,
       });
@@ -978,15 +978,15 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">GruaRD - Portal de Socios</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Primer Inicio de Sesion</p>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Grúa RD - Portal de Socios</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Primer Inicio de Sesion</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px;">Estimado/a ${nombre},</p>
           
           <p style="font-size: 16px;">
-            Gracias por ser parte del equipo inversor de GruaRD. Hemos registrado su primer inicio de sesion en el portal.
+            Gracias por ser parte del equipo inversor de Grúa RD. Hemos registrado su primer inicio de sesion en el portal.
           </p>
           
           <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
@@ -1015,19 +1015,19 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.inversores)}
           
-          ${generateFooterHTML('GruaRD - Juntos construimos el futuro')}
+          ${generateFooterHTML('Grúa RD - Juntos construimos el futuro')}
         </div>
       </body>
       </html>
     `;
 
-    const text = `Estimado/a ${nombre},\n\nGracias por ser parte del equipo inversor de GruaRD. Hemos registrado su primer inicio de sesion.\n\nRecordatorio: Si no ha cambiado su contrasena temporal, le recomendamos hacerlo por seguridad.\n\nGuia del Dashboard:\n- Resumen: Vista general de distribuciones\n- Distribuciones: Historial de pagos\n- Reportes: Informes financieros\n- Perfil: Datos bancarios y contrasena\n\n---\nGrúa RD\nDepartamento de Relaciones con Inversores\nsocios@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `Estimado/a ${nombre},\n\nGracias por ser parte del equipo inversor de Grúa RD. Hemos registrado su primer inicio de sesion.\n\nRecordatorio: Si no ha cambiado su contrasena temporal, le recomendamos hacerlo por seguridad.\n\nGuia del Dashboard:\n- Resumen: Vista general de distribuciones\n- Distribuciones: Historial de pagos\n- Reportes: Informes financieros\n- Perfil: Datos bancarios y contrasena\n\n---\nGrúa RD\nDepartamento de Relaciones con Inversores\nsocios@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD <${resend.fromEmail}>`,
+        from: `Grúa RD <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido al Portal de Socios GruaRD - Primer Inicio de Sesion',
+        subject: 'Bienvenido al Portal de Socios Grúa RD - Primer Inicio de Sesion',
         html,
         text,
       });
@@ -1084,15 +1084,15 @@ class ResendEmailService implements EmailService {
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a GruaRD</h1>
-          <p style="color: #e0e0e0; margin: 10px 0 0 0; font-size: 16px;">Panel de Administracion</p>
+          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a Grúa RD</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Panel de Administracion</p>
         </div>
         
         <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
           <p style="font-size: 16px;">Estimado/a ${nombre},</p>
           
           <p style="font-size: 16px;">
-            Se le ha asignado acceso al Panel de Administracion de GruaRD. A continuacion encontrara sus credenciales de acceso.
+            Se le ha asignado acceso al Panel de Administracion de Grúa RD. A continuacion encontrara sus credenciales de acceso.
           </p>
           
           <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
@@ -1140,19 +1140,19 @@ class ResendEmailService implements EmailService {
           
           ${generateSignatureHTML(SIGNATURE_CONFIG.administracion)}
           
-          ${generateFooterHTML('GruaRD - Panel de Administración')}
+          ${generateFooterHTML('Grúa RD - Panel de Administración')}
         </div>
       </body>
       </html>
     `;
 
-    const text = `Estimado/a ${nombre},\n\nSe le ha asignado acceso al Panel de Administracion de GruaRD.\n\nCredenciales de acceso:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nPermisos asignados: ${permisosFormatted}\n\nImportante: Cambie su contrasena en el primer inicio de sesion y no comparta sus credenciales.\n\nLineamientos:\n- Maneje la informacion con confidencialidad\n- Documente acciones administrativas\n- Reporte incidentes de seguridad\n- Cierre sesion cuando no use el sistema\n\n---\nGrúa RD\nDepartamento de Administración\nadmin@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const text = `Estimado/a ${nombre},\n\nSe le ha asignado acceso al Panel de Administracion de Grúa RD.\n\nCredenciales de acceso:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nPermisos asignados: ${permisosFormatted}\n\nImportante: Cambie su contrasena en el primer inicio de sesion y no comparta sus credenciales.\n\nLineamientos:\n- Maneje la informacion con confidencialidad\n- Documente acciones administrativas\n- Reporte incidentes de seguridad\n- Cierre sesion cuando no use el sistema\n\n---\nGrúa RD\nDepartamento de Administración\nadmin@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `GruaRD <${resend.fromEmail}>`,
+        from: `Grúa RD <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido al Panel de Administracion GruaRD - Credenciales de Acceso',
+        subject: 'Bienvenido al Panel de Administracion Grúa RD - Credenciales de Acceso',
         html,
         text,
       });
