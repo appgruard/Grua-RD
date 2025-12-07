@@ -585,9 +585,9 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
     if (detectedFaceCount > 0 && facesArray[0]) {
       faceScore = facesArray[0].score ?? facesArray[0].confidence ?? 0;
     }
-    faceScore = faceScore || data.faceScore ?? data.confidenceScore ?? data.livenessScore ?? 0;
+    faceScore = faceScore || (data.faceScore ?? data.confidenceScore ?? data.livenessScore ?? 0);
     
-    const hasFace = data.hasFace ?? detectedFaceCount > 0 ?? (data.faceCount !== undefined && data.faceCount > 0);
+    const hasFace = data.hasFace ?? (detectedFaceCount > 0 || (data.faceCount !== undefined && data.faceCount > 0));
     const isHuman = data.isHuman ?? hasFace;
     
     // Normalize score to 0-1 range if needed
