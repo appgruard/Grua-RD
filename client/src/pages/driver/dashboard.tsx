@@ -20,7 +20,9 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useLocationTracking } from '@/hooks/useLocation';
 import { calculateDistance } from '@/hooks/useDriverLocation';
 import { WalletAlertBanner, CashServiceConfirmationModal, useWalletStatus } from '@/components/wallet';
-import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { MapPin, Navigation, DollarSign, Loader2, MessageCircle, Play, CheckCircle, AlertCircle, CheckCircle2, ChevronUp, ChevronDown, Car, ShieldAlert, AlertTriangle, MoveRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { reverseGeocode } from '@/lib/maps';
 import { SiWaze, SiGooglemaps } from 'react-icons/si';
 import type { Servicio, Conductor, ServicioWithDetails, Documento, WalletWithDetails } from '@shared/schema';
 import type { Coordinates, RouteGeometry } from '@/lib/maps';
@@ -88,6 +90,14 @@ export default function DriverDashboard() {
   const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
   const [locationReady, setLocationReady] = useState(false);
   const lastRouteCalcRef = useRef<number>(0);
+  const [extendDestinationDialog, setExtendDestinationDialog] = useState<{
+    open: boolean;
+    serviceId: string | null;
+    originalDestination: Coordinates | null;
+    newDestination: Coordinates | null;
+    newAddress: string;
+    distanceKm: number;
+  }>({ open: false, serviceId: null, originalDestination: null, newDestination: null, newAddress: '', distanceKm: 0 });
   
   const walletStatus = useWalletStatus();
 
@@ -404,6 +414,90 @@ export default function DriverDashboard() {
       });
     },
   });
+
+  const extendDestination = useMutation({
+    mutationFn: async (data: { serviceId: string; lat: number; lng: number; address: string }) => {
+      const res = await apiRequest('POST', `/api/services/${data.serviceId}/extend-destination`, {
+        destinoExtendidoLat: data.lat,
+        destinoExtendidoLng: data.lng,
+        destinoExtendidoDireccion: data.address,
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const error = new Error(errorData.message || 'Error al extender destino') as Error & { response?: any };
+        error.response = errorData;
+        throw error;
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/drivers/active-service'] });
+      setExtendDestinationDialog({ open: false, serviceId: null, originalDestination: null, newDestination: null, newAddress: '', distanceKm: 0 });
+      toast({
+        title: 'Destino extendido',
+        description: `El destino se ha extendido ${data.extensionKm}km adicionales`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.message || error.message || 'No se pudo extender el destino',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const openExtendDestinationDialog = async (service: ServicioWithDetails) => {
+    const destLat = parseFloat(service.destinoLat as string);
+    const destLng = parseFloat(service.destinoLng as string);
+    setExtendDestinationDialog({
+      open: true,
+      serviceId: service.id,
+      originalDestination: { lat: destLat, lng: destLng },
+      newDestination: { lat: destLat, lng: destLng },
+      newAddress: service.destinoDireccion || '',
+      distanceKm: 0,
+    });
+  };
+
+  const handleExtendDestinationMarkerDrag = async (coords: Coordinates) => {
+    if (!extendDestinationDialog.originalDestination) return;
+    
+    const toRad = (deg: number) => deg * (Math.PI / 180);
+    const R = 6371;
+    const dLat = toRad(coords.lat - extendDestinationDialog.originalDestination.lat);
+    const dLng = toRad(coords.lng - extendDestinationDialog.originalDestination.lng);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(toRad(extendDestinationDialog.originalDestination.lat)) * Math.cos(toRad(coords.lat)) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceKm = R * c;
+    
+    let address = '';
+    try {
+      address = await reverseGeocode(coords.lat, coords.lng);
+    } catch (e) {
+      address = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+    }
+    
+    setExtendDestinationDialog(prev => ({
+      ...prev,
+      newDestination: coords,
+      newAddress: address,
+      distanceKm,
+    }));
+  };
+
+  const handleConfirmExtendDestination = () => {
+    if (!extendDestinationDialog.serviceId || !extendDestinationDialog.newDestination) return;
+    
+    extendDestination.mutate({
+      serviceId: extendDestinationDialog.serviceId,
+      lat: extendDestinationDialog.newDestination.lat,
+      lng: extendDestinationDialog.newDestination.lng,
+      address: extendDestinationDialog.newAddress,
+    });
+  };
 
   const handleConfirmAction = async () => {
     if (!confirmDialog.serviceId || !confirmDialog.action) return;
