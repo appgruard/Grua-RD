@@ -169,10 +169,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest('POST', '/api/auth/logout', {});
       if (!res.ok) throw new Error('Logout failed');
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Clear all auth-related cache immediately
       queryClient.setQueryData(['/api/auth/me'], null);
       setPendingVerification(null);
       setPendingVerificationUser(null);
+      // Also invalidate to prevent stale data on next login
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      // Clear all queries to ensure fresh state for next login
+      queryClient.clear();
     },
   });
 
