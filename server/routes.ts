@@ -1202,14 +1202,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // This prevents privilege escalation - you can only access accounts where you know the password
       const validAccounts = [];
       for (const account of accounts) {
-        const isValid = await bcrypt.compare(password, account.passwordHash);
-        if (isValid && (account.userType === 'cliente' || account.userType === 'conductor')) {
-          validAccounts.push({
-            userType: account.userType,
-            nombre: account.nombre,
-            apellido: account.apellido,
-            fotoUrl: account.fotoUrl,
+        // Skip accounts without a valid password hash (safety check)
+        if (!account.passwordHash) {
+          continue;
+        }
+        
+        // Only check cliente and conductor accounts for disambiguation
+        if (account.userType !== 'cliente' && account.userType !== 'conductor') {
+          continue;
+        }
+        
+        try {
+          const isValid = await bcrypt.compare(password, account.passwordHash);
+          if (isValid) {
+            validAccounts.push({
+              userType: account.userType,
+              nombre: account.nombre,
+              apellido: account.apellido,
+              fotoUrl: account.fotoUrl,
+            });
+          }
+        } catch (bcryptError) {
+          // Log but don't fail the whole request if one account has an invalid hash
+          logSystem.error('Bcrypt compare error for account', bcryptError, { 
+            email: account.email, 
+            userType: account.userType 
           });
+          continue;
         }
       }
       
