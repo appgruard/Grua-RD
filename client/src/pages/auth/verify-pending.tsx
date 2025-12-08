@@ -34,7 +34,7 @@ interface VerificationStepInfo {
 
 export default function VerifyPending() {
   const [, setLocation] = useLocation();
-  const { user, logout, pendingVerification, pendingVerificationUser, clearPendingVerification, refreshUser } = useAuth();
+  const { user, logout, pendingVerification, pendingVerificationUser, clearPendingVerification, refreshUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   
   // Use user from context or pendingVerificationUser immediately
@@ -54,7 +54,7 @@ export default function VerifyPending() {
   const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
   const [showProfileCamera, setShowProfileCamera] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isInitializing, setIsInitializing] = useState(!contextUser); // Only initializing if no context user
+  const [isInitializing, setIsInitializing] = useState(true); // Start as true, will be set to false when ready
   const [initializedUser, setInitializedUser] = useState<any>(null);
   const [initError, setInitError] = useState(false);
   const initFetchedRef = useRef(false);
@@ -178,10 +178,22 @@ export default function VerifyPending() {
   }, [fetchVerificationStatusFromServer]);
 
   // Single effect to fetch verification status on mount - runs once per session
+  // Wait for auth loading to complete before fetching verification status
   useEffect(() => {
+    // If auth is still loading, wait for it to complete
+    if (authLoading) {
+      return;
+    }
+    
     // Skip if already fetched this session
     if (initFetchedRef.current) {
       setIsInitializing(false);
+      return;
+    }
+    
+    // If we have no user and no pending verification user, redirect to login
+    if (!contextUser && !pendingVerificationUser) {
+      setLocation('/login');
       return;
     }
     
@@ -219,7 +231,7 @@ export default function VerifyPending() {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [fetchVerificationStatusFromServer]);
+  }, [authLoading, contextUser, pendingVerificationUser, fetchVerificationStatusFromServer, setLocation]);
 
   // Effect to refetch verification status when tab regains focus (handles multi-tab scenarios)
   useEffect(() => {
@@ -593,8 +605,8 @@ export default function VerifyPending() {
     setLocation('/login');
   };
 
-  // Show loading state while initializing
-  if (isInitializing) {
+  // Show loading state while initializing or waiting for auth
+  if (isInitializing || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
