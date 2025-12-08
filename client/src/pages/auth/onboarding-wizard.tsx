@@ -77,6 +77,14 @@ export default function OnboardingWizard() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cedulaVerified, setCedulaVerified] = useState(false);
+  
+  // Check if user already has cedula saved (for page refresh persistence)
+  useEffect(() => {
+    if (user && (user as any).cedula && formData.userType === 'conductor') {
+      setCedulaVerified(true);
+      updateField('cedula', (user as any).cedula);
+    }
+  }, [user]);
   const [ocrScore, setOcrScore] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);

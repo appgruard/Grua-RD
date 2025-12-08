@@ -1400,25 +1400,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           confidenceScore: result.confidenceScore
         });
         
-        // Save the image for manual review if authenticated
-        if (req.isAuthenticated() && image) {
-          try {
-            const timestamp = Date.now();
-            const filename = `cedula_manual_${req.user!.id}_${timestamp}.jpg`;
-            const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
-            
-            await storage.updateUser(req.user!.id, {
-              cedulaImageUrl: uploadResult.url,
-              cedula: result.cedula
-            });
-            
-            logSystem.info('Cedula saved for manual verification (name extraction failed)', { userId: req.user!.id });
-          } catch (uploadError) {
-            logSystem.warn('Failed to save cedula for manual verification', { 
-              userId: req.user!.id, 
-              error: uploadError 
-            });
+        // Save cedula for manual review if authenticated
+        if (req.isAuthenticated() && result.cedula) {
+          let imageUrl: string | null = null;
+          
+          if (image) {
+            try {
+              const timestamp = Date.now();
+              const filename = `cedula_manual_${req.user!.id}_${timestamp}.jpg`;
+              const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
+              imageUrl = uploadResult.url;
+            } catch (uploadError) {
+              logSystem.warn('Failed to upload cedula image, saving cedula number only', { 
+                userId: req.user!.id, 
+                error: uploadError 
+              });
+            }
           }
+          
+          const updateData: any = { cedula: result.cedula };
+          if (imageUrl) updateData.cedulaImageUrl = imageUrl;
+          
+          await storage.updateUser(req.user!.id, updateData);
+          logSystem.info('Cedula saved for manual verification (name extraction failed)', { 
+            userId: req.user!.id,
+            hasImage: !!imageUrl
+          });
         }
         
         return res.json({
@@ -1454,25 +1461,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             skipVerification
           });
           
-          // Save the image for manual review if authenticated
-          if (req.isAuthenticated() && image) {
-            try {
-              const timestamp = Date.now();
-              const filename = `cedula_manual_${req.user!.id}_${timestamp}.jpg`;
-              const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
-              
-              await storage.updateUser(req.user!.id, {
-                cedulaImageUrl: uploadResult.url,
-                cedula: result.cedula
-              });
-              
-              logSystem.info('Cedula saved for manual verification', { userId: req.user!.id });
-            } catch (uploadError) {
-              logSystem.warn('Failed to save cedula for manual verification', { 
-                userId: req.user!.id, 
-                error: uploadError 
-              });
+          // Save cedula for manual review if authenticated
+          if (req.isAuthenticated() && result.cedula) {
+            let imageUrl: string | null = null;
+            
+            // Try to save image, but don't block if it fails
+            if (image) {
+              try {
+                const timestamp = Date.now();
+                const filename = `cedula_manual_${req.user!.id}_${timestamp}.jpg`;
+                const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
+                imageUrl = uploadResult.url;
+              } catch (uploadError) {
+                logSystem.warn('Failed to upload cedula image, saving cedula number only', { 
+                  userId: req.user!.id, 
+                  error: uploadError 
+                });
+              }
             }
+            
+            // Always save cedula number (and image URL if available)
+            const updateData: any = { cedula: result.cedula };
+            if (imageUrl) updateData.cedulaImageUrl = imageUrl;
+            
+            await storage.updateUser(req.user!.id, updateData);
+            logSystem.info('Cedula saved for manual verification', { 
+              userId: req.user!.id, 
+              cedula: result.cedula?.slice(0, 5) + '***',
+              hasImage: !!imageUrl
+            });
           }
           
           return res.json({
