@@ -188,15 +188,23 @@ export default function DriverDashboard() {
         return;
       }
 
-      const target = isGoingToOrigin
-        ? {
-            lat: parseFloat(activeService.origenLat as string),
-            lng: parseFloat(activeService.origenLng as string),
-          }
-        : {
-            lat: parseFloat(activeService.destinoLat as string),
-            lng: parseFloat(activeService.destinoLng as string),
-          };
+      let target: Coordinates;
+      if (isGoingToOrigin) {
+        target = {
+          lat: parseFloat(activeService.origenLat as string),
+          lng: parseFloat(activeService.origenLng as string),
+        };
+      } else if (activeService.destinoExtendidoLat && activeService.destinoExtendidoLng) {
+        target = {
+          lat: parseFloat(activeService.destinoExtendidoLat as string),
+          lng: parseFloat(activeService.destinoExtendidoLng as string),
+        };
+      } else {
+        target = {
+          lat: parseFloat(activeService.destinoLat as string),
+          lng: parseFloat(activeService.destinoLng as string),
+        };
+      }
 
       try {
         const result = await getDirections(currentLocation, target);
@@ -209,7 +217,7 @@ export default function DriverDashboard() {
     };
 
     calculateRoute();
-  }, [activeService?.id, activeService?.estado, currentLocation, locationReady]);
+  }, [activeService?.id, activeService?.estado, activeService?.destinoExtendidoLat, activeService?.destinoExtendidoLng, currentLocation, locationReady]);
 
   const toggleAvailability = useMutation({
     mutationFn: async (disponible: boolean) => {
@@ -819,8 +827,13 @@ export default function DriverDashboard() {
                     );
                   })()}
                   {(activeService.estado === 'cargando' || activeService.estado === 'en_progreso') && (() => {
-                    const lat = typeof activeService.destinoLat === 'string' ? parseFloat(activeService.destinoLat) : activeService.destinoLat;
-                    const lng = typeof activeService.destinoLng === 'string' ? parseFloat(activeService.destinoLng) : activeService.destinoLng;
+                    const hasExtended = activeService.destinoExtendidoLat && activeService.destinoExtendidoLng;
+                    const lat = hasExtended 
+                      ? (typeof activeService.destinoExtendidoLat === 'string' ? parseFloat(activeService.destinoExtendidoLat) : activeService.destinoExtendidoLat)
+                      : (typeof activeService.destinoLat === 'string' ? parseFloat(activeService.destinoLat) : activeService.destinoLat);
+                    const lng = hasExtended
+                      ? (typeof activeService.destinoExtendidoLng === 'string' ? parseFloat(activeService.destinoExtendidoLng) : activeService.destinoExtendidoLng)
+                      : (typeof activeService.destinoLng === 'string' ? parseFloat(activeService.destinoLng) : activeService.destinoLng);
                     const wazeUrl = generateWazeNavigationUrl(lat, lng);
                     const googleUrl = generateGoogleMapsNavigationUrl(lat, lng);
                     if (!wazeUrl && !googleUrl) return null;
@@ -966,14 +979,39 @@ export default function DriverDashboard() {
               )}
 
               {activeService.estado === 'en_progreso' && (
-                <Button 
-                  className="w-full h-11 sm:h-12 text-sm sm:text-base" 
-                  onClick={() => setConfirmDialog({ open: true, action: 'complete', serviceId: activeService.id })}
-                  data-testid="button-complete-service"
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Completar Servicio
-                </Button>
+                <div className="space-y-2">
+                  {!activeService.destinoExtendidoLat && (
+                    <Button 
+                      variant="outline"
+                      className="w-full h-10 sm:h-11 text-xs sm:text-sm" 
+                      onClick={() => openExtendDestinationDialog(activeService)}
+                      data-testid="button-extend-destination"
+                    >
+                      <MoveRight className="w-4 h-4 mr-2" />
+                      Extender destino (hasta 1.5km)
+                    </Button>
+                  )}
+                  {activeService.destinoExtendidoLat && (
+                    <div className="p-2.5 sm:p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                      <div className="flex items-center gap-2 mb-1">
+                        <MoveRight className="w-4 h-4 text-blue-500" />
+                        <span className="text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">Destino extendido</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{activeService.destinoExtendidoDireccion}</p>
+                      {activeService.distanciaExtensionKm && (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">+{parseFloat(activeService.distanciaExtensionKm as string).toFixed(2)} km adicionales</p>
+                      )}
+                    </div>
+                  )}
+                  <Button 
+                    className="w-full h-11 sm:h-12 text-sm sm:text-base" 
+                    onClick={() => setConfirmDialog({ open: true, action: 'complete', serviceId: activeService.id })}
+                    data-testid="button-complete-service"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Completar Servicio
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -1185,6 +1223,101 @@ export default function DriverDashboard() {
         isLoading={acceptService.isPending}
         serviceAmount={cashConfirmation.serviceAmount}
       />
+
+      <Dialog 
+        open={extendDestinationDialog.open} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setExtendDestinationDialog({ open: false, serviceId: null, originalDestination: null, newDestination: null, newAddress: '', distanceKm: 0 });
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Extender destino</DialogTitle>
+            <DialogDescription>
+              Puede mover el destino hasta 1.5km mas si el cliente lo necesita. Arrastre el marcador en el mapa para ajustar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="h-48 rounded-lg overflow-hidden border">
+              {extendDestinationDialog.newDestination && (
+                <MapboxMapWithFastLoad
+                  center={extendDestinationDialog.newDestination}
+                  zoom={16}
+                  markers={[
+                    {
+                      position: extendDestinationDialog.newDestination,
+                      title: 'Nuevo destino',
+                      color: '#ef4444',
+                      type: 'destination',
+                      draggable: true,
+                      id: 'extended-destination',
+                    },
+                    ...(extendDestinationDialog.originalDestination ? [{
+                      position: extendDestinationDialog.originalDestination,
+                      title: 'Destino original',
+                      color: '#6b7280',
+                      type: 'default' as const,
+                      id: 'original-destination',
+                    }] : []),
+                  ]}
+                  onMarkerDragEnd={(markerId, coords) => {
+                    if (markerId === 'extended-destination') {
+                      handleExtendDestinationMarkerDrag(coords);
+                    }
+                  }}
+                  className="w-full h-full"
+                />
+              )}
+            </div>
+            {extendDestinationDialog.newAddress && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Nueva direccion:</Label>
+                <p className="text-sm font-medium">{extendDestinationDialog.newAddress}</p>
+              </div>
+            )}
+            <div className={cn(
+              "p-3 rounded-lg",
+              extendDestinationDialog.distanceKm > 1.5 
+                ? "bg-red-500/10 border border-red-500/30" 
+                : "bg-blue-500/10 border border-blue-500/30"
+            )}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Distancia adicional:</span>
+                <span className={cn(
+                  "font-bold",
+                  extendDestinationDialog.distanceKm > 1.5 ? "text-red-600" : "text-blue-600"
+                )}>
+                  {extendDestinationDialog.distanceKm.toFixed(2)} km
+                </span>
+              </div>
+              {extendDestinationDialog.distanceKm > 1.5 && (
+                <p className="text-xs text-red-600 mt-1">Maximo permitido: 1.5 km</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setExtendDestinationDialog({ open: false, serviceId: null, originalDestination: null, newDestination: null, newAddress: '', distanceKm: 0 })}
+              data-testid="button-cancel-extend"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleConfirmExtendDestination}
+              disabled={extendDestination.isPending || extendDestinationDialog.distanceKm > 1.5 || extendDestinationDialog.distanceKm === 0}
+              data-testid="button-confirm-extend"
+            >
+              {extendDestination.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              Confirmar extension
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
