@@ -80,9 +80,12 @@ export default function VerifyPending() {
         });
         if (res.ok) {
           const data = await res.json();
-          const { cedulaVerificada, telefonoVerificado, fotoVerificada } = data.verification;
+          const { cedulaVerificada, cedulaPendingReview, telefonoVerificado, fotoVerificada } = data.verification;
           
-          setCedulaVerified(cedulaVerificada);
+          // For onboarding flow, cedula step is complete if verified OR pending review
+          const cedulaStepComplete = cedulaVerificada || cedulaPendingReview;
+          
+          setCedulaVerified(cedulaStepComplete);
           setPhoneVerified(telefonoVerificado);
           setPhotoVerified(fotoVerificada);
 
@@ -92,9 +95,9 @@ export default function VerifyPending() {
               refreshUser().then(() => {
                 setLocation('/driver');
               });
-            } else if (cedulaVerificada && telefonoVerificado && !fotoVerificada) {
+            } else if (cedulaStepComplete && telefonoVerificado && !fotoVerificada) {
               setCurrentStep('photo');
-            } else if (cedulaVerificada && !telefonoVerificado) {
+            } else if (cedulaStepComplete && !telefonoVerificado) {
               setCurrentStep('phone');
             } else {
               setCurrentStep('cedula');
@@ -105,7 +108,7 @@ export default function VerifyPending() {
               refreshUser().then(() => {
                 setLocation('/client');
               });
-            } else if (cedulaVerificada) {
+            } else if (cedulaStepComplete) {
               setCurrentStep('phone');
             }
           }

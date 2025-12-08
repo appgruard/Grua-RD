@@ -1322,8 +1322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             imageUrl = uploadResult.url;
             
             await storage.updateUser(req.user!.id, {
-              cedulaImageUrl: uploadResult.url,
-              cedulaVerificada: true
+              cedulaImageUrl: uploadResult.url
             });
             
             logSystem.info('Cedula image saved for manual verification', { userId: req.user!.id });
@@ -1419,7 +1418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          const updateData: any = { cedula: result.cedula, cedulaVerificada: true };
+          const updateData: any = { cedula: result.cedula };
           if (imageUrl) updateData.cedulaImageUrl = imageUrl;
           
           await storage.updateUser(req.user!.id, updateData);
@@ -1482,7 +1481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Always save cedula number (and image URL if available)
-            const updateData: any = { cedula: result.cedula, cedulaVerificada: true };
+            const updateData: any = { cedula: result.cedula };
             if (imageUrl) updateData.cedulaImageUrl = imageUrl;
             
             await storage.updateUser(req.user!.id, updateData);
@@ -1846,17 +1845,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const isDriver = user.userType === 'conductor';
       const cedulaVerificada = user.cedulaVerificada === true;
+      // Cedula pending review = image submitted but not yet verified
+      const cedulaPendingReview = !cedulaVerificada && !!user.cedulaImageUrl;
       // Either telefonoVerificado OR emailVerificado counts as contact verified
       const contactoVerificado = user.telefonoVerificado === true || user.emailVerificado === true;
       const fotoVerificada = user.fotoVerificada === true;
       const fotoVerificadaScore = user.fotoVerificadaScore ? parseFloat(user.fotoVerificadaScore) : null;
+
+      // For onboarding flow purposes, cedula step is complete if verified OR pending review
+      const cedulaStepComplete = cedulaVerificada || cedulaPendingReview;
 
       const steps = [
         {
           id: 'cedula',
           name: 'Verificación de Cédula',
           description: 'Escanea tu cédula de identidad',
-          completed: cedulaVerificada,
+          completed: cedulaStepComplete,
+          pendingReview: cedulaPendingReview,
           required: true
         },
         {
@@ -1887,17 +1892,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userType: user.userType,
         verification: {
           cedulaVerificada,
-          telefonoVerificado,
+          cedulaPendingReview,
+          telefonoVerificado: contactoVerificado,
           fotoVerificada,
           fotoVerificadaScore,
           cedula: cedulaVerificada ? user.cedula : null,
-          phone: telefonoVerificado ? user.phone : null,
+          cedulaImageUrl: user.cedulaImageUrl || null,
+          phone: contactoVerificado ? user.phone : null,
           fotoUrl: user.fotoUrl || null
         },
         steps,
         progress,
         allCompleted,
-        canAccessPlatform: isDriver ? allCompleted : (cedulaVerificada && telefonoVerificado)
+        // canAccessPlatform still requires actual verification, not just pending review
+        canAccessPlatform: isDriver ? allCompleted : (cedulaVerificada && contactoVerificado)
       });
     } catch (error: any) {
       logSystem.error('Get verification status error', error, { userId: req.user?.id });
