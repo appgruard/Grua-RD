@@ -187,7 +187,7 @@ const allowedOrigins = isDevelopment
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (isDevelopment) {
         return callback(null, true);
       }
@@ -268,7 +268,7 @@ app.get("/health", async (_req: Request, res: Response) => {
   let databaseError: string | undefined;
   const dbStart = Date.now();
   try {
-    await pool.query('SELECT 1');
+    await pool.query('SELECT 1' as any);
     databaseResponseTime = Date.now() - dbStart;
   } catch (error) {
     databaseStatus = "unhealthy";

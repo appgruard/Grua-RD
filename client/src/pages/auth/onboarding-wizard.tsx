@@ -920,7 +920,7 @@ export default function OnboardingWizard() {
         {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
       </div>
       {otpTimer === 0 ? (
-        <Button type="button" variant="outline" className="w-full" onClick={sendOtpMutation.mutate} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
+        <Button type="button" variant="outline" className="w-full" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
           {sendOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>) : 'Enviar Código'}
         </Button>
       ) : (
@@ -934,10 +934,10 @@ export default function OnboardingWizard() {
             <Clock className="h-4 w-4" />
             <span>Expira en: {formatTime(otpTimer)}</span>
           </div>
-          <Button type="button" className="w-full" onClick={verifyOtpMutation.mutate} disabled={verifyOtpMutation.isPending || !formData.otpCode} data-testid="button-verify-otp">
+          <Button type="button" className="w-full" onClick={() => verifyOtpMutation.mutate()} disabled={verifyOtpMutation.isPending || !formData.otpCode} data-testid="button-verify-otp">
             {verifyOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar<ArrowRight className="w-4 h-4 ml-2" /></>)}
           </Button>
-          <Button type="button" variant="ghost" className="w-full" onClick={sendOtpMutation.mutate} disabled={sendOtpMutation.isPending || otpTimer > 60} data-testid="button-resend-otp">
+          <Button type="button" variant="ghost" className="w-full" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending || otpTimer > 60} data-testid="button-resend-otp">
             {otpTimer > 60 ? (<><Clock className="w-4 h-4 mr-2" />Reenviar en {formatTime(otpTimer - 60)}</>) : 'Reenviar Código'}
           </Button>
         </>

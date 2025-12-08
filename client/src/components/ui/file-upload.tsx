@@ -69,7 +69,7 @@ export function FileUpload({
   const handleFile = (file: File) => {
     const validation = validateFile(file);
     if (!validation.valid) {
-      setLocalError(validation.error);
+      setLocalError(validation.error ?? null);
       return;
     }
     setLocalError(null);

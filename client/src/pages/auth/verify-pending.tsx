@@ -55,7 +55,7 @@ export default function VerifyPending() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cedulaVerified, setCedulaVerified] = useState(verificationStatus.cedulaVerificada);
-  const [emailVerified, setEmailVerified] = useState(verificationStatus.emailVerificado);
+  const [emailVerified, setEmailVerified] = useState((verificationStatus as any)?.emailVerificado ?? false);
   const [photoVerified, setPhotoVerified] = useState(verificationStatus.fotoVerificada || false);
   const [profilePhotoImage, setProfilePhotoImage] = useState<string | null>(null);
   const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);

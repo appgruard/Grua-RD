@@ -182,8 +182,8 @@ export class WalletService {
       servicioId,
       paymentMethod,
       serviceAmount,
-      commission,
-      operatorEarnings,
+      calculatedCommission: commission,
+      calculatedOperatorEarnings: operatorEarnings,
       walletId: wallet.id,
       ...result
     });

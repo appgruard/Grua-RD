@@ -19,7 +19,7 @@ import { getDirections, formatDuration, formatDistance, formatETATime, calculate
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { ServicioWithDetails, Calificacion } from '@shared/schema';
-import type { Coordinates } from '@/lib/maps';
+import type { Coordinates, RouteGeometry } from '@/lib/maps';
 
 interface DriverLocationUpdate {
   lat: number;
@@ -75,7 +75,7 @@ export default function ClientTracking() {
     lastUpdate: number;
   } | null>(null);
   const [eta, setEta] = useState<{ minutes: number; arrivalTime: Date } | null>(null);
-  const [routeGeometry, setRouteGeometry] = useState<GeoJSON.LineString | null>(null);
+  const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [paymentConfirmationOpen, setPaymentConfirmationOpen] = useState(false);
@@ -165,7 +165,7 @@ export default function ClientTracking() {
         
         getDirections({ lat: payload.lat, lng: payload.lng }, target).then(result => {
           if (result.geometry) {
-            setRouteGeometry(result.geometry);
+            setRouteGeometry(result.geometry as RouteGeometry);
           }
           const etaMinutes = Math.ceil(result.duration / 60);
           setEta({

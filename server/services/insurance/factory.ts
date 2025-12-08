@@ -1,4 +1,5 @@
-import { InsuranceAdapter, InsuranceAdapterConfig } from './adapter';
+import { InsuranceAdapter } from './adapter';
+import { InsuranceAdapterConfig } from './types';
 import { MockInsuranceAdapter } from './adapters/mock-adapter';
 import { ASSAInsuranceAdapter } from './adapters/assa-adapter';
 import { ConnectInsuranceAdapter } from './adapters/connect-adapter';

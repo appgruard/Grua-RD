@@ -117,7 +117,7 @@ export class MockInsuranceAdapter extends BaseInsuranceAdapter {
 
     logger.info('MockAdapter: Validating policy by cedula', { cedula, vehiclePlate });
 
-    for (const policy of mockPolicies.values()) {
+    for (const policy of Array.from(mockPolicies.values())) {
       if (
         policy.holderCedula === cedula && 
         policy.vehiclePlate.toLowerCase() === vehiclePlate.toLowerCase() &&

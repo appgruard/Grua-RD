@@ -63,7 +63,7 @@ class StorageService {
       throw new Error(`Failed to download file: ${error}`);
     }
 
-    return Buffer.from(value);
+    return Buffer.from(value as unknown as Uint8Array);
   }
 
   async deleteFile(objectPath: string): Promise<void> {

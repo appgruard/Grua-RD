@@ -47,6 +47,7 @@ interface ServicioAseguradora {
   fechaFactura: string | null;
   fechaPago: string | null;
   fechaAprobacion: string | null;
+  aprobadoPor?: string | null;
   servicio?: {
     id: string;
     tipoServicio: string;

@@ -992,7 +992,7 @@ export class DatabaseStorage implements IStorage {
       .update(servicios)
       .set({ 
         estado: 'cancelado',
-        motivoCancelacion: 'Cancelado automáticamente - Ningún operador disponible'
+        canceladoAt: new Date()
       })
       .where(
         and(
@@ -1730,7 +1730,7 @@ export class DatabaseStorage implements IStorage {
         revisadoPorUsuario: true,
       },
     });
-    return result;
+    return result as DocumentoWithDetails | undefined;
   }
 
   async getDocumentosByUsuarioId(usuarioId: string): Promise<DocumentoWithDetails[]> {
@@ -1744,7 +1744,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results;
+    return results as DocumentoWithDetails[];
   }
 
   async getDocumentosByConductorId(conductorId: string): Promise<DocumentoWithDetails[]> {
@@ -1758,7 +1758,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results;
+    return results as DocumentoWithDetails[];
   }
 
   async getAllDocumentos(): Promise<DocumentoWithDetails[]> {
@@ -1771,7 +1771,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results;
+    return results as DocumentoWithDetails[];
   }
 
   async updateDocumento(id: string, data: Partial<Documento>): Promise<Documento> {
@@ -1843,7 +1843,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return result;
+    return result as DocumentoWithDetails | undefined;
   }
 
   async getAllClientInsuranceDocuments(userId: string): Promise<DocumentoWithDetails[]> {
@@ -1860,7 +1860,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results;
+    return results as DocumentoWithDetails[];
   }
 
   async hasApprovedClientInsurance(userId: string): Promise<boolean> {
@@ -1895,21 +1895,36 @@ export class DatabaseStorage implements IStorage {
     return result as ComisionWithDetails | undefined;
   }
 
-  async getComisionesByEstado(estado: string, tipo: 'operador' | 'empresa'): Promise<ComisionWithDetails[]> {
-    const field = tipo === 'operador' ? comisiones.estadoPagoOperador : comisiones.estadoPagoEmpresa;
-    const results = await db.query.comisiones.findMany({
-      where: eq(field, estado),
-      with: {
-        servicio: {
-          with: {
-            cliente: true,
-            conductor: true,
+  async getComisionesByEstado(estado: 'pendiente' | 'procesando' | 'pagado' | 'fallido', tipo: 'operador' | 'empresa'): Promise<ComisionWithDetails[]> {
+    if (tipo === 'operador') {
+      const results = await db.query.comisiones.findMany({
+        where: eq(comisiones.estadoPagoOperador, estado),
+        with: {
+          servicio: {
+            with: {
+              cliente: true,
+              conductor: true,
+            },
           },
         },
-      },
-      orderBy: desc(comisiones.createdAt),
-    });
-    return results as ComisionWithDetails[];
+        orderBy: desc(comisiones.createdAt),
+      });
+      return results as ComisionWithDetails[];
+    } else {
+      const results = await db.query.comisiones.findMany({
+        where: eq(comisiones.estadoPagoEmpresa, estado),
+        with: {
+          servicio: {
+            with: {
+              cliente: true,
+              conductor: true,
+            },
+          },
+        },
+        orderBy: desc(comisiones.createdAt),
+      });
+      return results as ComisionWithDetails[];
+    }
   }
 
   async getAllComisiones(): Promise<ComisionWithDetails[]> {
@@ -2075,7 +2090,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results;
+    return results as DocumentoWithDetails[];
   }
 
   async getAllDocuments(): Promise<DocumentoWithDetails[]> {
@@ -2092,7 +2107,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results;
+    return results as DocumentoWithDetails[];
   }
 
   async getDocumentosByServicioId(servicioId: string): Promise<DocumentoWithDetails[]> {
@@ -2110,7 +2125,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results;
+    return results as DocumentoWithDetails[];
   }
 
   async getServiciosPendientesAseguradora(): Promise<ServicioWithDetails[]> {
@@ -2456,7 +2471,7 @@ export class DatabaseStorage implements IStorage {
     return results.map(doc => ({
       ...doc,
       user: doc.usuario,
-    }));
+    })) as Array<Documento & { conductor?: Conductor; user?: User }>;
   }
 
   async getDocumentosVencidos(): Promise<Array<Documento & { conductor?: Conductor; user?: User }>> {
@@ -2476,7 +2491,7 @@ export class DatabaseStorage implements IStorage {
     return results.map(doc => ({
       ...doc,
       user: doc.usuario,
-    }));
+    })) as Array<Documento & { conductor?: Conductor; user?: User }>;
   }
 
   async getRecordatoriosEnviados(documentoId: string): Promise<DocumentoRecordatorio[]> {
@@ -3754,7 +3769,7 @@ export class DatabaseStorage implements IStorage {
     return results.map(contrato => {
       let porcentajeUtilizado = 0;
       if (contrato.tipoContrato === 'por_hora' && contrato.horasContratadas && contrato.horasUtilizadas) {
-        porcentajeUtilizado = (parseFloat(contrato.horasUtilizadas) / parseFloat(contrato.horasContratadas)) * 100;
+        porcentajeUtilizado = (parseFloat(String(contrato.horasUtilizadas)) / parseFloat(String(contrato.horasContratadas))) * 100;
       } else if (contrato.tipoContrato === 'por_servicio' && contrato.serviciosContratados && contrato.serviciosUtilizados) {
         porcentajeUtilizado = (contrato.serviciosUtilizados / contrato.serviciosContratados) * 100;
       }
@@ -3793,7 +3808,7 @@ export class DatabaseStorage implements IStorage {
     
     let porcentajeUtilizado = 0;
     if (result.tipoContrato === 'por_hora' && result.horasContratadas && result.horasUtilizadas) {
-      porcentajeUtilizado = (parseFloat(result.horasUtilizadas) / parseFloat(result.horasContratadas)) * 100;
+      porcentajeUtilizado = (parseFloat(String(result.horasUtilizadas)) / parseFloat(String(result.horasContratadas))) * 100;
     } else if (result.tipoContrato === 'por_servicio' && result.serviciosContratados && result.serviciosUtilizados) {
       porcentajeUtilizado = (result.serviciosUtilizados / result.serviciosContratados) * 100;
     }
@@ -3851,7 +3866,7 @@ export class DatabaseStorage implements IStorage {
     
     return results.map(proyecto => {
       const serviciosCompletados = proyecto.serviciosProgramados?.filter(
-        s => s.estado === 'completado'
+        s => s.estado === 'ejecutado'
       ).length || 0;
       
       return {
@@ -3883,7 +3898,7 @@ export class DatabaseStorage implements IStorage {
     if (!result) return undefined;
     
     const serviciosCompletados = result.serviciosProgramados?.filter(
-      s => s.estado === 'completado'
+      s => s.estado === 'ejecutado'
     ).length || 0;
     
     return {
@@ -3964,7 +3979,7 @@ export class DatabaseStorage implements IStorage {
     const now = new Date();
     const results = await db.query.serviciosProgramados.findMany({
       where: and(
-        eq(serviciosProgramados.estado, 'pendiente'),
+        eq(serviciosProgramados.estado, 'programado'),
         gte(serviciosProgramados.fechaProgramada, now)
       ),
       with: {
@@ -4080,8 +4095,7 @@ export class DatabaseStorage implements IStorage {
       .from(empresaProyectos)
       .where(and(
         eq(empresaProyectos.empresaId, empresaId),
-        eq(empresaProyectos.activo, true),
-        eq(empresaProyectos.estado, 'en_progreso')
+        eq(empresaProyectos.activo, true)
       ));
 
     const [empleadosActivos] = await db

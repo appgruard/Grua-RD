@@ -200,7 +200,25 @@ const MAPBOX_ACCESS_TOKEN = process.env.MAPBOX_ACCESS_TOKEN;
 
 declare global {
   namespace Express {
-    interface User extends User {}
+    interface User {
+      id: string;
+      email: string;
+      phone: string | null;
+      cedula: string | null;
+      cedulaImageUrl: string | null;
+      cedulaVerificada: boolean;
+      passwordHash: string;
+      userType: "cliente" | "conductor" | "admin" | "aseguradora" | "socio" | "empresa";
+      estadoCuenta: "activo" | "suspendido" | "pendiente_verificacion" | "rechazado" | "baneado";
+      nombre: string;
+      apellido: string | null;
+      fotoUrl: string | null;
+      calificacionPromedio: string | null;
+      telefonoVerificado: boolean | null;
+      emailVerificado: boolean | null;
+      fotoVerificada: boolean | null;
+      createdAt: Date;
+    }
   }
 }
 
@@ -225,7 +243,7 @@ passport.use(
         }
 
         logAuth.loginSuccess(user.id, user.email);
-        return done(null, user);
+        return done(null, user as any);
       } catch (error) {
         logSystem.error("Login error", error);
         return done(error);
@@ -241,7 +259,7 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id: string, done) => {
   try {
     const user = await storage.getUserById(id);
-    done(null, user);
+    done(null, user as any);
   } catch (error) {
     done(error);
   }
@@ -1354,7 +1372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (req.isAuthenticated()) {
         userNombre = req.user!.nombre;
-        userApellido = req.user!.apellido;
+        userApellido = req.user!.apellido ?? undefined;
       } else if (req.body.nombre && req.body.apellido) {
         // For registration flow - name provided in request body
         userNombre = req.body.nombre;
@@ -1595,7 +1613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (req.isAuthenticated()) {
         userNombre = req.user!.nombre;
-        userApellido = req.user!.apellido;
+        userApellido = req.user!.apellido ?? undefined;
       } else if (nombre && apellido) {
         // For registration flow - name provided in request body
         userNombre = nombre;
@@ -2035,15 +2053,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             } else {
               // Create new document as aprobado (already validated by Verifik)
-              await storage.createDocumento({
+              const doc = await storage.createDocumento({
                 tipo: 'foto_perfil',
                 conductorId: conductor.id,
                 url: photoDataUrl,
                 nombreArchivo: 'profile_photo_verified.jpg',
                 tamanoArchivo: estimatedSize,
                 mimeType: mimeType,
-                estado: 'aprobado',
               });
+              await storage.updateDocumento(doc.id, { estado: 'aprobado' });
             }
             logSystem.info("Profile photo document created/updated for conductor", {
               conductorId: conductor.id,
@@ -2208,7 +2226,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               nombreArchivo: req.file.originalname,
               tamanoArchivo: req.file.size,
               mimeType: req.file.mimetype,
-              estado: 'pendiente',
             });
           } else {
             // Create new document
@@ -2219,7 +2236,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               nombreArchivo: req.file.originalname,
               tamanoArchivo: req.file.size,
               mimeType: req.file.mimetype,
-              estado: 'pendiente',
             });
           }
         }
@@ -2362,7 +2378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Contraseña actualizada exitosamente" });
     } catch (error: any) {
-      logSystem.error('Reset password error', error, { telefono });
+      logSystem.error('Reset password error', error, { telefono: req.body?.telefono });
       res.status(500).json({ message: "Error al resetear contraseña" });
     }
   });
@@ -2493,14 +2509,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const user = req.user!;
-      let services;
+      let services: any[] = [];
 
       if (user.userType === 'cliente') {
         services = await storage.getServiciosByClientId(user.id);
       } else if (user.userType === 'conductor') {
         services = await storage.getServiciosByConductorId(user.id);
-      } else {
-        services = [];
       }
 
       res.json(services);
@@ -2569,7 +2583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         return new Promise<void>((resolve) => {
-          req.login(updatedUser, (err) => {
+          req.login(updatedUser as any, (err) => {
             if (err) {
               logSystem.error('Failed to update session after become-driver', { userId: user.id, error: err });
               res.status(500).json({ message: "Error al actualizar la sesión" });
@@ -2601,7 +2615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       logSystem.info('Client converted to driver', { userId: user.id, email: user.email });
       
       return new Promise<void>((resolve) => {
-        req.login(updatedUser, (err) => {
+        req.login(updatedUser as any, (err) => {
           if (err) {
             logSystem.error('Failed to update session after become-driver', { userId: user.id, error: err });
             res.status(500).json({ message: "Error al actualizar la sesión" });
@@ -2649,8 +2663,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getDocumentosByUsuarioId(userId),
         (async () => {
           try {
-            const { getCedulaVerificationStatus } = await import('./services/identity');
-            return getCedulaVerificationStatus(userId);
+            const user = await storage.getUserById(userId);
+            return user ? { cedulaVerificada: user.cedulaVerificada } : null;
           } catch {
             return null;
           }
@@ -3642,7 +3656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (!azulResult.success) {
-          logTransaction.failed('Azul payment failed on service completion', {
+          logSystem.error('Azul payment failed on service completion', null, {
             servicioId: oldService.id,
             isoCode: azulResult.isoCode,
             message: azulResult.responseMessage
@@ -3666,7 +3680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           azulReferenceNumber: azulResult.rrn,
         };
         
-        logTransaction.success('Azul payment processed on service completion', {
+        logSystem.info('Azul payment processed on service completion', {
           servicioId: oldService.id,
           azulOrderId: azulResult.azulOrderId,
           authorizationCode: azulResult.authorizationCode,
@@ -3808,27 +3822,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canceladoAt: new Date(),
       });
 
-      logService.info('Service cancelled', { 
-        servicioId,
-        cancelledBy: req.user!.id,
-        userType: req.user!.userType,
-        previousState: servicio.estado
-      });
+      logService.cancelled(servicioId, `Cancelled by ${req.user!.userType}`);
 
       if (isDriver && servicio.clienteId) {
-        await pushService.sendNotification(
-          servicio.clienteId,
-          'Servicio cancelado',
-          'El operador ha cancelado el servicio. Puedes solicitar uno nuevo.',
-          { type: 'service_cancelled', servicioId }
-        );
+        await pushService.sendToUser(servicio.clienteId, {
+          title: 'Servicio cancelado',
+          body: 'El operador ha cancelado el servicio. Puedes solicitar uno nuevo.',
+          data: { type: 'service_cancelled', servicioId }
+        });
       } else if (isClient && servicio.conductorId) {
-        await pushService.sendNotification(
-          servicio.conductorId,
-          'Servicio cancelado',
-          'El cliente ha cancelado el servicio.',
-          { type: 'service_cancelled', servicioId }
-        );
+        await pushService.sendToUser(servicio.conductorId, {
+          title: 'Servicio cancelado',
+          body: 'El cliente ha cancelado el servicio.',
+          data: { type: 'service_cancelled', servicioId }
+        });
       }
 
       res.json(cancelledService);
@@ -4336,7 +4343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const comision of allComisiones) {
         const montoTotal = parseFloat(comision.montoTotal || '0');
-        const gatewayFee = parseFloat(comision.gatewayFeeAmount || '0');
+        const gatewayFee = parseFloat((comision as any).gatewayFeeAmount || '0');
         const montoOperador = parseFloat(comision.montoOperador || '0');
         const montoEmpresa = parseFloat(comision.montoEmpresa || '0');
         
@@ -4380,9 +4387,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .slice(0, 50)
         .map((c) => {
           const montoTotal = parseFloat(c.montoTotal || '0');
-          const gatewayFee = parseFloat(c.gatewayFeeAmount || '0');
-          const netAmount = c.gatewayNetAmount 
-            ? parseFloat(c.gatewayNetAmount) 
+          const gatewayFee = parseFloat((c as any).gatewayFeeAmount || '0');
+          const netAmount = (c as any).gatewayNetAmount 
+            ? parseFloat((c as any).gatewayNetAmount) 
             : montoTotal - gatewayFee;
           
           return {
@@ -5495,13 +5502,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (req.file) {
         const fileName = `chat/${servicioId}/${Date.now()}-${req.file.originalname}`;
-        urlArchivo = await uploadDocument({
+        const uploadResult = await uploadDocument({
           buffer: req.file.buffer,
           originalName: req.file.originalname,
           mimeType: req.file.mimetype,
           userId: req.user!.id,
           documentType: 'chat_media',
         });
+        urlArchivo = uploadResult.url;
         nombreArchivo = req.file.originalname;
         
         if (req.file.mimetype.startsWith('video/')) {
@@ -5609,7 +5617,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombreArchivo: uploadResult.fileName,
         tamanoArchivo: uploadResult.fileSize,
         mimeType: uploadResult.mimeType,
-        estado: 'pendiente',
         validoHasta: validoHasta,
       });
 
@@ -5691,7 +5698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Archivo no encontrado" });
       }
 
-      res.setHeader('Content-Type', documento.mimeType);
+      res.setHeader('Content-Type', documento.mimeType || 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${documento.nombreArchivo}"`);
       res.send(fileBuffer);
     } catch (error: any) {
@@ -5773,22 +5780,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (conductor) {
           const user = await storage.getUserById(conductor.userId);
           if (user) {
-            await pushService.sendNotification(
-              user.id,
-              `Documento ${estadoTexto}`,
-              `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
-              { type: 'document_review', documentId }
-            );
+            await pushService.sendToUser(user.id, {
+              title: `Documento ${estadoTexto}`,
+              body: `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
+              data: { type: 'document_review', documentId }
+            });
           }
         }
       } else if (documento.usuarioId) {
         // Document belongs to a client (e.g., seguro_cliente)
-        await pushService.sendNotification(
-          documento.usuarioId,
-          `Documento ${estadoTexto}`,
-          `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
-          { type: 'document_review', documentId }
-        );
+        await pushService.sendToUser(documento.usuarioId, {
+          title: `Documento ${estadoTexto}`,
+          body: `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
+          data: { type: 'document_review', documentId }
+        });
       }
 
       logDocument.reviewed(req.user!.id, documentId, estado);
@@ -5931,12 +5936,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const conductor = await storage.getConductorById(driverId);
       if (conductor) {
-        await pushService.sendNotification(
-          conductor.userId,
-          'Cuenta Suspendida',
-          `Tu cuenta ha sido suspendida: ${motivo}`,
-          { type: 'account_suspended', reason: 'admin_action' }
-        );
+        await pushService.sendToUser(conductor.userId, {
+          title: 'Cuenta Suspendida',
+          body: `Tu cuenta ha sido suspendida: ${motivo}`,
+          data: { type: 'account_suspended', reason: 'admin_action' }
+        });
       }
       
       logSystem.info('Driver suspended by admin', { adminId: req.user!.id, driverId, motivo });
@@ -5960,12 +5964,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const conductor = await storage.getConductorById(driverId);
       if (conductor) {
-        await pushService.sendNotification(
-          conductor.userId,
-          'Cuenta Reactivada',
-          'Tu cuenta ha sido reactivada. Ya puedes volver a aceptar servicios.',
-          { type: 'account_reactivated' }
-        );
+        await pushService.sendToUser(conductor.userId, {
+          title: 'Cuenta Reactivada',
+          body: 'Tu cuenta ha sido reactivada. Ya puedes volver a aceptar servicios.',
+          data: { type: 'account_reactivated' }
+        });
       }
       
       logSystem.info('Driver reactivated by admin', { adminId: req.user!.id, driverId });
@@ -6055,7 +6058,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombreArchivo,
         tamanoArchivo: uploadResult.fileSize,
         mimeType: uploadResult.mimeType,
-        estado: 'pendiente',
         validoHasta: validoHasta,
       });
 
@@ -6166,7 +6168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete from database
       await storage.deleteDocumento(documento.id);
       
-      logDocument.deleted(req.user!.id, documento.id);
+      logDocument.deleted(documento.id);
       res.json({ message: "Documento de seguro eliminado correctamente" });
     } catch (error: any) {
       logSystem.error('Delete client insurance error', error);
@@ -6227,16 +6229,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedServicio = await storage.aprobarAseguradora(id, req.user!.id);
       
-      logService.updated(req.user!.id, id, { action: 'insurance_approved' });
+      logSystem.info('Insurance approved', { adminId: req.user!.id, servicioId: id, action: 'insurance_approved' });
 
       // Send push notification to client (with error handling)
       try {
-        await pushService.sendNotification(
-          servicio.clienteId,
-          'Póliza de seguro aprobada',
-          'Tu solicitud de servicio con aseguradora ha sido aprobada. Los conductores ya pueden aceptar tu solicitud.',
-          { type: 'insurance_approved', servicioId: id }
-        );
+        await pushService.sendToUser(servicio.clienteId, {
+          title: 'Póliza de seguro aprobada',
+          body: 'Tu solicitud de servicio con aseguradora ha sido aprobada. Los conductores ya pueden aceptar tu solicitud.',
+          data: { type: 'insurance_approved', servicioId: id }
+        });
       } catch (pushError) {
         logSystem.warn('Push notification failed for insurance approval', { servicioId: id, error: pushError });
       }
@@ -6276,16 +6277,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedServicio = await storage.rechazarAseguradora(id, req.user!.id, motivoRechazo);
       
-      logService.updated(req.user!.id, id, { action: 'insurance_rejected', reason: motivoRechazo });
+      logSystem.info('Insurance rejected', { adminId: req.user!.id, servicioId: id, action: 'insurance_rejected', reason: motivoRechazo });
 
       // Send push notification to client (with error handling)
       try {
-        await pushService.sendNotification(
-          servicio.clienteId,
-          'Póliza de seguro rechazada',
-          `Tu solicitud de servicio con aseguradora fue rechazada: ${motivoRechazo}`,
-          { type: 'insurance_rejected', servicioId: id, reason: motivoRechazo }
-        );
+        await pushService.sendToUser(servicio.clienteId, {
+          title: 'Póliza de seguro rechazada',
+          body: `Tu solicitud de servicio con aseguradora fue rechazada: ${motivoRechazo}`,
+          data: { type: 'insurance_rejected', servicioId: id, reason: motivoRechazo }
+        });
       } catch (pushError) {
         logSystem.warn('Push notification failed for insurance rejection', { servicioId: id, error: pushError });
       }
@@ -6661,7 +6661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const netAmount = parsedAmount - SAME_DAY_WITHDRAWAL_COMMISSION;
 
-      logTransaction.info('Immediate withdrawal requested', {
+      logSystem.info('Immediate withdrawal requested', {
         conductorId: conductor.id,
         amount: parsedAmount,
         commission: SAME_DAY_WITHDRAWAL_COMMISSION,
@@ -6847,8 +6847,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedWithdrawal = await storage.updateOperatorWithdrawal(id, {
         estado: 'pagado',
-        referenciaPago: referenciaBancaria || `MANUAL-${Date.now()}`,
-        estadoPago: 'COMPLETED_MANUAL',
+        azulPayoutReference: referenciaBancaria || `MANUAL-${Date.now()}`,
+        azulPayoutStatus: 'COMPLETED_MANUAL',
         errorMessage: notas || 'Procesado manualmente por administrador',
         procesadoAt: new Date(),
       });
@@ -7046,7 +7046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardholderName: cardholderName || null,
       });
 
-      logTransaction.success('Client payment method created with Azul', {
+      logSystem.info('Client payment method created with Azul', {
         userId: req.user!.id,
         paymentMethodId: paymentMethod.id,
         cardBrand: tokenResult.tokenData.cardBrand,
@@ -7311,7 +7311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardholderName: cardholderName || null,
       });
 
-      logTransaction.success('Operator payment method created with Azul', {
+      logSystem.info('Operator payment method created with Azul', {
         conductorId: conductor.id,
         paymentMethodId: paymentMethod.id,
         cardBrand: tokenResult.tokenData.cardBrand,
@@ -7511,7 +7511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!paymentResult.success) {
-        logTransaction.failed('Operator debt payment failed', {
+        logSystem.error('Operator debt payment failed', null, {
           conductorId: conductor.id,
           amount: paymentAmount,
           isoCode: paymentResult.isoCode,
@@ -7531,7 +7531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customOrderId,
       });
 
-      logTransaction.success('Operator debt paid with Azul', {
+      logSystem.info('Operator debt paid with Azul', {
         conductorId: conductor.id,
         amount: paymentAmount,
         azulOrderId: paymentResult.azulOrderId,
@@ -7640,7 +7640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateComisionNotas(req.params.id, notas);
       }
 
-      logTransaction.info('Admin marked commission as paid', {
+      logSystem.info('Admin marked commission as paid', {
         comisionId: req.params.id,
         tipo,
         referencia,
@@ -7805,10 +7805,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.text(`Distancia: ${servicio.distanciaKm} km`);
       doc.moveDown();
 
-      doc.fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`, { bold: true });
-      doc.fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
-      if (servicio.transactionId) {
-        doc.text(`ID de Transacción: ${servicio.transactionId}`);
+      doc.font('Helvetica-Bold').fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`);
+      doc.font('Helvetica').fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
+      if ((servicio as any).transactionId) {
+        doc.text(`ID de Transacción: ${(servicio as any).transactionId}`);
       }
       doc.moveDown();
 
@@ -7867,14 +7867,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // TODO: Actualizar con campos de Azul API cuando esté implementado
+      // Bank account info is stored in operatorBankAccounts table, not on conductor
+      const bankAccount = await storage.getOperatorBankAccountByCondutorId?.(conductor.id);
       res.json({
-        hasBankAccount: !!conductor.bankCode,
-        payoutEnabled: conductor.payoutEnabled || false,
-        bankAccount: conductor.bankCode ? {
-          bankName: conductor.bankName,
-          accountType: conductor.accountType,
-          last4: conductor.accountNumber,
-          accountHolder: conductor.accountHolder,
+        hasBankAccount: !!bankAccount,
+        payoutEnabled: (conductor as any).payoutEnabled || false,
+        bankAccount: bankAccount ? {
+          bankName: bankAccount.banco,
+          accountType: bankAccount.tipoCuenta,
+          last4: bankAccount.numeroCuenta?.slice(-4),
+          accountHolder: bankAccount.nombreTitular,
         } : null,
         balance: {
           available: conductor.balanceDisponible || "0.00",
@@ -7927,9 +7929,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(methods.map(m => ({
           id: m.id,
           cardBrand: m.cardBrand,
-          lastFourDigits: m.lastFourDigits,
-          expirationMonth: m.expirationMonth,
-          expirationYear: m.expirationYear,
+          lastFourDigits: m.last4,
+          expirationMonth: m.expiryMonth,
+          expirationYear: m.expiryYear,
           isDefault: m.isDefault,
           createdAt: m.createdAt,
         })));
@@ -7942,9 +7944,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(methods.map(m => ({
           id: m.id,
           cardBrand: m.cardBrand,
-          lastFourDigits: m.lastFourDigits,
-          expirationMonth: m.expirationMonth,
-          expirationYear: m.expirationYear,
+          lastFourDigits: m.last4,
+          expirationMonth: m.expiryMonth,
+          expirationYear: m.expiryYear,
           isDefault: m.isDefault,
           createdAt: m.createdAt,
         })));
@@ -8227,17 +8229,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { montoAprobado } = validationResult.data;
       const updated = await storage.aprobarServicioAseguradora(req.params.id, req.user!.id, String(montoAprobado));
       
-      logService.updated(req.user!.id, req.params.id, { action: 'insurance_approved_by_insurer', monto: montoAprobado });
+      logSystem.info('Insurance approved by insurer', { userId: req.user!.id, servicioId: req.params.id, action: 'insurance_approved_by_insurer', monto: montoAprobado });
 
       // Send notification to client
       if (servicio.servicio?.clienteId) {
         try {
-          await pushService.sendNotification(
-            servicio.servicio.clienteId,
-            'Servicio aprobado por aseguradora',
-            `Tu servicio de grúa ha sido aprobado por ${aseguradora.nombreEmpresa}`,
-            { type: 'insurance_approved', servicioId: servicio.servicioId }
-          );
+          await pushService.sendToUser(servicio.servicio.clienteId, {
+            title: 'Servicio aprobado por aseguradora',
+            body: `Tu servicio de grúa ha sido aprobado por ${aseguradora.nombreEmpresa}`,
+            data: { type: 'insurance_approved', servicioId: servicio.servicioId }
+          });
         } catch (pushError) {
           logSystem.warn('Push notification failed for insurance approval', { servicioId: req.params.id });
         }
@@ -8283,17 +8284,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { motivo } = validationResult.data;
       const updated = await storage.rechazarServicioAseguradora(req.params.id, req.user!.id, motivo);
       
-      logService.updated(req.user!.id, req.params.id, { action: 'insurance_rejected_by_insurer', motivo });
+      logSystem.info('Insurance rejected by insurer', { userId: req.user!.id, servicioId: req.params.id, action: 'insurance_rejected_by_insurer', motivo });
 
       // Send notification to client
       if (servicio.servicio?.clienteId) {
         try {
-          await pushService.sendNotification(
-            servicio.servicio.clienteId,
-            'Servicio rechazado por aseguradora',
-            `Tu servicio de grúa fue rechazado: ${motivo}`,
-            { type: 'insurance_rejected', servicioId: servicio.servicioId, reason: motivo }
-          );
+          await pushService.sendToUser(servicio.servicio.clienteId, {
+            title: 'Servicio rechazado por aseguradora',
+            body: `Tu servicio de grúa fue rechazado: ${motivo}`,
+            data: { type: 'insurance_rejected', servicioId: servicio.servicioId, reason: motivo }
+          });
         } catch (pushError) {
           logSystem.warn('Push notification failed for insurance rejection', { servicioId: req.params.id });
         }
@@ -8592,7 +8592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             logSystem.warn('Email service not configured, skipping ticket created email');
             return;
           }
-          const user = await storage.getUser(userId);
+          const user = await storage.getUserById(userId);
           if (user?.email) {
             await emailService.sendTicketCreatedEmail(user.email, user.nombre || 'Usuario', ticketSnapshot);
           }
@@ -8704,7 +8704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               logSystem.warn('Email service not configured, skipping ticket response email');
               return;
             }
-            const ticketOwner = await storage.getUser(ticketSnapshot.usuarioId);
+            const ticketOwner = await storage.getUserById(ticketSnapshot.usuarioId);
             if (ticketOwner?.email) {
               await emailService.sendTicketSupportResponseEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
                 id: ticketSnapshot.id,
@@ -8886,7 +8886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             logSystem.warn('Email service not configured, skipping ticket status email');
             return;
           }
-          const ticketOwner = await storage.getUser(ticketSnapshot.usuarioId);
+          const ticketOwner = await storage.getUserById(ticketSnapshot.usuarioId);
           if (ticketOwner?.email) {
             await emailService.sendTicketStatusChangedEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
               id: ticketSnapshot.id,
@@ -9041,7 +9041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pdfBuffer = await pdfService.generarEstadoFinancieroSocio({
         socio,
         periodo,
-        distribucion: distribucionSocio || null,
+        distribucion: distribucionSocio as any || null,
         resumen,
       });
 
@@ -9146,9 +9146,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email,
         passwordHash,
         nombre,
-        telefono: telefono || null,
+        apellido: '',
+        phone: telefono ?? undefined,
         userType: 'socio',
-        verificado: true,
+        emailVerificado: true,
       });
 
       // Create partner profile
@@ -9314,10 +9315,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           periodo,
           ingresosTotales: String(calculo.ingresosTotales),
           comisionEmpresa: String(calculo.comisionEmpresa),
-          porcentajeAlMomento: String(dist.porcentajeParticipacion),
           montoSocio: String(dist.montoSocio),
           calculadoPor: req.user!.id,
-        });
+        } as any);
         distribuciones.push(distribucion);
       }
 
@@ -9557,7 +9557,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombre: parsed.data.nombre,
         apellido: parsed.data.apellido || '',
         userType: 'admin',
-        estadoCuenta: 'activo',
         emailVerificado: true,
       });
 
@@ -9577,7 +9576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parsed.data.permisos
       );
 
-      logAuth.info('Administrator created', { 
+      logSystem.info('Administrator created', { 
         adminId: admin.id, 
         userId: newUser.id,
         email: parsed.data.email,
@@ -9616,7 +9615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No se pudo actualizar el administrador" });
       }
 
-      logAuth.info('Administrator updated', { 
+      logSystem.info('Administrator updated', { 
         adminId: req.params.id, 
         updatedBy: req.user!.id 
       });
@@ -9649,7 +9648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No se pudo cambiar el estado" });
       }
 
-      logAuth.info('Administrator status toggled', { 
+      logSystem.info('Administrator status toggled', { 
         adminId: req.params.id, 
         newStatus: updated.activo,
         changedBy: req.user!.id 
@@ -10236,9 +10235,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         passwordHash,
         nombre: parsed.data.nombre,
         apellido: parsed.data.apellido || "",
-        phone: parsed.data.phone || null,
+        phone: parsed.data.phone ?? undefined,
         userType: 'empresa',
-        estadoCuenta: 'activo',
       });
 
       const empresa = await storage.createEmpresa({
@@ -10833,7 +10831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!paymentResult.success) {
-        logTransaction.failed('Wallet debt payment failed', {
+        logSystem.error('Wallet debt payment failed', null, {
           conductorId: conductor.id,
           amount: paymentAmount,
           isoCode: paymentResult.isoCode,
@@ -10853,7 +10851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customOrderId,
       });
 
-      logTransaction.success('Wallet debt paid with Azul', {
+      logSystem.info('Wallet debt paid with Azul', {
         conductorId: conductor.id,
         amount: paymentAmount,
         azulOrderId: paymentResult.azulOrderId,

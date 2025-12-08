@@ -79,7 +79,7 @@ export async function checkStorageHealth(): Promise<{
     }
     
     // Try a simple list operation with a minimal prefix to test connectivity
-    const result = await storageClient.list({ prefix: '_health_', limit: 1 });
+    const result = await storageClient.list({ prefix: '_health_' });
     const responseTime = Date.now() - start;
     
     if (!result.ok) {
@@ -238,8 +238,8 @@ export async function getDocument(key: string): Promise<Buffer | null> {
       return null;
     }
     
-    // Convert Uint8Array to Buffer for compatibility
-    return Buffer.from(result.value);
+    // Convert to Buffer for compatibility
+    return Buffer.from(result.value as unknown as Uint8Array);
   } catch (error) {
     logger.error('Error retrieving document from object storage', {
       error: error instanceof Error ? error.message : 'Unknown error',
