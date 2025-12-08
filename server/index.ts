@@ -225,6 +225,38 @@ app.use(
   })
 );
 
+app.get("/debug/env", (_req: Request, res: Response) => {
+  const envVars = [
+    'NODE_ENV',
+    'PORT',
+    'DATABASE_URL',
+    'SESSION_SECRET',
+    'ALLOWED_ORIGINS',
+    'MAPBOX_ACCESS_TOKEN',
+    'VITE_MAPBOX_ACCESS_TOKEN',
+    'VAPID_PUBLIC_KEY',
+    'VAPID_PRIVATE_KEY',
+    'RESEND_API_KEY',
+    'TWILIO_ACCOUNT_SID',
+  ];
+  
+  const status: Record<string, string> = {};
+  for (const key of envVars) {
+    const value = process.env[key];
+    if (value) {
+      status[key] = `SET (${value.length} chars)`;
+    } else {
+      status[key] = 'NOT SET';
+    }
+  }
+  
+  res.json({
+    timestamp: new Date().toISOString(),
+    trustProxy: app.get("trust proxy"),
+    envStatus: status,
+  });
+});
+
 app.get("/health", async (_req: Request, res: Response) => {
   const timestamp = new Date().toISOString();
   const uptime = process.uptime();
