@@ -455,6 +455,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   ];
 
   app.use((req: Request, res: Response, next) => {
+    // Skip check for non-API routes (allow frontend/SPA routes to pass through)
+    if (!req.path.startsWith('/api/')) {
+      return next();
+    }
+    
     // Skip check for non-authenticated users (they'll fail auth checks later)
     if (!req.isAuthenticated()) {
       return next();
