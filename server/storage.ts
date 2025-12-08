@@ -158,6 +158,8 @@ export interface IStorage {
   // Users
   getUserById(id: string): Promise<UserWithConductor | undefined>;
   getUserByEmail(email: string): Promise<UserWithConductor | undefined>;
+  getUserByEmailAndType(email: string, userType: string): Promise<UserWithConductor | undefined>;
+  getUsersByEmail(email: string): Promise<UserWithConductor[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User>;
   getAllUsers(): Promise<User[]>;
@@ -655,6 +657,26 @@ export class DatabaseStorage implements IStorage {
       },
     });
     return result;
+  }
+
+  async getUserByEmailAndType(email: string, userType: string): Promise<UserWithConductor | undefined> {
+    const result = await db.query.users.findFirst({
+      where: and(eq(users.email, email), eq(users.userType, userType as any)),
+      with: {
+        conductor: true,
+      },
+    });
+    return result;
+  }
+
+  async getUsersByEmail(email: string): Promise<UserWithConductor[]> {
+    const results = await db.query.users.findMany({
+      where: eq(users.email, email),
+      with: {
+        conductor: true,
+      },
+    });
+    return results;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {

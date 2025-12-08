@@ -8,7 +8,8 @@ import {
   boolean, 
   timestamp,
   integer,
-  pgEnum
+  pgEnum,
+  uniqueIndex
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -164,9 +165,11 @@ export const tipoMensajeChatEnum = pgEnum("tipo_mensaje_chat", [
 ]);
 
 // Users Table
+// Note: email is not globally unique - users can have multiple accounts with different userTypes
+// A composite unique constraint on (email, userType) prevents duplicate accounts of the same type
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: text("email").notNull().unique(),
+  email: text("email").notNull(),
   phone: text("phone"),
   cedula: text("cedula"),
   cedulaImageUrl: text("cedula_image_url"),
@@ -183,7 +186,9 @@ export const users = pgTable("users", {
   fotoVerificada: boolean("foto_verificada").default(false).notNull(),
   fotoVerificadaScore: decimal("foto_verificada_score", { precision: 5, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  emailUserTypeUnique: uniqueIndex("users_email_user_type_unique").on(table.email, table.userType),
+}));
 
 // Conductores (Drivers) Table
 export const conductores = pgTable("conductores", {
