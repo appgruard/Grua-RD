@@ -4,32 +4,42 @@ import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle, User, Truck, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
+interface AccountOption {
+  id: string;
+  userType: 'cliente' | 'conductor';
+  nombre: string;
+  apellido: string | null;
+  fotoUrl: string | null;
+}
+
+type LoginStep = 'credentials' | 'select-account';
+
 export default function Login() {
   const [location, setLocation] = useLocation();
-  const { login, user, isLoading, pendingVerification } = useAuth();
+  const { login, checkAccounts, user, isLoading, pendingVerification } = useAuth();
   const { toast } = useToast();
+  
+  const [step, setStep] = useState<LoginStep>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   useEffect(() => {
-    // Redirect to verify-pending if there's a pending verification from login attempt
     if (pendingVerification) {
       setLocation('/verify-pending');
       return;
     }
     
     if (user && !isLoading) {
-      // Check if conductor needs verification using server data
       if (user.userType === 'conductor') {
-        // Either telefonoVerificado OR emailVerificado counts as contact verified
         const contactoVerificado = user.telefonoVerificado || (user as any).emailVerificado;
         const needsVerification = !user.cedulaVerificada || !contactoVerificado || !user.fotoVerificada;
         if (needsVerification) {
@@ -81,7 +91,32 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const loggedInUser = await login(email, password);
+      const result = await checkAccounts(email, password);
+      
+      if (result.requiresDisambiguation && result.accounts.length > 1) {
+        setAccounts(result.accounts);
+        setStep('select-account');
+        setLoading(false);
+        return;
+      }
+      
+      await performLogin();
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Credenciales inválidas';
+      setErrors({ general: errorMessage });
+      toast({
+        title: 'Error al iniciar sesión',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      setLoading(false);
+    }
+  };
+
+  const performLogin = async (userType?: string) => {
+    setLoading(true);
+    try {
+      const loggedInUser = await login(email, password, userType ? { userType } : undefined);
       
       toast({
         title: '¡Bienvenido!',
@@ -92,11 +127,16 @@ export default function Login() {
         setLocation('/admin');
       } else if (loggedInUser.userType === 'conductor') {
         setLocation('/driver');
+      } else if (loggedInUser.userType === 'aseguradora') {
+        setLocation('/aseguradora');
+      } else if (loggedInUser.userType === 'socio') {
+        setLocation('/socio');
+      } else if (loggedInUser.userType === 'empresa') {
+        setLocation('/empresa');
       } else {
         setLocation('/client');
       }
     } catch (error: any) {
-      // Check if this is a verification required error - redirect silently without error message
       if (error?.requiresVerification) {
         setLocation('/verify-pending');
         return;
@@ -113,6 +153,102 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  const handleAccountSelect = async (userType: 'cliente' | 'conductor') => {
+    await performLogin(userType);
+  };
+
+  const handleBackToCredentials = () => {
+    setStep('credentials');
+    setAccounts([]);
+    setErrors({});
+  };
+
+  const getAccountTypeLabel = (userType: 'cliente' | 'conductor') => {
+    return userType === 'conductor' ? 'Operador' : 'Cliente';
+  };
+
+  const getAccountTypeDescription = (userType: 'cliente' | 'conductor') => {
+    return userType === 'conductor' 
+      ? 'Gestiona y acepta servicios de grúa' 
+      : 'Solicita servicios de grúa';
+  };
+
+  if (step === 'select-account') {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-sm">
+            <div className="text-center mb-8">
+              <div className="flex justify-center mb-6">
+                <div className="relative">
+                  <img 
+                    src={logoUrl} 
+                    alt="Grúa RD Logo" 
+                    className="w-24 h-24 object-contain"
+                  />
+                </div>
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight">Selecciona tu cuenta</h1>
+              <p className="text-muted-foreground mt-2">
+                Tienes múltiples cuentas con este correo
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {accounts.map((account) => (
+                <Card
+                  key={account.userType}
+                  className="hover-elevate active-elevate-2 cursor-pointer transition-all"
+                  onClick={() => !loading && handleAccountSelect(account.userType)}
+                  data-testid={`button-select-${account.userType}`}
+                >
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className="w-full p-4 text-left flex items-center gap-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      {account.userType === 'conductor' ? (
+                        <Truck className="w-7 h-7 text-primary" />
+                      ) : (
+                        <User className="w-7 h-7 text-primary" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-lg text-foreground">
+                        {getAccountTypeLabel(account.userType)}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {getAccountTypeDescription(account.userType)}
+                      </p>
+                    </div>
+                    {loading && (
+                      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    )}
+                  </button>
+                </Card>
+              ))}
+            </div>
+
+            <div className="mt-6">
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={handleBackToCredentials}
+                disabled={loading}
+                data-testid="button-back-to-credentials"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Volver
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -204,7 +340,7 @@ export default function Login() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Iniciando sesión...
+                  Verificando...
                 </>
               ) : (
                 'Continuar'

@@ -227,15 +227,33 @@ passport.use(
     {
       usernameField: "email",
       passwordField: "password",
+      passReqToCallback: true,
     },
-    async (email, password, done) => {
+    async (req, email, password, done) => {
       try {
-        const user = await storage.getUserByEmail(email);
+        // Security model for disambiguation:
+        // When userType is provided, fetch the specific account by email + type
+        // This is secure because each email can only have ONE account per type
+        // Password is always verified for the selected account
+        
+        const requestedUserType = req.body.userType as string | undefined;
+        
+        let user;
+        if (requestedUserType) {
+          // Disambiguation: login with specific account type
+          // Each email can only have one account per type, so this is safe
+          user = await storage.getUserByEmailAndType(email, requestedUserType);
+        } else {
+          // Default: get first account (backwards compatibility)
+          user = await storage.getUserByEmail(email);
+        }
+        
         if (!user) {
           logAuth.loginFailed(email, "User not found");
           return done(null, false);
         }
 
+        // Always verify password for the selected account
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) {
           logAuth.loginFailed(email, "Invalid password");
@@ -1113,6 +1131,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timestamp: new Date().toISOString(),
         error: error.message,
       });
+    }
+  });
+
+  // Check if multiple accounts exist for an email (for disambiguation)
+  // Security: Only returns accounts where password matches that specific account
+  // Uses userType for selection (not raw IDs) since a user can only have ONE account per type
+  app.post("/api/auth/check-accounts", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email y contraseña son requeridos" });
+      }
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Formato de correo electrónico inválido" });
+      }
+      
+      // Get all accounts with this email
+      const accounts = await storage.getUsersByEmail(email);
+      
+      if (accounts.length === 0) {
+        return res.status(401).json({ message: "Credenciales inválidas" });
+      }
+      
+      // Security: Validate password against EACH individual account
+      // Only return accounts where the provided password matches that specific account's hash
+      // This prevents privilege escalation - you can only access accounts where you know the password
+      const validAccounts = [];
+      for (const account of accounts) {
+        const isValid = await bcrypt.compare(password, account.passwordHash);
+        if (isValid && (account.userType === 'cliente' || account.userType === 'conductor')) {
+          validAccounts.push({
+            userType: account.userType,
+            nombre: account.nombre,
+            apellido: account.apellido,
+            fotoUrl: account.fotoUrl,
+          });
+        }
+      }
+      
+      // No valid accounts with matching password
+      if (validAccounts.length === 0) {
+        logAuth.loginFailed(email, "Invalid password");
+        return res.status(401).json({ message: "Credenciales inválidas" });
+      }
+      
+      // If only one valid account, no disambiguation needed
+      if (validAccounts.length === 1) {
+        return res.json({ 
+          requiresDisambiguation: false,
+          accounts: validAccounts
+        });
+      }
+      
+      // Multiple accounts found - return info for disambiguation
+      // Note: We use userType for selection since each email can only have ONE account per type
+      return res.json({
+        requiresDisambiguation: true,
+        accounts: validAccounts,
+      });
+      
+    } catch (error: any) {
+      logSystem.error('Check accounts error', error, { email: req.body.email });
+      res.status(500).json({ message: "Error al verificar cuentas" });
     }
   });
 

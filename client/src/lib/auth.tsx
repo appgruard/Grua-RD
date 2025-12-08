@@ -17,12 +17,29 @@ interface VerificationError extends Error {
   user: UserWithConductor;
 }
 
+interface AccountInfo {
+  userType: 'cliente' | 'conductor';
+  nombre: string;
+  apellido: string | null;
+  fotoUrl: string | null;
+}
+
+interface CheckAccountsResult {
+  requiresDisambiguation: boolean;
+  accounts: AccountInfo[];
+}
+
+interface LoginOptions {
+  userType?: string;
+}
+
 interface AuthContextType {
   user: UserWithConductor | null;
   isLoading: boolean;
   pendingVerification: VerificationStatus | null;
   pendingVerificationUser: UserWithConductor | null;
-  login: (email: string, password: string) => Promise<UserWithConductor>;
+  login: (email: string, password: string, options?: LoginOptions) => Promise<UserWithConductor>;
+  checkAccounts: (email: string, password: string) => Promise<CheckAccountsResult>;
   register: (data: RegisterData) => Promise<UserWithConductor>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -72,8 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLoading = cookieExists ? queryLoading : false;
 
   const loginMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string }) => {
-      // Use fetch directly instead of apiRequest to handle 403 verification cases
+    mutationFn: async (data: { email: string; password: string; userType?: string }) => {
       const API_BASE_URL = import.meta.env.VITE_API_URL || '';
       const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/login` : '/api/auth/login';
       
@@ -84,7 +100,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: 'include',
       });
       
-      // Try to parse JSON response
       let responseData;
       try {
         responseData = await res.json();
@@ -93,7 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { user: null };
       }
       
-      // Handle 403 with verification required - throw special error for redirect
       if (res.status === 403 && responseData?.requiresVerification) {
         const verificationError = new Error(responseData.message) as VerificationError;
         verificationError.requiresVerification = true;
@@ -159,8 +173,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const login = async (email: string, password: string) => {
-    const result = await loginMutation.mutateAsync({ email, password });
+  const checkAccounts = async (email: string, password: string): Promise<CheckAccountsResult> => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+    const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/check-accounts` : '/api/auth/check-accounts';
+    
+    const res = await fetch(fullUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      credentials: 'include',
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(data?.message || 'Error verificando cuentas');
+    }
+    
+    return data;
+  };
+
+  const login = async (email: string, password: string, options?: LoginOptions) => {
+    const result = await loginMutation.mutateAsync({ 
+      email, 
+      password, 
+      userType: options?.userType,
+    });
     return result.user;
   };
 
@@ -188,7 +226,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading, 
       pendingVerification,
       pendingVerificationUser,
-      login, 
+      login,
+      checkAccounts,
       register, 
       logout, 
       refreshUser,
