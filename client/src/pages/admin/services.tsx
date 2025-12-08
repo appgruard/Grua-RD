@@ -22,17 +22,21 @@ export default function AdminServices() {
     service.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const statusColors = {
+  const statusColors: Record<string, "secondary" | "default" | "destructive"> = {
     pendiente: 'secondary',
     aceptado: 'default',
+    conductor_en_sitio: 'default',
+    cargando: 'default',
     en_progreso: 'default',
     completado: 'default',
     cancelado: 'destructive',
-  } as const;
+  };
 
-  const statusLabels = {
+  const statusLabels: Record<string, string> = {
     pendiente: 'Pendiente',
     aceptado: 'Aceptado',
+    conductor_en_sitio: 'En Sitio',
+    cargando: 'Cargando',
     en_progreso: 'En Progreso',
     completado: 'Completado',
     cancelado: 'Cancelado',

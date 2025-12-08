@@ -28,13 +28,13 @@ type ConductorWithUser = Conductor & {
 
 export default function AdminDrivers() {
   const [search, setSearch] = useState('');
-  const [expandedDrivers, setExpandedDrivers] = useState<Set<number>>(new Set());
+  const [expandedDrivers, setExpandedDrivers] = useState<Set<string>>(new Set());
   
   const { data: drivers, isLoading } = useQuery<ConductorWithUser[]>({
     queryKey: ['/api/admin/drivers'],
   });
 
-  const toggleExpanded = (driverId: number) => {
+  const toggleExpanded = (driverId: string) => {
     setExpandedDrivers(prev => {
       const newSet = new Set(prev);
       if (newSet.has(driverId)) {
