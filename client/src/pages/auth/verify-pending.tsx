@@ -123,16 +123,21 @@ export default function VerifyPending() {
             setCurrentStep('cedula');
           }
         } else {
-          // Only redirect if skipRedirects is not true
+          // Client verification flow
           if (cedulaVerificada && emailVerificado) {
+            // Fully verified - redirect if skipRedirects is not true
             if (!options?.skipRedirects) {
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/client');
               });
             }
-          } else if (cedulaStepComplete) {
+          } else if (cedulaStepComplete && !emailVerificado) {
+            // Cedula done, needs email verification
             setCurrentStep('email');
+          } else {
+            // Needs cedula verification first
+            setCurrentStep('cedula');
           }
         }
         return { success: true };

@@ -40,8 +40,8 @@ export default function Login() {
     
     if (user && !isLoading) {
       if (user.userType === 'conductor') {
-        const contactoVerificado = user.telefonoVerificado || (user as any).emailVerificado;
-        const needsVerification = !user.cedulaVerificada || !contactoVerificado || !user.fotoVerificada;
+        const emailVerificado = (user as any).emailVerificado;
+        const needsVerification = !user.cedulaVerificada || !emailVerificado || !user.fotoVerificada;
         if (needsVerification) {
           setLocation('/verify-pending');
           return;
@@ -56,6 +56,13 @@ export default function Login() {
       } else if (user.userType === 'empresa') {
         setLocation('/empresa');
       } else {
+        // Check if client needs verification (cedula and email)
+        const emailVerificado = (user as any).emailVerificado;
+        const needsVerification = !user.cedulaVerificada || !emailVerificado;
+        if (needsVerification) {
+          setLocation('/verify-pending');
+          return;
+        }
         setLocation('/client');
       }
     }
