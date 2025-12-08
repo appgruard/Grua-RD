@@ -49,6 +49,15 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 2025 - Dual-Account System Implementation
+- **Database Schema Change**: Replaced unique constraint on `users.email` with composite unique index on `(email, user_type)`. This allows the same email to be used for both client and driver accounts.
+- **Migration 0012**: `migrations/0012_dual_account_email_constraint.sql` drops `users_email_unique` and creates `users_email_user_type_unique` composite index.
+- **New Storage Methods**: Added `getUserByEmailAndType(email, userType)` and `getUsersByEmail(email)` to `server/storage.ts` for querying users with dual accounts.
+- **Client Profile Enhancement**: Added "¿También eres operador de grúa?" section that redirects to `/auth/onboarding-wizard?tipo=conductor` instead of in-place account conversion.
+- **Driver Profile Enhancement**: Added "¿También necesitas servicios de grúa?" section that redirects to `/auth/onboarding-wizard?tipo=cliente` for creating a client account.
+- **Empty State Message**: Driver dashboard now shows "Aún no hay servicios cerca de tu zona" when there are no nearby service requests.
+- **Registration Flow**: Backend now allows same email/phone for different account types, checking only for duplicates within the same userType.
+
 ### December 2025 - Registration Flow Security Improvements
 - **Client Email OTP Verification**: Changed client registration from SMS to Email OTP verification. Uses `/api/auth/send-otp` and `/api/auth/verify-otp` endpoints, matching the operator flow. Step 3 of onboarding now shows "Verificación de Correo Electrónico" with email display.
 - **Operator Name Editing During Cedula Scan**: Operators can now edit their name and surname before completing cedula verification (Step 2). Includes edit button, form fields initialized from current profile data, and validation for non-empty values.
