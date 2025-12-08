@@ -1322,7 +1322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             imageUrl = uploadResult.url;
             
             await storage.updateUser(req.user!.id, {
-              cedulaImageUrl: uploadResult.url
+              cedulaImageUrl: uploadResult.url,
+              cedulaVerificada: true
             });
             
             logSystem.info('Cedula image saved for manual verification', { userId: req.user!.id });
@@ -1418,7 +1419,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
-          const updateData: any = { cedula: result.cedula };
+          const updateData: any = { cedula: result.cedula, cedulaVerificada: true };
           if (imageUrl) updateData.cedulaImageUrl = imageUrl;
           
           await storage.updateUser(req.user!.id, updateData);
@@ -1481,7 +1482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Always save cedula number (and image URL if available)
-            const updateData: any = { cedula: result.cedula };
+            const updateData: any = { cedula: result.cedula, cedulaVerificada: true };
             if (imageUrl) updateData.cedulaImageUrl = imageUrl;
             
             await storage.updateUser(req.user!.id, updateData);
