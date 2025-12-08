@@ -1784,7 +1784,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDocumento(id: string): Promise<void> {
-    await db.delete(documentos).where(eq(documentos.id, id));
+    const documento = await this.getDocumentoById(id);
+    if (documento) {
+      // Delete from object storage
+      const { deleteDocument } = await import('./services/object-storage');
+      await deleteDocument(documento.url);
+      
+      // Delete from database
+      await db.delete(documentos).where(eq(documentos.id, id));
+    }
+  }
+
+  async getDocumentosByConductor(conductorId: string): Promise<Documento[]> {
+    return db
+      .select()
+      .from(documentos)
+      .where(eq(documentos.conductorId, conductorId))
+      .orderBy(desc(documentos.createdAt));
   }
 
   async aprobarDocumento(id: string, adminId: string): Promise<Documento> {
@@ -2022,41 +2038,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(serviceReceipts.servicioId, servicioId))
       .limit(1);
     return receipt;
-  }
-
-  // Documentos
-  async createDocumento(documento: InsertDocumento): Promise<Documento> {
-    const [newDocumento] = await db.insert(documentos).values(documento).returning();
-    return newDocumento;
-  }
-
-  async getDocumentoById(id: string): Promise<Documento | undefined> {
-    const [documento] = await db
-      .select()
-      .from(documentos)
-      .where(eq(documentos.id, id))
-      .limit(1);
-    return documento;
-  }
-
-  async getDocumentosByConductor(conductorId: string): Promise<Documento[]> {
-    return db
-      .select()
-      .from(documentos)
-      .where(eq(documentos.conductorId, conductorId))
-      .orderBy(desc(documentos.createdAt));
-  }
-
-  async deleteDocumento(id: string): Promise<void> {
-    const documento = await this.getDocumentoById(id);
-    if (documento) {
-      // Delete from object storage
-      const { deleteDocument } = await import('./services/object-storage');
-      await deleteDocument(documento.url);
-      
-      // Delete from database
-      await db.delete(documentos).where(eq(documentos.id, id));
-    }
   }
 
   async updateDocumentoStatus(
