@@ -1054,6 +1054,30 @@ export default function DriverProfile() {
 
           <ThemeSettingsCard />
 
+          <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-client">
+            <div className="p-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <User className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold mb-1">¿Necesitas solicitar una grúa?</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Crea una cuenta de cliente adicional para poder solicitar servicios de grúa cuando lo necesites.
+                  </p>
+                  <Button 
+                    onClick={() => setLocation('/auth/onboarding-wizard?tipo=cliente')}
+                    className="w-full"
+                    data-testid="button-become-client"
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Crear cuenta de Cliente
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+
           <Card className="overflow-hidden">
             <div className="p-4 border-b border-border">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">

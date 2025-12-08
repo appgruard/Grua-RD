@@ -886,6 +886,20 @@ export default function DriverDashboard() {
         </div>
       )}
 
+      {!activeService && driverData?.disponible && nearbyRequests && nearbyRequests.length === 0 && (
+        <div className="bg-background border-t border-border p-4 safe-area-inset-bottom">
+          <div className="flex flex-col items-center justify-center text-center py-6 space-y-2" data-testid="no-services-message">
+            <MapPin className="w-10 h-10 text-muted-foreground opacity-50" />
+            <p className="text-sm font-medium text-muted-foreground">
+              Aún no hay servicios cerca de tu zona
+            </p>
+            <p className="text-xs text-muted-foreground/70">
+              Te notificaremos cuando haya nuevas solicitudes
+            </p>
+          </div>
+        </div>
+      )}
+
       {!activeService && driverData?.disponible && nearbyRequests && nearbyRequests.length > 0 && (
         <div 
           className={cn(
