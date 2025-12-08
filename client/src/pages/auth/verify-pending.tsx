@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
-type VerificationStep = 'cedula' | 'phone' | 'photo' | 'complete';
+type VerificationStep = 'cedula' | 'email' | 'photo' | 'complete';
 
 interface VerificationStepInfo {
   id: VerificationStep;
@@ -39,12 +39,12 @@ export default function VerifyPending() {
   
   const currentUser = user || pendingVerificationUser;
   const isDriver = currentUser?.userType === 'conductor';
-  // Either telefonoVerificado OR emailVerificado counts as contact verified
-  const contactoVerificado = currentUser?.telefonoVerificado || (currentUser as any)?.emailVerificado || false;
+  // Only email verification is required (no SMS)
+  const emailVerificado = (currentUser as any)?.emailVerificado || false;
   
   const verificationStatus = pendingVerification || {
     cedulaVerificada: currentUser?.cedulaVerificada || false,
-    telefonoVerificado: contactoVerificado,
+    emailVerificado: emailVerificado,
     fotoVerificada: (currentUser as any)?.fotoVerificada || false,
   };
 
@@ -55,7 +55,7 @@ export default function VerifyPending() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cedulaVerified, setCedulaVerified] = useState(verificationStatus.cedulaVerificada);
-  const [phoneVerified, setPhoneVerified] = useState(verificationStatus.telefonoVerificado);
+  const [emailVerified, setEmailVerified] = useState(verificationStatus.emailVerificado);
   const [photoVerified, setPhotoVerified] = useState(verificationStatus.fotoVerificada || false);
   const [profilePhotoImage, setProfilePhotoImage] = useState<string | null>(null);
   const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
@@ -80,36 +80,36 @@ export default function VerifyPending() {
         });
         if (res.ok) {
           const data = await res.json();
-          const { cedulaVerificada, cedulaPendingReview, telefonoVerificado, fotoVerificada } = data.verification;
+          const { cedulaVerificada, cedulaPendingReview, emailVerificado, fotoVerificada } = data.verification;
           
           // For onboarding flow, cedula step is complete if verified OR pending review
           const cedulaStepComplete = cedulaVerificada || cedulaPendingReview;
           
           setCedulaVerified(cedulaStepComplete);
-          setPhoneVerified(telefonoVerificado);
+          setEmailVerified(emailVerificado);
           setPhotoVerified(fotoVerificada);
 
           if (isDriver) {
-            if (cedulaVerificada && telefonoVerificado && fotoVerificada) {
+            if (cedulaVerificada && emailVerificado && fotoVerificada) {
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/driver');
               });
-            } else if (cedulaStepComplete && telefonoVerificado && !fotoVerificada) {
+            } else if (cedulaStepComplete && emailVerificado && !fotoVerificada) {
               setCurrentStep('photo');
-            } else if (cedulaStepComplete && !telefonoVerificado) {
-              setCurrentStep('phone');
+            } else if (cedulaStepComplete && !emailVerificado) {
+              setCurrentStep('email');
             } else {
               setCurrentStep('cedula');
             }
           } else {
-            if (cedulaVerificada && telefonoVerificado) {
+            if (cedulaVerificada && emailVerificado) {
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/client');
               });
             } else if (cedulaStepComplete) {
-              setCurrentStep('phone');
+              setCurrentStep('email');
             }
           }
         }
@@ -142,13 +142,13 @@ export default function VerifyPending() {
         current: currentStep === 'cedula'
       },
       {
-        id: 'phone',
+        id: 'email',
         title: 'Verificar Correo',
         shortTitle: 'Correo',
         description: 'Confirma tu correo electrónico con un código',
         icon: Mail,
-        completed: phoneVerified,
-        current: currentStep === 'phone'
+        completed: emailVerified,
+        current: currentStep === 'email'
       }
     ];
 
@@ -224,7 +224,7 @@ export default function VerifyPending() {
       if (data.verified) {
         setCedulaVerified(true);
         toast({ title: 'Cédula verificada', description: 'Tu identidad ha sido verificada exitosamente' });
-        setCurrentStep('phone');
+        setCurrentStep('email');
       } else if (data.success && data.manualVerificationRequired) {
         // Manual verification required - allow user to proceed
         setCedulaVerified(true);
@@ -232,7 +232,7 @@ export default function VerifyPending() {
           title: 'Cédula recibida', 
           description: 'Tu cédula será verificada manualmente por un administrador' 
         });
-        setCurrentStep('phone');
+        setCurrentStep('email');
       } else if (data.success && !data.verified) {
         setErrors({ cedula: data.error || 'El nombre en la cédula no coincide con el nombre registrado' });
         toast({ 
@@ -452,7 +452,7 @@ export default function VerifyPending() {
       return res.json();
     },
     onSuccess: async () => {
-      setPhoneVerified(true);
+      setEmailVerified(true);
       toast({ title: 'Correo verificado', description: 'Tu correo electrónico ha sido verificado' });
       
       if (isDriver) {
@@ -724,16 +724,16 @@ export default function VerifyPending() {
 
           <Card className={cn(
             "transition-all",
-            phoneVerified ? "border-green-500/50 bg-green-500/5" : 
-            currentStep === 'phone' && cedulaVerified ? "ring-2 ring-primary" : "opacity-60"
+            emailVerified ? "border-green-500/50 bg-green-500/5" : 
+            currentStep === 'email' && cedulaVerified ? "ring-2 ring-primary" : "opacity-60"
           )} data-testid="card-phone-verification">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "w-10 h-10 rounded-full flex items-center justify-center",
-                  phoneVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  emailVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
                 )}>
-                  {phoneVerified ? (
+                  {emailVerified ? (
                     <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
                   ) : (
                     <Mail className="w-5 h-5" />
@@ -742,18 +742,18 @@ export default function VerifyPending() {
                 <div className="flex-1">
                   <CardTitle className="text-base flex items-center justify-between gap-2">
                     <span>Paso 2: Verificación de Correo</span>
-                    {phoneVerified && (
+                    {emailVerified && (
                       <Badge className="bg-green-500 hover:bg-green-600">Verificado</Badge>
                     )}
                   </CardTitle>
                   <CardDescription>
-                    {phoneVerified ? 'Tu correo ha sido verificado' : currentUser?.email || 'Sin correo registrado'}
+                    {emailVerified ? 'Tu correo ha sido verificado' : currentUser?.email || 'Sin correo registrado'}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             
-            {!phoneVerified && currentStep === 'phone' && cedulaVerified && (
+            {!emailVerified && currentStep === 'email' && cedulaVerified && (
               <CardContent className="space-y-4">
                 {errors.otp && (
                   <Alert variant="destructive">
@@ -820,7 +820,7 @@ export default function VerifyPending() {
             <Card className={cn(
               "transition-all",
               photoVerified ? "border-green-500/50 bg-green-500/5" : 
-              currentStep === 'photo' && cedulaVerified && phoneVerified ? "ring-2 ring-primary" : "opacity-60"
+              currentStep === 'photo' && cedulaVerified && emailVerified ? "ring-2 ring-primary" : "opacity-60"
             )} data-testid="card-photo-verification">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-3">
@@ -848,7 +848,7 @@ export default function VerifyPending() {
                 </div>
               </CardHeader>
               
-              {!photoVerified && currentStep === 'photo' && cedulaVerified && phoneVerified && (
+              {!photoVerified && currentStep === 'photo' && cedulaVerified && emailVerified && (
                 <CardContent className="space-y-4">
                   {errors.profilePhoto && (
                     <Alert variant="destructive">

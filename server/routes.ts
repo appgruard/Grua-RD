@@ -988,20 +988,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // For clientes and conductores, validate that identity verification is complete
     if (user && !skipVerificationTypes.includes(user.userType)) {
-      // Check email verification (telefonoVerificado OR emailVerificado - either one counts as contact verified)
-      const contactoVerificado = user.telefonoVerificado === true || user.emailVerificado === true;
+      // Only email verification is required (no SMS)
+      const emailVerificado = user.emailVerificado === true;
       
       const verificationStatus = {
         cedulaVerificada: user.cedulaVerificada === true,
-        telefonoVerificado: contactoVerificado,
+        emailVerificado: emailVerificado,
         fotoVerificada: user.fotoVerificada === true,
       };
       
       // Determine what's required based on user type
       const isConductor = user.userType === 'conductor';
       const needsVerification = isConductor 
-        ? (!verificationStatus.cedulaVerificada || !contactoVerificado || !verificationStatus.fotoVerificada)
-        : (!verificationStatus.cedulaVerificada || !contactoVerificado);
+        ? (!verificationStatus.cedulaVerificada || !emailVerificado || !verificationStatus.fotoVerificada)
+        : (!verificationStatus.cedulaVerificada || !emailVerificado);
       
       // If verification is missing, return 403 with minimal safe data and redirect to complete registration
       if (needsVerification) {
@@ -1011,10 +1011,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: user.email,
           nombre: user.nombre,
           apellido: user.apellido,
-          phone: user.phone,
           userType: user.userType,
           cedulaVerificada: user.cedulaVerificada,
-          telefonoVerificado: user.telefonoVerificado,
+          emailVerificado: user.emailVerificado,
           fotoVerificada: user.fotoVerificada,
         };
         
@@ -1847,8 +1846,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cedulaVerificada = user.cedulaVerificada === true;
       // Cedula pending review = image submitted but not yet verified
       const cedulaPendingReview = !cedulaVerificada && !!user.cedulaImageUrl;
-      // Either telefonoVerificado OR emailVerificado counts as contact verified
-      const contactoVerificado = user.telefonoVerificado === true || user.emailVerificado === true;
+      // Only email verification is required (no SMS)
+      const emailVerificado = user.emailVerificado === true;
       const fotoVerificada = user.fotoVerificada === true;
       const fotoVerificadaScore = user.fotoVerificadaScore ? parseFloat(user.fotoVerificadaScore) : null;
 
@@ -1865,10 +1864,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           required: true
         },
         {
-          id: 'phone',
+          id: 'email',
           name: 'Verificación de Correo',
           description: 'Verifica tu correo electrónico con código',
-          completed: contactoVerificado,
+          completed: emailVerificado,
           required: true
         }
       ];
@@ -1893,19 +1892,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verification: {
           cedulaVerificada,
           cedulaPendingReview,
-          telefonoVerificado: contactoVerificado,
+          emailVerificado,
           fotoVerificada,
           fotoVerificadaScore,
           cedula: cedulaVerificada ? user.cedula : null,
           cedulaImageUrl: user.cedulaImageUrl || null,
-          phone: contactoVerificado ? user.phone : null,
+          email: user.email || null,
           fotoUrl: user.fotoUrl || null
         },
         steps,
         progress,
         allCompleted,
         // canAccessPlatform still requires actual verification, not just pending review
-        canAccessPlatform: isDriver ? allCompleted : (cedulaVerificada && contactoVerificado)
+        canAccessPlatform: isDriver ? allCompleted : (cedulaVerificada && emailVerificado)
       });
     } catch (error: any) {
       logSystem.error('Get verification status error', error, { userId: req.user?.id });
