@@ -222,6 +222,14 @@ export default function VerifyPending() {
         setCedulaVerified(true);
         toast({ title: 'Cédula verificada', description: 'Tu identidad ha sido verificada exitosamente' });
         setCurrentStep('phone');
+      } else if (data.success && data.manualVerificationRequired) {
+        // Manual verification required - allow user to proceed
+        setCedulaVerified(true);
+        toast({ 
+          title: 'Cédula recibida', 
+          description: 'Tu cédula será verificada manualmente por un administrador' 
+        });
+        setCurrentStep('phone');
       } else if (data.success && !data.verified) {
         setErrors({ cedula: data.error || 'El nombre en la cédula no coincide con el nombre registrado' });
         toast({ 
