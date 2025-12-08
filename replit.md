@@ -81,6 +81,13 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Schema Updates**: Added `vehiculos` relation to `conductoresRelations` and `conductorVehiculosRelations` for proper one-to-many relationship between operators and vehicles.
 - **Required Documents Simplified**: Driver onboarding and document renewal now only require: Licencia de Conducir, Cédula (Frente/Reverso). Vehicle-specific documents are managed separately.
 
+### December 2025 - Verification Flow Reliability Improvements
+- **Login Hang Fix**: Removed race condition in login flow when users have pending verification. Login now defers navigation until pendingVerification state is populated, preventing the app from hanging.
+- **Post-Refresh Refetch Pattern**: Verification success handlers now follow a deterministic sequence: optimistic local update → refreshUser() → refetchVerificationStatus({ bypassInitGuard: true, skipRedirects: true }) → manual redirect. This ensures UI stays in sync with backend state.
+- **Error State Reset**: When verification status fetch fails, all local verification flags (cedulaVerified, emailVerified, photoVerified) and currentStep are reset to prevent stale UI states.
+- **Visibility Change Listener**: Added visibilitychange event listener for multi-tab scenarios to refetch verification status when user returns to the tab.
+- **Cedula Dual-Account Support**: Cedula validation now allows the same cedula to be used across multiple account types (client/operator) when both accounts belong to the same person (same email after trim/lowercase normalization).
+
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
 - **Mapbox**: Maps (Mapbox GL JS via react-map-gl), Directions API, Geocoding API.
