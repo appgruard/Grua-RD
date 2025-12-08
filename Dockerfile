@@ -6,6 +6,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Accept VITE_ environment variables as build arguments
+# These must be available at build time for Vite to embed them
+ARG VITE_MAPBOX_ACCESS_TOKEN
+ENV VITE_MAPBOX_ACCESS_TOKEN=$VITE_MAPBOX_ACCESS_TOKEN
+
 COPY package*.json ./
 
 RUN npm ci

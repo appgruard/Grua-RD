@@ -1605,7 +1605,7 @@ export class DatabaseStorage implements IStorage {
   async getVehicleTypeDistribution(startDate?: string, endDate?: string): Promise<Array<{ tipoVehiculo: string; count: number; revenue: number }>> {
     let query = db
       .select({
-        tipoVehiculo: sql<string>`COALESCE(${servicios.tipoVehiculo}, 'no_especificado')`.as('tipo_vehiculo'),
+        tipoVehiculo: sql<string>`COALESCE(${servicios.tipoVehiculo}::text, 'no_especificado')`.as('tipo_vehiculo'),
         count: sql<number>`COUNT(*)::int`.as('count'),
         revenue: sql<number>`COALESCE(SUM(CAST(${servicios.costoTotal} AS NUMERIC)) FILTER (WHERE ${servicios.estado} = 'completado'), 0)`.as('revenue'),
       })
@@ -1621,7 +1621,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const results = await query
-      .groupBy(sql`COALESCE(${servicios.tipoVehiculo}, 'no_especificado')`)
+      .groupBy(sql`COALESCE(${servicios.tipoVehiculo}::text, 'no_especificado')`)
       .orderBy(desc(sql`COUNT(*)`));
 
     return results.map(r => ({
