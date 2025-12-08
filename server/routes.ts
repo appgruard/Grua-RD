@@ -747,36 +747,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const existingUser = await storage.getUserByEmail(userData.email);
-      if (existingUser) {
-        // Allow registration with same email if it's for a different account type
-        const requestedType = userType || 'cliente';
-        if (existingUser.userType === requestedType) {
-          logAuth.registerFailed(userData.email, "Email already registered for same account type");
-          return res.status(400).json({ message: "Ya tienes una cuenta de este tipo con este correo" });
+      const requestedType = userType || 'cliente';
+      const userTypeLabel = requestedType === 'conductor' ? 'operador' : 'cliente';
+      
+      // Check if user already exists with the same email AND type
+      const existingUserSameType = await storage.getUserByEmailAndType(userData.email, requestedType);
+      if (existingUserSameType) {
+        logAuth.registerFailed(userData.email, "Email already registered for same account type");
+        
+        // Check if user needs to complete verification
+        const needsVerification = requestedType === 'conductor' 
+          ? !existingUserSameType.cedulaVerificada 
+          : !existingUserSameType.emailVerificado;
+        
+        if (needsVerification) {
+          const verificationMessage = requestedType === 'conductor'
+            ? `Ya tienes una cuenta de operador con este correo. Inicia sesión para completar la verificación de tu cédula.`
+            : `Ya tienes una cuenta de cliente con este correo. Inicia sesión para acceder a tu cuenta.`;
+          return res.status(400).json({ 
+            message: verificationMessage,
+            needsVerification: true,
+            userType: requestedType
+          });
         }
-        // User is creating a secondary account of a different type - allowed
-        logSystem.info("User creating secondary account with same email", {
-          existingType: existingUser.userType,
-          newType: requestedType,
-          email: userData.email
+        
+        return res.status(400).json({ 
+          message: `Ya tienes una cuenta de ${userTypeLabel} con este correo. Inicia sesión para acceder.` 
         });
       }
 
+      // Check phone for same account type
       if (userData.phone) {
-        const existingPhone = await storage.getUserByPhone(userData.phone);
-        if (existingPhone) {
-          // Allow same phone for different account types
-          const requestedType = userType || 'cliente';
-          if (existingPhone.userType === requestedType) {
-            logAuth.registerFailed(userData.email, "Phone already registered for same account type");
-            return res.status(400).json({ message: "Ya tienes una cuenta de este tipo con este teléfono" });
+        const existingPhoneSameType = await storage.getUserByPhone(userData.phone);
+        if (existingPhoneSameType && existingPhoneSameType.userType === requestedType) {
+          logAuth.registerFailed(userData.email, "Phone already registered for same account type");
+          
+          // Check if user needs to complete verification
+          const needsVerification = requestedType === 'conductor' 
+            ? !existingPhoneSameType.cedulaVerificada 
+            : !existingPhoneSameType.emailVerificado;
+          
+          if (needsVerification) {
+            const verificationMessage = requestedType === 'conductor'
+              ? `Ya tienes una cuenta de operador con este teléfono. Inicia sesión para completar la verificación de tu cédula.`
+              : `Ya tienes una cuenta de cliente con este teléfono. Inicia sesión para acceder a tu cuenta.`;
+            return res.status(400).json({ 
+              message: verificationMessage,
+              needsVerification: true,
+              userType: requestedType
+            });
           }
-          // User is creating a secondary account with different type - allowed
-          logSystem.info("User creating secondary account with same phone", {
-            existingType: existingPhone.userType,
-            newType: requestedType,
-            phone: userData.phone
+          
+          return res.status(400).json({ 
+            message: `Ya tienes una cuenta de ${userTypeLabel} con este teléfono. Inicia sesión para acceder.` 
           });
         }
       }
