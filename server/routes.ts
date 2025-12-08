@@ -1021,7 +1021,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (!verificationStatus.cedulaVerificada || !emailVerificado || !verificationStatus.fotoVerificada)
         : (!verificationStatus.cedulaVerificada || !emailVerificado);
       
-      // If verification is missing, return 403 with minimal safe data and redirect to complete registration
+      // If verification is missing, destroy the session and return 403
       if (needsVerification) {
         // Return only safe, non-sensitive user data for the verification page
         const safeUserData = {
@@ -1035,12 +1035,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fotoVerificada: user.fotoVerificada,
         };
         
-        return res.status(403).json({
-          message: "Debe completar la verificación de identidad antes de acceder",
-          requiresVerification: true,
-          verificationStatus,
-          redirectTo: '/verify-pending',
-          user: safeUserData,
+        // Destroy the session synchronously to prevent access without verification
+        return new Promise<void>((resolve) => {
+          req.session.destroy((err) => {
+            if (err) {
+              logSystem.error('Error destroying session for unverified user', err, { userId: user.id });
+            }
+            res.status(403).json({
+              message: "Debe completar la verificación de identidad antes de acceder",
+              requiresVerification: true,
+              verificationStatus,
+              redirectTo: '/verify-pending',
+              user: safeUserData,
+            });
+            resolve();
+          });
         });
       }
     }
