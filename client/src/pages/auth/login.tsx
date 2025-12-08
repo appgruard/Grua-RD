@@ -138,7 +138,9 @@ export default function Login() {
       }
     } catch (error: any) {
       if (error?.requiresVerification) {
-        setLocation('/verify-pending');
+        // Don't redirect here - let the useEffect handle it
+        // This ensures pendingVerification state is properly set before navigation
+        setLoading(false);
         return;
       }
       
@@ -149,7 +151,6 @@ export default function Login() {
         description: errorMessage,
         variant: 'destructive',
       });
-    } finally {
       setLoading(false);
     }
   };

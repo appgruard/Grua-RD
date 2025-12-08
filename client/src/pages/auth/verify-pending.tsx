@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { useMutation } from '@tanstack/react-query';
@@ -37,30 +37,34 @@ export default function VerifyPending() {
   const { user, logout, pendingVerification, pendingVerificationUser, clearPendingVerification, refreshUser } = useAuth();
   const { toast } = useToast();
   
-  const currentUser = user || pendingVerificationUser;
-  const isDriver = currentUser?.userType === 'conductor';
-  // Only email verification is required (no SMS)
-  const emailVerificado = (currentUser as any)?.emailVerificado || false;
+  // Use user from context or pendingVerificationUser immediately
+  const contextUser = user || pendingVerificationUser;
   
-  const verificationStatus = pendingVerification || {
-    cedulaVerificada: currentUser?.cedulaVerificada || false,
-    emailVerificado: emailVerificado,
-    fotoVerificada: (currentUser as any)?.fotoVerificada || false,
-  };
-
+  // State declarations - initialize with optimistic values from pendingVerification
   const [currentStep, setCurrentStep] = useState<VerificationStep>('cedula');
   const [otpCode, setOtpCode] = useState('');
   const [otpTimer, setOtpTimer] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
-  const [cedulaVerified, setCedulaVerified] = useState(verificationStatus.cedulaVerificada);
-  const [emailVerified, setEmailVerified] = useState((verificationStatus as any)?.emailVerificado ?? false);
-  const [photoVerified, setPhotoVerified] = useState(verificationStatus.fotoVerificada || false);
+  const [cedulaVerified, setCedulaVerified] = useState(pendingVerification?.cedulaVerificada || false);
+  const [emailVerified, setEmailVerified] = useState((pendingVerification as any)?.emailVerificado || false);
+  const [photoVerified, setPhotoVerified] = useState(pendingVerification?.fotoVerificada || false);
   const [profilePhotoImage, setProfilePhotoImage] = useState<string | null>(null);
   const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
   const [showProfileCamera, setShowProfileCamera] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isInitializing, setIsInitializing] = useState(!contextUser); // Only initializing if no context user
+  const [initializedUser, setInitializedUser] = useState<any>(null);
+  const [initError, setInitError] = useState(false);
+  const initFetchedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Use user from context, or pendingVerificationUser, or initializedUser from API
+  const currentUser = contextUser || initializedUser;
+  const isDriver = currentUser?.userType === 'conductor';
+  // Only email verification is required (no SMS)
+  const emailVerificado = (currentUser as any)?.emailVerificado || false;
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -72,56 +76,160 @@ export default function VerifyPending() {
   const profileCanvasRef = useRef<HTMLCanvasElement>(null);
   const profileStreamRef = useRef<MediaStream | null>(null);
 
-  useEffect(() => {
-    const checkVerificationStatus = async () => {
-      try {
-        const res = await fetch('/api/identity/verification-status', {
-          credentials: 'include'
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const { cedulaVerificada, cedulaPendingReview, emailVerificado, fotoVerificada } = data.verification;
-          
-          // For onboarding flow, cedula step is complete if verified OR pending review
-          const cedulaStepComplete = cedulaVerificada || cedulaPendingReview;
-          
-          setCedulaVerified(cedulaStepComplete);
-          setEmailVerified(emailVerificado);
-          setPhotoVerified(fotoVerificada);
+  // Reusable function to fetch verification status from the server
+  // When skipRedirects is true, only update local state without triggering redirects
+  const fetchVerificationStatusFromServer = useCallback(async (signal?: AbortSignal, options?: { skipRedirects?: boolean }) => {
+    try {
+      const res = await fetch('/api/identity/verification-status', {
+        credentials: 'include',
+        signal
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        const { cedulaVerificada, cedulaPendingReview, emailVerificado, fotoVerificada } = data.verification;
+        
+        // Store user data from the response if we don't have context user
+        if (data.user && !contextUser) {
+          setInitializedUser(data.user);
+        }
+        
+        // For onboarding flow, cedula step is complete if verified OR pending review
+        const cedulaStepComplete = cedulaVerificada || cedulaPendingReview;
+        
+        // Always update local verification state
+        setCedulaVerified(cedulaStepComplete);
+        setEmailVerified(emailVerificado);
+        setPhotoVerified(fotoVerificada);
 
-          if (isDriver) {
-            if (cedulaVerificada && emailVerificado && fotoVerificada) {
+        // Determine user type from API response or context
+        const checkUser = data.user || contextUser;
+        const isDriverCheck = checkUser?.userType === 'conductor';
+
+        if (isDriverCheck) {
+          // Only redirect if skipRedirects is not true
+          if (cedulaVerificada && emailVerificado && fotoVerificada) {
+            if (!options?.skipRedirects) {
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/driver');
               });
-            } else if (cedulaStepComplete && emailVerificado && !fotoVerificada) {
-              setCurrentStep('photo');
-            } else if (cedulaStepComplete && !emailVerificado) {
-              setCurrentStep('email');
-            } else {
-              setCurrentStep('cedula');
             }
+          } else if (cedulaStepComplete && emailVerificado && !fotoVerificada) {
+            setCurrentStep('photo');
+          } else if (cedulaStepComplete && !emailVerificado) {
+            setCurrentStep('email');
           } else {
-            if (cedulaVerificada && emailVerificado) {
+            setCurrentStep('cedula');
+          }
+        } else {
+          // Only redirect if skipRedirects is not true
+          if (cedulaVerificada && emailVerificado) {
+            if (!options?.skipRedirects) {
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/client');
               });
-            } else if (cedulaStepComplete) {
-              setCurrentStep('email');
             }
+          } else if (cedulaStepComplete) {
+            setCurrentStep('email');
           }
         }
-      } catch (error) {
-        console.error('Error checking verification status:', error);
+        return { success: true };
+      } else if (res.status === 401) {
+        if (!options?.skipRedirects) {
+          setLocation('/login');
+        }
+        return { success: false, unauthorized: true };
+      } else {
+        return { success: false };
+      }
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return { success: false, aborted: true };
+      console.error('Error checking verification status:', error);
+      return { success: false };
+    }
+  }, [contextUser, setLocation, clearPendingVerification, refreshUser]);
+
+  // Function to manually refetch verification status (for focus events, retry, etc.)
+  // Always passes skipRedirects: true to avoid duplicate redirects after mutations
+  const refetchVerificationStatus = useCallback(async (options?: { bypassInitGuard?: boolean }) => {
+    // Skip if init hasn't completed yet, unless bypassInitGuard is true
+    if (!options?.bypassInitGuard && !initFetchedRef.current) {
+      return false;
+    }
+    
+    // Cancel any ongoing fetch
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
+    // Always skip redirects when refetching - caller handles navigation
+    const result = await fetchVerificationStatusFromServer(controller.signal, { skipRedirects: true });
+    return result.success;
+  }, [fetchVerificationStatusFromServer]);
+
+  // Single effect to fetch verification status on mount - runs once per session
+  useEffect(() => {
+    // Skip if already fetched this session
+    if (initFetchedRef.current) {
+      setIsInitializing(false);
+      return;
+    }
+    
+    initFetchedRef.current = true;
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      setInitError(true);
+      setCedulaVerified(false);
+      setEmailVerified(false);
+      setPhotoVerified(false);
+      setCurrentStep('cedula');
+      setIsInitializing(false);
+    }, 10000);
+    
+    const doFetch = async () => {
+      // Initial fetch can do redirects (skipRedirects: false by default)
+      const result = await fetchVerificationStatusFromServer(controller.signal);
+      clearTimeout(timeoutId);
+      if (!result.success && !result.aborted && !result.unauthorized) {
+        setInitError(true);
+        setCedulaVerified(false);
+        setEmailVerified(false);
+        setPhotoVerified(false);
+        setCurrentStep('cedula');
+      }
+      setIsInitializing(false);
+    };
+
+    doFetch();
+    
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [fetchVerificationStatusFromServer]);
+
+  // Effect to refetch verification status when tab regains focus (handles multi-tab scenarios)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Only refetch if page becomes visible and we have a user
+      if (document.visibilityState === 'visible' && currentUser && initFetchedRef.current) {
+        refetchVerificationStatus();
       }
     };
 
-    if (currentUser) {
-      checkVerificationStatus();
-    }
-  }, [currentUser, isDriver, setLocation, clearPendingVerification, refreshUser]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUser, refetchVerificationStatus]);
 
   useEffect(() => {
     if (otpTimer > 0) {
@@ -223,11 +331,13 @@ export default function VerifyPending() {
 
       if (data.verified) {
         setCedulaVerified(true);
+        await refetchVerificationStatus();
         toast({ title: 'Cédula verificada', description: 'Tu identidad ha sido verificada exitosamente' });
         setCurrentStep('email');
       } else if (data.success && data.manualVerificationRequired) {
         // Manual verification required - allow user to proceed
         setCedulaVerified(true);
+        await refetchVerificationStatus();
         toast({ 
           title: 'Cédula recibida', 
           description: 'Tu cédula será verificada manualmente por un administrador' 
@@ -367,6 +477,7 @@ export default function VerifyPending() {
         toast({ title: 'Foto verificada', description: `Verificación exitosa (${Math.round((data.score || 0) * 100)}%)` });
         clearPendingVerification();
         await refreshUser();
+        await refetchVerificationStatus({ bypassInitGuard: true });
         setLocation('/driver');
       } else {
         setErrors({ profilePhoto: data.error || 'La foto no cumple con los requisitos' });
@@ -456,10 +567,12 @@ export default function VerifyPending() {
       toast({ title: 'Correo verificado', description: 'Tu correo electrónico ha sido verificado' });
       
       if (isDriver) {
+        await refetchVerificationStatus({ bypassInitGuard: true });
         setCurrentStep('photo');
       } else {
         clearPendingVerification();
         await refreshUser();
+        await refetchVerificationStatus({ bypassInitGuard: true });
         setLocation('/client');
       }
     },
@@ -474,6 +587,39 @@ export default function VerifyPending() {
     clearPendingVerification();
     setLocation('/login');
   };
+
+  // Show loading state while initializing
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
+            <h2 className="text-lg font-semibold mb-2">Cargando...</h2>
+            <p className="text-muted-foreground mb-4">Verificando tu sesión</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state if initialization failed
+  if (initError && !currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Error de conexión</h2>
+            <p className="text-muted-foreground mb-4">No pudimos verificar tu sesión. Intenta nuevamente.</p>
+            <Button onClick={() => setLocation('/login')} data-testid="button-go-login-error">
+              Ir a iniciar sesión
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (

@@ -2114,6 +2114,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         userType: user.userType,
+        // Include basic user data for the verification page
+        user: {
+          id: user.id,
+          email: user.email,
+          nombre: user.nombre,
+          apellido: user.apellido,
+          userType: user.userType,
+          cedulaVerificada: user.cedulaVerificada,
+          emailVerificado: user.emailVerificado,
+          telefonoVerificado: user.telefonoVerificado,
+          fotoVerificada: user.fotoVerificada,
+        },
         verification: {
           cedulaVerificada,
           cedulaPendingReview,
