@@ -241,12 +241,16 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
     
     logger.info("Verifik OCR response received", { 
       hasOCRData: !!ocrData,
+      verifik_id: data._id,
+      verifik_url: data.url,
       documentType: ocrData?.documentType || data.documentType,
       firstName: ocrData?.firstName,
       lastName: ocrData?.lastName,
       documentNumber: ocrData?.documentNumber || data.documentNumber,
       confidenceScore: confidenceScore,
-      rawConfidenceScore: ocrData?.confidenceScore
+      rawConfidenceScore: ocrData?.confidenceScore,
+      status: data.status,
+      validationMethod: data.validationMethod
     });
 
     if (!ocrData && !data.documentNumber) {
