@@ -1312,6 +1312,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { scanAndVerifyCedula, isVerifikConfigured } = await import("./services/verifik-ocr");
       
       if (!isVerifikConfigured()) {
+        if (req.isAuthenticated() && image) {
+          try {
+            const timestamp = Date.now();
+            const filename = `cedula_${req.user!.id}_${timestamp}.jpg`;
+            const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
+            
+            await storage.updateUser(req.user!.id, {
+              cedulaImageUrl: uploadResult.url
+            });
+            
+            logSystem.info('Cedula image saved for manual verification', { userId: req.user!.id });
+            
+            return res.json({
+              success: true,
+              verified: false,
+              manualVerificationRequired: true,
+              message: "Tu cédula ha sido recibida y será verificada manualmente por un administrador."
+            });
+          } catch (uploadError) {
+            logSystem.error('Failed to save cedula image for manual verification', { error: uploadError });
+          }
+        }
+        
         return res.status(503).json({ 
           message: "El servicio de verificación OCR no está configurado" 
         });
@@ -1331,6 +1354,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = await scanAndVerifyCedula(image, userNombre, userApellido);
+
+      // Save cedula image if user is authenticated (regardless of OCR result)
+      if (req.isAuthenticated() && image) {
+        try {
+          const timestamp = Date.now();
+          const filename = `cedula_${req.user!.id}_${timestamp}.jpg`;
+          const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
+          
+          await storage.updateUser(req.user!.id, {
+            cedulaImageUrl: uploadResult.url
+          });
+          
+          logSystem.info('Cedula image saved', { userId: req.user!.id, url: uploadResult.url });
+        } catch (uploadError) {
+          logSystem.warn('Failed to save cedula image', { userId: req.user!.id, error: uploadError });
+        }
+      }
 
       if (!result.success) {
         logSystem.warn('OCR scan failed', { 
@@ -2335,6 +2375,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get service error', error);
       res.status(500).json({ message: "Failed to get service" });
+    }
+  });
+
+  // Endpoint to convert a client account to a driver account
+  app.post("/api/drivers/become-driver", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Debe iniciar sesión" });
+    }
+
+    try {
+      // Get fresh user data from storage to avoid stale session data
+      const userId = (req.user as any)?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Sesión inválida" });
+      }
+      
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+      
+      // Check if user is already a driver
+      if (user.userType === 'conductor') {
+        return res.status(400).json({ message: "Ya eres conductor" });
+      }
+      
+      // Check if user is a client
+      if (user.userType !== 'cliente') {
+        return res.status(400).json({ message: "Solo los clientes pueden convertirse en conductores" });
+      }
+      
+      // Check if user already has a conductor profile
+      const existingConductor = await storage.getConductorByUserId(user.id);
+      if (existingConductor) {
+        // Just update the user type
+        await storage.updateUser(user.id, { userType: 'conductor' });
+        
+        // Update session with new user data
+        const updatedUser = await storage.getUserById(user.id);
+        if (!updatedUser) {
+          logSystem.error('Failed to get updated user after conversion', { userId: user.id });
+          return res.status(500).json({ message: "Error al actualizar la sesión" });
+        }
+        
+        return new Promise<void>((resolve) => {
+          req.login(updatedUser, (err) => {
+            if (err) {
+              logSystem.error('Failed to update session after become-driver', { userId: user.id, error: err });
+              res.status(500).json({ message: "Error al actualizar la sesión" });
+            } else {
+              res.json({ 
+                success: true, 
+                message: "Tu cuenta ha sido actualizada a conductor",
+                redirectTo: '/driver/dashboard'
+              });
+            }
+            resolve();
+          });
+        });
+      }
+      
+      // Update user type to conductor
+      await storage.updateUser(user.id, { 
+        userType: 'conductor',
+        estadoCuenta: 'pendiente_verificacion'
+      });
+      
+      // Update session with new user data
+      const updatedUser = await storage.getUserById(user.id);
+      if (!updatedUser) {
+        logSystem.error('Failed to get updated user after conversion', { userId: user.id });
+        return res.status(500).json({ message: "Error al actualizar la sesión" });
+      }
+      
+      logSystem.info('Client converted to driver', { userId: user.id, email: user.email });
+      
+      return new Promise<void>((resolve) => {
+        req.login(updatedUser, (err) => {
+          if (err) {
+            logSystem.error('Failed to update session after become-driver', { userId: user.id, error: err });
+            res.status(500).json({ message: "Error al actualizar la sesión" });
+          } else {
+            res.json({ 
+              success: true, 
+              message: "Tu cuenta ha sido convertida a conductor. Completa tu perfil.",
+              redirectTo: '/auth/onboarding-wizard',
+              requiresOnboarding: true
+            });
+          }
+          resolve();
+        });
+      });
+    } catch (error: any) {
+      logSystem.error('Become driver error', error, { userId: (req.user as any)?.id });
+      res.status(500).json({ message: "Error al convertir cuenta a conductor" });
     }
   });
 
@@ -4647,6 +4782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apellido: user.apellido,
         email: user.email,
         cedula: user.cedula,
+        cedulaImageUrl: user.cedulaImageUrl,
         phone: user.phone,
         photoUrl: user.fotoUrl,
         userType: user.userType,

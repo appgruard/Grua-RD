@@ -169,6 +169,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   phone: text("phone"),
   cedula: text("cedula"),
+  cedulaImageUrl: text("cedula_image_url"),
   cedulaVerificada: boolean("cedula_verificada").default(false).notNull(),
   passwordHash: text("password_hash").notNull(),
   userType: userTypeEnum("user_type").notNull().default("cliente"),

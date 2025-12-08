@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2, IdCard, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2, IdCard, CheckCircle2, AlertCircle, Truck } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useMutation } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
 import ClientPaymentMethods from '@/components/ClientPaymentMethods';
@@ -110,6 +110,30 @@ export default function ClientProfile() {
       }
     }
   };
+
+  const becomeDriverMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/drivers/become-driver');
+      return response.json();
+    },
+    onSuccess: async (data) => {
+      await refreshUser();
+      toast({
+        title: 'Cuenta actualizada',
+        description: data.message,
+      });
+      if (data.redirectTo) {
+        setLocation(data.redirectTo);
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   if (!user) return null;
 
@@ -298,6 +322,40 @@ export default function ClientProfile() {
         </div>
 
         <ThemeSettingsCard />
+
+        <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-driver">
+          <div className="p-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Truck className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-semibold mb-1">¿Quieres ser conductor?</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Conviértete en conductor de grúa y comienza a ganar dinero con tu vehículo.
+                </p>
+                <Button 
+                  onClick={() => becomeDriverMutation.mutate()}
+                  disabled={becomeDriverMutation.isPending}
+                  className="w-full"
+                  data-testid="button-become-driver"
+                >
+                  {becomeDriverMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Truck className="w-4 h-4 mr-2" />
+                      Convertirme en Conductor
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
 
           <Button
             variant="outline"
