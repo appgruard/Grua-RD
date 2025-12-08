@@ -7,9 +7,20 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Accept VITE_ environment variables as build arguments
-# These must be available at build time for Vite to embed them
+# These must be available at build time for Vite to embed them in the frontend bundle
+# IMPORTANT: In CapRover, set these as "App Configs" with "Is Build-Time Variable" enabled
+
+# Mapbox token for maps rendering
 ARG VITE_MAPBOX_ACCESS_TOKEN
 ENV VITE_MAPBOX_ACCESS_TOKEN=$VITE_MAPBOX_ACCESS_TOKEN
+
+# VAPID public key for web push notifications
+ARG VITE_VAPID_PUBLIC_KEY
+ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
+
+# API URL for mobile apps (optional for web, required for native builds)
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 
 COPY package*.json ./
 
