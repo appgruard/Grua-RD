@@ -19,7 +19,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache dumb-init
+# Install dumb-init and wget for health checks
+RUN apk add --no-cache dumb-init wget
 
 COPY package*.json ./
 
@@ -34,7 +35,8 @@ ENV PORT=80
 
 EXPOSE 80
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# Health check using wget
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
