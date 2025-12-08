@@ -1,6 +1,6 @@
 # Plan: Corrección de Errores de Object Storage y Verificación
 
-## Estado: ✅ COMPLETADO (2025-12-08)
+## Estado: ✅ COMPLETADO (2025-12-08, actualizado)
 
 ---
 
@@ -27,6 +27,20 @@
 **Cambio realizado:**
 - Se agregó verificación de `isStorageInitialized()` ANTES de procesar el archivo
 - Retorna error 503 con mensaje descriptivo y `retryable: true` si storage no disponible
+
+### ✅ Tarea 3b: Agregar verificación de storage a TODOS los endpoints de upload (2025-12-08)
+**Archivo:** `server/routes.ts`
+
+**Problema identificado:**
+- Solo `/api/driver/documents` tenía la verificación de storage
+- El frontend usaba principalmente `/api/documents/upload` que NO tenía la verificación
+- Endpoints como `/api/chat/send-media` y `/api/client/insurance` también faltaban
+
+**Cambios realizados:**
+- Línea ~5980: Agregado check a `/api/chat/send-media`
+- Línea ~6051: Agregado check a `/api/documents/upload` ← **Este era el endpoint principal usado por el frontend**
+- Línea ~6580: Agregado check a `/api/client/insurance`
+- Todos los endpoints ahora retornan 503 con `retryable: true` cuando storage no está disponible
 
 ### ✅ Extra: Corregir rutas de botones de cambio de tipo de cuenta
 **Archivos:** `client/src/pages/client/profile.tsx`, `client/src/pages/driver/profile.tsx`

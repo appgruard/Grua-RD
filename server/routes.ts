@@ -5976,6 +5976,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let detectedTipoMensaje = tipoMensaje || 'texto';
 
       if (req.file) {
+        // Check storage availability before uploading
+        if (!isStorageInitialized()) {
+          return res.status(503).json({ 
+            message: "El servicio de almacenamiento no está disponible temporalmente. Por favor intenta de nuevo.",
+            retryable: true
+          });
+        }
         const fileName = `chat/${servicioId}/${Date.now()}-${req.file.originalname}`;
         const uploadResult = await uploadDocument({
           buffer: req.file.buffer,
@@ -6038,6 +6045,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (!req.file) {
       return res.status(400).json({ message: "No se proporcionó ningún archivo" });
+    }
+
+    // Check storage availability BEFORE processing
+    if (!isStorageInitialized()) {
+      return res.status(503).json({ 
+        message: "El servicio de almacenamiento no está disponible temporalmente. Por favor intenta de nuevo en unos segundos.",
+        retryable: true
+      });
     }
 
     try {
@@ -6559,6 +6574,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (!req.file) {
       return res.status(400).json({ message: "No se proporcionó ningún archivo" });
+    }
+
+    // Check storage availability BEFORE processing
+    if (!isStorageInitialized()) {
+      return res.status(503).json({ 
+        message: "El servicio de almacenamiento no está disponible temporalmente. Por favor intenta de nuevo en unos segundos.",
+        retryable: true
+      });
     }
 
     try {
