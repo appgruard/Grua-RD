@@ -160,6 +160,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<UserWithConductor | undefined>;
   getUserByEmailAndType(email: string, userType: string): Promise<UserWithConductor | undefined>;
   getUsersByEmail(email: string): Promise<UserWithConductor[]>;
+  getBasicUsersByEmail(email: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User>;
   getAllUsers(): Promise<User[]>;
@@ -676,6 +677,11 @@ export class DatabaseStorage implements IStorage {
         conductor: true,
       },
     });
+    return results;
+  }
+
+  async getBasicUsersByEmail(email: string): Promise<User[]> {
+    const results = await db.select().from(users).where(eq(users.email, email));
     return results;
   }
 

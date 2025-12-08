@@ -1190,8 +1190,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Formato de correo electrónico inválido" });
       }
       
-      // Get all accounts with this email
-      const accounts = await storage.getUsersByEmail(email);
+      // Get all accounts with this email (using basic query without relations for performance)
+      let accounts;
+      try {
+        accounts = await storage.getBasicUsersByEmail(email);
+        console.log('Check-accounts: Found accounts count:', accounts?.length || 0);
+      } catch (dbError: any) {
+        console.error('Check-accounts: Database query failed:', dbError?.message);
+        throw new Error(`Database query failed: ${dbError?.message}`);
+      }
       
       if (accounts.length === 0) {
         return res.status(401).json({ message: "Credenciales inválidas" });
@@ -1254,7 +1261,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
     } catch (error: any) {
-      logSystem.error('Check accounts error', error, { email: req.body.email });
+      const errorMessage = error?.message || 'Unknown error';
+      const errorStack = error?.stack || '';
+      console.error('Check accounts error details:', {
+        message: errorMessage,
+        stack: errorStack,
+        email: req.body.email,
+        errorType: error?.constructor?.name
+      });
+      logSystem.error('Check accounts error', error, { 
+        email: req.body.email,
+        errorMessage,
+        errorStack: errorStack.substring(0, 500)
+      });
       res.status(500).json({ message: "Error al verificar cuentas" });
     }
   });
