@@ -74,6 +74,10 @@ export default function OnboardingWizard() {
   const [licenseBackFile, setLicenseBackFile] = useState<File | null>(null);
   const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
   const [uploadingDocs, setUploadingDocs] = useState(false);
+  
+  // Client insurance fields
+  const [clientInsuranceName, setClientInsuranceName] = useState('');
+  const [clientPolicyNumber, setClientPolicyNumber] = useState('');
   const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
   const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
   
@@ -180,6 +184,10 @@ export default function OnboardingWizard() {
     setCapturedImage(null);
     setErrors({});
     stopOCRCameraEarly();
+    // Reset client insurance fields when switching user type
+    setClientInsuranceName('');
+    setClientPolicyNumber('');
+    setInsuranceFile(null);
   }, [formData.userType]);
 
   // Advance to next step when cedula is verified for operators
@@ -1080,19 +1088,140 @@ export default function OnboardingWizard() {
     </div>
   );
 
+  const handleSkipStep4ForClient = () => {
+    setCompletedSteps(prev => new Set(prev).add(4));
+    setCurrentStep(8);
+    toast({ title: 'Paso omitido', description: 'Puedes subir tu seguro más tarde desde tu perfil' });
+  };
+
+  const uploadClientInsuranceMutation = useMutation({
+    mutationFn: async () => {
+      if (!insuranceFile) {
+        throw new Error('Debe seleccionar un documento de seguro');
+      }
+      if (!clientInsuranceName.trim()) {
+        throw new Error('Nombre de aseguradora es requerido');
+      }
+      if (!clientPolicyNumber.trim()) {
+        throw new Error('Número de póliza es requerido');
+      }
+
+      const formDataIns = new FormData();
+      formDataIns.append('document', insuranceFile);
+      formDataIns.append('aseguradoraNombre', clientInsuranceName.trim());
+      formDataIns.append('numeroPoliza', clientPolicyNumber.trim());
+
+      const insRes = await fetch('/api/client/insurance', {
+        method: 'POST',
+        credentials: 'include',
+        body: formDataIns,
+      });
+      
+      if (!insRes.ok) {
+        const errorData = await insRes.json();
+        throw new Error(errorData.message || 'Error al subir documento de seguro');
+      }
+      
+      return insRes.json();
+    },
+    onSuccess: () => {
+      toast({ title: '¡Seguro subido!', description: 'Tu documento de seguro ha sido guardado' });
+      setInsuranceFile(null);
+      setClientInsuranceName('');
+      setClientPolicyNumber('');
+      setCompletedSteps(prev => new Set(prev).add(4));
+      setCurrentStep(8);
+    },
+    onError: (error: any) => {
+      setErrors({ documents: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
+    },
+  });
+
   const renderStep4 = () => (
     <div className="space-y-4">
       {errors.documents && (<Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errors.documents}</AlertDescription></Alert>)}
-      {formData.userType === 'conductor' && (
+      {formData.userType === 'conductor' ? (
         <>
           <FileUpload label="Licencia de Conducir (Frente)" required onFileSelect={setLicenseFile} fileName={licenseFile?.name} error={errors.licenseFile} testId="input-license-file" />
           <FileUpload label="Licencia de Conducir (Reverso)" required onFileSelect={setLicenseBackFile} fileName={licenseBackFile?.name} error={errors.licenseBackFile} testId="input-license-back-file" />
+          <FileUpload label="Documento de Seguro de Grúa" onFileSelect={setInsuranceFile} fileName={insuranceFile?.name} required testId="input-insurance-file" />
+          <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
+            {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Subir Documentos<Upload className="w-4 h-4 ml-2" /></>)}
+          </Button>
         </>
+      ) : (
+        <div className="space-y-4">
+          <div className="text-center py-2">
+            <FileText className="w-12 h-12 mx-auto text-primary mb-2" />
+            <p className="text-sm font-medium">Documento de Seguro (Opcional)</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Si tienes un seguro de vehículo, puedes subirlo ahora o hacerlo después desde tu perfil.
+            </p>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="clientInsuranceName">Nombre de Aseguradora</Label>
+              <Input 
+                id="clientInsuranceName" 
+                placeholder="Ej: Seguros Reservas, Mapfre, etc." 
+                value={clientInsuranceName} 
+                onChange={(e) => setClientInsuranceName(e.target.value)} 
+                disabled={uploadClientInsuranceMutation.isPending}
+                data-testid="input-client-insurance-name" 
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="clientPolicyNumber">Número de Póliza</Label>
+              <Input 
+                id="clientPolicyNumber" 
+                placeholder="Número de tu póliza de seguro" 
+                value={clientPolicyNumber} 
+                onChange={(e) => setClientPolicyNumber(e.target.value)} 
+                disabled={uploadClientInsuranceMutation.isPending}
+                data-testid="input-client-policy-number" 
+              />
+            </div>
+            
+            <FileUpload 
+              label="Documento de Seguro" 
+              onFileSelect={setInsuranceFile} 
+              fileName={insuranceFile?.name} 
+              testId="input-client-insurance-file" 
+            />
+          </div>
+          
+          <div className="flex flex-col gap-2">
+            <Button 
+              type="button" 
+              className="w-full" 
+              onClick={() => uploadClientInsuranceMutation.mutate()} 
+              disabled={uploadClientInsuranceMutation.isPending || !insuranceFile || !clientInsuranceName.trim() || !clientPolicyNumber.trim()} 
+              data-testid="button-upload-client-insurance"
+            >
+              {uploadClientInsuranceMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
+              ) : (
+                <><Upload className="w-4 h-4 mr-2" />Subir Seguro</>
+              )}
+            </Button>
+            
+            <Button 
+              type="button" 
+              variant="ghost" 
+              className="w-full" 
+              onClick={handleSkipStep4ForClient} 
+              disabled={uploadClientInsuranceMutation.isPending}
+              data-testid="button-skip-documents"
+            >
+              Omitir y continuar
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
       )}
-      <FileUpload label={formData.userType === 'conductor' ? 'Documento de Seguro de Grúa' : 'Documento de Seguro'} onFileSelect={setInsuranceFile} fileName={insuranceFile?.name} required={formData.userType === 'conductor'} testId="input-insurance-file" />
-      <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
-        {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Subir Documentos<Upload className="w-4 h-4 ml-2" /></>)}
-      </Button>
     </div>
   );
 
