@@ -49,6 +49,12 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 2025 - Registration Flow Security Improvements
+- **Client Email OTP Verification**: Changed client registration from SMS to Email OTP verification. Uses `/api/auth/send-otp` and `/api/auth/verify-otp` endpoints, matching the operator flow. Step 3 of onboarding now shows "Verificación de Correo Electrónico" with email display.
+- **Operator Name Editing During Cedula Scan**: Operators can now edit their name and surname before completing cedula verification (Step 2). Includes edit button, form fields initialized from current profile data, and validation for non-empty values.
+- **Unverified User Login Block**: Login endpoint now uses synchronous `req.session.destroy()` to prevent unverified users from accessing protected routes. Session is destroyed before 403 response is sent, ensuring no session persistence.
+- **Email Validation in OTP Flow**: Added validation in `sendOtpMutation` to ensure email is not empty before sending verification code.
+
 ### December 2025 - ID Card (Cédula) Verification Fix
 - **New Endpoint for Cédula Images**: Added `GET /api/admin/cedula-image/:userId` endpoint to serve ID card images from Replit Object Storage. Admin-only access with proper authentication.
 - **Admin Verification Panel Updated**: Fixed image display in manual verification dialog to use the new endpoint instead of non-existent `/api/documents/view/` path.
