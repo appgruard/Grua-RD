@@ -8,13 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, Mail, Phone, Star, LogOut, FileText, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar, Pencil, Camera, Loader2, Wrench, Shield, ShieldCheck, ShieldX, ShieldAlert, Edit3, Save, X, Truck } from 'lucide-react';
+import { User, Mail, Phone, Star, LogOut, FileText, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar, Pencil, Camera, Loader2, Wrench, Shield, ShieldCheck, ShieldX, ShieldAlert, Edit3, Save, X, Truck, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileUpload } from '@/components/FileUpload';
 import { EditProfileModal } from '@/components/EditProfileModal';
+import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { DocumentExpirationAlerts } from '@/components/DocumentExpirationAlerts';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
@@ -78,6 +79,7 @@ export default function DriverProfile() {
   const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
   const [editingVehicles, setEditingVehicles] = useState(false);
   const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const documentsRef = useRef<HTMLDivElement>(null);
 
@@ -1052,6 +1054,25 @@ export default function DriverProfile() {
 
           <ThemeSettingsCard />
 
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Seguridad
+              </h3>
+            </div>
+            <div className="p-4">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setChangePasswordOpen(true)}
+                data-testid="button-change-password"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                Cambiar Contraseña
+              </Button>
+            </div>
+          </Card>
+
           <Button
             variant="destructive"
             className="w-full"
@@ -1078,6 +1099,11 @@ export default function DriverProfile() {
           marcaGrua: driverData.marcaGrua,
           modeloGrua: driverData.modeloGrua,
         } : undefined}
+      />
+
+      <ChangePasswordModal
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
       />
     </div>
   );

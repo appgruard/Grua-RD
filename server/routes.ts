@@ -2132,6 +2132,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/users/change-password", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        return res.status(400).json({ message: "Todos los campos son requeridos" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "La nueva contraseña debe tener al menos 6 caracteres" });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ message: "Las contraseñas no coinciden" });
+      }
+
+      const userId = req.user!.id;
+      const user = await storage.getUserById(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "Usuario no encontrado" });
+      }
+
+      const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValidPassword) {
+        return res.status(400).json({ message: "La contraseña actual es incorrecta" });
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(userId, { passwordHash });
+
+      logAuth.passwordReset(userId);
+
+      res.json({ message: "Contraseña actualizada exitosamente" });
+    } catch (error: any) {
+      logSystem.error('Change password error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al cambiar la contraseña" });
+    }
+  });
+
   app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
     try {
       const { telefono } = req.body;
