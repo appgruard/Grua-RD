@@ -399,6 +399,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Helper function to check if user needs verification
+  const userNeedsVerification = (user: any): boolean => {
+    if (!user) return false;
+    
+    // Skip verification check for admin, aseguradora, socio, and empresa users
+    const skipVerificationTypes = ['admin', 'aseguradora', 'socio', 'empresa'];
+    if (skipVerificationTypes.includes(user.userType)) {
+      return false;
+    }
+
+    const isConductor = user.userType === 'conductor';
+    const cedulaVerificada = user.cedulaVerificada === true;
+    const emailVerificado = user.emailVerificado === true;
+    const fotoVerificada = user.fotoVerificada === true;
+
+    return isConductor 
+      ? (!cedulaVerificada || !emailVerificado || !fotoVerificada)
+      : (!cedulaVerificada || !emailVerificado);
+  };
+
+  // Middleware to block unverified users from accessing non-verification endpoints
+  // This allows users to stay logged in during verification while restricting access
+  // Uses exact path + method matching to prevent unintended access through nested routes
+  const VERIFICATION_ALLOWED_PATTERNS: Array<{ method: string; path: string }> = [
+    { method: 'GET', path: '/api/auth/me' },
+    { method: 'POST', path: '/api/auth/logout' },
+    { method: 'POST', path: '/api/auth/send-otp' },
+    { method: 'POST', path: '/api/auth/verify-otp' },
+    { method: 'POST', path: '/api/identity/scan-cedula' },
+    { method: 'POST', path: '/api/identity/verify-cedula' },
+    { method: 'POST', path: '/api/identity/verify-profile-photo' },
+    { method: 'GET', path: '/api/identity/verification-status' },
+    { method: 'GET', path: '/api/identity/status' },
+    { method: 'PATCH', path: '/api/users/me' },
+    { method: 'POST', path: '/api/documents/upload' },
+  ];
+
+  app.use((req: Request, res: Response, next) => {
+    // Skip check for non-authenticated users (they'll fail auth checks later)
+    if (!req.isAuthenticated()) {
+      return next();
+    }
+
+    const user = req.user as any;
+    
+    // If user is fully verified or exempt, allow all endpoints
+    if (!userNeedsVerification(user)) {
+      return next();
+    }
+
+    // User needs verification - only allow verification-related endpoints with exact matching
+    const requestPath = req.path;
+    const requestMethod = req.method;
+
+    const isAllowed = VERIFICATION_ALLOWED_PATTERNS.some(
+      pattern => pattern.method === requestMethod && pattern.path === requestPath
+    );
+
+    if (isAllowed) {
+      return next();
+    }
+
+    // Block access to other endpoints
+    logSystem.warn('Unverified user blocked from endpoint', { 
+      userId: user.id, 
+      userType: user.userType, 
+      path: requestPath, 
+      method: requestMethod 
+    });
+    
+    return res.status(403).json({
+      message: "Debe completar la verificación de identidad antes de acceder a esta función",
+      requiresVerification: true,
+      redirectTo: '/verify-pending'
+    });
+  });
+
   const httpServer = createServer(app);
 
   const wss = new WebSocketServer({ noServer: true });
@@ -454,6 +531,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUserById(userId);
       if (!user) {
         logSystem.warn('WebSocket rejected: User not found', { userId });
+        ws.close();
+        return;
+      }
+
+      // Block unverified users from WebSocket access
+      if (userNeedsVerification(user)) {
+        logSystem.warn('WebSocket rejected: User needs verification', { 
+          userId: user.id, 
+          userType: user.userType,
+          cedulaVerificada: user.cedulaVerificada,
+          emailVerificado: user.emailVerificado,
+          fotoVerificada: user.fotoVerificada
+        });
+        ws.send(JSON.stringify({
+          type: 'error',
+          payload: { 
+            message: 'Debe completar la verificación de identidad',
+            requiresVerification: true,
+            redirectTo: '/verify-pending'
+          }
+        }));
         ws.close();
         return;
       }
@@ -1021,7 +1119,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? (!verificationStatus.cedulaVerificada || !emailVerificado || !verificationStatus.fotoVerificada)
         : (!verificationStatus.cedulaVerificada || !emailVerificado);
       
-      // If verification is missing, destroy the session and return 403
+      // If verification is missing, return 403 but KEEP session active
+      // This allows the user to complete verification steps (photo upload, OTP, etc.)
       if (needsVerification) {
         // Return only safe, non-sensitive user data for the verification page
         const safeUserData = {
@@ -1035,21 +1134,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fotoVerificada: user.fotoVerificada,
         };
         
-        // Destroy the session synchronously to prevent access without verification
-        return new Promise<void>((resolve) => {
-          req.session.destroy((err) => {
-            if (err) {
-              logSystem.error('Error destroying session for unverified user', err, { userId: user.id });
-            }
-            res.status(403).json({
-              message: "Debe completar la verificación de identidad antes de acceder",
-              requiresVerification: true,
-              verificationStatus,
-              redirectTo: '/verify-pending',
-              user: safeUserData,
-            });
-            resolve();
-          });
+        // Keep session active so user can complete verification steps
+        // The frontend will redirect to verify-pending page
+        // Verification endpoints will work since req.isAuthenticated() will return true
+        return res.status(403).json({
+          message: "Debe completar la verificación de identidad antes de acceder",
+          requiresVerification: true,
+          verificationStatus,
+          redirectTo: '/verify-pending',
+          user: safeUserData,
         });
       }
     }

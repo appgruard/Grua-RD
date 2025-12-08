@@ -123,11 +123,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Also invalidate to ensure fresh data
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
     },
-    onError: (error: any) => {
+    onError: async (error: any) => {
       // If verification is required, store the state temporarily
       if (error?.requiresVerification) {
         setPendingVerification(error.verificationStatus);
         setPendingVerificationUser(error.user);
+        // Session is kept active on server, so invalidate query to get authenticated user
+        // This allows verification endpoints to work properly
+        await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       }
     },
   });
