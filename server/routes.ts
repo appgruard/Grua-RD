@@ -776,28 +776,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check phone for same account type
+      // Check phone for same account type (simple duplicate check, no verification logic)
       if (userData.phone) {
         const existingPhoneSameType = await storage.getUserByPhone(userData.phone);
         if (existingPhoneSameType && existingPhoneSameType.userType === requestedType) {
           logAuth.registerFailed(userData.email, "Phone already registered for same account type");
-          
-          // Check if user needs to complete verification
-          const needsVerification = requestedType === 'conductor' 
-            ? !existingPhoneSameType.cedulaVerificada 
-            : !existingPhoneSameType.emailVerificado;
-          
-          if (needsVerification) {
-            const verificationMessage = requestedType === 'conductor'
-              ? `Ya tienes una cuenta de operador con este teléfono. Inicia sesión para completar la verificación de tu cédula.`
-              : `Ya tienes una cuenta de cliente con este teléfono. Inicia sesión para acceder a tu cuenta.`;
-            return res.status(400).json({ 
-              message: verificationMessage,
-              needsVerification: true,
-              userType: requestedType
-            });
-          }
-          
           return res.status(400).json({ 
             message: `Ya tienes una cuenta de ${userTypeLabel} con este teléfono. Inicia sesión para acceder.` 
           });
