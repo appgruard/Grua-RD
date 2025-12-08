@@ -10,6 +10,12 @@ import { checkStorageHealth } from "./services/object-storage";
 
 const app = express();
 
+// Trust proxy when behind reverse proxy (CapRover/nginx)
+// This is required for secure cookies to work correctly with HTTPS
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 const STATIC_FILE_EXTENSIONS = /\.(js|css|woff2|woff|ttf|eot|otf|png|jpg|jpeg|gif|svg|ico|webp|avif|mp4|webm|pdf|map)$/i;
 const FONT_EXTENSIONS = /\.(woff2|woff|ttf|eot|otf)$/i;
 const HASHED_ASSET_PATTERN = /[-_.][A-Za-z0-9_-]{6,}\.(js|css)$/;
