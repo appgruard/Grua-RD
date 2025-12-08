@@ -49,6 +49,11 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 2025 - ID Card (Cédula) Verification Fix
+- **New Endpoint for Cédula Images**: Added `GET /api/admin/cedula-image/:userId` endpoint to serve ID card images from Replit Object Storage. Admin-only access with proper authentication.
+- **Admin Verification Panel Updated**: Fixed image display in manual verification dialog to use the new endpoint instead of non-existent `/api/documents/view/` path.
+- **Onboarding Wizard State Persistence**: Fixed issue where driver verification state was lost on page refresh. Now properly restores `cedulaVerified` state from database when user data loads, using refs to distinguish between hydration and user-initiated userType changes.
+
 ### December 2025 - Password Change Feature & Deployment Fixes
 - **Password Change in Profiles**: Added `POST /api/users/change-password` endpoint and `ChangePasswordModal` component. Both client and driver profiles now have a "Seguridad" section with "Cambiar Contraseña" button.
 - **CapRover Deployment Fixes**: Updated Dockerfile to include all VITE_ build-time variables (VITE_MAPBOX_ACCESS_TOKEN, VITE_VAPID_PUBLIC_KEY, VITE_API_URL). Updated DEPLOYMENT_CAPROVER.md with clear instructions on build-time vs runtime variables.
