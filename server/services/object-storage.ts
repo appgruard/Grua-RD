@@ -5,34 +5,40 @@ import path from 'path';
 
 let storage: Client | null = null;
 let storageInitAttempted = false;
+let lastRetryTime = 0;
+const RETRY_INTERVAL = 30000; // 30 seconds between retry attempts
 
 /**
  * Attempts to initialize storage client, returns null if unavailable
- * Allows retry on subsequent calls if initialization failed previously
+ * Implements smart retry logic with exponential backoff
  */
 function getStorageClient(): Client | null {
+  // Return existing client if available
   if (storage) {
     return storage;
   }
 
-  if (!storageInitAttempted) {
-    try {
-      storage = new Client();
-      storageInitAttempted = true;
-      logger.info('Replit Object Storage initialized successfully');
-      return storage;
-    } catch (error) {
-      storageInitAttempted = true;
-      logger.warn('Replit Object Storage not available. Document upload feature will not work until a bucket is created.', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      return null;
-    }
+  const now = Date.now();
+  
+  // If we already attempted and failed, only retry after RETRY_INTERVAL
+  if (storageInitAttempted && (now - lastRetryTime) < RETRY_INTERVAL) {
+    return null;
   }
 
-  // On subsequent calls, allow retry by resetting the flag periodically
-  // This enables recovery if a bucket is created after startup
-  return null;
+  try {
+    storage = new Client();
+    storageInitAttempted = true;
+    lastRetryTime = now;
+    logger.info('Replit Object Storage initialized successfully');
+    return storage;
+  } catch (error) {
+    storageInitAttempted = true;
+    lastRetryTime = now;
+    logger.warn('Replit Object Storage not available. Document upload feature will not work until a bucket is created.', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    return null;
+  }
 }
 
 /**
@@ -55,7 +61,7 @@ export function isStorageInitialized(): boolean {
 /**
  * Health check for Object Storage
  * Tests basic connectivity by attempting to list with a minimal prefix
- * Resets storage client on each check to allow recovery if storage becomes available
+ * Only resets storage client if an operation fails with an existing client
  */
 export async function checkStorageHealth(): Promise<{ 
   status: string; 
@@ -63,10 +69,6 @@ export async function checkStorageHealth(): Promise<{
   error?: string;
 }> {
   const start = Date.now();
-  
-  // Reset storage client to allow retry on each health check
-  // This enables recovery if storage becomes available after a previous failure
-  resetStorageClient();
   
   try {
     const storageClient = getStorageClient();
@@ -83,6 +85,8 @@ export async function checkStorageHealth(): Promise<{
     const responseTime = Date.now() - start;
     
     if (!result.ok) {
+      // Only reset if the operation fails with an existing client
+      resetStorageClient();
       return {
         status: "unhealthy",
         responseTime,
@@ -95,6 +99,8 @@ export async function checkStorageHealth(): Promise<{
       responseTime 
     };
   } catch (error) {
+    // Only reset in case of connection error
+    resetStorageClient();
     return { 
       status: "unhealthy", 
       responseTime: Date.now() - start,

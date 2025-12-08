@@ -475,6 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { method: 'PATCH', path: '/api/drivers/me/vehiculos', prefix: true },
     { method: 'DELETE', path: '/api/drivers/me/vehiculos', prefix: true },
     { method: 'POST', path: '/api/users/profile-photo' },
+    { method: 'POST', path: '/api/analytics/web-vitals' },
   ];
 
   app.use((req: Request, res: Response, next) => {
@@ -6114,6 +6115,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (!req.file) {
       return res.status(400).json({ message: "No se proporcionó ningún archivo" });
+    }
+
+    // Check storage availability BEFORE processing
+    if (!isStorageInitialized()) {
+      return res.status(503).json({ 
+        message: "El servicio de almacenamiento no está disponible temporalmente. Por favor intenta de nuevo en unos segundos.",
+        retryable: true
+      });
     }
 
     try {
