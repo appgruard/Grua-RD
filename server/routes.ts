@@ -1313,26 +1313,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!isVerifikConfigured()) {
         if (req.isAuthenticated() && image) {
+          let imageUrl: string | null = null;
+          
           try {
             const timestamp = Date.now();
             const filename = `cedula_${req.user!.id}_${timestamp}.jpg`;
             const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
+            imageUrl = uploadResult.url;
             
             await storage.updateUser(req.user!.id, {
               cedulaImageUrl: uploadResult.url
             });
             
             logSystem.info('Cedula image saved for manual verification', { userId: req.user!.id });
-            
-            return res.json({
-              success: true,
-              verified: false,
-              manualVerificationRequired: true,
-              message: "Tu cédula ha sido recibida y será verificada manualmente por un administrador."
-            });
           } catch (uploadError) {
-            logSystem.error('Failed to save cedula image for manual verification', { error: uploadError });
+            logSystem.warn('Failed to save cedula image, continuing without image storage', { 
+              userId: req.user!.id, 
+              error: uploadError 
+            });
           }
+          
+          return res.json({
+            success: true,
+            verified: false,
+            manualVerificationRequired: true,
+            imageSaved: !!imageUrl,
+            message: imageUrl 
+              ? "Tu cédula ha sido recibida y será verificada manualmente por un administrador."
+              : "Tu cédula será verificada manualmente. Por favor, asegúrate de tenerla disponible si se solicita."
+          });
         }
         
         return res.status(503).json({ 

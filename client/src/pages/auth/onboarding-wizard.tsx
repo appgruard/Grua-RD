@@ -231,6 +231,15 @@ export default function OnboardingWizard() {
         toast({ title: 'Cédula verificada', description: `Verificación exitosa (${Math.round((data.confidenceScore || 0) * 100)}%)` });
         setCompletedSteps(prev => new Set(prev).add(2));
         setCurrentStep(3);
+      } else if (data.success && data.manualVerificationRequired) {
+        updateField('cedula', data.cedula || '');
+        setCedulaVerified(true);
+        toast({ 
+          title: 'Cédula recibida', 
+          description: 'Tu cédula será verificada manualmente por un administrador' 
+        });
+        setCompletedSteps(prev => new Set(prev).add(2));
+        setCurrentStep(3);
       } else if (data.success && !data.verified) {
         updateField('cedula', data.cedula || '');
         setErrors({ cedula: data.error || 'El nombre en la cédula no coincide con el nombre registrado' });
