@@ -313,15 +313,17 @@ export const getSafeUser = (user: any) => {
       id: user.conductor.id,
       userId: user.conductor.userId,
       licencia: user.conductor.licencia,
-      placaGrua: user.conductor.placaGrua,
-      marcaGrua: user.conductor.marcaGrua,
-      modeloGrua: user.conductor.modeloGrua,
       disponible: user.conductor.disponible,
       ubicacionLat: user.conductor.ubicacionLat,
       ubicacionLng: user.conductor.ubicacionLng,
       ultimaUbicacionUpdate: user.conductor.ultimaUbicacionUpdate,
       balanceDisponible: user.conductor.balanceDisponible,
       balancePendiente: user.conductor.balancePendiente,
+      licenciaFrontalUrl: user.conductor.licenciaFrontalUrl,
+      licenciaTraseraUrl: user.conductor.licenciaTraseraUrl,
+      licenciaVerificada: user.conductor.licenciaVerificada,
+      categoriasConfiguradas: user.conductor.categoriasConfiguradas,
+      vehiculosRegistrados: user.conductor.vehiculosRegistrados,
     };
   }
   
@@ -356,15 +358,17 @@ export const getSafeUserForAdmin = (user: any) => {
       id: user.conductor.id,
       userId: user.conductor.userId,
       licencia: user.conductor.licencia,
-      placaGrua: user.conductor.placaGrua,
-      marcaGrua: user.conductor.marcaGrua,
-      modeloGrua: user.conductor.modeloGrua,
       disponible: user.conductor.disponible,
       ubicacionLat: user.conductor.ubicacionLat,
       ubicacionLng: user.conductor.ubicacionLng,
       ultimaUbicacionUpdate: user.conductor.ultimaUbicacionUpdate,
       balanceDisponible: user.conductor.balanceDisponible,
       balancePendiente: user.conductor.balancePendiente,
+      licenciaFrontalUrl: user.conductor.licenciaFrontalUrl,
+      licenciaTraseraUrl: user.conductor.licenciaTraseraUrl,
+      licenciaVerificada: user.conductor.licenciaVerificada,
+      categoriasConfiguradas: user.conductor.categoriasConfiguradas,
+      vehiculosRegistrados: user.conductor.vehiculosRegistrados,
     };
   }
   
@@ -432,15 +436,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const emailVerificado = user.emailVerificado === true;
     const fotoVerificada = user.fotoVerificada === true;
 
-    return isConductor 
-      ? (!cedulaVerificada || !emailVerificado || !fotoVerificada)
-      : (!cedulaVerificada || !emailVerificado);
+    if (!isConductor) {
+      // Client only needs cedula and email
+      return !cedulaVerificada || !emailVerificado;
+    }
+
+    // Driver needs 6 verifications - check conductor data for additional fields
+    const conductor = user.conductor;
+    const licenciaVerificada = conductor?.licenciaVerificada === true;
+    const categoriasConfiguradas = conductor?.categoriasConfiguradas === true;
+    const vehiculosRegistrados = conductor?.vehiculosRegistrados === true;
+
+    return !cedulaVerificada || !emailVerificado || !fotoVerificada || 
+           !licenciaVerificada || !categoriasConfiguradas || !vehiculosRegistrados;
   };
 
   // Middleware to block unverified users from accessing non-verification endpoints
   // This allows users to stay logged in during verification while restricting access
   // Uses exact path + method matching to prevent unintended access through nested routes
-  const VERIFICATION_ALLOWED_PATTERNS: Array<{ method: string; path: string }> = [
+  // Set prefix: true for routes that have dynamic parameters (e.g., /api/drivers/me/vehiculos/:id)
+  const VERIFICATION_ALLOWED_PATTERNS: Array<{ method: string; path: string; prefix?: boolean }> = [
     { method: 'GET', path: '/api/auth/me' },
     { method: 'POST', path: '/api/auth/logout' },
     { method: 'POST', path: '/api/auth/send-otp' },
@@ -452,6 +467,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { method: 'GET', path: '/api/identity/status' },
     { method: 'PATCH', path: '/api/users/me' },
     { method: 'POST', path: '/api/documents/upload' },
+    { method: 'POST', path: '/api/driver/documents' },
+    { method: 'GET', path: '/api/drivers/me/servicios' },
+    { method: 'PUT', path: '/api/drivers/me/servicios' },
+    { method: 'GET', path: '/api/drivers/me/vehiculos', prefix: true },
+    { method: 'POST', path: '/api/drivers/me/vehiculos' },
+    { method: 'PATCH', path: '/api/drivers/me/vehiculos', prefix: true },
+    { method: 'DELETE', path: '/api/drivers/me/vehiculos', prefix: true },
+    { method: 'POST', path: '/api/users/profile-photo' },
   ];
 
   app.use((req: Request, res: Response, next) => {
@@ -472,13 +495,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return next();
     }
 
-    // User needs verification - only allow verification-related endpoints with exact matching
+    // User needs verification - only allow verification-related endpoints
+    // Uses exact matching for most routes, prefix matching for routes with parameters
     const requestPath = req.path;
     const requestMethod = req.method;
 
-    const isAllowed = VERIFICATION_ALLOWED_PATTERNS.some(
-      pattern => pattern.method === requestMethod && pattern.path === requestPath
-    );
+    const isAllowed = VERIFICATION_ALLOWED_PATTERNS.some(pattern => {
+      if (pattern.method !== requestMethod) return false;
+      if (pattern.prefix) {
+        return requestPath === pattern.path || requestPath.startsWith(pattern.path + '/');
+      }
+      return pattern.path === requestPath;
+    });
 
     if (isAllowed) {
       return next();
@@ -2090,7 +2118,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For onboarding flow purposes, cedula step is complete if verified OR pending review
       const cedulaStepComplete = cedulaVerificada || cedulaPendingReview;
 
-      const steps = [
+      // Fetch conductor data for drivers
+      let conductor = null;
+      if (isDriver) {
+        conductor = await storage.getConductorByUserId(user.id);
+      }
+
+      const steps: Array<{ id: string; name: string; description: string; completed: boolean; pendingReview?: boolean; required: boolean }> = [
         {
           id: 'cedula',
           name: 'Verificación de Cédula',
@@ -2114,6 +2148,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: 'Foto de Perfil Verificada',
           description: 'Sube una foto clara de tu rostro',
           completed: fotoVerificada,
+          required: true
+        });
+        steps.push({
+          id: 'license',
+          name: 'Subir Licencia',
+          description: 'Sube fotos de tu licencia (frente y reverso)',
+          completed: !!(conductor?.licenciaFrontalUrl && conductor?.licenciaTraseraUrl),
+          required: true
+        });
+        steps.push({
+          id: 'categories',
+          name: 'Categorías de Servicio',
+          description: 'Selecciona las categorías de servicio que ofreces',
+          completed: conductor?.categoriasConfiguradas || false,
+          required: true
+        });
+        steps.push({
+          id: 'vehicles',
+          name: 'Registrar Vehículos',
+          description: 'Registra tus vehículos para cada categoría',
+          completed: conductor?.vehiculosRegistrados || false,
           required: true
         });
       }
@@ -2146,7 +2201,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cedula: cedulaVerificada ? user.cedula : null,
           cedulaImageUrl: user.cedulaImageUrl || null,
           email: user.email || null,
-          fotoUrl: user.fotoUrl || null
+          fotoUrl: user.fotoUrl || null,
+          ...(isDriver && {
+            licenciaVerificada: conductor?.licenciaVerificada || false,
+            categoriasConfiguradas: conductor?.categoriasConfiguradas || false,
+            vehiculosRegistrados: conductor?.vehiculosRegistrados || false,
+            licenciaFrontalUrl: conductor?.licenciaFrontalUrl || null,
+            licenciaTraseraUrl: conductor?.licenciaTraseraUrl || null
+          })
         },
         steps,
         progress,
@@ -3083,6 +3145,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.setConductorServicios(conductor.id, categorias);
+      
+      // Mark categories as configured
+      await storage.updateConductor(conductor.id, { categoriasConfiguradas: true });
+      
       const servicios = await storage.getConductorServicios(conductor.id);
       
       logSystem.info('Driver services updated', { conductorId: conductor.id, count: servicios.length });
@@ -3177,6 +3243,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         detalles,
         fotoUrl,
       });
+
+      // Check if all selected categories have vehicles registered
+      const [servicios, vehiculos] = await Promise.all([
+        storage.getConductorServicios(conductor.id),
+        storage.getConductorVehiculos(conductor.id)
+      ]);
+      
+      const selectedCategories = servicios.map(s => s.categoriaServicio);
+      const vehicleCategories = vehiculos.filter(v => v.activo).map(v => v.categoria);
+      const allCategoriesHaveVehicles = selectedCategories.length > 0 && 
+        selectedCategories.every(cat => vehicleCategories.includes(cat));
+      
+      if (allCategoriesHaveVehicles) {
+        await storage.updateConductor(conductor.id, { vehiculosRegistrados: true });
+        logSystem.info('All categories have vehicles, marked vehiculosRegistrados', { conductorId: conductor.id });
+      }
 
       logSystem.info('Driver vehicle created/updated', { conductorId: conductor.id, categoria, vehiculoId: vehiculo.id });
       res.json(vehiculo);
@@ -5966,6 +6048,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Upload document error', error);
       res.status(500).json({ message: error.message || "Failed to upload document" });
+    }
+  });
+
+  // Upload license document (driver verification flow)
+  app.post("/api/driver/documents", upload.single('document'), async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Solo conductores pueden subir documentos" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No se proporcionó ningún archivo" });
+    }
+
+    try {
+      const { type } = req.body;
+      
+      if (!type || !['licencia', 'licencia_trasera'].includes(type)) {
+        return res.status(400).json({ message: "Tipo de documento inválido. Debe ser 'licencia' o 'licencia_trasera'" });
+      }
+
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      // Upload to object storage
+      const uploadResult = await uploadDocument({
+        buffer: req.file.buffer,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        userId: conductor.id,
+        documentType: type,
+      });
+
+      // Update conductor record with the license URL
+      const updateData: Record<string, any> = {};
+      if (type === 'licencia') {
+        updateData.licenciaFrontalUrl = uploadResult.url;
+      } else {
+        updateData.licenciaTraseraUrl = uploadResult.url;
+      }
+
+      // Get updated conductor to check if both license images are now present
+      const updatedConductor = await storage.updateConductor(conductor.id, updateData);
+
+      // If both front and back are uploaded, set licenciaVerificada to true
+      if (updatedConductor.licenciaFrontalUrl && updatedConductor.licenciaTraseraUrl) {
+        await storage.updateConductor(conductor.id, { licenciaVerificada: true });
+        logSystem.info('License verified - both sides uploaded', { conductorId: conductor.id });
+      }
+
+      logDocument.uploaded(conductor.id, type, conductor.id);
+      res.json({ 
+        url: uploadResult.url,
+        type: type,
+        success: true
+      });
+    } catch (error: any) {
+      logSystem.error('Upload license document error', error);
+      res.status(500).json({ message: error.message || "Failed to upload license document" });
     }
   });
 

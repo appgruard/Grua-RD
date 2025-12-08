@@ -8,6 +8,9 @@ interface VerificationStatus {
   cedulaVerificada: boolean;
   telefonoVerificado: boolean;
   fotoVerificada?: boolean;
+  licenciaVerificada?: boolean;
+  categoriasConfiguradas?: boolean;
+  vehiculosRegistrados?: boolean;
 }
 
 interface VerificationError extends Error {

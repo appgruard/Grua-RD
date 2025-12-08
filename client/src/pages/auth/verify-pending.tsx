@@ -16,11 +16,14 @@ import { cn } from '@/lib/utils';
 import { 
   Loader2, IdCard, Mail, CheckCircle2, AlertCircle, 
   Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, 
-  UserCircle, ArrowRight, Circle, CheckCircle
+  UserCircle, ArrowRight, Circle, CheckCircle, FileText, Grid3X3, Car
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
+import { FileUpload } from '@/components/FileUpload';
+import { ServiceCategoryMultiSelect, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
+import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 
-type VerificationStep = 'cedula' | 'email' | 'photo' | 'complete';
+type VerificationStep = 'cedula' | 'email' | 'photo' | 'license' | 'categories' | 'vehicles' | 'complete';
 
 interface VerificationStepInfo {
   id: VerificationStep;
@@ -53,6 +56,16 @@ export default function VerifyPending() {
   const [profilePhotoImage, setProfilePhotoImage] = useState<string | null>(null);
   const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
   const [showProfileCamera, setShowProfileCamera] = useState(false);
+  const [licenseVerified, setLicenseVerified] = useState(false);
+  const [licenseFrontUrl, setLicenseFrontUrl] = useState<string | null>(null);
+  const [licenseBackUrl, setLicenseBackUrl] = useState<string | null>(null);
+  const [categoriesVerified, setCategoriesVerified] = useState(false);
+  const [vehiclesVerified, setVehiclesVerified] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<Array<{ categoria: string; subtipos: string[] }>>([]);
+  const [vehicles, setVehicles] = useState<VehicleData[]>([]);
+  const [isUploadingLicense, setIsUploadingLicense] = useState(false);
+  const [isSavingCategories, setIsSavingCategories] = useState(false);
+  const [isSavingVehicles, setIsSavingVehicles] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isInitializing, setIsInitializing] = useState(true); // Start as true, will be set to false when ready
   const [initializedUser, setInitializedUser] = useState<any>(null);
@@ -87,7 +100,17 @@ export default function VerifyPending() {
       
       if (res.ok) {
         const data = await res.json();
-        const { cedulaVerificada, cedulaPendingReview, emailVerificado, fotoVerificada } = data.verification;
+        const { 
+          cedulaVerificada, 
+          cedulaPendingReview, 
+          emailVerificado, 
+          fotoVerificada,
+          licenciaVerificada,
+          licenciaFrontalUrl,
+          licenciaTraseraUrl,
+          categoriasConfiguradas,
+          vehiculosRegistrados
+        } = data.verification;
         
         // Store user data from the response if we don't have context user
         if (data.user && !contextUser) {
@@ -107,20 +130,36 @@ export default function VerifyPending() {
         const isDriverCheck = checkUser?.userType === 'conductor';
 
         if (isDriverCheck) {
-          // Only redirect if skipRedirects is not true
-          if (cedulaVerificada && emailVerificado && fotoVerificada) {
+          // Update driver-specific verification states
+          setLicenseVerified(licenciaVerificada || false);
+          if (licenciaFrontalUrl) setLicenseFrontUrl(licenciaFrontalUrl);
+          if (licenciaTraseraUrl) setLicenseBackUrl(licenciaTraseraUrl);
+          setCategoriesVerified(categoriasConfiguradas || false);
+          setVehiclesVerified(vehiculosRegistrados || false);
+
+          // Check if all 6 steps are complete for driver
+          const allDriverStepsComplete = cedulaVerificada && emailVerificado && fotoVerificada && 
+            licenciaVerificada && categoriasConfiguradas && vehiculosRegistrados;
+
+          if (allDriverStepsComplete) {
             if (!options?.skipRedirects) {
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/driver');
               });
             }
-          } else if (cedulaStepComplete && emailVerificado && !fotoVerificada) {
-            setCurrentStep('photo');
-          } else if (cedulaStepComplete && !emailVerificado) {
-            setCurrentStep('email');
-          } else {
+          } else if (!cedulaStepComplete) {
             setCurrentStep('cedula');
+          } else if (!emailVerificado) {
+            setCurrentStep('email');
+          } else if (!fotoVerificada) {
+            setCurrentStep('photo');
+          } else if (!licenciaVerificada) {
+            setCurrentStep('license');
+          } else if (!categoriasConfiguradas) {
+            setCurrentStep('categories');
+          } else if (!vehiculosRegistrados) {
+            setCurrentStep('vehicles');
           }
         } else {
           // Client verification flow
@@ -287,6 +326,33 @@ export default function VerifyPending() {
         completed: photoVerified,
         current: currentStep === 'photo'
       });
+      baseSteps.push({
+        id: 'license',
+        title: 'Licencia de Conducir',
+        shortTitle: 'Licencia',
+        description: 'Sube fotos de tu licencia (frontal y trasera)',
+        icon: FileText,
+        completed: licenseVerified,
+        current: currentStep === 'license'
+      });
+      baseSteps.push({
+        id: 'categories',
+        title: 'Categorías de Servicio',
+        shortTitle: 'Categorías',
+        description: 'Selecciona los servicios que ofreces',
+        icon: Grid3X3,
+        completed: categoriesVerified,
+        current: currentStep === 'categories'
+      });
+      baseSteps.push({
+        id: 'vehicles',
+        title: 'Vehículos',
+        shortTitle: 'Vehículos',
+        description: 'Registra los datos de tus vehículos',
+        icon: Car,
+        completed: vehiclesVerified,
+        current: currentStep === 'vehicles'
+      });
     }
 
     return baseSteps;
@@ -348,18 +414,15 @@ export default function VerifyPending() {
 
       if (data.verified) {
         setCedulaVerified(true);
-        await refetchVerificationStatus();
-        toast({ title: 'Cédula verificada', description: 'Tu identidad ha sido verificada exitosamente' });
         setCurrentStep('email');
+        toast({ title: 'Cédula verificada', description: 'Tu identidad ha sido verificada exitosamente' });
       } else if (data.success && data.manualVerificationRequired) {
-        // Manual verification required - allow user to proceed
         setCedulaVerified(true);
-        await refetchVerificationStatus();
+        setCurrentStep('email');
         toast({ 
           title: 'Cédula recibida', 
           description: 'Tu cédula será verificada manualmente por un administrador' 
         });
-        setCurrentStep('email');
       } else if (data.success && !data.verified) {
         setErrors({ cedula: data.error || 'El nombre en la cédula no coincide con el nombre registrado' });
         toast({ 
@@ -492,10 +555,7 @@ export default function VerifyPending() {
       if (data.verified) {
         setPhotoVerified(true);
         toast({ title: 'Foto verificada', description: `Verificación exitosa (${Math.round((data.score || 0) * 100)}%)` });
-        clearPendingVerification();
-        await refreshUser();
-        await refetchVerificationStatus({ bypassInitGuard: true });
-        setLocation('/driver');
+        setCurrentStep('license');
       } else {
         setErrors({ profilePhoto: data.error || 'La foto no cumple con los requisitos' });
         toast({ 
@@ -545,6 +605,127 @@ export default function VerifyPending() {
     if (profileFileInputRef.current) profileFileInputRef.current.value = '';
   };
 
+  const handleLicenseUpload = async (file: File, type: 'licencia' | 'licencia_trasera') => {
+    setIsUploadingLicense(true);
+    setErrors({});
+
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('type', type);
+
+      const response = await fetch('/api/driver/documents', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al subir el documento');
+
+      if (type === 'licencia') {
+        setLicenseFrontUrl(data.url);
+      } else {
+        setLicenseBackUrl(data.url);
+      }
+
+      toast({ title: 'Documento subido', description: `${type === 'licencia' ? 'Parte frontal' : 'Parte trasera'} de la licencia subida exitosamente` });
+    } catch (err: any) {
+      setErrors({ [type]: err.message || 'Error al subir el documento' });
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingLicense(false);
+    }
+  };
+
+  const handleLicenseContinue = async () => {
+    if (!licenseFrontUrl || !licenseBackUrl) {
+      setErrors({ license: 'Debes subir ambos lados de la licencia' });
+      return;
+    }
+
+    setLicenseVerified(true);
+    setCurrentStep('categories');
+    toast({ title: 'Licencia subida', description: 'Ahora selecciona las categorías de servicio' });
+  };
+
+  const handleSaveCategories = async () => {
+    if (selectedCategories.length === 0) {
+      setErrors({ categories: 'Debes seleccionar al menos una categoría de servicio' });
+      return;
+    }
+
+    setIsSavingCategories(true);
+    setErrors({});
+
+    try {
+      const response = await fetch('/api/drivers/me/servicios', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ servicios: selectedCategories }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al guardar las categorías');
+
+      setCategoriesVerified(true);
+      setCurrentStep('vehicles');
+      toast({ title: 'Categorías guardadas', description: 'Ahora registra los datos de tus vehículos' });
+    } catch (err: any) {
+      setErrors({ categories: err.message || 'Error al guardar las categorías' });
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSavingCategories(false);
+    }
+  };
+
+  const handleSaveVehicles = async () => {
+    const categoryIds = selectedCategories.map(c => c.categoria);
+    const vehicleErrors: Record<string, string> = {};
+    
+    for (const catId of categoryIds) {
+      const vehicle = vehicles.find(v => v.categoria === catId);
+      if (!vehicle || !vehicle.placa || !vehicle.color || !vehicle.modelo) {
+        vehicleErrors[`vehicle_${catId}`] = 'Completa los campos requeridos';
+      }
+    }
+
+    if (Object.keys(vehicleErrors).length > 0) {
+      setErrors(vehicleErrors);
+      return;
+    }
+
+    setIsSavingVehicles(true);
+    setErrors({});
+
+    try {
+      for (const vehicle of vehicles) {
+        const response = await fetch('/api/drivers/me/vehiculos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(vehicle),
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Error al registrar el vehículo');
+      }
+
+      setVehiclesVerified(true);
+      toast({ title: 'Registro completado', description: 'Todos los vehículos han sido registrados exitosamente' });
+      
+      clearPendingVerification();
+      await refreshUser();
+      setLocation('/driver');
+    } catch (err: any) {
+      setErrors({ vehicles: err.message || 'Error al registrar los vehículos' });
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSavingVehicles(false);
+    }
+  };
+
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/auth/send-otp', {
@@ -584,12 +765,10 @@ export default function VerifyPending() {
       toast({ title: 'Correo verificado', description: 'Tu correo electrónico ha sido verificado' });
       
       if (isDriver) {
-        await refetchVerificationStatus({ bypassInitGuard: true });
         setCurrentStep('photo');
       } else {
         clearPendingVerification();
         await refreshUser();
-        await refetchVerificationStatus({ bypassInitGuard: true });
         setLocation('/client');
       }
     },
@@ -1074,6 +1253,252 @@ export default function VerifyPending() {
                     </div>
                   )}
                   <canvas ref={profileCanvasRef} className="hidden" />
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {isDriver && (
+            <Card className={cn(
+              "transition-all",
+              licenseVerified ? "border-green-500/50 bg-green-500/5" : 
+              currentStep === 'license' && cedulaVerified && emailVerified && photoVerified ? "ring-2 ring-primary" : "opacity-60"
+            )} data-testid="card-license-verification">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    licenseVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  )}>
+                    {licenseVerified ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <FileText className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <span>Paso 4: Licencia de Conducir</span>
+                      {licenseVerified && (
+                        <Badge className="bg-green-500 hover:bg-green-600">Verificado</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {licenseVerified ? 'Tu licencia ha sido subida' : 'Sube fotos de tu licencia (frontal y trasera)'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              {!licenseVerified && currentStep === 'license' && cedulaVerified && emailVerified && photoVerified && (
+                <CardContent className="space-y-4">
+                  {errors.license && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{errors.license}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="grid gap-4">
+                    <div>
+                      <p className="text-sm font-medium mb-2">Parte Frontal de la Licencia</p>
+                      {licenseFrontUrl ? (
+                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                          <img src={licenseFrontUrl} alt="Licencia frontal" className="w-full h-full object-contain" />
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="absolute top-2 right-2"
+                            onClick={() => setLicenseFrontUrl(null)}
+                            data-testid="button-remove-license-front"
+                          >
+                            Cambiar
+                          </Button>
+                        </div>
+                      ) : (
+                        <FileUpload
+                          label=""
+                          helperText="Arrastra o selecciona la parte frontal de tu licencia"
+                          onFileSelect={(file) => handleLicenseUpload(file, 'licencia')}
+                          disabled={isUploadingLicense}
+                        />
+                      )}
+                      {errors.licencia && (
+                        <p className="text-sm text-destructive mt-1">{errors.licencia}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium mb-2">Parte Trasera de la Licencia</p>
+                      {licenseBackUrl ? (
+                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                          <img src={licenseBackUrl} alt="Licencia trasera" className="w-full h-full object-contain" />
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="absolute top-2 right-2"
+                            onClick={() => setLicenseBackUrl(null)}
+                            data-testid="button-remove-license-back"
+                          >
+                            Cambiar
+                          </Button>
+                        </div>
+                      ) : (
+                        <FileUpload
+                          label=""
+                          helperText="Arrastra o selecciona la parte trasera de tu licencia"
+                          onFileSelect={(file) => handleLicenseUpload(file, 'licencia_trasera')}
+                          disabled={isUploadingLicense}
+                        />
+                      )}
+                      {errors.licencia_trasera && (
+                        <p className="text-sm text-destructive mt-1">{errors.licencia_trasera}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={handleLicenseContinue} 
+                    className="w-full"
+                    disabled={!licenseFrontUrl || !licenseBackUrl || isUploadingLicense}
+                    data-testid="button-continue-license"
+                  >
+                    {isUploadingLicense ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
+                    ) : (
+                      <>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
+                    )}
+                  </Button>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {isDriver && (
+            <Card className={cn(
+              "transition-all",
+              categoriesVerified ? "border-green-500/50 bg-green-500/5" : 
+              currentStep === 'categories' && cedulaVerified && emailVerified && photoVerified && licenseVerified ? "ring-2 ring-primary" : "opacity-60"
+            )} data-testid="card-categories-verification">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    categoriesVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  )}>
+                    {categoriesVerified ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Grid3X3 className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <span>Paso 5: Categorías de Servicio</span>
+                      {categoriesVerified && (
+                        <Badge className="bg-green-500 hover:bg-green-600">Configurado</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {categoriesVerified ? 'Has configurado tus categorías de servicio' : 'Selecciona los tipos de servicio que ofreces'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              {!categoriesVerified && currentStep === 'categories' && cedulaVerified && emailVerified && photoVerified && licenseVerified && (
+                <CardContent className="space-y-4">
+                  {errors.categories && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{errors.categories}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <ServiceCategoryMultiSelect
+                    value={selectedCategories}
+                    onChange={setSelectedCategories}
+                    disabled={isSavingCategories}
+                  />
+
+                  <Button 
+                    onClick={handleSaveCategories} 
+                    className="w-full"
+                    disabled={selectedCategories.length === 0 || isSavingCategories}
+                    data-testid="button-save-categories"
+                  >
+                    {isSavingCategories ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                    ) : (
+                      <>Guardar y Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
+                    )}
+                  </Button>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {isDriver && (
+            <Card className={cn(
+              "transition-all",
+              vehiclesVerified ? "border-green-500/50 bg-green-500/5" : 
+              currentStep === 'vehicles' && cedulaVerified && emailVerified && photoVerified && licenseVerified && categoriesVerified ? "ring-2 ring-primary" : "opacity-60"
+            )} data-testid="card-vehicles-verification">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    vehiclesVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  )}>
+                    {vehiclesVerified ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Car className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <span>Paso 6: Registro de Vehículos</span>
+                      {vehiclesVerified && (
+                        <Badge className="bg-green-500 hover:bg-green-600">Registrado</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {vehiclesVerified ? 'Tus vehículos han sido registrados' : 'Registra los datos de tus vehículos para cada categoría'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              {!vehiclesVerified && currentStep === 'vehicles' && cedulaVerified && emailVerified && photoVerified && licenseVerified && categoriesVerified && (
+                <CardContent className="space-y-4">
+                  {errors.vehicles && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{errors.vehicles}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <VehicleCategoryForm
+                    selectedCategories={selectedCategories.map(c => c.categoria)}
+                    vehicles={vehicles}
+                    onChange={setVehicles}
+                    disabled={isSavingVehicles}
+                    errors={errors}
+                  />
+
+                  <Button 
+                    onClick={handleSaveVehicles} 
+                    className="w-full"
+                    disabled={isSavingVehicles}
+                    data-testid="button-complete-registration"
+                  >
+                    {isSavingVehicles ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Registrando...</>
+                    ) : (
+                      <>Completar Registro<CheckCircle className="w-4 h-4 ml-2" /></>
+                    )}
+                  </Button>
                 </CardContent>
               )}
             </Card>

@@ -34,12 +34,20 @@
 ### Tarea 1: Corregir Bug 5 - UI del siguiente paso no se despliega
 **Prioridad**: Alta (afecta la experiencia de usuario)
 **Archivos a modificar**: `client/src/pages/auth/verify-pending.tsx`
+**Estado**: ✅ COMPLETADO (2025-12-08)
 
-**Pasos**:
-1. Revisar la función `scanCedulaImage` y cómo actualiza `currentStep`
-2. Asegurar que después de `setCurrentStep('email')` o `setCurrentStep('photo')`, el componente renderice correctamente las opciones del nuevo paso
-3. Verificar que no hay condiciones que oculten los botones de acción del paso actual
-4. Forzar un re-render si es necesario usando una key única en el contenedor del paso
+**Causa raíz identificada**: 
+Después de completar un paso, se llamaba `refetchVerificationStatus()` que consultaba el servidor y actualizaba el estado local. Si el servidor aún no había procesado el cambio, el estado local era sobrescrito con valores anteriores, revirtiendo los cambios antes de que `setCurrentStep()` pudiera ejecutarse.
+
+**Solución implementada**:
+1. Eliminadas las llamadas a `refetchVerificationStatus()` inmediatamente después de completar un paso
+2. Se establecen primero los estados locales (`setCedulaVerified(true)`, `setCurrentStep('email')`)
+3. El toast de confirmación se muestra después de actualizar el estado
+
+**Cambios realizados**:
+- `scanCedulaImage()`: Removido `await refetchVerificationStatus()` antes de `setCurrentStep('email')`
+- `verifyOtpMutation.onSuccess`: Removido `await refetchVerificationStatus()` antes de `setCurrentStep('photo')`
+- `validateProfilePhoto()`: Removido `await refetchVerificationStatus()` antes de `setLocation('/driver')`
 
 **Prueba de aceptación**: Al completar el escaneo de cédula, las opciones del siguiente paso (email o foto) deben aparecer automáticamente sin necesidad de refrescar.
 
@@ -48,15 +56,27 @@
 ### Tarea 2: Corregir Bug 1 - Foto de perfil solicitada nuevamente
 **Prioridad**: Alta
 **Archivos a modificar**: 
-- `client/src/pages/auth/verify-pending.tsx`
-- `client/src/pages/driver/dashboard.tsx` (si aplica)
-- Verificar endpoint `/api/identity/verification-status`
+- `client/src/App.tsx`
+**Estado**: ✅ COMPLETADO (2025-12-08)
 
-**Pasos**:
-1. Verificar que `fotoVerificada` se establece a `true` correctamente en el backend después de validar la foto
-2. Revisar la lógica de redirección después de completar la verificación
-3. Asegurar que el dashboard no tiene condiciones que soliciten la foto nuevamente si ya está verificada
-4. Verificar que `refreshUser()` actualiza correctamente el estado del usuario con `fotoVerificada: true`
+**Causa raíz identificada**: 
+Había una inconsistencia entre las verificaciones de autenticación:
+- En `login.tsx`: Se verificaba `!user.cedulaVerificada || !emailVerificado || !user.fotoVerificada`
+- En `App.tsx ProtectedRoute`: Solo se verificaba `!user.cedulaVerificada || !contactoVerificado` (SIN fotoVerificada)
+
+Esto causaba que un conductor pudiera pasar la verificación de ProtectedRoute sin tener la foto verificada, pero al volver a iniciar sesión sería redirigido a `/verify-pending`.
+
+**Solución implementada**:
+Se agregó la verificación de `fotoVerificada` al `ProtectedRoute` en `App.tsx`:
+```javascript
+const fotoVerificada = (user as any).fotoVerificada;
+const needsVerification = !user.cedulaVerificada || !contactoVerificado || !fotoVerificada;
+```
+
+Ahora ambas verificaciones (login y ProtectedRoute) son consistentes y requieren:
+1. `cedulaVerificada`
+2. `contactoVerificado` (teléfono o email)
+3. `fotoVerificada` (solo para conductores)
 
 **Prueba de aceptación**: Después de completar todos los pasos de verificación, el conductor debe acceder directamente al dashboard sin que se le pida foto nuevamente.
 
@@ -66,23 +86,64 @@
 **Prioridad**: Media
 **Archivos a modificar**: 
 - `client/src/components/EditProfileModal.tsx`
-- `client/src/pages/driver/profile.tsx` (remover props relacionados)
+- `client/src/pages/driver/profile.tsx`
+**Estado**: ✅ COMPLETADO (2025-12-08)
 
-**Pasos**:
+**Cambios realizados**:
+
 1. En `EditProfileModal.tsx`:
-   - Eliminar estados: `placaGrua`, `marcaGrua`, `modeloGrua`
-   - Eliminar la sección JSX "Información de la Grúa" (líneas 579-655 aproximadamente)
-   - Eliminar la interfaz `conductorData` del tipo de props (o solo dejar `licencia`)
-   - Eliminar la lógica de actualización de estos campos en `handleSubmit`
+   - Eliminados estados: `placaGrua`, `marcaGrua`, `modeloGrua`
+   - Simplificada la interfaz `conductorData` a solo contener `licencia`
+   - Actualizado el tipo de `updateProfileMutation` para solo incluir `licencia`
+   - Simplificada la lógica de `handleSubmit` para solo actualizar `licencia`
+   - Reemplazada la sección JSX "Información de la Grúa" por solo el campo de licencia
+   - Agregado mensaje informativo: "Para gestionar tus vehículos, ve a la sección 'Vehículos por Categoría' en tu perfil"
 
 2. En `profile.tsx`:
-   - Actualizar la llamada a `EditProfileModal` para no pasar los campos de grúa
+   - Actualizada la prop `conductorData` para solo pasar `licencia`
 
 **Prueba de aceptación**: El modal de editar perfil no debe mostrar campos de placa, marca o modelo de grúa. Los vehículos se gestionan únicamente desde la sección "Vehículos por Categoría".
 
 ---
 
 ### Tarea 4: Agregar pasos de licencia, categorías y vehículos al flujo de verificación
+**Estado**: ✅ COMPLETADO (2025-12-08)
+
+**Cambios realizados**:
+
+1. En `shared/schema.ts`:
+   - Agregados campos al conductores table: `licenciaFrontalUrl`, `licenciaTraseraUrl`, `licenciaVerificada`, `categoriasConfiguradas`, `vehiculosRegistrados`
+
+2. En `server/routes.ts`:
+   - Actualizado endpoint `/api/identity/verification-status` para retornar los nuevos campos de verificación para conductores
+   - Agregados 3 nuevos pasos de verificación: license, categories, vehicles
+   - Actualizado PUT `/api/drivers/me/servicios` para establecer `categoriasConfiguradas: true`
+   - Actualizado POST `/api/drivers/me/vehiculos` para verificar si todos los vehículos están registrados y establecer `vehiculosRegistrados: true`
+
+3. En `client/src/lib/auth.tsx`:
+   - Actualizada interfaz `VerificationStatus` con campos: `licenciaVerificada`, `categoriasConfiguradas`, `vehiculosRegistrados`
+
+4. En `client/src/App.tsx`:
+   - Actualizado `ProtectedRoute` para verificar las 6 condiciones para conductores:
+     - cedulaVerificada, emailVerificado, fotoVerificada
+     - licenciaVerificada, categoriasConfiguradas, vehiculosRegistrados
+
+5. En `client/src/pages/auth/verify-pending.tsx`:
+   - Extendido tipo `VerificationStep` con: 'license', 'categories', 'vehicles'
+   - Agregados estados para nuevos pasos de verificación
+   - Actualizada función `fetchVerificationStatusFromServer` para manejar nuevos campos
+   - Actualizada función `getSteps()` con 3 nuevos pasos para conductores
+   - Agregado JSX para los 3 nuevos pasos:
+     - Step de licencia: dos FileUpload para frente y reverso
+     - Step de categorías: integración con ServiceCategoryMultiSelect
+     - Step de vehículos: integración con VehicleCategoryForm
+   - Actualizada lógica de redirección para verificación completa
+
+**Prueba de aceptación**: El flujo de verificación de conductores ahora tiene 6 pasos secuenciales. Después de completar todos, el conductor accede al dashboard.
+
+---
+
+### Tarea 4 (Original):
 **Prioridad**: Alta
 **Archivos a modificar**: 
 - `client/src/pages/auth/verify-pending.tsx`

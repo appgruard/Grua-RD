@@ -208,6 +208,11 @@ export const conductores = pgTable("conductores", {
   licenciaRestricciones: text("licencia_restricciones"),
   licenciaCategoriaVerificada: boolean("licencia_categoria_verificada").default(false),
   licenciaFechaVencimiento: timestamp("licencia_fecha_vencimiento"),
+  licenciaFrontalUrl: text("licencia_frontal_url"),
+  licenciaTraseraUrl: text("licencia_trasera_url"),
+  licenciaVerificada: boolean("licencia_verificada").default(false),
+  categoriasConfiguradas: boolean("categorias_configuradas").default(false),
+  vehiculosRegistrados: boolean("vehiculos_registrados").default(false),
 });
 
 // Conductor Service Categories Table (driver can offer multiple service categories)

@@ -1119,9 +1119,6 @@ export default function DriverProfile() {
         fotoVerificadaScore={user.fotoVerificadaScore ? parseFloat(user.fotoVerificadaScore) : null}
         conductorData={driverData ? {
           licencia: driverData.licencia,
-          placaGrua: driverData.placaGrua,
-          marcaGrua: driverData.marcaGrua,
-          modeloGrua: driverData.modeloGrua,
         } : undefined}
       />
 
