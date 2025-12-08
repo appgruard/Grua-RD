@@ -1391,32 +1391,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if name extraction failed
+      // Check if name extraction failed - allow manual verification instead of blocking
       if (userNombre && userApellido && (!result.nombre || !result.apellido)) {
-        logSystem.warn('Could not verify name match - insufficient data from OCR', {
+        logSystem.warn('Could not verify name match - insufficient data from OCR, allowing manual verification', {
           userId: req.user?.id,
           hasNombre: !!result.nombre,
           hasApellido: !!result.apellido,
           confidenceScore: result.confidenceScore
         });
         
-        return res.status(400).json({
-          success: false,
+        // Save the image for manual review if authenticated
+        if (req.isAuthenticated() && image) {
+          try {
+            const timestamp = Date.now();
+            const filename = `cedula_manual_${req.user!.id}_${timestamp}.jpg`;
+            const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
+            
+            await storage.updateUser(req.user!.id, {
+              cedulaImageUrl: uploadResult.url,
+              cedula: result.cedula
+            });
+            
+            logSystem.info('Cedula saved for manual verification (name extraction failed)', { userId: req.user!.id });
+          } catch (uploadError) {
+            logSystem.warn('Failed to save cedula for manual verification', { 
+              userId: req.user!.id, 
+              error: uploadError 
+            });
+          }
+        }
+        
+        return res.json({
+          success: true,
+          cedula: result.cedula,
+          nombre: result.nombre,
+          apellido: result.apellido,
           verified: false,
           nameMatch: false,
+          manualVerificationRequired: true,
           confidenceScore: result.confidenceScore,
-          message: "No se pudo extraer el nombre completo de la cédula. Por favor, asegúrate de que la imagen sea clara y legible."
+          message: "Cédula escaneada. La verificación será revisada manualmente."
         });
       }
 
-      // Check name match result
+      // Check name match result - if skipVerification is true or similarity is reasonable, allow to continue
       if (!result.nameMatch) {
         logSystem.warn('Name mismatch during cedula verification', {
           userId: req.user?.id,
           registeredName: `${userNombre} ${userApellido}`,
           documentName: `${result.nombre} ${result.apellido}`,
-          similarity: result.nameSimilarity
+          similarity: result.nameSimilarity,
+          skipVerification
         });
+        
+        // If similarity is at least 30% or skipVerification is true, allow manual verification
+        const allowManualVerification = skipVerification || (result.nameSimilarity && result.nameSimilarity >= 0.3);
+        
+        if (allowManualVerification) {
+          logSystem.info('Allowing manual verification despite name mismatch', {
+            userId: req.user?.id,
+            similarity: result.nameSimilarity,
+            skipVerification
+          });
+          
+          // Save the image for manual review if authenticated
+          if (req.isAuthenticated() && image) {
+            try {
+              const timestamp = Date.now();
+              const filename = `cedula_manual_${req.user!.id}_${timestamp}.jpg`;
+              const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
+              
+              await storage.updateUser(req.user!.id, {
+                cedulaImageUrl: uploadResult.url,
+                cedula: result.cedula
+              });
+              
+              logSystem.info('Cedula saved for manual verification', { userId: req.user!.id });
+            } catch (uploadError) {
+              logSystem.warn('Failed to save cedula for manual verification', { 
+                userId: req.user!.id, 
+                error: uploadError 
+              });
+            }
+          }
+          
+          return res.json({
+            success: true,
+            cedula: result.cedula,
+            nombre: result.nombre,
+            apellido: result.apellido,
+            verified: false,
+            nameMatch: false,
+            manualVerificationRequired: true,
+            confidenceScore: result.confidenceScore,
+            similarity: result.nameSimilarity,
+            message: "Cédula escaneada. La verificación del nombre será revisada manualmente."
+          });
+        }
         
         return res.status(400).json({
           success: false,
