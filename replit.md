@@ -49,6 +49,12 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 2025 - Password Change Feature & Deployment Fixes
+- **Password Change in Profiles**: Added `POST /api/users/change-password` endpoint and `ChangePasswordModal` component. Both client and driver profiles now have a "Seguridad" section with "Cambiar Contraseña" button.
+- **CapRover Deployment Fixes**: Updated Dockerfile to include all VITE_ build-time variables (VITE_MAPBOX_ACCESS_TOKEN, VITE_VAPID_PUBLIC_KEY, VITE_API_URL). Updated DEPLOYMENT_CAPROVER.md with clear instructions on build-time vs runtime variables.
+- **Mobile Build Scripts Enhanced**: All 4 build scripts (cliente/conductor for Android/iOS) now export required VITE_ variables with validation warnings.
+- **Azul Integration Status**: Code is COMPLETE. Only missing production credentials (AZUL_MERCHANT_ID, AZUL_AUTH1, AZUL_AUTH2, etc.)
+
 ### December 2025 - Multi-Vehicle Operator Support
 - **Removed Vehicle-Specific Document Requirements**: Operators can now manage multiple tow trucks without needing to upload vehicle-specific documents (Matrícula del vehículo, Seguro de la grúa, Foto del vehículo) at the operator level. Vehicle documentation is managed per-vehicle in the `conductorVehiculos` table.
 - **Dynamic Map Marker Colors**: Admin monitoring page now displays tow truck markers with colors based on the operator's vehicle color input. The first active vehicle's color is used for map representation.
