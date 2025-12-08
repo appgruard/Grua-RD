@@ -90,6 +90,9 @@ export default function DriverDashboard() {
   const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
   const [locationReady, setLocationReady] = useState(false);
   const lastRouteCalcRef = useRef<number>(0);
+  const activeServiceRef = useRef<ServicioWithDetails | null>(null);
+  const currentLocationRef = useRef<Coordinates>({ lat: 18.4861, lng: -69.9312 });
+  const locationReadyRef = useRef(false);
   const [extendDestinationDialog, setExtendDestinationDialog] = useState<{
     open: boolean;
     serviceId: string | null;
@@ -129,6 +132,10 @@ export default function DriverDashboard() {
     initialData: initData?.activeService,
   });
 
+  useEffect(() => {
+    activeServiceRef.current = activeService || null;
+  }, [activeService]);
+
   const { send, connectionId } = useWebSocket(
     (message) => {
       if (message.type === 'new_request') {
@@ -137,6 +144,25 @@ export default function DriverDashboard() {
           title: 'Nueva solicitud',
           description: 'Hay una nueva solicitud de servicio cerca de ti',
         });
+      }
+      const currentActiveService = activeServiceRef.current;
+      if (message.type === 'service_status_change' && currentActiveService && message.payload.id === currentActiveService.id) {
+        const updatedService = message.payload as ServicioWithDetails;
+        queryClient.setQueryData(['/api/drivers/active-service'], updatedService);
+        activeServiceRef.current = updatedService;
+        
+        if (updatedService.destinoExtendidoLat && updatedService.destinoExtendidoLng && locationReadyRef.current) {
+          lastRouteCalcRef.current = 0;
+          const target: Coordinates = {
+            lat: parseFloat(updatedService.destinoExtendidoLat as string),
+            lng: parseFloat(updatedService.destinoExtendidoLng as string)
+          };
+          getDirections(currentLocationRef.current, target).then(result => {
+            if (result.geometry) {
+              setRouteGeometry(result.geometry as RouteGeometry);
+            }
+          }).catch(console.error);
+        }
       }
     },
     () => {
@@ -537,7 +563,9 @@ export default function DriverDashboard() {
 
   const handleLocationUpdate = useCallback((location: Coordinates) => {
     setCurrentLocation(location);
+    currentLocationRef.current = location;
     setLocationReady(true);
+    locationReadyRef.current = true;
     if (driverData?.id) {
       apiRequest('PUT', '/api/drivers/location', location);
     }

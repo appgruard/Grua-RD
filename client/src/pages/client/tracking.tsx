@@ -82,6 +82,7 @@ export default function ClientTracking() {
   const [hasShownCompletionFlow, setHasShownCompletionFlow] = useState(false);
   const [paymentStatusShown, setPaymentStatusShown] = useState(false);
   const lastRouteCalcRef = useRef<number>(0);
+  const driverLocationRef = useRef<Coordinates | null>(null);
   const { user } = useAuth();
 
   const searchParams = new URLSearchParams(searchString);
@@ -145,10 +146,9 @@ export default function ClientTracking() {
   const { send } = useWebSocket((message) => {
     if (message.type === 'driver_location_update' && message.payload.servicioId === serviceId) {
       const payload = message.payload as DriverLocationUpdate;
-      setDriverLocation({
-        lat: payload.lat,
-        lng: payload.lng,
-      });
+      const newDriverLocation = { lat: payload.lat, lng: payload.lng };
+      setDriverLocation(newDriverLocation);
+      driverLocationRef.current = newDriverLocation;
       setDriverInfo({
         speed: payload.speed,
         statusMessage: payload.statusMessage,
@@ -170,7 +170,7 @@ export default function ClientTracking() {
           target = { lat: parseFloat(service.origenLat as string), lng: parseFloat(service.origenLng as string) };
         }
         
-        getDirections({ lat: payload.lat, lng: payload.lng }, target).then(result => {
+        getDirections(newDriverLocation, target).then(result => {
           if (result.geometry) {
             setRouteGeometry(result.geometry as RouteGeometry);
           }
@@ -187,13 +187,14 @@ export default function ClientTracking() {
       
       queryClient.setQueryData(['/api/services', serviceId], updatedService);
       
-      if (updatedService.destinoExtendidoLat && updatedService.destinoExtendidoLng && driverLocation) {
+      const currentDriverLocation = driverLocationRef.current;
+      if (updatedService.destinoExtendidoLat && updatedService.destinoExtendidoLng && currentDriverLocation) {
         const target: Coordinates = {
           lat: parseFloat(updatedService.destinoExtendidoLat as string),
           lng: parseFloat(updatedService.destinoExtendidoLng as string)
         };
         lastRouteCalcRef.current = Date.now();
-        getDirections(driverLocation, target).then(result => {
+        getDirections(currentDriverLocation, target).then(result => {
           if (result.geometry) {
             setRouteGeometry(result.geometry as RouteGeometry);
           }
