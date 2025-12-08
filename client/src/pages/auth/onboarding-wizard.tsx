@@ -78,13 +78,38 @@ export default function OnboardingWizard() {
   const [showCamera, setShowCamera] = useState(false);
   const [cedulaVerified, setCedulaVerified] = useState(false);
   
+  // Track userType changes to distinguish user-initiated vs hydration changes
+  const userTypeChangeCountRef = useRef(0);
+  const lastSyncedUserTypeRef = useRef<string | null>(null);
+  
   // Check if user already has cedula saved (for page refresh persistence)
+  // This runs once when user data is available to restore verification state
   useEffect(() => {
-    if (user && (user as any).cedula && formData.userType === 'conductor') {
-      setCedulaVerified(true);
-      updateField('cedula', (user as any).cedula);
+    if (user && !authLoading && lastSyncedUserTypeRef.current === null) {
+      const userData = user as any;
+      const syncedUserType = userData.userType || 'cliente';
+      
+      // Mark this userType as the initial synced value (prevents reset effect)
+      lastSyncedUserTypeRef.current = syncedUserType;
+      
+      // Sync userType from authenticated user
+      if (syncedUserType !== formData.userType) {
+        setFormData(prev => ({ ...prev, userType: syncedUserType }));
+      }
+      
+      // Check if driver already has cedula saved or verified
+      if (syncedUserType === 'conductor') {
+        if (userData.cedulaVerificada || userData.cedula || userData.cedulaImageUrl) {
+          setCedulaVerified(true);
+          if (userData.cedula) {
+            setFormData(prev => ({ ...prev, cedula: userData.cedula }));
+          }
+          // Mark step 2 as completed if cedula exists
+          setCompletedSteps(prev => new Set(prev).add(2));
+        }
+      }
     }
-  }, [user]);
+  }, [user, authLoading]);
   const [ocrScore, setOcrScore] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -127,8 +152,19 @@ export default function OnboardingWizard() {
     setShowCamera(false);
   };
 
-  // Reset OCR state when user type changes
+  // Reset OCR state when user type changes (only for user-initiated changes, not hydration)
   useEffect(() => {
+    // Track change count
+    userTypeChangeCountRef.current += 1;
+    
+    // Skip first change (initial mount) and skip if this matches the synced userType
+    if (userTypeChangeCountRef.current <= 1) return;
+    if (lastSyncedUserTypeRef.current === formData.userType) {
+      // Clear the ref after using it to allow future changes from same type to reset
+      lastSyncedUserTypeRef.current = null;
+      return;
+    }
+    
     setCedulaVerified(false);
     setOcrScore(null);
     setCapturedImage(null);

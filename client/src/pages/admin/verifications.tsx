@@ -1052,7 +1052,7 @@ export default function AdminVerifications() {
                   </label>
                   <div className="border rounded-lg overflow-hidden bg-muted/30">
                     <img 
-                      src={`/api/documents/view/${encodeURIComponent(selectedCedulaUser.cedulaImageUrl)}`}
+                      src={`/api/admin/cedula-image/${selectedCedulaUser.id}`}
                       alt="Cédula del usuario"
                       className="w-full max-h-[400px] object-contain"
                       data-testid="img-cedula-preview"

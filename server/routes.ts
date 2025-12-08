@@ -4957,6 +4957,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve cedula image from object storage (admin only)
+  app.get("/api/admin/cedula-image/:userId", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { userId } = req.params;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.cedulaImageUrl) {
+        return res.status(404).json({ message: "No cedula image available for this user" });
+      }
+
+      // Download the image from object storage
+      const imageBuffer = await storageService.downloadFile(user.cedulaImageUrl);
+      
+      // Determine content type based on file extension
+      const contentType = user.cedulaImageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.send(imageBuffer);
+    } catch (error: any) {
+      logSystem.error('Get cedula image error', error);
+      res.status(500).json({ message: "Failed to retrieve cedula image" });
+    }
+  });
+
   app.post("/api/pricing/calculate", pricingLimiter, async (req: Request, res: Response) => {
     try {
       const { distanceKm, servicioCategoria, servicioSubtipo } = req.body;
