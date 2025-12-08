@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect, memo, useRef, useCallback } from 'react';
 import { Loader2, MapPin } from 'lucide-react';
-import type { Coordinates, MarkerType } from './MapboxMap';
+import type { Coordinates, MarkerType, MapMarker } from './MapboxMap';
 import type { RouteGeometry } from '@/lib/maps';
 
 const MapboxMapLazy = lazy(() => import('./MapboxMap').then(module => ({ default: module.MapboxMap })));
@@ -8,15 +8,10 @@ const MapboxMapLazy = lazy(() => import('./MapboxMap').then(module => ({ default
 interface LazyMapboxMapProps {
   center: Coordinates;
   zoom?: number;
-  markers?: Array<{
-    position: Coordinates;
-    title?: string;
-    icon?: string;
-    color?: string;
-    type?: MarkerType;
-  }>;
+  markers?: MapMarker[];
   onMapClick?: (coordinates: Coordinates) => void;
   onAddressChange?: (address: string) => void;
+  onMarkerDragEnd?: (markerId: string, coordinates: Coordinates, address: string) => void;
   className?: string;
   showHeatmap?: boolean;
   heatmapData?: Array<{ lat: number; lng: number; weight: number }>;
@@ -46,6 +41,7 @@ function LazyMapboxMapInner({
   markers = [],
   onMapClick,
   onAddressChange,
+  onMarkerDragEnd,
   className = 'w-full h-full',
   showHeatmap = false,
   heatmapData = [],
@@ -116,6 +112,7 @@ function LazyMapboxMapInner({
         markers={markers}
         onMapClick={onMapClick}
         onAddressChange={onAddressChange}
+        onMarkerDragEnd={onMarkerDragEnd}
         className={className}
         showHeatmap={showHeatmap}
         heatmapData={heatmapData}
