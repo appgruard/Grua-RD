@@ -7,8 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2, IdCard, CheckCircle2, AlertCircle, Truck, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
 import ClientPaymentMethods from '@/components/ClientPaymentMethods';
@@ -113,29 +112,6 @@ export default function ClientProfile() {
     }
   };
 
-  const becomeDriverMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/drivers/become-driver');
-      return response.json();
-    },
-    onSuccess: async (data) => {
-      await refreshUser();
-      toast({
-        title: 'Cuenta actualizada',
-        description: data.message,
-      });
-      if (data.redirectTo) {
-        setLocation(data.redirectTo);
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
 
   if (!user) return null;
 
@@ -351,27 +327,17 @@ export default function ClientProfile() {
                 <Truck className="w-6 h-6 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold mb-1">¿Quieres ser conductor?</h3>
+                <h3 className="text-base font-semibold mb-1">¿También quieres ser conductor?</h3>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Conviértete en conductor de grúa y comienza a ganar dinero con tu vehículo.
+                  Crea una cuenta de conductor adicional y comienza a ganar dinero con tu vehículo. Podrás alternar entre ambas cuentas.
                 </p>
                 <Button 
-                  onClick={() => becomeDriverMutation.mutate()}
-                  disabled={becomeDriverMutation.isPending}
+                  onClick={() => setLocation('/auth/onboarding-wizard?tipo=conductor')}
                   className="w-full"
                   data-testid="button-become-driver"
                 >
-                  {becomeDriverMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Procesando...
-                    </>
-                  ) : (
-                    <>
-                      <Truck className="w-4 h-4 mr-2" />
-                      Convertirme en Conductor
-                    </>
-                  )}
+                  <Truck className="w-4 h-4 mr-2" />
+                  Crear cuenta de Conductor
                 </Button>
               </div>
             </div>

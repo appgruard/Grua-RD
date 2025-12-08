@@ -55,9 +55,14 @@ export default function OnboardingWizard() {
   const { register, user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   
+  // Read ?tipo= query parameter to pre-select user type
+  const urlParams = new URLSearchParams(window.location.search);
+  const preselectedType = urlParams.get('tipo') as UserType | null;
+  const isAddingSecondaryAccount = preselectedType === 'conductor' || preselectedType === 'cliente';
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<OnboardingData>({
-    email: '', password: '', userType: 'cliente', cedula: '', phone: '',
+    email: '', password: '', userType: preselectedType || 'cliente', cedula: '', phone: '',
     otpCode: '', nombre: '', apellido: '', licencia: '',
     placaGrua: '', marcaGrua: '', modeloGrua: '',
   });

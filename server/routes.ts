@@ -731,15 +731,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existingUser = await storage.getUserByEmail(userData.email);
       if (existingUser) {
-        logAuth.registerFailed(userData.email, "Email already registered");
-        return res.status(400).json({ message: "Email ya está registrado" });
+        // Allow registration with same email if it's for a different account type
+        const requestedType = userType || 'cliente';
+        if (existingUser.userType === requestedType) {
+          logAuth.registerFailed(userData.email, "Email already registered for same account type");
+          return res.status(400).json({ message: "Ya tienes una cuenta de este tipo con este correo" });
+        }
+        // User is creating a secondary account of a different type - allowed
+        logSystem.info("User creating secondary account with same email", {
+          existingType: existingUser.userType,
+          newType: requestedType,
+          email: userData.email
+        });
       }
 
       if (userData.phone) {
         const existingPhone = await storage.getUserByPhone(userData.phone);
         if (existingPhone) {
-          logAuth.registerFailed(userData.email, "Phone already registered");
-          return res.status(400).json({ message: "Teléfono ya está registrado" });
+          // Allow same phone for different account types
+          const requestedType = userType || 'cliente';
+          if (existingPhone.userType === requestedType) {
+            logAuth.registerFailed(userData.email, "Phone already registered for same account type");
+            return res.status(400).json({ message: "Ya tienes una cuenta de este tipo con este teléfono" });
+          }
+          // User is creating a secondary account with different type - allowed
+          logSystem.info("User creating secondary account with same phone", {
+            existingType: existingPhone.userType,
+            newType: requestedType,
+            phone: userData.phone
+          });
         }
       }
 
