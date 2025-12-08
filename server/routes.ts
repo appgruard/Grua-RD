@@ -3980,6 +3980,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint for driver to extend destination up to 1.5km beyond original destination
+  const extendDestinationSchema = z.object({
+    destinoExtendidoLat: z.number().finite().min(-90).max(90),
+    destinoExtendidoLng: z.number().finite().min(-180).max(180),
+    destinoExtendidoDireccion: z.string().min(1).max(500),
+  });
+
+  app.post("/api/services/:id/extend-destination", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const servicioId = req.params.id;
+      const servicio = await storage.getServicioById(servicioId);
+      
+      if (!servicio) {
+        return res.status(404).json({ message: "Servicio no encontrado" });
+      }
+
+      if (servicio.conductorId !== req.user!.id) {
+        return res.status(403).json({ message: "Solo el conductor asignado puede extender el destino" });
+      }
+
+      if (servicio.estado !== 'en_progreso') {
+        return res.status(400).json({ message: "Solo se puede extender el destino cuando el servicio está en progreso" });
+      }
+
+      const parseResult = extendDestinationSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          message: "Datos de extensión inválidos",
+          errors: parseResult.error.issues
+        });
+      }
+
+      const { destinoExtendidoLat, destinoExtendidoLng, destinoExtendidoDireccion } = parseResult.data;
+
+      // Calculate distance from original destination to extended destination
+      const originalDestLat = parseFloat(servicio.destinoLat);
+      const originalDestLng = parseFloat(servicio.destinoLng);
+      
+      // Haversine formula to calculate distance in km
+      const toRad = (deg: number) => deg * (Math.PI / 180);
+      const R = 6371; // Earth's radius in km
+      const dLat = toRad(destinoExtendidoLat - originalDestLat);
+      const dLng = toRad(destinoExtendidoLng - originalDestLng);
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(originalDestLat)) * Math.cos(toRad(destinoExtendidoLat)) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const extensionKm = R * c;
+
+      // Maximum extension is 1.5km
+      const MAX_EXTENSION_KM = 1.5;
+      if (extensionKm > MAX_EXTENSION_KM) {
+        return res.status(400).json({ 
+          message: `La extensión máxima permitida es ${MAX_EXTENSION_KM}km. La distancia solicitada es ${extensionKm.toFixed(2)}km.`,
+          maxExtensionKm: MAX_EXTENSION_KM,
+          requestedExtensionKm: extensionKm
+        });
+      }
+
+      const updatedServicio = await storage.updateServicio(servicioId, {
+        destinoExtendidoLat: destinoExtendidoLat.toString(),
+        destinoExtendidoLng: destinoExtendidoLng.toString(),
+        destinoExtendidoDireccion,
+        distanciaExtensionKm: extensionKm.toFixed(2),
+        extensionAprobada: true,
+      });
+
+      logSystem.info('Service destination extended', {
+        servicioId,
+        conductorId: req.user!.id,
+        extensionKm: extensionKm.toFixed(2),
+        newDestination: destinoExtendidoDireccion
+      });
+
+      // Notify client about the extension
+      if (servicio.clienteId) {
+        await pushService.sendToUser(servicio.clienteId, {
+          title: 'Destino extendido',
+          body: `El operador ha extendido el destino ${extensionKm.toFixed(1)}km adicional a: ${destinoExtendidoDireccion}`,
+          data: { type: 'destination_extended', servicioId }
+        });
+      }
+
+      // Broadcast update to connected clients
+      if (serviceSessions.has(servicioId)) {
+        const broadcast = JSON.stringify({
+          type: 'service_status_change',
+          payload: updatedServicio,
+        });
+        serviceSessions.get(servicioId)!.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcast);
+          }
+        });
+      }
+
+      res.json({
+        success: true,
+        servicio: updatedServicio,
+        extensionKm: extensionKm.toFixed(2)
+      });
+    } catch (error: any) {
+      logSystem.error('Extend destination error', error, { servicioId: req.params.id });
+      res.status(500).json({ message: "Error al extender el destino" });
+    }
+  });
+
   app.post("/api/services/:id/confirm-payment", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "No autenticado" });
