@@ -222,7 +222,7 @@ class FilesystemStorageProvider implements StorageProvider {
 
     return {
       key,
-      url: `/api/storage/files/${key}`,
+      url: key,
       fileName: options.originalName,
       fileSize: options.buffer.length,
       mimeType: options.mimeType,
@@ -393,4 +393,12 @@ export async function checkStorageHealth(): Promise<{
 
 export function getFilesystemProvider(): FilesystemStorageProvider {
   return filesystemProvider;
+}
+
+export function getPublicUrl(key: string): string {
+  const provider = getStorageProvider();
+  if (provider.name === 'filesystem') {
+    return `/api/storage/files/${key}`;
+  }
+  return key;
 }

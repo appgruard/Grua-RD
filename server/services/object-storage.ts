@@ -8,6 +8,7 @@ export {
   validateFile,
   getActiveProviderName,
   getFilesystemProvider,
+  getPublicUrl,
   type StorageResult as UploadResult,
   type StorageUploadOptions as UploadOptions,
 } from './storage-provider';
