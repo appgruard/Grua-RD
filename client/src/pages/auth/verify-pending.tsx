@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Loader2, IdCard, Mail, CheckCircle2, AlertCircle, 
   Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, 
@@ -363,6 +364,37 @@ export default function VerifyPending() {
   const totalSteps = steps.length;
   const progress = Math.round((completedSteps / totalSteps) * 100);
   const currentStepIndex = steps.findIndex(s => s.current);
+
+  // Helper function to determine the next verification step
+  const getNextStep = useCallback((completedStep: VerificationStep): VerificationStep => {
+    if (!isDriver) {
+      // Client flow: cedula -> email -> complete
+      if (completedStep === 'cedula') return 'email';
+      return 'complete';
+    }
+    
+    // Driver flow: cedula -> email -> photo -> license -> categories -> vehicles -> complete
+    const driverSteps: VerificationStep[] = ['cedula', 'email', 'photo', 'license', 'categories', 'vehicles', 'complete'];
+    const currentIndex = driverSteps.indexOf(completedStep);
+    
+    if (currentIndex < driverSteps.length - 1) {
+      return driverSteps[currentIndex + 1];
+    }
+    
+    return 'complete';
+  }, [isDriver]);
+
+  // Animation variants for step transitions
+  const stepVariants = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 }
+  };
+
+  const stepTransition = {
+    duration: 0.3,
+    ease: 'easeInOut'
+  };
 
   const convertToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -998,70 +1030,80 @@ export default function VerifyPending() {
               </div>
             </CardHeader>
             
-            {!cedulaVerified && currentStep === 'cedula' && (
-              <CardContent className="space-y-4">
-                {errors.cedula && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{errors.cedula}</AlertDescription>
-                  </Alert>
-                )}
+            <AnimatePresence mode="wait">
+              {!cedulaVerified && currentStep === 'cedula' && (
+                <motion.div
+                  key="cedula-content"
+                  initial={stepVariants.initial}
+                  animate={stepVariants.animate}
+                  exit={stepVariants.exit}
+                  transition={stepTransition}
+                >
+                  <CardContent className="space-y-4">
+                    {errors.cedula && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{errors.cedula}</AlertDescription>
+                      </Alert>
+                    )}
 
-                {showCamera ? (
-                  <div className="space-y-4">
-                    <div className="relative aspect-[4/3] bg-black rounded-lg overflow-hidden">
-                      <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="border-2 border-dashed border-white/50 rounded-lg w-[90%] h-[70%] flex items-center justify-center">
-                          <ScanLine className="w-12 h-12 text-white/70 animate-pulse" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button onClick={capturePhoto} className="flex-1" disabled={isScanning} data-testid="button-capture">
-                        {isScanning ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</> : <><Camera className="w-4 h-4 mr-2" />Capturar</>}
-                      </Button>
-                      <Button variant="outline" onClick={stopCamera} data-testid="button-cancel-camera">Cancelar</Button>
-                    </div>
-                  </div>
-                ) : capturedImage ? (
-                  <div className="space-y-4">
-                    <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted">
-                      <img src={capturedImage} alt="Cédula capturada" className="w-full h-full object-contain" />
-                      {isScanning && (
-                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                          <div className="text-center">
-                            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                            <p className="text-sm">Escaneando documento...</p>
+                    {showCamera ? (
+                      <div className="space-y-4">
+                        <div className="relative aspect-[4/3] bg-black rounded-lg overflow-hidden">
+                          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="border-2 border-dashed border-white/50 rounded-lg w-[90%] h-[70%] flex items-center justify-center">
+                              <ScanLine className="w-12 h-12 text-white/70 animate-pulse" />
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                    <Button variant="outline" onClick={resetScan} className="w-full" data-testid="button-reset-scan">
-                      <RefreshCcw className="w-4 h-4 mr-2" />Tomar otra foto
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button variant="outline" onClick={startCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-camera">
-                        <Camera className="w-8 h-8" />
-                        <span className="text-sm">Usar cámara</span>
-                      </Button>
-                      <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-file">
-                        <Upload className="w-8 h-8" />
-                        <span className="text-sm">Subir imagen</span>
-                      </Button>
-                    </div>
-                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" data-testid="input-file-cedula" />
-                    <p className="text-xs text-center text-muted-foreground">
-                      Coloca tu cédula sobre una superficie plana y bien iluminada
-                    </p>
-                  </div>
-                )}
-                <canvas ref={canvasRef} className="hidden" />
-              </CardContent>
-            )}
+                        <div className="flex gap-2">
+                          <Button onClick={capturePhoto} className="flex-1" disabled={isScanning} data-testid="button-capture">
+                            {isScanning ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</> : <><Camera className="w-4 h-4 mr-2" />Capturar</>}
+                          </Button>
+                          <Button variant="outline" onClick={stopCamera} data-testid="button-cancel-camera">Cancelar</Button>
+                        </div>
+                      </div>
+                    ) : capturedImage ? (
+                      <div className="space-y-4">
+                        <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted">
+                          <img src={capturedImage} alt="Cédula capturada" className="w-full h-full object-contain" />
+                          {isScanning && (
+                            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                              <div className="text-center">
+                                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                                <p className="text-sm">Escaneando documento...</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <Button variant="outline" onClick={resetScan} className="w-full" data-testid="button-reset-scan">
+                          <RefreshCcw className="w-4 h-4 mr-2" />Tomar otra foto
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button variant="outline" onClick={startCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-camera">
+                            <Camera className="w-8 h-8" />
+                            <span className="text-sm">Usar cámara</span>
+                          </Button>
+                          <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-file">
+                            <Upload className="w-8 h-8" />
+                            <span className="text-sm">Subir imagen</span>
+                          </Button>
+                        </div>
+                        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" data-testid="input-file-cedula" />
+                        <p className="text-xs text-center text-muted-foreground">
+                          Coloca tu cédula sobre una superficie plana y bien iluminada
+                        </p>
+                      </div>
+                    )}
+                    <canvas ref={canvasRef} className="hidden" />
+                  </CardContent>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Card>
 
           <Card className={cn(
@@ -1095,67 +1137,77 @@ export default function VerifyPending() {
               </div>
             </CardHeader>
             
-            {!emailVerified && currentStep === 'email' && cedulaVerified && (
-              <CardContent className="space-y-4">
-                {errors.otp && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{errors.otp}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Enviaremos un código a:</p>
-                  <p className="font-medium">{currentUser?.email}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="otp">Código de verificación</Label>
-                  <Input
-                    id="otp"
-                    placeholder="Ingresa el código de 6 dígitos"
-                    value={otpCode}
-                    onChange={(e) => {
-                      setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
-                      setErrors({});
-                    }}
-                    maxLength={6}
-                    className="text-center text-lg tracking-widest"
-                    data-testid="input-otp-code"
-                  />
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => sendOtpMutation.mutate()}
-                    disabled={otpTimer > 0 || sendOtpMutation.isPending}
-                    className="flex-1"
-                    data-testid="button-send-otp"
-                  >
-                    {sendOtpMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : otpTimer > 0 ? (
-                      `Reenviar en ${otpTimer}s`
-                    ) : (
-                      'Enviar código'
+            <AnimatePresence mode="wait">
+              {!emailVerified && currentStep === 'email' && cedulaVerified && (
+                <motion.div
+                  key="email-content"
+                  initial={stepVariants.initial}
+                  animate={stepVariants.animate}
+                  exit={stepVariants.exit}
+                  transition={stepTransition}
+                >
+                  <CardContent className="space-y-4">
+                    {errors.otp && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{errors.otp}</AlertDescription>
+                      </Alert>
                     )}
-                  </Button>
-                  <Button
-                    onClick={() => verifyOtpMutation.mutate()}
-                    disabled={otpCode.length !== 6 || verifyOtpMutation.isPending}
-                    className="flex-1"
-                    data-testid="button-verify-otp"
-                  >
-                    {verifyOtpMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Verificar'
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            )}
+
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-1">Enviaremos un código a:</p>
+                      <p className="font-medium">{currentUser?.email}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="otp">Código de verificación</Label>
+                      <Input
+                        id="otp"
+                        placeholder="Ingresa el código de 6 dígitos"
+                        value={otpCode}
+                        onChange={(e) => {
+                          setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                          setErrors({});
+                        }}
+                        maxLength={6}
+                        className="text-center text-lg tracking-widest"
+                        data-testid="input-otp-code"
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => sendOtpMutation.mutate()}
+                        disabled={otpTimer > 0 || sendOtpMutation.isPending}
+                        className="flex-1"
+                        data-testid="button-send-otp"
+                      >
+                        {sendOtpMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : otpTimer > 0 ? (
+                          `Reenviar en ${otpTimer}s`
+                        ) : (
+                          'Enviar código'
+                        )}
+                      </Button>
+                      <Button
+                        onClick={() => verifyOtpMutation.mutate()}
+                        disabled={otpCode.length !== 6 || verifyOtpMutation.isPending}
+                        className="flex-1"
+                        data-testid="button-verify-otp"
+                      >
+                        {verifyOtpMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Verificar'
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Card>
 
           {isDriver && (
@@ -1190,71 +1242,81 @@ export default function VerifyPending() {
                 </div>
               </CardHeader>
               
-              {!photoVerified && currentStep === 'photo' && cedulaVerified && emailVerified && (
-                <CardContent className="space-y-4">
-                  {errors.profilePhoto && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{errors.profilePhoto}</AlertDescription>
-                    </Alert>
-                  )}
+              <AnimatePresence mode="wait">
+                {!photoVerified && currentStep === 'photo' && cedulaVerified && emailVerified && (
+                  <motion.div
+                    key="photo-content"
+                    initial={stepVariants.initial}
+                    animate={stepVariants.animate}
+                    exit={stepVariants.exit}
+                    transition={stepTransition}
+                  >
+                    <CardContent className="space-y-4">
+                      {errors.profilePhoto && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{errors.profilePhoto}</AlertDescription>
+                        </Alert>
+                      )}
 
-                  {showProfileCamera ? (
-                    <div className="space-y-4">
-                      <div className="relative mx-auto w-48 h-48 rounded-full overflow-hidden bg-black">
-                        <video ref={profileVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className="border-2 border-dashed border-white/50 rounded-full w-40 h-40" />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={captureProfilePhotoFromVideo} className="flex-1" disabled={isValidatingPhoto} data-testid="button-capture-profile">
-                          {isValidatingPhoto ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</> : <><Camera className="w-4 h-4 mr-2" />Capturar</>}
-                        </Button>
-                        <Button variant="outline" onClick={stopProfileCamera} data-testid="button-cancel-profile-camera">Cancelar</Button>
-                      </div>
-                    </div>
-                  ) : profilePhotoImage ? (
-                    <div className="space-y-4">
-                      <div className="relative mx-auto w-48 h-48 rounded-full overflow-hidden bg-muted">
-                        <img src={profilePhotoImage} alt="Foto de perfil" className="w-full h-full object-cover" />
-                        {isValidatingPhoto && (
-                          <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                            <div className="text-center">
-                              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                              <p className="text-sm">Verificando foto...</p>
+                      {showProfileCamera ? (
+                        <div className="space-y-4">
+                          <div className="relative mx-auto w-48 h-48 rounded-full overflow-hidden bg-black">
+                            <video ref={profileVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="border-2 border-dashed border-white/50 rounded-full w-40 h-40" />
                             </div>
                           </div>
-                        )}
-                      </div>
-                      <Button variant="outline" onClick={resetProfilePhoto} className="w-full" data-testid="button-reset-profile-photo">
-                        <RefreshCcw className="w-4 h-4 mr-2" />Tomar otra foto
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="mx-auto w-32 h-32 rounded-full bg-muted flex items-center justify-center">
-                        <UserCircle className="w-16 h-16 text-muted-foreground" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button variant="outline" onClick={startProfileCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-profile-camera">
-                          <Camera className="w-8 h-8" />
-                          <span className="text-sm">Usar cámara</span>
-                        </Button>
-                        <Button variant="outline" onClick={() => profileFileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-profile-file">
-                          <Upload className="w-8 h-8" />
-                          <span className="text-sm">Subir imagen</span>
-                        </Button>
-                      </div>
-                      <input ref={profileFileInputRef} type="file" accept="image/*" onChange={handleProfileFileSelect} className="hidden" data-testid="input-file-profile" />
-                      <p className="text-xs text-center text-muted-foreground">
-                        Asegúrate de que tu rostro sea visible y esté bien iluminado
-                      </p>
-                    </div>
-                  )}
-                  <canvas ref={profileCanvasRef} className="hidden" />
-                </CardContent>
-              )}
+                          <div className="flex gap-2">
+                            <Button onClick={captureProfilePhotoFromVideo} className="flex-1" disabled={isValidatingPhoto} data-testid="button-capture-profile">
+                              {isValidatingPhoto ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</> : <><Camera className="w-4 h-4 mr-2" />Capturar</>}
+                            </Button>
+                            <Button variant="outline" onClick={stopProfileCamera} data-testid="button-cancel-profile-camera">Cancelar</Button>
+                          </div>
+                        </div>
+                      ) : profilePhotoImage ? (
+                        <div className="space-y-4">
+                          <div className="relative mx-auto w-48 h-48 rounded-full overflow-hidden bg-muted">
+                            <img src={profilePhotoImage} alt="Foto de perfil" className="w-full h-full object-cover" />
+                            {isValidatingPhoto && (
+                              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                                <div className="text-center">
+                                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                                  <p className="text-sm">Verificando foto...</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <Button variant="outline" onClick={resetProfilePhoto} className="w-full" data-testid="button-reset-profile-photo">
+                            <RefreshCcw className="w-4 h-4 mr-2" />Tomar otra foto
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="mx-auto w-32 h-32 rounded-full bg-muted flex items-center justify-center">
+                            <UserCircle className="w-16 h-16 text-muted-foreground" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <Button variant="outline" onClick={startProfileCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-profile-camera">
+                              <Camera className="w-8 h-8" />
+                              <span className="text-sm">Usar cámara</span>
+                            </Button>
+                            <Button variant="outline" onClick={() => profileFileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-profile-file">
+                              <Upload className="w-8 h-8" />
+                              <span className="text-sm">Subir imagen</span>
+                            </Button>
+                          </div>
+                          <input ref={profileFileInputRef} type="file" accept="image/*" onChange={handleProfileFileSelect} className="hidden" data-testid="input-file-profile" />
+                          <p className="text-xs text-center text-muted-foreground">
+                            Asegúrate de que tu rostro sea visible y esté bien iluminado
+                          </p>
+                        </div>
+                      )}
+                      <canvas ref={profileCanvasRef} className="hidden" />
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
           )}
 
@@ -1290,87 +1352,97 @@ export default function VerifyPending() {
                 </div>
               </CardHeader>
               
-              {!licenseVerified && currentStep === 'license' && cedulaVerified && emailVerified && photoVerified && (
-                <CardContent className="space-y-4">
-                  {errors.license && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{errors.license}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="grid gap-4">
-                    <div>
-                      <p className="text-sm font-medium mb-2">Parte Frontal de la Licencia</p>
-                      {licenseFrontUrl ? (
-                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                          <img src={licenseFrontUrl} alt="Licencia frontal" className="w-full h-full object-contain" />
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="absolute top-2 right-2"
-                            onClick={() => setLicenseFrontUrl(null)}
-                            data-testid="button-remove-license-front"
-                          >
-                            Cambiar
-                          </Button>
-                        </div>
-                      ) : (
-                        <FileUpload
-                          label=""
-                          helperText="Arrastra o selecciona la parte frontal de tu licencia"
-                          onFileSelect={(file) => handleLicenseUpload(file, 'licencia')}
-                          disabled={isUploadingLicense}
-                        />
-                      )}
-                      {errors.licencia && (
-                        <p className="text-sm text-destructive mt-1">{errors.licencia}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-medium mb-2">Parte Trasera de la Licencia</p>
-                      {licenseBackUrl ? (
-                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                          <img src={licenseBackUrl} alt="Licencia trasera" className="w-full h-full object-contain" />
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="absolute top-2 right-2"
-                            onClick={() => setLicenseBackUrl(null)}
-                            data-testid="button-remove-license-back"
-                          >
-                            Cambiar
-                          </Button>
-                        </div>
-                      ) : (
-                        <FileUpload
-                          label=""
-                          helperText="Arrastra o selecciona la parte trasera de tu licencia"
-                          onFileSelect={(file) => handleLicenseUpload(file, 'licencia_trasera')}
-                          disabled={isUploadingLicense}
-                        />
-                      )}
-                      {errors.licencia_trasera && (
-                        <p className="text-sm text-destructive mt-1">{errors.licencia_trasera}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <Button 
-                    onClick={handleLicenseContinue} 
-                    className="w-full"
-                    disabled={!licenseFrontUrl || !licenseBackUrl || isUploadingLicense}
-                    data-testid="button-continue-license"
+              <AnimatePresence mode="wait">
+                {!licenseVerified && currentStep === 'license' && cedulaVerified && emailVerified && photoVerified && (
+                  <motion.div
+                    key="license-content"
+                    initial={stepVariants.initial}
+                    animate={stepVariants.animate}
+                    exit={stepVariants.exit}
+                    transition={stepTransition}
                   >
-                    {isUploadingLicense ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
-                    ) : (
-                      <>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
-                    )}
-                  </Button>
-                </CardContent>
-              )}
+                    <CardContent className="space-y-4">
+                      {errors.license && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{errors.license}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="grid gap-4">
+                        <div>
+                          <p className="text-sm font-medium mb-2">Parte Frontal de la Licencia</p>
+                          {licenseFrontUrl ? (
+                            <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                              <img src={licenseFrontUrl} alt="Licencia frontal" className="w-full h-full object-contain" />
+                              <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                className="absolute top-2 right-2"
+                                onClick={() => setLicenseFrontUrl(null)}
+                                data-testid="button-remove-license-front"
+                              >
+                                Cambiar
+                              </Button>
+                            </div>
+                          ) : (
+                            <FileUpload
+                              label=""
+                              helperText="Arrastra o selecciona la parte frontal de tu licencia"
+                              onFileSelect={(file) => handleLicenseUpload(file, 'licencia')}
+                              disabled={isUploadingLicense}
+                            />
+                          )}
+                          {errors.licencia && (
+                            <p className="text-sm text-destructive mt-1">{errors.licencia}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-medium mb-2">Parte Trasera de la Licencia</p>
+                          {licenseBackUrl ? (
+                            <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                              <img src={licenseBackUrl} alt="Licencia trasera" className="w-full h-full object-contain" />
+                              <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                className="absolute top-2 right-2"
+                                onClick={() => setLicenseBackUrl(null)}
+                                data-testid="button-remove-license-back"
+                              >
+                                Cambiar
+                              </Button>
+                            </div>
+                          ) : (
+                            <FileUpload
+                              label=""
+                              helperText="Arrastra o selecciona la parte trasera de tu licencia"
+                              onFileSelect={(file) => handleLicenseUpload(file, 'licencia_trasera')}
+                              disabled={isUploadingLicense}
+                            />
+                          )}
+                          {errors.licencia_trasera && (
+                            <p className="text-sm text-destructive mt-1">{errors.licencia_trasera}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <Button 
+                        onClick={handleLicenseContinue} 
+                        className="w-full"
+                        disabled={!licenseFrontUrl || !licenseBackUrl || isUploadingLicense}
+                        data-testid="button-continue-license"
+                      >
+                        {isUploadingLicense ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
+                        ) : (
+                          <>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
           )}
 
@@ -1406,35 +1478,45 @@ export default function VerifyPending() {
                 </div>
               </CardHeader>
               
-              {!categoriesVerified && currentStep === 'categories' && cedulaVerified && emailVerified && photoVerified && licenseVerified && (
-                <CardContent className="space-y-4">
-                  {errors.categories && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{errors.categories}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <ServiceCategoryMultiSelect
-                    value={selectedCategories}
-                    onChange={setSelectedCategories}
-                    disabled={isSavingCategories}
-                  />
-
-                  <Button 
-                    onClick={handleSaveCategories} 
-                    className="w-full"
-                    disabled={selectedCategories.length === 0 || isSavingCategories}
-                    data-testid="button-save-categories"
+              <AnimatePresence mode="wait">
+                {!categoriesVerified && currentStep === 'categories' && cedulaVerified && emailVerified && photoVerified && licenseVerified && (
+                  <motion.div
+                    key="categories-content"
+                    initial={stepVariants.initial}
+                    animate={stepVariants.animate}
+                    exit={stepVariants.exit}
+                    transition={stepTransition}
                   >
-                    {isSavingCategories ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
-                    ) : (
-                      <>Guardar y Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
-                    )}
-                  </Button>
-                </CardContent>
-              )}
+                    <CardContent className="space-y-4">
+                      {errors.categories && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{errors.categories}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <ServiceCategoryMultiSelect
+                        value={selectedCategories}
+                        onChange={setSelectedCategories}
+                        disabled={isSavingCategories}
+                      />
+
+                      <Button 
+                        onClick={handleSaveCategories} 
+                        className="w-full"
+                        disabled={selectedCategories.length === 0 || isSavingCategories}
+                        data-testid="button-save-categories"
+                      >
+                        {isSavingCategories ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                        ) : (
+                          <>Guardar y Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
           )}
 
@@ -1470,37 +1552,47 @@ export default function VerifyPending() {
                 </div>
               </CardHeader>
               
-              {!vehiclesVerified && currentStep === 'vehicles' && cedulaVerified && emailVerified && photoVerified && licenseVerified && categoriesVerified && (
-                <CardContent className="space-y-4">
-                  {errors.vehicles && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{errors.vehicles}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <VehicleCategoryForm
-                    selectedCategories={selectedCategories.map(c => c.categoria)}
-                    vehicles={vehicles}
-                    onChange={setVehicles}
-                    disabled={isSavingVehicles}
-                    errors={errors}
-                  />
-
-                  <Button 
-                    onClick={handleSaveVehicles} 
-                    className="w-full"
-                    disabled={isSavingVehicles}
-                    data-testid="button-complete-registration"
+              <AnimatePresence mode="wait">
+                {!vehiclesVerified && currentStep === 'vehicles' && cedulaVerified && emailVerified && photoVerified && licenseVerified && categoriesVerified && (
+                  <motion.div
+                    key="vehicles-content"
+                    initial={stepVariants.initial}
+                    animate={stepVariants.animate}
+                    exit={stepVariants.exit}
+                    transition={stepTransition}
                   >
-                    {isSavingVehicles ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Registrando...</>
-                    ) : (
-                      <>Completar Registro<CheckCircle className="w-4 h-4 ml-2" /></>
-                    )}
-                  </Button>
-                </CardContent>
-              )}
+                    <CardContent className="space-y-4">
+                      {errors.vehicles && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{errors.vehicles}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <VehicleCategoryForm
+                        selectedCategories={selectedCategories.map(c => c.categoria)}
+                        vehicles={vehicles}
+                        onChange={setVehicles}
+                        disabled={isSavingVehicles}
+                        errors={errors}
+                      />
+
+                      <Button 
+                        onClick={handleSaveVehicles} 
+                        className="w-full"
+                        disabled={isSavingVehicles}
+                        data-testid="button-complete-registration"
+                      >
+                        {isSavingVehicles ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Registrando...</>
+                        ) : (
+                          <>Completar Registro<CheckCircle className="w-4 h-4 ml-2" /></>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
           )}
         </div>
