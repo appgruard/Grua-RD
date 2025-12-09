@@ -6237,7 +6237,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (type === 'licencia') {
         const { scanAndVerifyLicense, isVerifikConfigured } = await import("./services/verifik-ocr");
         
-        if (isVerifikConfigured()) {
+        const verifikIsConfigured = isVerifikConfigured();
+        logSystem.info('Verifik configuration check for license upload', { 
+          isConfigured: verifikIsConfigured,
+          hasApiKey: !!process.env.VERIFIK_API_KEY,
+          apiKeyLength: process.env.VERIFIK_API_KEY?.length || 0
+        });
+        
+        if (verifikIsConfigured) {
           // Convert buffer to base64 for Verifik
           const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
           
