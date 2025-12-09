@@ -88,12 +88,14 @@ function LoadingFallback() {
 
 function ProtectedRoute({ 
   children, 
-  allowedTypes 
+  allowedTypes,
+  allowPendingVerification = false
 }: { 
   children: React.ReactNode; 
-  allowedTypes: string[];
+  allowedTypes?: string[];
+  allowPendingVerification?: boolean;
 }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, pendingVerificationUser } = useAuth();
 
   useEffect(() => {
     if (user?.userType === 'conductor') {
@@ -109,30 +111,49 @@ function ProtectedRoute({
     );
   }
 
-  if (!user) {
+  // Check for authenticated user or pending verification user
+  const currentUser = user || pendingVerificationUser;
+  
+  if (!currentUser) {
     return <Redirect to="/login" />;
   }
 
+  // Enforce role-based access first (even for pending verification routes)
+  if (allowedTypes && !allowedTypes.includes(currentUser.userType)) {
+    return <Redirect to="/login" />;
+  }
+
+  // If allowPendingVerification is true, skip verification checks
+  // This allows access to verification-related pages during the verification flow
+  if (allowPendingVerification) {
+    return <>{children}</>;
+  }
+
   // For conductors, check if verification is complete using authoritative server data
-  if (user.userType === 'conductor') {
+  if (currentUser.userType === 'conductor') {
     // Either telefonoVerificado OR emailVerificado counts as contact verified
-    const contactoVerificado = user.telefonoVerificado || (user as any).emailVerificado;
+    const contactoVerificado = currentUser.telefonoVerificado || (currentUser as any).emailVerificado;
     // Conductors also need photo verification
-    const fotoVerificada = (user as any).fotoVerificada;
+    const fotoVerificada = (currentUser as any).fotoVerificada;
     // Additional driver verification checks from conductor data
-    const licenciaVerificada = (user as any).conductor?.licenciaVerificada;
-    const categoriasConfiguradas = (user as any).conductor?.categoriasConfiguradas;
-    const vehiculosRegistrados = (user as any).conductor?.vehiculosRegistrados;
+    const licenciaVerificada = (currentUser as any).conductor?.licenciaVerificada;
+    const categoriasConfiguradas = (currentUser as any).conductor?.categoriasConfiguradas;
+    const vehiculosRegistrados = (currentUser as any).conductor?.vehiculosRegistrados;
     // Driver needs ALL 6 verification steps completed
-    const needsVerification = !user.cedulaVerificada || !contactoVerificado || !fotoVerificada || 
+    const needsVerification = !currentUser.cedulaVerificada || !contactoVerificado || !fotoVerificada || 
       !licenciaVerificada || !categoriasConfiguradas || !vehiculosRegistrados;
     if (needsVerification) {
       return <Redirect to="/verify-pending" />;
     }
   }
 
-  if (!allowedTypes.includes(user.userType)) {
-    return <Redirect to="/login" />;
+  // For clients, check basic verification
+  if (currentUser.userType === 'cliente') {
+    const emailVerificado = (currentUser as any).emailVerificado;
+    const needsVerification = !currentUser.cedulaVerificada || !emailVerificado;
+    if (needsVerification) {
+      return <Redirect to="/verify-pending" />;
+    }
   }
 
   return <>{children}</>;
@@ -148,7 +169,11 @@ function Router() {
         <Route path="/onboarding" component={OnboardingWizard} />
         <Route path="/verify-otp" component={VerifyOTP} />
         <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/verify-pending" component={VerifyPending} />
+        <Route path="/verify-pending">
+          <ProtectedRoute allowPendingVerification={true}>
+            <VerifyPending />
+          </ProtectedRoute>
+        </Route>
         <Route path="/privacy-policy" component={PrivacyPolicy} />
       
       {/* Client Routes - Most specific first */}

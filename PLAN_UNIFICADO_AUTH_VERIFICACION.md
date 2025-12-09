@@ -215,7 +215,30 @@ passport.deserializeUser(async (id: string, done) => {
 
 ---
 
-### FASE 2: Sesiones Durante Verificación Pendiente (Prioridad: ALTA)
+### FASE 2: Sesiones Durante Verificación Pendiente (Prioridad: ALTA) ✅ COMPLETADA - 9 Dic 2025
+
+**Estado:** Implementada y verificada
+
+**Cambios realizados:**
+- ✅ 2.1 ProtectedRoute actualizado con prop `allowPendingVerification` para permitir acceso a rutas de verificación
+- ✅ 2.1 Ruta `/verify-pending` envuelta en ProtectedRoute con `allowPendingVerification={true}`
+- ✅ 2.1 Verificación de clientes también incluida en ProtectedRoute
+- ✅ 2.2 Middleware de verificación ya implementado con `VERIFICATION_ALLOWED_PATTERNS` y `userNeedsVerification()`
+- ✅ 2.2 Ruta `/api/storage/files/*` agregada a patrones permitidos durante verificación
+
+**Archivos modificados:**
+- `client/src/App.tsx` - ProtectedRoute con allowPendingVerification
+- `server/routes.ts` - Middleware de verificación con patrones permitidos
+
+**Rutas permitidas durante verificación:**
+- `/api/auth/me`, `/api/auth/logout`, `/api/auth/send-otp`, `/api/auth/verify-otp`
+- `/api/identity/*` (scan-cedula, verify-cedula, verify-profile-photo, verification-status, status)
+- `/api/documents/upload`, `/api/driver/documents`
+- `/api/drivers/me/servicios`, `/api/drivers/me/vehiculos/*`
+- `/api/users/me`, `/api/users/profile-photo`
+- `/api/storage/files/*`
+
+---
 
 #### 2.1 Mantener Sesión Activa Durante Verificación (Problema #3)
 
