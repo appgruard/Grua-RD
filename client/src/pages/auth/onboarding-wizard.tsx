@@ -157,17 +157,30 @@ export default function OnboardingWizard() {
     }
   }, [cedulaVerified, formData.userType, currentStep]);
 
-  // Restore wizard state from session storage
+  // Restore wizard state from localStorage (with 24-hour expiration)
   useEffect(() => {
     try {
-      const savedState = sessionStorage.getItem(WIZARD_STORAGE_KEY);
+      const savedState = localStorage.getItem(WIZARD_STORAGE_KEY);
       if (savedState) {
         const parsed = JSON.parse(savedState);
-        setCurrentStep(parsed.currentStep || 1);
-        setFormData(parsed.formData || formData);
-        setCompletedSteps(new Set(parsed.completedSteps || []));
-        setSelectedServices(parsed.selectedServices || []);
-        setVehicleData(parsed.vehicleData || []);
+        
+        // Check expiration (24 hours = 86400000 ms)
+        const EXPIRATION_MS = 24 * 60 * 60 * 1000;
+        const savedAt = parsed.savedAt || 0;
+        const now = Date.now();
+        
+        if (now - savedAt > EXPIRATION_MS) {
+          // State expired, remove it
+          localStorage.removeItem(WIZARD_STORAGE_KEY);
+          console.log('Wizard state expired, starting fresh');
+        } else {
+          // State is valid, restore it
+          setCurrentStep(parsed.currentStep || 1);
+          setFormData(parsed.formData || formData);
+          setCompletedSteps(new Set(parsed.completedSteps || []));
+          setSelectedServices(parsed.selectedServices || []);
+          setVehicleData(parsed.vehicleData || []);
+        }
       }
     } catch (error) {
       console.error('Error restoring wizard state:', error);
@@ -176,7 +189,7 @@ export default function OnboardingWizard() {
     }
   }, []);
 
-  // Save wizard state to session storage
+  // Save wizard state to localStorage (with timestamp for expiration check)
   useEffect(() => {
     if (!isInitialized) return;
     try {
@@ -185,8 +198,9 @@ export default function OnboardingWizard() {
         completedSteps: Array.from(completedSteps),
         selectedServices,
         vehicleData,
+        savedAt: Date.now(),
       };
-      sessionStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(stateToSave));
+      localStorage.setItem(WIZARD_STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (error) {
       console.error('Error saving wizard state:', error);
     }
@@ -436,7 +450,8 @@ export default function OnboardingWizard() {
       const res = await apiRequest('POST', '/api/auth/verify-otp', {
         email: formData.email,
         codigo: formData.otpCode,
-        tipoOperacion: 'registro'
+        tipoOperacion: 'registro',
+        userType: formData.userType
       });
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();

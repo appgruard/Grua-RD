@@ -92,16 +92,22 @@ export async function verifyCedula(
   userId: string,
   cedula: string,
   ipAddress?: string,
-  userAgent?: string
-): Promise<{ success: boolean; error?: string; formatted?: string }> {
+  userAgent?: string,
+  isOCRVerified: boolean = false
+): Promise<{ success: boolean; error?: string; formatted?: string; pendingReview?: boolean }> {
   try {
-    // Clean and format the cedula (remove dashes/spaces)
-    const cleaned = cedula.replace(/[\s-]/g, '');
+    // Validate format and checksum using existing validation
+    const validation = validateCedulaFormat(cedula);
     
-    // Format with dashes: XXX-XXXXXXX-X
-    const formatted = cleaned.length === 11 
-      ? `${cleaned.slice(0, 3)}-${cleaned.slice(3, 10)}-${cleaned.slice(10)}`
-      : cedula;
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: validation.error
+      };
+    }
+    
+    const formatted = validation.formatted!;
+    const cleaned = cedula.replace(/[\s-]/g, '');
     
     // Get the current user's email to allow same cedula for same person's accounts
     const currentUser = await db.query.users.findFirst({
@@ -148,19 +154,28 @@ export async function verifyCedula(
       };
     }
     
-    // Update user with verified cédula
+    // For clients without OCR verification, mark for pending review
+    // For OCR-verified users, mark as fully verified
+    const pendingReview = !isOCRVerified;
+    
     await db.update(users)
       .set({
         cedula: formatted,
-        cedulaVerificada: true
+        cedulaVerificada: isOCRVerified,
+        cedulaPendingReview: pendingReview
       })
       .where(eq(users.id, userId));
     
-    logger.info(`Successful cedula verification for user ${userId}`);
+    if (pendingReview) {
+      logger.info(`Cedula submitted for manual review for user ${userId} (client - no OCR)`);
+    } else {
+      logger.info(`Cedula fully verified for user ${userId} (OCR verified)`);
+    }
     
     return {
       success: true,
-      formatted: formatted
+      formatted: formatted,
+      pendingReview: pendingReview
     };
     
   } catch (error) {

@@ -1485,9 +1485,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/verify-otp", async (req: Request, res: Response) => {
+  app.post("/api/auth/verify-otp", verifyOTPLimiter, async (req: Request, res: Response) => {
     try {
-      const { email, codigo, tipoOperacion } = req.body;
+      const { email, codigo, tipoOperacion, userType } = req.body;
 
       if (!email || !codigo || !tipoOperacion) {
         return res.status(400).json({ message: "Datos incompletos" });
@@ -1515,12 +1515,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.markVerificationCodeAsUsed(verificationCode.id);
 
       if (tipoOperacion === 'registro') {
-        const user = await storage.getUserByEmail(email);
+        // Fix: Use getUserByEmailAndType to update the correct account
+        // when a user has multiple accounts (cliente/conductor) with same email
+        let user;
+        if (userType && (userType === 'cliente' || userType === 'conductor')) {
+          user = await storage.getUserByEmailAndType(email, userType);
+          logSystem.info('OTP verification using userType', { email, userType, userId: user?.id });
+        } else {
+          // Fallback for backwards compatibility - use first matching user
+          user = await storage.getUserByEmail(email);
+          logSystem.warn('OTP verification without userType - using fallback', { email, userId: user?.id });
+        }
+        
         if (user) {
           await storage.updateUser(user.id, { 
             emailVerificado: true,
             estadoCuenta: 'activo'
           });
+          logAuth.loginSuccess(user.id, `Email verified for ${user.userType} account`);
         }
       }
 

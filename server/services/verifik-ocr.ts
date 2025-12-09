@@ -61,11 +61,29 @@ export function compareNames(
     docLastTokens.some(dt => dt === rt || dt.includes(rt) || rt.includes(dt))
   );
   
-  const match = similarity >= 0.5 && (firstNameMatch || lastNameMatch);
+  // Increased threshold from 0.5 to 0.6, and require BOTH first AND last name match
+  const match = similarity >= 0.6 && firstNameMatch && lastNameMatch;
+  
+  // Log edge cases for analysis
+  if (similarity >= 0.5 && similarity < 0.6) {
+    console.warn("Name match edge case - borderline similarity:", {
+      registeredNombre, registeredApellido,
+      documentNombre, documentApellido,
+      similarity, firstNameMatch, lastNameMatch
+    });
+  }
   
   let details = "";
   if (!match) {
-    details = `El nombre registrado "${registeredNombre} ${registeredApellido}" no coincide con el nombre en la cédula "${documentNombre} ${documentApellido}"`;
+    if (!firstNameMatch && !lastNameMatch) {
+      details = `El nombre registrado "${registeredNombre} ${registeredApellido}" no coincide con el nombre en la cédula "${documentNombre} ${documentApellido}"`;
+    } else if (!firstNameMatch) {
+      details = `El nombre "${registeredNombre}" no coincide con "${documentNombre}" en la cédula`;
+    } else if (!lastNameMatch) {
+      details = `El apellido "${registeredApellido}" no coincide con "${documentApellido}" en la cédula`;
+    } else {
+      details = `La similitud (${Math.round(similarity * 100)}%) es insuficiente para verificar la identidad`;
+    }
   }
   
   return { match, similarity, details };
@@ -233,11 +251,23 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       ocrConfidenceScoreType: typeof ocrData?.confidenceScore
     });
     
-    // Check for confidenceScore - if undefined or 0, assume document was read successfully
+    // Check for confidenceScore - if undefined or 0, use conservative default
     const rawConfidence = ocrData?.confidenceScore;
+    const isAssumedScore = !(typeof rawConfidence === 'number' && rawConfidence > 0);
     const confidenceScore = (typeof rawConfidence === 'number' && rawConfidence > 0) 
       ? rawConfidence 
-      : (ocrData?.firstName && ocrData?.lastName ? 0.8 : 0);
+      : (ocrData?.firstName && ocrData?.lastName ? 0.7 : 0);
+    
+    // Log when using assumed/default confidence score
+    if (isAssumedScore && confidenceScore > 0) {
+      logger.warn("Using assumed confidence score - consider manual verification", {
+        assumedScore: confidenceScore,
+        hasFirstName: !!ocrData?.firstName,
+        hasLastName: !!ocrData?.lastName,
+        firstName: ocrData?.firstName,
+        lastName: ocrData?.lastName
+      });
+    }
     
     logger.info("Verifik OCR response received", { 
       hasOCRData: !!ocrData,

@@ -752,7 +752,8 @@ export default function VerifyPending() {
       const res = await apiRequest('POST', '/api/auth/verify-otp', {
         email: currentUser?.email,
         codigo: otpCode,
-        tipoOperacion: 'registro'
+        tipoOperacion: 'registro',
+        userType: currentUser?.userType
       });
       if (!res.ok) {
         const data = await res.json();
