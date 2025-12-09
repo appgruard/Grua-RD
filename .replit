@@ -22,12 +22,3 @@ author = 51072480
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
-
-[[workflows.workflow]]
-name = "Start"
-mode = "sequential"
-author = 51074120
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start aplication"
