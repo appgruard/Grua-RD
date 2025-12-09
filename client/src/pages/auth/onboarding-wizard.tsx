@@ -206,15 +206,30 @@ export default function OnboardingWizard() {
     }
   }, [currentStep, formData, completedSteps, selectedServices, vehicleData, isInitialized]);
 
-  // Redirect authenticated users to their dashboard
+  // Redirect authenticated users - check verification status first
   useEffect(() => {
     if (user && !authLoading) {
       const userData = user as any;
       const userType = userData.userType || 'cliente';
+      const emailVerificado = userData.emailVerificado || false;
+      const cedulaVerificada = userData.cedulaVerificada || false;
+      const fotoVerificada = userData.fotoVerificada || false;
+      
+      // Check if user needs verification based on their type
       if (userType === 'conductor') {
-        setLocation('/driver');
+        const needsVerification = !cedulaVerificada || !emailVerificado || !fotoVerificada;
+        if (needsVerification) {
+          setLocation('/verify-pending');
+        } else {
+          setLocation('/driver');
+        }
       } else if (userType === 'cliente') {
-        setLocation('/client');
+        const needsVerification = !cedulaVerificada || !emailVerificado;
+        if (needsVerification) {
+          setLocation('/verify-pending');
+        } else {
+          setLocation('/client');
+        }
       } else if (userType === 'admin') {
         setLocation('/admin');
       }

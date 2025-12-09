@@ -156,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async (data: RegisterData) => {
       const res = await apiRequest('POST', '/api/auth/register', data);
       if (!res.ok) throw new Error('Registration failed');
-      return res.json();
+      return await res.json();
     },
     onSuccess: async (data) => {
       queryClient.setQueryData(['/api/auth/me'], data.user);

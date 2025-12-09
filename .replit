@@ -8,6 +8,10 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
+localPort = 38791
+externalPort = 3001
+
+[[ports]]
 localPort = 45421
 externalPort = 3000
 
@@ -19,7 +23,7 @@ NODE_ENV = "development"
 [workflows]
 
 [[workflows.workflow]]
-name = "Start aplication"
+name = "Start application"
 mode = "sequential"
 author = 51072480
 
