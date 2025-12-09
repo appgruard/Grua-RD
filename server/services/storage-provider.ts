@@ -303,15 +303,23 @@ class FilesystemStorageProvider implements StorageProvider {
 }
 
 let activeProvider: StorageProvider | null = null;
-const replitProvider = new ReplitStorageProvider();
 const filesystemProvider = new FilesystemStorageProvider();
+
+// Solo inicializar Replit provider si no estamos forzando filesystem
+const forceFilesystem = process.env.STORAGE_PROVIDER === 'filesystem' || process.env.CAPROVER === 'true';
+const replitProvider = forceFilesystem ? null : new ReplitStorageProvider();
+
+if (forceFilesystem) {
+  logger.info('Filesystem storage forced via environment variable (CapRover deployment)');
+}
 
 function getStorageProvider(): StorageProvider {
   if (activeProvider && activeProvider.isAvailable()) {
     return activeProvider;
   }
 
-  if (replitProvider.isAvailable()) {
+  // Solo intentar Replit si no estamos forzando filesystem
+  if (replitProvider && replitProvider.isAvailable()) {
     activeProvider = replitProvider;
     logger.info('Using Replit Object Storage provider');
     return activeProvider;
