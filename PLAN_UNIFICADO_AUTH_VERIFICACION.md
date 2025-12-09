@@ -417,7 +417,19 @@ const VERIFICATION_ALLOWED_ROUTES = [
 
 ---
 
-### FASE 3: Correcciones de UI de Verificación (Prioridad: ALTA)
+### FASE 3: Correcciones de UI de Verificación (Prioridad: ALTA) ✅ COMPLETADA - 9 Dic 2025
+
+**Estado:** Implementada y verificada
+
+**Cambios realizados:**
+- ✅ 3.1 Función helper `getNextStep()` agregada para determinar automáticamente el siguiente paso de verificación
+- ✅ 3.2 Transiciones suaves con framer-motion implementadas usando `AnimatePresence` y `motion.div`
+- ✅ Animaciones aplicadas a todas las cards de verificación (cedula, email, photo, license, categories, vehicles)
+
+**Archivos modificados:**
+- `client/src/pages/auth/verify-pending.tsx`
+
+---
 
 #### 3.1 Siguiente Paso No Se Despliega (Problema #4)
 
