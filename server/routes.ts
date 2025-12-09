@@ -3361,8 +3361,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       logSystem.info('Driver vehicle created/updated', { conductorId: conductor.id, categoria, vehiculoId: vehiculo.id });
       res.json(vehiculo);
     } catch (error: any) {
-      logSystem.error('Create driver vehicle error', error);
-      res.status(500).json({ message: "Failed to create driver vehicle" });
+      logSystem.error('Create driver vehicle error', { 
+        message: error?.message, 
+        stack: error?.stack,
+        conductorId: req.user?.id 
+      });
+      res.status(500).json({ 
+        message: error?.message || "Failed to create driver vehicle",
+        details: process.env.NODE_ENV !== 'production' ? error?.stack : undefined
+      });
     }
   });
 
