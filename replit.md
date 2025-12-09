@@ -63,3 +63,36 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Capacitor**: For native mobile app functionalities and plugins.
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
+
+## CapRover Deployment
+
+### Document Storage Configuration
+The application uses a provider-agnostic storage abstraction that automatically selects the appropriate storage backend:
+
+1. **Replit Object Storage**: Used when running inside Replit environment (default)
+2. **Filesystem Storage**: Used when running outside Replit (CapRover, Docker, local)
+
+### CapRover Volume Configuration
+When deploying to CapRover, configure a persistent volume for document uploads:
+
+1. In CapRover app settings, add a persistent volume:
+   - **Container Path**: `/app/uploads`
+   - **Host Path**: Use CapRover's default persistent storage
+
+2. Optionally set the `STORAGE_PATH` environment variable to customize the storage location:
+   ```
+   STORAGE_PATH=/app/uploads
+   ```
+
+### Environment Variables for CapRover
+Required environment variables for CapRover deployment:
+- `DATABASE_URL`: PostgreSQL connection string
+- `SESSION_SECRET`: Session encryption key
+- `MAPBOX_ACCESS_TOKEN` / `VITE_MAPBOX_ACCESS_TOKEN`: Mapbox API key
+- `RESEND_API_KEY`: Email service API key
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: Push notification keys
+- `STORAGE_PATH`: (Optional) Custom path for file storage, defaults to `/app/uploads`
+
+### Storage API Endpoints
+- `GET /api/storage/info`: Returns current storage provider status
+- `GET /api/storage/files/*`: Serves uploaded files from filesystem storage (requires authentication)
