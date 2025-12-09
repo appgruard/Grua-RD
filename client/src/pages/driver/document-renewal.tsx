@@ -286,12 +286,12 @@ export default function DocumentRenewal() {
         </Alert>
       )}
 
-      {(documentStatus?.documentosProximosAVencer ?? 0) > 0 && (
+      {documentStatus?.documentosProximosAVencer > 0 && (
         <Alert data-testid="alert-expiring-soon">
           <Calendar className="h-4 w-4" />
           <AlertTitle>Documentos por Vencer</AlertTitle>
           <AlertDescription>
-            Tienes {documentStatus?.documentosProximosAVencer ?? 0} documento(s) que vencerán en los próximos 30 días.
+            Tienes {documentStatus.documentosProximosAVencer} documento(s) que vencerán en los próximos 30 días.
             Por favor, renuévalos antes de que expiren.
           </AlertDescription>
         </Alert>
@@ -391,7 +391,7 @@ export default function DocumentRenewal() {
                       <FileUpload
                         onFileSelect={(file) => handleFileSelect(file, docType.tipo)}
                         accept="image/*,.pdf"
-                        maxSizeMB={10}
+                        maxSize={10 * 1024 * 1024}
                         disabled={isUploading || uploadMutation.isPending}
                       />
 

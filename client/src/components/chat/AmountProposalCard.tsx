@@ -68,7 +68,10 @@ export function AmountProposalCard({
 
   const proposeMutation = useMutation({
     mutationFn: async ({ monto, notas }: { monto: number; notas: string }) => {
-      return apiRequest('POST', `/api/services/${servicioId}/propose-amount`, { monto, notas });
+      return apiRequest(`/api/services/${servicioId}/propose-amount`, {
+        method: 'POST',
+        body: JSON.stringify({ monto, notas }),
+      });
     },
     onSuccess: () => {
       toast({
@@ -91,7 +94,9 @@ export function AmountProposalCard({
 
   const confirmMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', `/api/services/${servicioId}/confirm-amount`);
+      return apiRequest(`/api/services/${servicioId}/confirm-amount`, {
+        method: 'POST',
+      });
     },
     onSuccess: () => {
       toast({

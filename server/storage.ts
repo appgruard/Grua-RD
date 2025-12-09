@@ -158,9 +158,6 @@ export interface IStorage {
   // Users
   getUserById(id: string): Promise<UserWithConductor | undefined>;
   getUserByEmail(email: string): Promise<UserWithConductor | undefined>;
-  getUserByEmailAndType(email: string, userType: string): Promise<UserWithConductor | undefined>;
-  getUsersByEmail(email: string): Promise<UserWithConductor[]>;
-  getBasicUsersByEmail(email: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User>;
   getAllUsers(): Promise<User[]>;
@@ -660,31 +657,6 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getUserByEmailAndType(email: string, userType: string): Promise<UserWithConductor | undefined> {
-    const result = await db.query.users.findFirst({
-      where: and(eq(users.email, email), eq(users.userType, userType as any)),
-      with: {
-        conductor: true,
-      },
-    });
-    return result;
-  }
-
-  async getUsersByEmail(email: string): Promise<UserWithConductor[]> {
-    const results = await db.query.users.findMany({
-      where: eq(users.email, email),
-      with: {
-        conductor: true,
-      },
-    });
-    return results;
-  }
-
-  async getBasicUsersByEmail(email: string): Promise<User[]> {
-    const results = await db.select().from(users).where(eq(users.email, email));
-    return results;
-  }
-
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
@@ -1020,7 +992,7 @@ export class DatabaseStorage implements IStorage {
       .update(servicios)
       .set({ 
         estado: 'cancelado',
-        canceladoAt: new Date()
+        motivoCancelacion: 'Cancelado automáticamente - Ningún operador disponible'
       })
       .where(
         and(
@@ -1633,7 +1605,7 @@ export class DatabaseStorage implements IStorage {
   async getVehicleTypeDistribution(startDate?: string, endDate?: string): Promise<Array<{ tipoVehiculo: string; count: number; revenue: number }>> {
     let query = db
       .select({
-        tipoVehiculo: sql<string>`COALESCE(${servicios.tipoVehiculo}::text, 'no_especificado')`.as('tipo_vehiculo'),
+        tipoVehiculo: sql<string>`COALESCE(${servicios.tipoVehiculo}, 'no_especificado')`.as('tipo_vehiculo'),
         count: sql<number>`COUNT(*)::int`.as('count'),
         revenue: sql<number>`COALESCE(SUM(CAST(${servicios.costoTotal} AS NUMERIC)) FILTER (WHERE ${servicios.estado} = 'completado'), 0)`.as('revenue'),
       })
@@ -1649,7 +1621,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const results = await query
-      .groupBy(sql`COALESCE(${servicios.tipoVehiculo}::text, 'no_especificado')`)
+      .groupBy(sql`COALESCE(${servicios.tipoVehiculo}, 'no_especificado')`)
       .orderBy(desc(sql`COUNT(*)`));
 
     return results.map(r => ({
@@ -1758,7 +1730,7 @@ export class DatabaseStorage implements IStorage {
         revisadoPorUsuario: true,
       },
     });
-    return result as DocumentoWithDetails | undefined;
+    return result;
   }
 
   async getDocumentosByUsuarioId(usuarioId: string): Promise<DocumentoWithDetails[]> {
@@ -1772,7 +1744,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results as DocumentoWithDetails[];
+    return results;
   }
 
   async getDocumentosByConductorId(conductorId: string): Promise<DocumentoWithDetails[]> {
@@ -1786,7 +1758,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results as DocumentoWithDetails[];
+    return results;
   }
 
   async getAllDocumentos(): Promise<DocumentoWithDetails[]> {
@@ -1799,7 +1771,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results as DocumentoWithDetails[];
+    return results;
   }
 
   async updateDocumento(id: string, data: Partial<Documento>): Promise<Documento> {
@@ -1812,23 +1784,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDocumento(id: string): Promise<void> {
-    const documento = await this.getDocumentoById(id);
-    if (documento) {
-      // Delete from object storage
-      const { deleteDocument } = await import('./services/object-storage');
-      await deleteDocument(documento.url);
-      
-      // Delete from database
-      await db.delete(documentos).where(eq(documentos.id, id));
-    }
-  }
-
-  async getDocumentosByConductor(conductorId: string): Promise<Documento[]> {
-    return db
-      .select()
-      .from(documentos)
-      .where(eq(documentos.conductorId, conductorId))
-      .orderBy(desc(documentos.createdAt));
+    await db.delete(documentos).where(eq(documentos.id, id));
   }
 
   async aprobarDocumento(id: string, adminId: string): Promise<Documento> {
@@ -1871,7 +1827,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return result as DocumentoWithDetails | undefined;
+    return result;
   }
 
   async getAllClientInsuranceDocuments(userId: string): Promise<DocumentoWithDetails[]> {
@@ -1888,7 +1844,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results as DocumentoWithDetails[];
+    return results;
   }
 
   async hasApprovedClientInsurance(userId: string): Promise<boolean> {
@@ -1923,36 +1879,21 @@ export class DatabaseStorage implements IStorage {
     return result as ComisionWithDetails | undefined;
   }
 
-  async getComisionesByEstado(estado: 'pendiente' | 'procesando' | 'pagado' | 'fallido', tipo: 'operador' | 'empresa'): Promise<ComisionWithDetails[]> {
-    if (tipo === 'operador') {
-      const results = await db.query.comisiones.findMany({
-        where: eq(comisiones.estadoPagoOperador, estado),
-        with: {
-          servicio: {
-            with: {
-              cliente: true,
-              conductor: true,
-            },
+  async getComisionesByEstado(estado: string, tipo: 'operador' | 'empresa'): Promise<ComisionWithDetails[]> {
+    const field = tipo === 'operador' ? comisiones.estadoPagoOperador : comisiones.estadoPagoEmpresa;
+    const results = await db.query.comisiones.findMany({
+      where: eq(field, estado),
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
           },
         },
-        orderBy: desc(comisiones.createdAt),
-      });
-      return results as ComisionWithDetails[];
-    } else {
-      const results = await db.query.comisiones.findMany({
-        where: eq(comisiones.estadoPagoEmpresa, estado),
-        with: {
-          servicio: {
-            with: {
-              cliente: true,
-              conductor: true,
-            },
-          },
-        },
-        orderBy: desc(comisiones.createdAt),
-      });
-      return results as ComisionWithDetails[];
-    }
+      },
+      orderBy: desc(comisiones.createdAt),
+    });
+    return results as ComisionWithDetails[];
   }
 
   async getAllComisiones(): Promise<ComisionWithDetails[]> {
@@ -2083,6 +2024,41 @@ export class DatabaseStorage implements IStorage {
     return receipt;
   }
 
+  // Documentos
+  async createDocumento(documento: InsertDocumento): Promise<Documento> {
+    const [newDocumento] = await db.insert(documentos).values(documento).returning();
+    return newDocumento;
+  }
+
+  async getDocumentoById(id: string): Promise<Documento | undefined> {
+    const [documento] = await db
+      .select()
+      .from(documentos)
+      .where(eq(documentos.id, id))
+      .limit(1);
+    return documento;
+  }
+
+  async getDocumentosByConductor(conductorId: string): Promise<Documento[]> {
+    return db
+      .select()
+      .from(documentos)
+      .where(eq(documentos.conductorId, conductorId))
+      .orderBy(desc(documentos.createdAt));
+  }
+
+  async deleteDocumento(id: string): Promise<void> {
+    const documento = await this.getDocumentoById(id);
+    if (documento) {
+      // Delete from object storage
+      const { deleteDocument } = await import('./services/object-storage');
+      await deleteDocument(documento.url);
+      
+      // Delete from database
+      await db.delete(documentos).where(eq(documentos.id, id));
+    }
+  }
+
   async updateDocumentoStatus(
     id: string,
     estado: 'pendiente' | 'aprobado' | 'rechazado',
@@ -2118,7 +2094,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results as DocumentoWithDetails[];
+    return results;
   }
 
   async getAllDocuments(): Promise<DocumentoWithDetails[]> {
@@ -2135,7 +2111,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results as DocumentoWithDetails[];
+    return results;
   }
 
   async getDocumentosByServicioId(servicioId: string): Promise<DocumentoWithDetails[]> {
@@ -2153,7 +2129,7 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(documentos.createdAt),
     });
-    return results as DocumentoWithDetails[];
+    return results;
   }
 
   async getServiciosPendientesAseguradora(): Promise<ServicioWithDetails[]> {
@@ -2499,7 +2475,7 @@ export class DatabaseStorage implements IStorage {
     return results.map(doc => ({
       ...doc,
       user: doc.usuario,
-    })) as Array<Documento & { conductor?: Conductor; user?: User }>;
+    }));
   }
 
   async getDocumentosVencidos(): Promise<Array<Documento & { conductor?: Conductor; user?: User }>> {
@@ -2519,7 +2495,7 @@ export class DatabaseStorage implements IStorage {
     return results.map(doc => ({
       ...doc,
       user: doc.usuario,
-    })) as Array<Documento & { conductor?: Conductor; user?: User }>;
+    }));
   }
 
   async getRecordatoriosEnviados(documentoId: string): Promise<DocumentoRecordatorio[]> {
@@ -3797,7 +3773,7 @@ export class DatabaseStorage implements IStorage {
     return results.map(contrato => {
       let porcentajeUtilizado = 0;
       if (contrato.tipoContrato === 'por_hora' && contrato.horasContratadas && contrato.horasUtilizadas) {
-        porcentajeUtilizado = (parseFloat(String(contrato.horasUtilizadas)) / parseFloat(String(contrato.horasContratadas))) * 100;
+        porcentajeUtilizado = (parseFloat(contrato.horasUtilizadas) / parseFloat(contrato.horasContratadas)) * 100;
       } else if (contrato.tipoContrato === 'por_servicio' && contrato.serviciosContratados && contrato.serviciosUtilizados) {
         porcentajeUtilizado = (contrato.serviciosUtilizados / contrato.serviciosContratados) * 100;
       }
@@ -3836,7 +3812,7 @@ export class DatabaseStorage implements IStorage {
     
     let porcentajeUtilizado = 0;
     if (result.tipoContrato === 'por_hora' && result.horasContratadas && result.horasUtilizadas) {
-      porcentajeUtilizado = (parseFloat(String(result.horasUtilizadas)) / parseFloat(String(result.horasContratadas))) * 100;
+      porcentajeUtilizado = (parseFloat(result.horasUtilizadas) / parseFloat(result.horasContratadas)) * 100;
     } else if (result.tipoContrato === 'por_servicio' && result.serviciosContratados && result.serviciosUtilizados) {
       porcentajeUtilizado = (result.serviciosUtilizados / result.serviciosContratados) * 100;
     }
@@ -3894,7 +3870,7 @@ export class DatabaseStorage implements IStorage {
     
     return results.map(proyecto => {
       const serviciosCompletados = proyecto.serviciosProgramados?.filter(
-        s => s.estado === 'ejecutado'
+        s => s.estado === 'completado'
       ).length || 0;
       
       return {
@@ -3926,7 +3902,7 @@ export class DatabaseStorage implements IStorage {
     if (!result) return undefined;
     
     const serviciosCompletados = result.serviciosProgramados?.filter(
-      s => s.estado === 'ejecutado'
+      s => s.estado === 'completado'
     ).length || 0;
     
     return {
@@ -4007,7 +3983,7 @@ export class DatabaseStorage implements IStorage {
     const now = new Date();
     const results = await db.query.serviciosProgramados.findMany({
       where: and(
-        eq(serviciosProgramados.estado, 'programado'),
+        eq(serviciosProgramados.estado, 'pendiente'),
         gte(serviciosProgramados.fechaProgramada, now)
       ),
       with: {
@@ -4123,7 +4099,8 @@ export class DatabaseStorage implements IStorage {
       .from(empresaProyectos)
       .where(and(
         eq(empresaProyectos.empresaId, empresaId),
-        eq(empresaProyectos.activo, true)
+        eq(empresaProyectos.activo, true),
+        eq(empresaProyectos.estado, 'en_progreso')
       ));
 
     const [empleadosActivos] = await db

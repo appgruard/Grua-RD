@@ -584,41 +584,9 @@ export default function ClientHome() {
   };
 
   const markers = [
-    origin && { 
-      position: origin, 
-      title: isOnsiteService() ? 'Ubicación del servicio' : (isExtractionService() ? 'Ubicación del vehículo' : 'Origen'), 
-      color: '#22c55e', 
-      type: 'origin' as const,
-      draggable: true,
-      id: 'origin'
-    },
-    destination && (requiresTransport() || (isExtractionService() && quiereTransporteExtraccion)) && { 
-      position: destination, 
-      title: isExtractionService() ? 'Destino de transporte' : 'Destino', 
-      color: '#ef4444', 
-      type: 'destination' as const,
-      draggable: true,
-      id: 'destination'
-    },
+    origin && { position: origin, title: isOnsiteService() ? 'Ubicación del servicio' : (isExtractionService() ? 'Ubicación del vehículo' : 'Origen'), color: '#22c55e', type: 'origin' as const },
+    destination && (requiresTransport() || (isExtractionService() && quiereTransporteExtraccion)) && { position: destination, title: isExtractionService() ? 'Destino de transporte' : 'Destino', color: '#ef4444', type: 'destination' as const },
   ].filter(Boolean) as any[];
-
-  const handleMarkerDragEnd = async (markerId: string, newCoords: Coordinates, address: string) => {
-    if (markerId === 'origin') {
-      setOrigin(newCoords);
-      setOrigenDireccion(address);
-      toast({
-        title: 'Ubicación actualizada',
-        description: 'Se ha actualizado la ubicación de origen',
-      });
-    } else if (markerId === 'destination') {
-      setDestination(newCoords);
-      setDestinoDireccion(address);
-      toast({
-        title: 'Destino actualizado',
-        description: 'Se ha actualizado la ubicación de destino',
-      });
-    }
-  };
 
   const mapCenter = origin || currentLocation;
 
@@ -663,7 +631,6 @@ export default function ClientHome() {
         <MapboxMapWithFastLoad
           center={mapCenter}
           markers={markers}
-          onMarkerDragEnd={handleMarkerDragEnd}
           className="absolute inset-0 z-0"
           routeGeometry={routeGeometry}
           focusOnOrigin={!!origin && !destination}

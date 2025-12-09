@@ -17,7 +17,7 @@ import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensa
 import type { User, Servicio, Empresa } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
-import { uploadDocument, getDocument, isStorageInitialized, getFilesystemProvider, getActiveProviderName } from "./services/object-storage";
+import { uploadDocument, getDocument, isStorageInitialized } from "./services/object-storage";
 import { pdfService } from "./services/pdf-service";
 import { insuranceValidationService, getSupportedInsurers, InsurerCode } from "./services/insurance";
 import { documentValidationService } from "./services/document-validation";
@@ -200,25 +200,7 @@ const MAPBOX_ACCESS_TOKEN = process.env.MAPBOX_ACCESS_TOKEN;
 
 declare global {
   namespace Express {
-    interface User {
-      id: string;
-      email: string;
-      phone: string | null;
-      cedula: string | null;
-      cedulaImageUrl: string | null;
-      cedulaVerificada: boolean;
-      passwordHash: string;
-      userType: "cliente" | "conductor" | "admin" | "aseguradora" | "socio" | "empresa";
-      estadoCuenta: "activo" | "suspendido" | "pendiente_verificacion" | "rechazado" | "baneado";
-      nombre: string;
-      apellido: string | null;
-      fotoUrl: string | null;
-      calificacionPromedio: string | null;
-      telefonoVerificado: boolean | null;
-      emailVerificado: boolean | null;
-      fotoVerificada: boolean | null;
-      createdAt: Date;
-    }
+    interface User extends User {}
   }
 }
 
@@ -227,33 +209,15 @@ passport.use(
     {
       usernameField: "email",
       passwordField: "password",
-      passReqToCallback: true,
     },
-    async (req, email, password, done) => {
+    async (email, password, done) => {
       try {
-        // Security model for disambiguation:
-        // When userType is provided, fetch the specific account by email + type
-        // This is secure because each email can only have ONE account per type
-        // Password is always verified for the selected account
-        
-        const requestedUserType = req.body.userType as string | undefined;
-        
-        let user;
-        if (requestedUserType) {
-          // Disambiguation: login with specific account type
-          // Each email can only have one account per type, so this is safe
-          user = await storage.getUserByEmailAndType(email, requestedUserType);
-        } else {
-          // Default: get first account (backwards compatibility)
-          user = await storage.getUserByEmail(email);
-        }
-        
+        const user = await storage.getUserByEmail(email);
         if (!user) {
           logAuth.loginFailed(email, "User not found");
           return done(null, false);
         }
 
-        // Always verify password for the selected account
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) {
           logAuth.loginFailed(email, "Invalid password");
@@ -261,7 +225,7 @@ passport.use(
         }
 
         logAuth.loginSuccess(user.id, user.email);
-        return done(null, user as any);
+        return done(null, user);
       } catch (error) {
         logSystem.error("Login error", error);
         return done(error);
@@ -277,7 +241,7 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id: string, done) => {
   try {
     const user = await storage.getUserById(id);
-    done(null, user as any);
+    done(null, user);
   } catch (error) {
     done(error);
   }
@@ -313,17 +277,15 @@ export const getSafeUser = (user: any) => {
       id: user.conductor.id,
       userId: user.conductor.userId,
       licencia: user.conductor.licencia,
+      placaGrua: user.conductor.placaGrua,
+      marcaGrua: user.conductor.marcaGrua,
+      modeloGrua: user.conductor.modeloGrua,
       disponible: user.conductor.disponible,
       ubicacionLat: user.conductor.ubicacionLat,
       ubicacionLng: user.conductor.ubicacionLng,
       ultimaUbicacionUpdate: user.conductor.ultimaUbicacionUpdate,
       balanceDisponible: user.conductor.balanceDisponible,
       balancePendiente: user.conductor.balancePendiente,
-      licenciaFrontalUrl: user.conductor.licenciaFrontalUrl,
-      licenciaTraseraUrl: user.conductor.licenciaTraseraUrl,
-      licenciaVerificada: user.conductor.licenciaVerificada,
-      categoriasConfiguradas: user.conductor.categoriasConfiguradas,
-      vehiculosRegistrados: user.conductor.vehiculosRegistrados,
     };
   }
   
@@ -358,17 +320,15 @@ export const getSafeUserForAdmin = (user: any) => {
       id: user.conductor.id,
       userId: user.conductor.userId,
       licencia: user.conductor.licencia,
+      placaGrua: user.conductor.placaGrua,
+      marcaGrua: user.conductor.marcaGrua,
+      modeloGrua: user.conductor.modeloGrua,
       disponible: user.conductor.disponible,
       ubicacionLat: user.conductor.ubicacionLat,
       ubicacionLng: user.conductor.ubicacionLng,
       ultimaUbicacionUpdate: user.conductor.ultimaUbicacionUpdate,
       balanceDisponible: user.conductor.balanceDisponible,
       balancePendiente: user.conductor.balancePendiente,
-      licenciaFrontalUrl: user.conductor.licenciaFrontalUrl,
-      licenciaTraseraUrl: user.conductor.licenciaTraseraUrl,
-      licenciaVerificada: user.conductor.licenciaVerificada,
-      categoriasConfiguradas: user.conductor.categoriasConfiguradas,
-      vehiculosRegistrados: user.conductor.vehiculosRegistrados,
     };
   }
   
@@ -401,17 +361,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(express.json());
 
-  const isProduction = process.env.NODE_ENV === "production";
-  
   const sessionParser = session({
     secret: process.env.SESSION_SECRET || "gruard-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
-    proxy: isProduction,
     cookie: {
-      secure: isProduction,
-      httpOnly: true,
-      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       maxAge: 30 * 24 * 60 * 60 * 1000,
     },
   });
@@ -420,115 +375,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(passport.initialize());
   app.use(passport.session());
-
-  // Helper function to check if user needs verification
-  const userNeedsVerification = (user: any): boolean => {
-    if (!user) return false;
-    
-    // Skip verification check for admin, aseguradora, socio, and empresa users
-    const skipVerificationTypes = ['admin', 'aseguradora', 'socio', 'empresa'];
-    if (skipVerificationTypes.includes(user.userType)) {
-      return false;
-    }
-
-    const isConductor = user.userType === 'conductor';
-    // Use truthy checks to handle both boolean true and integer 1 (database type mismatch)
-    const cedulaVerificada = !!user.cedulaVerificada;
-    const emailVerificado = !!user.emailVerificado;
-    const fotoVerificada = !!user.fotoVerificada;
-
-    if (!isConductor) {
-      // Client only needs cedula and email
-      return !cedulaVerificada || !emailVerificado;
-    }
-
-    // Driver needs 6 verifications - check conductor data for additional fields
-    // Use truthy checks to handle integer values from database (vehiculosRegistrados is stored as int)
-    const conductor = user.conductor;
-    const licenciaVerificada = !!conductor?.licenciaVerificada;
-    const categoriasConfiguradas = !!conductor?.categoriasConfiguradas;
-    const vehiculosRegistrados = !!conductor?.vehiculosRegistrados;
-
-    return !cedulaVerificada || !emailVerificado || !fotoVerificada || 
-           !licenciaVerificada || !categoriasConfiguradas || !vehiculosRegistrados;
-  };
-
-  // Middleware to block unverified users from accessing non-verification endpoints
-  // This allows users to stay logged in during verification while restricting access
-  // Uses exact path + method matching to prevent unintended access through nested routes
-  // Set prefix: true for routes that have dynamic parameters (e.g., /api/drivers/me/vehiculos/:id)
-  const VERIFICATION_ALLOWED_PATTERNS: Array<{ method: string; path: string; prefix?: boolean }> = [
-    { method: 'GET', path: '/api/auth/me' },
-    { method: 'POST', path: '/api/auth/logout' },
-    { method: 'POST', path: '/api/auth/send-otp' },
-    { method: 'POST', path: '/api/auth/verify-otp' },
-    { method: 'POST', path: '/api/identity/scan-cedula' },
-    { method: 'POST', path: '/api/identity/verify-cedula' },
-    { method: 'POST', path: '/api/identity/verify-profile-photo' },
-    { method: 'GET', path: '/api/identity/verification-status' },
-    { method: 'GET', path: '/api/identity/status' },
-    { method: 'PATCH', path: '/api/users/me' },
-    { method: 'POST', path: '/api/documents/upload' },
-    { method: 'POST', path: '/api/driver/documents' },
-    { method: 'GET', path: '/api/drivers/me/servicios' },
-    { method: 'PUT', path: '/api/drivers/me/servicios' },
-    { method: 'GET', path: '/api/drivers/me/vehiculos', prefix: true },
-    { method: 'POST', path: '/api/drivers/me/vehiculos' },
-    { method: 'PATCH', path: '/api/drivers/me/vehiculos', prefix: true },
-    { method: 'DELETE', path: '/api/drivers/me/vehiculos', prefix: true },
-    { method: 'POST', path: '/api/users/profile-photo' },
-    { method: 'POST', path: '/api/analytics/web-vitals' },
-  ];
-
-  app.use((req: Request, res: Response, next) => {
-    // Skip check for non-API routes (allow frontend/SPA routes to pass through)
-    if (!req.path.startsWith('/api/')) {
-      return next();
-    }
-    
-    // Skip check for non-authenticated users (they'll fail auth checks later)
-    if (!req.isAuthenticated()) {
-      return next();
-    }
-
-    const user = req.user as any;
-    
-    // If user is fully verified or exempt, allow all endpoints
-    if (!userNeedsVerification(user)) {
-      return next();
-    }
-
-    // User needs verification - only allow verification-related endpoints
-    // Uses exact matching for most routes, prefix matching for routes with parameters
-    const requestPath = req.path;
-    const requestMethod = req.method;
-
-    const isAllowed = VERIFICATION_ALLOWED_PATTERNS.some(pattern => {
-      if (pattern.method !== requestMethod) return false;
-      if (pattern.prefix) {
-        return requestPath === pattern.path || requestPath.startsWith(pattern.path + '/');
-      }
-      return pattern.path === requestPath;
-    });
-
-    if (isAllowed) {
-      return next();
-    }
-
-    // Block access to other endpoints
-    logSystem.warn('Unverified user blocked from endpoint', { 
-      userId: user.id, 
-      userType: user.userType, 
-      path: requestPath, 
-      method: requestMethod 
-    });
-    
-    return res.status(403).json({
-      message: "Debe completar la verificación de identidad antes de acceder a esta función",
-      requiresVerification: true,
-      redirectTo: '/verify-pending'
-    });
-  });
 
   const httpServer = createServer(app);
 
@@ -585,27 +431,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUserById(userId);
       if (!user) {
         logSystem.warn('WebSocket rejected: User not found', { userId });
-        ws.close();
-        return;
-      }
-
-      // Block unverified users from WebSocket access
-      if (userNeedsVerification(user)) {
-        logSystem.warn('WebSocket rejected: User needs verification', { 
-          userId: user.id, 
-          userType: user.userType,
-          cedulaVerificada: user.cedulaVerificada,
-          emailVerificado: user.emailVerificado,
-          fotoVerificada: user.fotoVerificada
-        });
-        ws.send(JSON.stringify({
-          type: 'error',
-          payload: { 
-            message: 'Debe completar la verificación de identidad',
-            requiresVerification: true,
-            redirectTo: '/verify-pending'
-          }
-        }));
         ws.close();
         return;
       }
@@ -783,43 +608,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const requestedType = userType || 'cliente';
-      const userTypeLabel = requestedType === 'conductor' ? 'operador' : 'cliente';
-      
-      // Check if user already exists with the same email AND type
-      const existingUserSameType = await storage.getUserByEmailAndType(userData.email, requestedType);
-      if (existingUserSameType) {
-        logAuth.registerFailed(userData.email, "Email already registered for same account type");
-        
-        // Check if user needs to complete verification
-        const needsVerification = requestedType === 'conductor' 
-          ? !existingUserSameType.cedulaVerificada 
-          : !existingUserSameType.emailVerificado;
-        
-        if (needsVerification) {
-          const verificationMessage = requestedType === 'conductor'
-            ? `Ya tienes una cuenta de operador con este correo. Inicia sesión para completar la verificación de tu cédula.`
-            : `Ya tienes una cuenta de cliente con este correo. Inicia sesión para acceder a tu cuenta.`;
-          return res.status(400).json({ 
-            message: verificationMessage,
-            needsVerification: true,
-            userType: requestedType
-          });
-        }
-        
-        return res.status(400).json({ 
-          message: `Ya tienes una cuenta de ${userTypeLabel} con este correo. Inicia sesión para acceder.` 
-        });
+      const existingUser = await storage.getUserByEmail(userData.email);
+      if (existingUser) {
+        logAuth.registerFailed(userData.email, "Email already registered");
+        return res.status(400).json({ message: "Email ya está registrado" });
       }
 
-      // Check phone for same account type (simple duplicate check, no verification logic)
       if (userData.phone) {
-        const existingPhoneSameType = await storage.getUserByPhone(userData.phone);
-        if (existingPhoneSameType && existingPhoneSameType.userType === requestedType) {
-          logAuth.registerFailed(userData.email, "Phone already registered for same account type");
-          return res.status(400).json({ 
-            message: `Ya tienes una cuenta de ${userTypeLabel} con este teléfono. Inicia sesión para acceder.` 
-          });
+        const existingPhone = await storage.getUserByPhone(userData.phone);
+        if (existingPhone) {
+          logAuth.registerFailed(userData.email, "Phone already registered");
+          return res.status(400).json({ message: "Teléfono ya está registrado" });
         }
       }
 
@@ -959,52 +758,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timestamp: new Date().toISOString(),
         error: error.message
       });
-    }
-  });
-
-  // Storage provider info
-  app.get("/api/storage/info", async (_req: Request, res: Response) => {
-    res.json({
-      provider: getActiveProviderName(),
-      initialized: isStorageInitialized(),
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  // Serve files from filesystem storage (for CapRover/local deployments)
-  app.get("/api/storage/files/*", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    try {
-      const key = req.path.replace('/api/storage/files/', '');
-      
-      if (!key || key.includes('..')) {
-        return res.status(400).json({ message: "Invalid file path" });
-      }
-
-      const fileBuffer = await getDocument(key);
-      if (!fileBuffer) {
-        return res.status(404).json({ message: "File not found" });
-      }
-
-      const ext = key.split('.').pop()?.toLowerCase() || '';
-      const mimeTypes: Record<string, string> = {
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'png': 'image/png',
-        'pdf': 'application/pdf',
-        'gif': 'image/gif',
-        'webp': 'image/webp',
-      };
-
-      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
-      res.setHeader('Cache-Control', 'private, max-age=3600');
-      res.send(fileBuffer);
-    } catch (error: any) {
-      logSystem.error('Error serving file from storage', error);
-      res.status(500).json({ message: "Failed to retrieve file" });
     }
   });
 
@@ -1222,111 +975,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check if multiple accounts exist for an email (for disambiguation)
-  // Security: Only returns accounts where password matches that specific account
-  // Uses userType for selection (not raw IDs) since a user can only have ONE account per type
-  app.post("/api/auth/check-accounts", async (req: Request, res: Response) => {
-    try {
-      const { email, password } = req.body;
-      
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email y contraseña son requeridos" });
-      }
-      
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({ message: "Formato de correo electrónico inválido" });
-      }
-      
-      // Get all accounts with this email (using basic query without relations for performance)
-      let accounts;
-      try {
-        accounts = await storage.getBasicUsersByEmail(email);
-        console.log('Check-accounts: Found accounts count:', accounts?.length || 0);
-      } catch (dbError: any) {
-        console.error('Check-accounts: Database query failed:', dbError?.message);
-        throw new Error(`Database query failed: ${dbError?.message}`);
-      }
-      
-      if (accounts.length === 0) {
-        return res.status(401).json({ message: "Credenciales inválidas" });
-      }
-      
-      // Security: Validate password against EACH individual account
-      // Only return accounts where the provided password matches that specific account's hash
-      // This prevents privilege escalation - you can only access accounts where you know the password
-      const validAccounts = [];
-      for (const account of accounts) {
-        // Skip accounts without a valid password hash (safety check)
-        if (!account.passwordHash) {
-          continue;
-        }
-        
-        // Only check cliente and conductor accounts for disambiguation
-        if (account.userType !== 'cliente' && account.userType !== 'conductor') {
-          continue;
-        }
-        
-        try {
-          const isValid = await bcrypt.compare(password, account.passwordHash);
-          if (isValid) {
-            validAccounts.push({
-              userType: account.userType,
-              nombre: account.nombre,
-              apellido: account.apellido,
-              fotoUrl: account.fotoUrl,
-            });
-          }
-        } catch (bcryptError) {
-          // Log but don't fail the whole request if one account has an invalid hash
-          logSystem.error('Bcrypt compare error for account', bcryptError, { 
-            email: account.email, 
-            userType: account.userType 
-          });
-          continue;
-        }
-      }
-      
-      // No valid accounts with matching password
-      if (validAccounts.length === 0) {
-        logAuth.loginFailed(email, "Invalid password");
-        return res.status(401).json({ message: "Credenciales inválidas" });
-      }
-      
-      // If only one valid account, no disambiguation needed
-      if (validAccounts.length === 1) {
-        return res.json({ 
-          requiresDisambiguation: false,
-          accounts: validAccounts
-        });
-      }
-      
-      // Multiple accounts found - return info for disambiguation
-      // Note: We use userType for selection since each email can only have ONE account per type
-      return res.json({
-        requiresDisambiguation: true,
-        accounts: validAccounts,
-      });
-      
-    } catch (error: any) {
-      const errorMessage = error?.message || 'Unknown error';
-      const errorStack = error?.stack || '';
-      console.error('Check accounts error details:', {
-        message: errorMessage,
-        stack: errorStack,
-        email: req.body.email,
-        errorType: error?.constructor?.name
-      });
-      logSystem.error('Check accounts error', error, { 
-        email: req.body.email,
-        errorMessage,
-        errorStack: errorStack.substring(0, 500)
-      });
-      res.status(500).json({ message: "Error al verificar cuentas" });
-    }
-  });
-
   app.post("/api/auth/login", passport.authenticate("local"), async (req: Request, res: Response) => {
     const user = req.user as any;
     
@@ -1335,23 +983,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // For clientes and conductores, validate that identity verification is complete
     if (user && !skipVerificationTypes.includes(user.userType)) {
-      // Only email verification is required (no SMS)
-      const emailVerificado = user.emailVerificado === true;
+      // Check email verification (telefonoVerificado OR emailVerificado - either one counts as contact verified)
+      const contactoVerificado = user.telefonoVerificado === true || user.emailVerificado === true;
       
       const verificationStatus = {
         cedulaVerificada: user.cedulaVerificada === true,
-        emailVerificado: emailVerificado,
+        telefonoVerificado: contactoVerificado,
         fotoVerificada: user.fotoVerificada === true,
       };
       
       // Determine what's required based on user type
       const isConductor = user.userType === 'conductor';
       const needsVerification = isConductor 
-        ? (!verificationStatus.cedulaVerificada || !emailVerificado || !verificationStatus.fotoVerificada)
-        : (!verificationStatus.cedulaVerificada || !emailVerificado);
+        ? (!verificationStatus.cedulaVerificada || !contactoVerificado || !verificationStatus.fotoVerificada)
+        : (!verificationStatus.cedulaVerificada || !contactoVerificado);
       
-      // If verification is missing, return 403 but KEEP session active
-      // This allows the user to complete verification steps (photo upload, OTP, etc.)
+      // If verification is missing, return 403 with minimal safe data and redirect to complete registration
       if (needsVerification) {
         // Return only safe, non-sensitive user data for the verification page
         const safeUserData = {
@@ -1359,15 +1006,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: user.email,
           nombre: user.nombre,
           apellido: user.apellido,
+          phone: user.phone,
           userType: user.userType,
           cedulaVerificada: user.cedulaVerificada,
-          emailVerificado: user.emailVerificado,
+          telefonoVerificado: user.telefonoVerificado,
           fotoVerificada: user.fotoVerificada,
         };
         
-        // Keep session active so user can complete verification steps
-        // The frontend will redirect to verify-pending page
-        // Verification endpoints will work since req.isAuthenticated() will return true
         return res.status(403).json({
           message: "Debe completar la verificación de identidad antes de acceder",
           requiresVerification: true,
@@ -1403,20 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {
     req.logout(() => {
-      // Destroy the session completely to prevent any stale data
-      req.session.destroy((err) => {
-        if (err) {
-          console.error('Session destroy error:', err);
-        }
-        // Clear the session cookie
-        res.clearCookie('connect.sid', {
-          path: '/',
-          httpOnly: true,
-          secure: isProduction,
-          sameSite: 'lax',
-        });
-        res.json({ message: "Logged out" });
-      });
+      res.json({ message: "Logged out" });
     });
   });
 
@@ -1426,24 +1058,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(getSafeUser(req.user));
     } else {
       res.status(401).json({ message: "Not authenticated" });
-    }
-  });
-
-  // Rate limiters for OTP endpoints (must be declared before use)
-  const verifyOTPLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // max 10 requests per hour per IP
-    message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora.",
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (req, res) => {
-      logSystem.warn('Rate limit exceeded for OTP verification', { 
-        ip: req.ip, 
-        userId: req.user?.id 
-      });
-      res.status(429).json({ 
-        message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora." 
-      });
     }
   });
 
@@ -1503,9 +1117,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/verify-otp", verifyOTPLimiter, async (req: Request, res: Response) => {
+  app.post("/api/auth/verify-otp", async (req: Request, res: Response) => {
     try {
-      const { email, codigo, tipoOperacion, userType } = req.body;
+      const { email, codigo, tipoOperacion } = req.body;
 
       if (!email || !codigo || !tipoOperacion) {
         return res.status(400).json({ message: "Datos incompletos" });
@@ -1533,24 +1147,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.markVerificationCodeAsUsed(verificationCode.id);
 
       if (tipoOperacion === 'registro') {
-        // Fix: Use getUserByEmailAndType to update the correct account
-        // when a user has multiple accounts (cliente/conductor) with same email
-        let user;
-        if (userType && (userType === 'cliente' || userType === 'conductor')) {
-          user = await storage.getUserByEmailAndType(email, userType);
-          logSystem.info('OTP verification using userType', { email, userType, userId: user?.id });
-        } else {
-          // Fallback for backwards compatibility - use first matching user
-          user = await storage.getUserByEmail(email);
-          logSystem.warn('OTP verification without userType - using fallback', { email, userId: user?.id });
-        }
-        
+        const user = await storage.getUserByEmail(email);
         if (user) {
           await storage.updateUser(user.id, { 
             emailVerificado: true,
             estadoCuenta: 'activo'
           });
-          logAuth.loginSuccess(user.id, `Email verified for ${user.userType} account`);
         }
       }
 
@@ -1597,6 +1199,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.status(429).json({ 
         message: "Demasiados intentos de envío de código. Intenta nuevamente en 1 hora." 
+      });
+    }
+  });
+
+  const verifyOTPLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10, // max 10 requests per hour per IP
+    message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logSystem.warn('Rate limit exceeded for OTP verification', { 
+        ip: req.ip, 
+        userId: req.user?.id 
+      });
+      res.status(429).json({ 
+        message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora." 
       });
     }
   });
@@ -1688,38 +1307,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { scanAndVerifyCedula, isVerifikConfigured } = await import("./services/verifik-ocr");
       
       if (!isVerifikConfigured()) {
-        if (req.isAuthenticated() && image) {
-          let imageUrl: string | null = null;
-          
-          try {
-            const timestamp = Date.now();
-            const filename = `cedula_${req.user!.id}_${timestamp}.jpg`;
-            const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
-            imageUrl = uploadResult.url;
-            
-            await storage.updateUser(req.user!.id, {
-              cedulaImageUrl: uploadResult.url
-            });
-            
-            logSystem.info('Cedula image saved for manual verification', { userId: req.user!.id });
-          } catch (uploadError) {
-            logSystem.warn('Failed to save cedula image, continuing without image storage', { 
-              userId: req.user!.id, 
-              error: uploadError 
-            });
-          }
-          
-          return res.json({
-            success: true,
-            verified: false,
-            manualVerificationRequired: true,
-            imageSaved: !!imageUrl,
-            message: imageUrl 
-              ? "Tu cédula ha sido recibida y será verificada manualmente por un administrador."
-              : "Tu cédula será verificada manualmente. Por favor, asegúrate de tenerla disponible si se solicita."
-          });
-        }
-        
         return res.status(503).json({ 
           message: "El servicio de verificación OCR no está configurado" 
         });
@@ -1731,7 +1318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (req.isAuthenticated()) {
         userNombre = req.user!.nombre;
-        userApellido = req.user!.apellido ?? undefined;
+        userApellido = req.user!.apellido;
       } else if (req.body.nombre && req.body.apellido) {
         // For registration flow - name provided in request body
         userNombre = req.body.nombre;
@@ -1739,23 +1326,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = await scanAndVerifyCedula(image, userNombre, userApellido);
-
-      // Save cedula image if user is authenticated (regardless of OCR result)
-      if (req.isAuthenticated() && image) {
-        try {
-          const timestamp = Date.now();
-          const filename = `cedula_${req.user!.id}_${timestamp}.jpg`;
-          const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
-          
-          await storage.updateUser(req.user!.id, {
-            cedulaImageUrl: uploadResult.url
-          });
-          
-          logSystem.info('Cedula image saved', { userId: req.user!.id, url: uploadResult.url });
-        } catch (uploadError) {
-          logSystem.warn('Failed to save cedula image', { userId: req.user!.id, error: uploadError });
-        }
-      }
 
       if (!result.success) {
         logSystem.warn('OCR scan failed', { 
@@ -1767,120 +1337,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if name extraction failed - allow manual verification instead of blocking
+      // Check if name extraction failed
       if (userNombre && userApellido && (!result.nombre || !result.apellido)) {
-        logSystem.warn('Could not verify name match - insufficient data from OCR, allowing manual verification', {
+        logSystem.warn('Could not verify name match - insufficient data from OCR', {
           userId: req.user?.id,
           hasNombre: !!result.nombre,
           hasApellido: !!result.apellido,
           confidenceScore: result.confidenceScore
         });
         
-        // Save cedula for manual review if authenticated
-        if (req.isAuthenticated() && result.cedula) {
-          let imageUrl: string | null = null;
-          
-          if (image) {
-            try {
-              const timestamp = Date.now();
-              const filename = `cedula_manual_${req.user!.id}_${timestamp}.jpg`;
-              const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
-              imageUrl = uploadResult.url;
-            } catch (uploadError) {
-              logSystem.warn('Failed to upload cedula image, saving cedula number only', { 
-                userId: req.user!.id, 
-                error: uploadError 
-              });
-            }
-          }
-          
-          const updateData: any = { cedula: result.cedula };
-          if (imageUrl) updateData.cedulaImageUrl = imageUrl;
-          
-          await storage.updateUser(req.user!.id, updateData);
-          logSystem.info('Cedula saved for manual verification (name extraction failed)', { 
-            userId: req.user!.id,
-            hasImage: !!imageUrl
-          });
-        }
-        
-        return res.json({
-          success: true,
-          cedula: result.cedula,
-          nombre: result.nombre,
-          apellido: result.apellido,
+        return res.status(400).json({
+          success: false,
           verified: false,
           nameMatch: false,
-          manualVerificationRequired: true,
           confidenceScore: result.confidenceScore,
-          message: "Cédula escaneada. La verificación será revisada manualmente."
+          message: "No se pudo extraer el nombre completo de la cédula. Por favor, asegúrate de que la imagen sea clara y legible."
         });
       }
 
-      // Check name match result - if skipVerification is true or similarity is reasonable, allow to continue
+      // Check name match result
       if (!result.nameMatch) {
         logSystem.warn('Name mismatch during cedula verification', {
           userId: req.user?.id,
           registeredName: `${userNombre} ${userApellido}`,
           documentName: `${result.nombre} ${result.apellido}`,
-          similarity: result.nameSimilarity,
-          skipVerification
+          similarity: result.nameSimilarity
         });
-        
-        // If similarity is at least 30% or skipVerification is true, allow manual verification
-        const allowManualVerification = skipVerification || (result.nameSimilarity && result.nameSimilarity >= 0.3);
-        
-        if (allowManualVerification) {
-          logSystem.info('Allowing manual verification despite name mismatch', {
-            userId: req.user?.id,
-            similarity: result.nameSimilarity,
-            skipVerification
-          });
-          
-          // Save cedula for manual review if authenticated
-          if (req.isAuthenticated() && result.cedula) {
-            let imageUrl: string | null = null;
-            
-            // Try to save image, but don't block if it fails
-            if (image) {
-              try {
-                const timestamp = Date.now();
-                const filename = `cedula_manual_${req.user!.id}_${timestamp}.jpg`;
-                const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
-                imageUrl = uploadResult.url;
-              } catch (uploadError) {
-                logSystem.warn('Failed to upload cedula image, saving cedula number only', { 
-                  userId: req.user!.id, 
-                  error: uploadError 
-                });
-              }
-            }
-            
-            // Always save cedula number (and image URL if available)
-            const updateData: any = { cedula: result.cedula };
-            if (imageUrl) updateData.cedulaImageUrl = imageUrl;
-            
-            await storage.updateUser(req.user!.id, updateData);
-            logSystem.info('Cedula saved for manual verification', { 
-              userId: req.user!.id, 
-              cedula: result.cedula?.slice(0, 5) + '***',
-              hasImage: !!imageUrl
-            });
-          }
-          
-          return res.json({
-            success: true,
-            cedula: result.cedula,
-            nombre: result.nombre,
-            apellido: result.apellido,
-            verified: false,
-            nameMatch: false,
-            manualVerificationRequired: true,
-            confidenceScore: result.confidenceScore,
-            similarity: result.nameSimilarity,
-            message: "Cédula escaneada. La verificación del nombre será revisada manualmente."
-          });
-        }
         
         return res.status(400).json({
           success: false,
@@ -1972,7 +1454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (req.isAuthenticated()) {
         userNombre = req.user!.nombre;
-        userApellido = req.user!.apellido ?? undefined;
+        userApellido = req.user!.apellido;
       } else if (nombre && apellido) {
         // For registration flow - name provided in request body
         userNombre = nombre;
@@ -2221,36 +1703,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const isDriver = user.userType === 'conductor';
       const cedulaVerificada = user.cedulaVerificada === true;
-      // Cedula pending review = image submitted but not yet verified
-      const cedulaPendingReview = !cedulaVerificada && !!user.cedulaImageUrl;
-      // Only email verification is required (no SMS)
-      const emailVerificado = user.emailVerificado === true;
+      // Either telefonoVerificado OR emailVerificado counts as contact verified
+      const contactoVerificado = user.telefonoVerificado === true || user.emailVerificado === true;
       const fotoVerificada = user.fotoVerificada === true;
       const fotoVerificadaScore = user.fotoVerificadaScore ? parseFloat(user.fotoVerificadaScore) : null;
 
-      // For onboarding flow purposes, cedula step is complete if verified OR pending review
-      const cedulaStepComplete = cedulaVerificada || cedulaPendingReview;
-
-      // Fetch conductor data for drivers
-      let conductor = null;
-      if (isDriver) {
-        conductor = await storage.getConductorByUserId(user.id);
-      }
-
-      const steps: Array<{ id: string; name: string; description: string; completed: boolean; pendingReview?: boolean; required: boolean }> = [
+      const steps = [
         {
           id: 'cedula',
           name: 'Verificación de Cédula',
           description: 'Escanea tu cédula de identidad',
-          completed: cedulaStepComplete,
-          pendingReview: cedulaPendingReview,
+          completed: cedulaVerificada,
           required: true
         },
         {
-          id: 'email',
+          id: 'phone',
           name: 'Verificación de Correo',
           description: 'Verifica tu correo electrónico con código',
-          completed: emailVerificado,
+          completed: contactoVerificado,
           required: true
         }
       ];
@@ -2263,27 +1733,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completed: fotoVerificada,
           required: true
         });
-        steps.push({
-          id: 'license',
-          name: 'Subir Licencia',
-          description: 'Sube fotos de tu licencia (frente y reverso)',
-          completed: !!(conductor?.licenciaFrontalUrl && conductor?.licenciaTraseraUrl),
-          required: true
-        });
-        steps.push({
-          id: 'categories',
-          name: 'Categorías de Servicio',
-          description: 'Selecciona las categorías de servicio que ofreces',
-          completed: conductor?.categoriasConfiguradas || false,
-          required: true
-        });
-        steps.push({
-          id: 'vehicles',
-          name: 'Registrar Vehículos',
-          description: 'Registra tus vehículos para cada categoría',
-          completed: conductor?.vehiculosRegistrados || false,
-          required: true
-        });
       }
 
       const completedSteps = steps.filter(s => s.completed).length;
@@ -2293,41 +1742,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         userType: user.userType,
-        // Include basic user data for the verification page
-        user: {
-          id: user.id,
-          email: user.email,
-          nombre: user.nombre,
-          apellido: user.apellido,
-          userType: user.userType,
-          cedulaVerificada: user.cedulaVerificada,
-          emailVerificado: user.emailVerificado,
-          telefonoVerificado: user.telefonoVerificado,
-          fotoVerificada: user.fotoVerificada,
-        },
         verification: {
           cedulaVerificada,
-          cedulaPendingReview,
-          emailVerificado,
+          telefonoVerificado,
           fotoVerificada,
           fotoVerificadaScore,
           cedula: cedulaVerificada ? user.cedula : null,
-          cedulaImageUrl: user.cedulaImageUrl || null,
-          email: user.email || null,
-          fotoUrl: user.fotoUrl || null,
-          ...(isDriver && {
-            licenciaVerificada: conductor?.licenciaVerificada || false,
-            categoriasConfiguradas: conductor?.categoriasConfiguradas || false,
-            vehiculosRegistrados: conductor?.vehiculosRegistrados || false,
-            licenciaFrontalUrl: conductor?.licenciaFrontalUrl || null,
-            licenciaTraseraUrl: conductor?.licenciaTraseraUrl || null
-          })
+          phone: telefonoVerificado ? user.phone : null,
+          fotoUrl: user.fotoUrl || null
         },
         steps,
         progress,
         allCompleted,
-        // canAccessPlatform still requires actual verification, not just pending review
-        canAccessPlatform: isDriver ? allCompleted : (cedulaVerificada && emailVerificado)
+        canAccessPlatform: isDriver ? allCompleted : (cedulaVerificada && telefonoVerificado)
       });
     } catch (error: any) {
       logSystem.error('Get verification status error', error, { userId: req.user?.id });
@@ -2458,15 +1885,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             } else {
               // Create new document as aprobado (already validated by Verifik)
-              const doc = await storage.createDocumento({
+              await storage.createDocumento({
                 tipo: 'foto_perfil',
                 conductorId: conductor.id,
                 url: photoDataUrl,
                 nombreArchivo: 'profile_photo_verified.jpg',
                 tamanoArchivo: estimatedSize,
                 mimeType: mimeType,
+                estado: 'aprobado',
               });
-              await storage.updateDocumento(doc.id, { estado: 'aprobado' });
             }
             logSystem.info("Profile photo document created/updated for conductor", {
               conductorId: conductor.id,
@@ -2631,6 +2058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               nombreArchivo: req.file.originalname,
               tamanoArchivo: req.file.size,
               mimeType: req.file.mimetype,
+              estado: 'pendiente',
             });
           } else {
             // Create new document
@@ -2641,6 +2069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               nombreArchivo: req.file.originalname,
               tamanoArchivo: req.file.size,
               mimeType: req.file.mimetype,
+              estado: 'pendiente',
             });
           }
         }
@@ -2655,50 +2084,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Profile photo upload error', error, { userId: req.user?.id });
       res.status(500).json({ message: "Error al subir la foto de perfil" });
-    }
-  });
-
-  app.post("/api/users/change-password", async (req: Request, res: Response) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ message: "No autenticado" });
-      }
-
-      const { currentPassword, newPassword, confirmPassword } = req.body;
-
-      if (!currentPassword || !newPassword || !confirmPassword) {
-        return res.status(400).json({ message: "Todos los campos son requeridos" });
-      }
-
-      if (newPassword.length < 6) {
-        return res.status(400).json({ message: "La nueva contraseña debe tener al menos 6 caracteres" });
-      }
-
-      if (newPassword !== confirmPassword) {
-        return res.status(400).json({ message: "Las contraseñas no coinciden" });
-      }
-
-      const userId = req.user!.id;
-      const user = await storage.getUserById(userId);
-
-      if (!user) {
-        return res.status(404).json({ message: "Usuario no encontrado" });
-      }
-
-      const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
-      if (!isValidPassword) {
-        return res.status(400).json({ message: "La contraseña actual es incorrecta" });
-      }
-
-      const passwordHash = await bcrypt.hash(newPassword, 10);
-      await storage.updateUser(userId, { passwordHash });
-
-      logAuth.passwordReset(userId);
-
-      res.json({ message: "Contraseña actualizada exitosamente" });
-    } catch (error: any) {
-      logSystem.error('Change password error', error, { userId: req.user?.id });
-      res.status(500).json({ message: "Error al cambiar la contraseña" });
     }
   });
 
@@ -2783,7 +2168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Contraseña actualizada exitosamente" });
     } catch (error: any) {
-      logSystem.error('Reset password error', error, { telefono: req.body?.telefono });
+      logSystem.error('Reset password error', error, { telefono });
       res.status(500).json({ message: "Error al resetear contraseña" });
     }
   });
@@ -2914,12 +2299,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const user = req.user!;
-      let services: any[] = [];
+      let services;
 
       if (user.userType === 'cliente') {
         services = await storage.getServiciosByClientId(user.id);
       } else if (user.userType === 'conductor') {
         services = await storage.getServiciosByConductorId(user.id);
+      } else {
+        services = [];
       }
 
       res.json(services);
@@ -2943,101 +2330,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get service error', error);
       res.status(500).json({ message: "Failed to get service" });
-    }
-  });
-
-  // Endpoint to convert a client account to a driver account
-  app.post("/api/drivers/become-driver", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Debe iniciar sesión" });
-    }
-
-    try {
-      // Get fresh user data from storage to avoid stale session data
-      const userId = (req.user as any)?.id;
-      if (!userId) {
-        return res.status(401).json({ message: "Sesión inválida" });
-      }
-      
-      const user = await storage.getUserById(userId);
-      if (!user) {
-        return res.status(404).json({ message: "Usuario no encontrado" });
-      }
-      
-      // Check if user is already a driver
-      if (user.userType === 'conductor') {
-        return res.status(400).json({ message: "Ya eres conductor" });
-      }
-      
-      // Check if user is a client
-      if (user.userType !== 'cliente') {
-        return res.status(400).json({ message: "Solo los clientes pueden convertirse en conductores" });
-      }
-      
-      // Check if user already has a conductor profile
-      const existingConductor = await storage.getConductorByUserId(user.id);
-      if (existingConductor) {
-        // Just update the user type
-        await storage.updateUser(user.id, { userType: 'conductor' });
-        
-        // Update session with new user data
-        const updatedUser = await storage.getUserById(user.id);
-        if (!updatedUser) {
-          logSystem.error('Failed to get updated user after conversion', { userId: user.id });
-          return res.status(500).json({ message: "Error al actualizar la sesión" });
-        }
-        
-        return new Promise<void>((resolve) => {
-          req.login(updatedUser as any, (err) => {
-            if (err) {
-              logSystem.error('Failed to update session after become-driver', { userId: user.id, error: err });
-              res.status(500).json({ message: "Error al actualizar la sesión" });
-            } else {
-              res.json({ 
-                success: true, 
-                message: "Tu cuenta ha sido actualizada a conductor",
-                redirectTo: '/driver/dashboard'
-              });
-            }
-            resolve();
-          });
-        });
-      }
-      
-      // Update user type to conductor
-      await storage.updateUser(user.id, { 
-        userType: 'conductor',
-        estadoCuenta: 'pendiente_verificacion'
-      });
-      
-      // Update session with new user data
-      const updatedUser = await storage.getUserById(user.id);
-      if (!updatedUser) {
-        logSystem.error('Failed to get updated user after conversion', { userId: user.id });
-        return res.status(500).json({ message: "Error al actualizar la sesión" });
-      }
-      
-      logSystem.info('Client converted to driver', { userId: user.id, email: user.email });
-      
-      return new Promise<void>((resolve) => {
-        req.login(updatedUser as any, (err) => {
-          if (err) {
-            logSystem.error('Failed to update session after become-driver', { userId: user.id, error: err });
-            res.status(500).json({ message: "Error al actualizar la sesión" });
-          } else {
-            res.json({ 
-              success: true, 
-              message: "Tu cuenta ha sido convertida a conductor. Completa tu perfil.",
-              redirectTo: '/auth/onboarding-wizard',
-              requiresOnboarding: true
-            });
-          }
-          resolve();
-        });
-      });
-    } catch (error: any) {
-      logSystem.error('Become driver error', error, { userId: (req.user as any)?.id });
-      res.status(500).json({ message: "Error al convertir cuenta a conductor" });
     }
   });
 
@@ -3068,8 +2360,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getDocumentosByUsuarioId(userId),
         (async () => {
           try {
-            const user = await storage.getUserById(userId);
-            return user ? { cedulaVerificada: user.cedulaVerificada } : null;
+            const { getCedulaVerificationStatus } = await import('./services/identity');
+            return getCedulaVerificationStatus(userId);
           } catch {
             return null;
           }
@@ -3196,17 +2488,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      let conductor = await storage.getConductorByUserId(req.user!.id);
+      const conductor = await storage.getConductorByUserId(req.user!.id);
       if (!conductor) {
-        // Auto-create conductor record if it doesn't exist
-        logSystem.info('Creating conductor record for user during get services', { userId: req.user!.id });
-        conductor = await storage.createConductor({
-          userId: req.user!.id,
-          licencia: '',
-          placaGrua: '',
-          marcaGrua: '',
-          modeloGrua: '',
-        });
+        return res.status(404).json({ message: "Conductor no encontrado" });
       }
 
       const servicios = await storage.getConductorServicios(conductor.id);
@@ -3224,17 +2508,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      let conductor = await storage.getConductorByUserId(req.user!.id);
+      const conductor = await storage.getConductorByUserId(req.user!.id);
       if (!conductor) {
-        // Auto-create conductor record if it doesn't exist
-        logSystem.info('Creating conductor record for user during set services', { userId: req.user!.id });
-        conductor = await storage.createConductor({
-          userId: req.user!.id,
-          licencia: '',
-          placaGrua: '',
-          marcaGrua: '',
-          modeloGrua: '',
-        });
+        return res.status(404).json({ message: "Conductor no encontrado" });
       }
 
       const { categorias } = req.body;
@@ -3274,10 +2550,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.setConductorServicios(conductor.id, categorias);
-      
-      // Mark categories as configured
-      await storage.updateConductor(conductor.id, { categoriasConfiguradas: true });
-      
       const servicios = await storage.getConductorServicios(conductor.id);
       
       logSystem.info('Driver services updated', { conductorId: conductor.id, count: servicios.length });
@@ -3373,34 +2645,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fotoUrl,
       });
 
-      // Check if all selected categories have vehicles registered
-      const [servicios, vehiculos] = await Promise.all([
-        storage.getConductorServicios(conductor.id),
-        storage.getConductorVehiculos(conductor.id)
-      ]);
-      
-      const selectedCategories = servicios.map(s => s.categoriaServicio);
-      const vehicleCategories = vehiculos.filter(v => v.activo).map(v => v.categoria);
-      const allCategoriesHaveVehicles = selectedCategories.length > 0 && 
-        selectedCategories.every(cat => vehicleCategories.includes(cat));
-      
-      if (allCategoriesHaveVehicles) {
-        await storage.updateConductor(conductor.id, { vehiculosRegistrados: true });
-        logSystem.info('All categories have vehicles, marked vehiculosRegistrados', { conductorId: conductor.id });
-      }
-
       logSystem.info('Driver vehicle created/updated', { conductorId: conductor.id, categoria, vehiculoId: vehiculo.id });
       res.json(vehiculo);
     } catch (error: any) {
-      logSystem.error('Create driver vehicle error', { 
-        message: error?.message, 
-        stack: error?.stack,
-        conductorId: req.user?.id 
-      });
-      res.status(500).json({ 
-        message: error?.message || "Failed to create driver vehicle",
-        details: process.env.NODE_ENV !== 'production' ? error?.stack : undefined
-      });
+      logSystem.error('Create driver vehicle error', error);
+      res.status(500).json({ message: "Failed to create driver vehicle" });
     }
   });
 
@@ -4104,7 +3353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (!azulResult.success) {
-          logSystem.error('Azul payment failed on service completion', null, {
+          logTransaction.failed('Azul payment failed on service completion', {
             servicioId: oldService.id,
             isoCode: azulResult.isoCode,
             message: azulResult.responseMessage
@@ -4128,7 +3377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           azulReferenceNumber: azulResult.rrn,
         };
         
-        logSystem.info('Azul payment processed on service completion', {
+        logTransaction.success('Azul payment processed on service completion', {
           servicioId: oldService.id,
           azulOrderId: azulResult.azulOrderId,
           authorizationCode: azulResult.authorizationCode,
@@ -4203,117 +3452,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint for driver to extend destination up to 1.5km beyond original destination
-  const extendDestinationSchema = z.object({
-    destinoExtendidoLat: z.number().finite().min(-90).max(90),
-    destinoExtendidoLng: z.number().finite().min(-180).max(180),
-    destinoExtendidoDireccion: z.string().min(1).max(500),
-  });
-
-  app.post("/api/services/:id/extend-destination", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
-      return res.status(401).json({ message: "No autorizado" });
-    }
-
-    try {
-      const servicioId = req.params.id;
-      const servicio = await storage.getServicioById(servicioId);
-      
-      if (!servicio) {
-        return res.status(404).json({ message: "Servicio no encontrado" });
-      }
-
-      if (servicio.conductorId !== req.user!.id) {
-        return res.status(403).json({ message: "Solo el conductor asignado puede extender el destino" });
-      }
-
-      if (servicio.estado !== 'en_progreso') {
-        return res.status(400).json({ message: "Solo se puede extender el destino cuando el servicio está en progreso" });
-      }
-
-      const parseResult = extendDestinationSchema.safeParse(req.body);
-      if (!parseResult.success) {
-        return res.status(400).json({
-          message: "Datos de extensión inválidos",
-          errors: parseResult.error.issues
-        });
-      }
-
-      const { destinoExtendidoLat, destinoExtendidoLng, destinoExtendidoDireccion } = parseResult.data;
-
-      // Calculate distance from original destination to extended destination
-      const originalDestLat = parseFloat(servicio.destinoLat);
-      const originalDestLng = parseFloat(servicio.destinoLng);
-      
-      // Haversine formula to calculate distance in km
-      const toRad = (deg: number) => deg * (Math.PI / 180);
-      const R = 6371; // Earth's radius in km
-      const dLat = toRad(destinoExtendidoLat - originalDestLat);
-      const dLng = toRad(destinoExtendidoLng - originalDestLng);
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(toRad(originalDestLat)) * Math.cos(toRad(destinoExtendidoLat)) *
-                Math.sin(dLng / 2) * Math.sin(dLng / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const extensionKm = R * c;
-
-      // Maximum extension is 1.5km
-      const MAX_EXTENSION_KM = 1.5;
-      if (extensionKm > MAX_EXTENSION_KM) {
-        return res.status(400).json({ 
-          message: `La extensión máxima permitida es ${MAX_EXTENSION_KM}km. La distancia solicitada es ${extensionKm.toFixed(2)}km.`,
-          maxExtensionKm: MAX_EXTENSION_KM,
-          requestedExtensionKm: extensionKm
-        });
-      }
-
-      const updatedServicio = await storage.updateServicio(servicioId, {
-        destinoExtendidoLat: destinoExtendidoLat.toString(),
-        destinoExtendidoLng: destinoExtendidoLng.toString(),
-        destinoExtendidoDireccion,
-        distanciaExtensionKm: extensionKm.toFixed(2),
-        extensionAprobada: true,
-      });
-
-      logSystem.info('Service destination extended', {
-        servicioId,
-        conductorId: req.user!.id,
-        extensionKm: extensionKm.toFixed(2),
-        newDestination: destinoExtendidoDireccion
-      });
-
-      // Notify client about the extension
-      if (servicio.clienteId) {
-        await pushService.sendToUser(servicio.clienteId, {
-          title: 'Destino extendido',
-          body: `El operador ha extendido el destino ${extensionKm.toFixed(1)}km adicional a: ${destinoExtendidoDireccion}`,
-          data: { type: 'destination_extended', servicioId }
-        });
-      }
-
-      // Broadcast update to connected clients
-      if (serviceSessions.has(servicioId)) {
-        const broadcast = JSON.stringify({
-          type: 'service_status_change',
-          payload: updatedServicio,
-        });
-        serviceSessions.get(servicioId)!.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(broadcast);
-          }
-        });
-      }
-
-      res.json({
-        success: true,
-        servicio: updatedServicio,
-        extensionKm: extensionKm.toFixed(2)
-      });
-    } catch (error: any) {
-      logSystem.error('Extend destination error', error, { servicioId: req.params.id });
-      res.status(500).json({ message: "Error al extender el destino" });
-    }
-  });
-
   app.post("/api/services/:id/confirm-payment", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "No autenticado" });
@@ -4381,20 +3519,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canceladoAt: new Date(),
       });
 
-      logService.cancelled(servicioId, `Cancelled by ${req.user!.userType}`);
+      logService.info('Service cancelled', { 
+        servicioId,
+        cancelledBy: req.user!.id,
+        userType: req.user!.userType,
+        previousState: servicio.estado
+      });
 
       if (isDriver && servicio.clienteId) {
-        await pushService.sendToUser(servicio.clienteId, {
-          title: 'Servicio cancelado',
-          body: 'El operador ha cancelado el servicio. Puedes solicitar uno nuevo.',
-          data: { type: 'service_cancelled', servicioId }
-        });
+        await pushService.sendNotification(
+          servicio.clienteId,
+          'Servicio cancelado',
+          'El operador ha cancelado el servicio. Puedes solicitar uno nuevo.',
+          { type: 'service_cancelled', servicioId }
+        );
       } else if (isClient && servicio.conductorId) {
-        await pushService.sendToUser(servicio.conductorId, {
-          title: 'Servicio cancelado',
-          body: 'El cliente ha cancelado el servicio.',
-          data: { type: 'service_cancelled', servicioId }
-        });
+        await pushService.sendNotification(
+          servicio.conductorId,
+          'Servicio cancelado',
+          'El cliente ha cancelado el servicio.',
+          { type: 'service_cancelled', servicioId }
+        );
       }
 
       res.json(cancelledService);
@@ -4902,7 +4047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const comision of allComisiones) {
         const montoTotal = parseFloat(comision.montoTotal || '0');
-        const gatewayFee = parseFloat((comision as any).gatewayFeeAmount || '0');
+        const gatewayFee = parseFloat(comision.gatewayFeeAmount || '0');
         const montoOperador = parseFloat(comision.montoOperador || '0');
         const montoEmpresa = parseFloat(comision.montoEmpresa || '0');
         
@@ -4946,9 +4091,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .slice(0, 50)
         .map((c) => {
           const montoTotal = parseFloat(c.montoTotal || '0');
-          const gatewayFee = parseFloat((c as any).gatewayFeeAmount || '0');
-          const netAmount = (c as any).gatewayNetAmount 
-            ? parseFloat((c as any).gatewayNetAmount) 
+          const gatewayFee = parseFloat(c.gatewayFeeAmount || '0');
+          const netAmount = c.gatewayNetAmount 
+            ? parseFloat(c.gatewayNetAmount) 
             : montoTotal - gatewayFee;
           
           return {
@@ -5497,7 +4642,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apellido: user.apellido,
         email: user.email,
         cedula: user.cedula,
-        cedulaImageUrl: user.cedulaImageUrl,
         phone: user.phone,
         photoUrl: user.fotoUrl,
         userType: user.userType,
@@ -5520,43 +4664,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get pending cédula verifications error', error);
       res.status(500).json({ message: "Failed to get pending cédula verifications" });
-    }
-  });
-
-  // Serve cedula image from object storage (admin only)
-  app.get("/api/admin/cedula-image/:userId", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
-      return res.status(401).json({ message: "Not authorized" });
-    }
-
-    try {
-      const { userId } = req.params;
-      
-      if (!userId) {
-        return res.status(400).json({ message: "User ID is required" });
-      }
-
-      const user = await storage.getUserById(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (!user.cedulaImageUrl) {
-        return res.status(404).json({ message: "No cedula image available for this user" });
-      }
-
-      // Download the image from object storage
-      const imageBuffer = await storageService.downloadFile(user.cedulaImageUrl);
-      
-      // Determine content type based on file extension
-      const contentType = user.cedulaImageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'private, max-age=3600');
-      res.send(imageBuffer);
-    } catch (error: any) {
-      logSystem.error('Get cedula image error', error);
-      res.status(500).json({ message: "Failed to retrieve cedula image" });
     }
   });
 
@@ -6060,22 +5167,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let detectedTipoMensaje = tipoMensaje || 'texto';
 
       if (req.file) {
-        // Check storage availability before uploading
-        if (!isStorageInitialized()) {
-          return res.status(503).json({ 
-            message: "El servicio de almacenamiento no está disponible temporalmente. Por favor intenta de nuevo.",
-            retryable: true
-          });
-        }
         const fileName = `chat/${servicioId}/${Date.now()}-${req.file.originalname}`;
-        const uploadResult = await uploadDocument({
+        urlArchivo = await uploadDocument({
           buffer: req.file.buffer,
           originalName: req.file.originalname,
           mimeType: req.file.mimetype,
           userId: req.user!.id,
           documentType: 'chat_media',
         });
-        urlArchivo = uploadResult.url;
         nombreArchivo = req.file.originalname;
         
         if (req.file.mimetype.startsWith('video/')) {
@@ -6131,14 +5230,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "No se proporcionó ningún archivo" });
     }
 
-    // Check storage availability BEFORE processing
-    if (!isStorageInitialized()) {
-      return res.status(503).json({ 
-        message: "El servicio de almacenamiento no está disponible temporalmente. Por favor intenta de nuevo en unos segundos.",
-        retryable: true
-      });
-    }
-
     try {
       const { tipoDocumento, fechaVencimiento } = req.body;
       
@@ -6191,6 +5282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombreArchivo: uploadResult.fileName,
         tamanoArchivo: uploadResult.fileSize,
         mimeType: uploadResult.mimeType,
+        estado: 'pendiente',
         validoHasta: validoHasta,
       });
 
@@ -6199,182 +5291,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Upload document error', error);
       res.status(500).json({ message: error.message || "Failed to upload document" });
-    }
-  });
-
-  // Upload license document (driver verification flow)
-  app.post("/api/driver/documents", upload.single('document'), async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
-    if (req.user!.userType !== 'conductor') {
-      return res.status(403).json({ message: "Solo conductores pueden subir documentos" });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ message: "No se proporcionó ningún archivo" });
-    }
-
-    // Check storage availability BEFORE processing
-    if (!isStorageInitialized()) {
-      return res.status(503).json({ 
-        message: "El servicio de almacenamiento no está disponible temporalmente. Por favor intenta de nuevo en unos segundos.",
-        retryable: true
-      });
-    }
-
-    try {
-      const { type } = req.body;
-      
-      if (!type || !['licencia', 'licencia_trasera'].includes(type)) {
-        return res.status(400).json({ message: "Tipo de documento inválido. Debe ser 'licencia' o 'licencia_trasera'" });
-      }
-
-      let conductor = await storage.getConductorByUserId(req.user!.id);
-      if (!conductor) {
-        // Auto-create conductor record if it doesn't exist (for operators who registered without vehicle data)
-        logSystem.info('Creating conductor record for user during document upload', { userId: req.user!.id });
-        conductor = await storage.createConductor({
-          userId: req.user!.id,
-          licencia: '',
-          placaGrua: '',
-          marcaGrua: '',
-          modeloGrua: '',
-        });
-      }
-
-      // For front license, validate with Verifik before uploading
-      let verifikValidation: { verified: boolean; error?: string; nombre?: string; apellido?: string; licenseNumber?: string } = { verified: false };
-      
-      if (type === 'licencia') {
-        const { scanAndVerifyLicense, isVerifikConfigured } = await import("./services/verifik-ocr");
-        
-        const verifikIsConfigured = isVerifikConfigured();
-        logSystem.info('Verifik configuration check for license upload', { 
-          isConfigured: verifikIsConfigured,
-          hasApiKey: !!process.env.VERIFIK_API_KEY,
-          apiKeyLength: process.env.VERIFIK_API_KEY?.length || 0
-        });
-        
-        if (verifikIsConfigured) {
-          // Convert buffer to base64 for Verifik
-          const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-          
-          // Get user data for name comparison
-          const user = await storage.getUserById(req.user!.id);
-          const userNombre = user?.nombre;
-          const userApellido = user?.apellido ?? undefined;
-          
-          const result = await scanAndVerifyLicense(imageBase64, userNombre, userApellido);
-          
-          logSystem.info('Verifik license validation result', {
-            conductorId: conductor.id,
-            success: result.success,
-            verified: result.verified,
-            nameMatch: result.nameMatch,
-            confidenceScore: result.confidenceScore,
-            licenseNumber: result.licenseNumber ? result.licenseNumber.slice(0, 4) + '***' : undefined
-          });
-          
-          if (!result.success) {
-            return res.status(400).json({ 
-              message: result.error || "No se pudo validar la licencia con el servicio de verificación",
-              verified: false
-            });
-          }
-          
-          if (!result.verified) {
-            // License not verified - still save but warn
-            logSystem.warn('License uploaded but not verified by Verifik', {
-              conductorId: conductor.id,
-              nameMatch: result.nameMatch,
-              confidenceScore: result.confidenceScore,
-              error: result.error
-            });
-          }
-          
-          verifikValidation = {
-            verified: result.verified,
-            error: result.error,
-            nombre: result.nombre,
-            apellido: result.apellido,
-            licenseNumber: result.licenseNumber
-          };
-        } else {
-          logSystem.warn('Verifik not configured, license requires manual verification', { conductorId: conductor.id });
-        }
-      }
-
-      // Upload to object storage
-      const uploadResult = await uploadDocument({
-        buffer: req.file.buffer,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        userId: conductor.id,
-        documentType: type,
-      });
-
-      // Update conductor record with the license URL
-      const updateData: Record<string, any> = {};
-      if (type === 'licencia') {
-        updateData.licenciaFrontalUrl = uploadResult.url;
-      } else {
-        updateData.licenciaTraseraUrl = uploadResult.url;
-      }
-
-      // Get updated conductor to check if both license images are now present
-      const updatedConductor = await storage.updateConductor(conductor.id, updateData);
-
-      // Only set licenciaVerificada to true if:
-      // 1. Both front and back are uploaded AND
-      // 2. Front license was verified by Verifik (or Verifik is not configured)
-      if (updatedConductor.licenciaFrontalUrl && updatedConductor.licenciaTraseraUrl) {
-        const { isVerifikConfigured } = await import("./services/verifik-ocr");
-        
-        // If Verifik is configured, only verify if the front was validated
-        // If Verifik is not configured, mark for manual review (don't auto-verify)
-        if (isVerifikConfigured()) {
-          if (verifikValidation.verified || type === 'licencia_trasera') {
-            // For back upload, check if front was already verified
-            // We need to re-validate if this is the back upload
-            if (type === 'licencia_trasera') {
-              // Trust that front was already validated when uploaded
-              await storage.updateConductor(conductor.id, { licenciaVerificada: true });
-              logSystem.info('License verified - both sides uploaded and front was validated', { conductorId: conductor.id });
-            } else {
-              await storage.updateConductor(conductor.id, { licenciaVerificada: true });
-              logSystem.info('License verified via Verifik', { conductorId: conductor.id });
-            }
-          } else {
-            logSystem.warn('License images uploaded but not verified - Verifik validation failed', { 
-              conductorId: conductor.id,
-              verifikError: verifikValidation.error 
-            });
-          }
-        } else {
-          // Verifik not configured - requires manual verification
-          logSystem.info('License images uploaded - requires manual verification (Verifik not configured)', { conductorId: conductor.id });
-        }
-      }
-
-      logDocument.uploaded(conductor.id, type, conductor.id);
-      res.json({ 
-        url: uploadResult.url,
-        type: type,
-        success: true,
-        verified: verifikValidation.verified,
-        verifikValidation: type === 'licencia' ? {
-          nameMatch: verifikValidation.verified,
-          extractedName: verifikValidation.nombre && verifikValidation.apellido 
-            ? `${verifikValidation.nombre} ${verifikValidation.apellido}` 
-            : undefined,
-          licenseNumber: verifikValidation.licenseNumber
-        } : undefined
-      });
-    } catch (error: any) {
-      logSystem.error('Upload license document error', error);
-      res.status(500).json({ message: error.message || "Failed to upload license document" });
     }
   });
 
@@ -6448,7 +5364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Archivo no encontrado" });
       }
 
-      res.setHeader('Content-Type', documento.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Type', documento.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${documento.nombreArchivo}"`);
       res.send(fileBuffer);
     } catch (error: any) {
@@ -6530,20 +5446,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (conductor) {
           const user = await storage.getUserById(conductor.userId);
           if (user) {
-            await pushService.sendToUser(user.id, {
-              title: `Documento ${estadoTexto}`,
-              body: `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
-              data: { type: 'document_review', documentId }
-            });
+            await pushService.sendNotification(
+              user.id,
+              `Documento ${estadoTexto}`,
+              `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
+              { type: 'document_review', documentId }
+            );
           }
         }
       } else if (documento.usuarioId) {
         // Document belongs to a client (e.g., seguro_cliente)
-        await pushService.sendToUser(documento.usuarioId, {
-          title: `Documento ${estadoTexto}`,
-          body: `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
-          data: { type: 'document_review', documentId }
-        });
+        await pushService.sendNotification(
+          documento.usuarioId,
+          `Documento ${estadoTexto}`,
+          `Tu ${tipoLabel} ha sido ${estadoTexto}${motivoRechazo ? ': ' + motivoRechazo : ''}`,
+          { type: 'document_review', documentId }
+        );
       }
 
       logDocument.reviewed(req.user!.id, documentId, estado);
@@ -6686,11 +5604,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const conductor = await storage.getConductorById(driverId);
       if (conductor) {
-        await pushService.sendToUser(conductor.userId, {
-          title: 'Cuenta Suspendida',
-          body: `Tu cuenta ha sido suspendida: ${motivo}`,
-          data: { type: 'account_suspended', reason: 'admin_action' }
-        });
+        await pushService.sendNotification(
+          conductor.userId,
+          'Cuenta Suspendida',
+          `Tu cuenta ha sido suspendida: ${motivo}`,
+          { type: 'account_suspended', reason: 'admin_action' }
+        );
       }
       
       logSystem.info('Driver suspended by admin', { adminId: req.user!.id, driverId, motivo });
@@ -6714,11 +5633,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const conductor = await storage.getConductorById(driverId);
       if (conductor) {
-        await pushService.sendToUser(conductor.userId, {
-          title: 'Cuenta Reactivada',
-          body: 'Tu cuenta ha sido reactivada. Ya puedes volver a aceptar servicios.',
-          data: { type: 'account_reactivated' }
-        });
+        await pushService.sendNotification(
+          conductor.userId,
+          'Cuenta Reactivada',
+          'Tu cuenta ha sido reactivada. Ya puedes volver a aceptar servicios.',
+          { type: 'account_reactivated' }
+        );
       }
       
       logSystem.info('Driver reactivated by admin', { adminId: req.user!.id, driverId });
@@ -6762,14 +5682,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (!req.file) {
       return res.status(400).json({ message: "No se proporcionó ningún archivo" });
-    }
-
-    // Check storage availability BEFORE processing
-    if (!isStorageInitialized()) {
-      return res.status(503).json({ 
-        message: "El servicio de almacenamiento no está disponible temporalmente. Por favor intenta de nuevo en unos segundos.",
-        retryable: true
-      });
     }
 
     try {
@@ -6816,6 +5728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombreArchivo,
         tamanoArchivo: uploadResult.fileSize,
         mimeType: uploadResult.mimeType,
+        estado: 'pendiente',
         validoHasta: validoHasta,
       });
 
@@ -6926,7 +5839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Delete from database
       await storage.deleteDocumento(documento.id);
       
-      logDocument.deleted(documento.id);
+      logDocument.deleted(req.user!.id, documento.id);
       res.json({ message: "Documento de seguro eliminado correctamente" });
     } catch (error: any) {
       logSystem.error('Delete client insurance error', error);
@@ -6987,15 +5900,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedServicio = await storage.aprobarAseguradora(id, req.user!.id);
       
-      logSystem.info('Insurance approved', { adminId: req.user!.id, servicioId: id, action: 'insurance_approved' });
+      logService.updated(req.user!.id, id, { action: 'insurance_approved' });
 
       // Send push notification to client (with error handling)
       try {
-        await pushService.sendToUser(servicio.clienteId, {
-          title: 'Póliza de seguro aprobada',
-          body: 'Tu solicitud de servicio con aseguradora ha sido aprobada. Los conductores ya pueden aceptar tu solicitud.',
-          data: { type: 'insurance_approved', servicioId: id }
-        });
+        await pushService.sendNotification(
+          servicio.clienteId,
+          'Póliza de seguro aprobada',
+          'Tu solicitud de servicio con aseguradora ha sido aprobada. Los conductores ya pueden aceptar tu solicitud.',
+          { type: 'insurance_approved', servicioId: id }
+        );
       } catch (pushError) {
         logSystem.warn('Push notification failed for insurance approval', { servicioId: id, error: pushError });
       }
@@ -7035,15 +5949,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedServicio = await storage.rechazarAseguradora(id, req.user!.id, motivoRechazo);
       
-      logSystem.info('Insurance rejected', { adminId: req.user!.id, servicioId: id, action: 'insurance_rejected', reason: motivoRechazo });
+      logService.updated(req.user!.id, id, { action: 'insurance_rejected', reason: motivoRechazo });
 
       // Send push notification to client (with error handling)
       try {
-        await pushService.sendToUser(servicio.clienteId, {
-          title: 'Póliza de seguro rechazada',
-          body: `Tu solicitud de servicio con aseguradora fue rechazada: ${motivoRechazo}`,
-          data: { type: 'insurance_rejected', servicioId: id, reason: motivoRechazo }
-        });
+        await pushService.sendNotification(
+          servicio.clienteId,
+          'Póliza de seguro rechazada',
+          `Tu solicitud de servicio con aseguradora fue rechazada: ${motivoRechazo}`,
+          { type: 'insurance_rejected', servicioId: id, reason: motivoRechazo }
+        );
       } catch (pushError) {
         logSystem.warn('Push notification failed for insurance rejection', { servicioId: id, error: pushError });
       }
@@ -7419,7 +6334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const netAmount = parsedAmount - SAME_DAY_WITHDRAWAL_COMMISSION;
 
-      logSystem.info('Immediate withdrawal requested', {
+      logTransaction.info('Immediate withdrawal requested', {
         conductorId: conductor.id,
         amount: parsedAmount,
         commission: SAME_DAY_WITHDRAWAL_COMMISSION,
@@ -7605,8 +6520,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updatedWithdrawal = await storage.updateOperatorWithdrawal(id, {
         estado: 'pagado',
-        azulPayoutReference: referenciaBancaria || `MANUAL-${Date.now()}`,
-        azulPayoutStatus: 'COMPLETED_MANUAL',
+        referenciaPago: referenciaBancaria || `MANUAL-${Date.now()}`,
+        estadoPago: 'COMPLETED_MANUAL',
         errorMessage: notas || 'Procesado manualmente por administrador',
         procesadoAt: new Date(),
       });
@@ -7804,7 +6719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardholderName: cardholderName || null,
       });
 
-      logSystem.info('Client payment method created with Azul', {
+      logTransaction.success('Client payment method created with Azul', {
         userId: req.user!.id,
         paymentMethodId: paymentMethod.id,
         cardBrand: tokenResult.tokenData.cardBrand,
@@ -8069,7 +6984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardholderName: cardholderName || null,
       });
 
-      logSystem.info('Operator payment method created with Azul', {
+      logTransaction.success('Operator payment method created with Azul', {
         conductorId: conductor.id,
         paymentMethodId: paymentMethod.id,
         cardBrand: tokenResult.tokenData.cardBrand,
@@ -8269,7 +7184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!paymentResult.success) {
-        logSystem.error('Operator debt payment failed', null, {
+        logTransaction.failed('Operator debt payment failed', {
           conductorId: conductor.id,
           amount: paymentAmount,
           isoCode: paymentResult.isoCode,
@@ -8289,7 +7204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customOrderId,
       });
 
-      logSystem.info('Operator debt paid with Azul', {
+      logTransaction.success('Operator debt paid with Azul', {
         conductorId: conductor.id,
         amount: paymentAmount,
         azulOrderId: paymentResult.azulOrderId,
@@ -8398,7 +7313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateComisionNotas(req.params.id, notas);
       }
 
-      logSystem.info('Admin marked commission as paid', {
+      logTransaction.info('Admin marked commission as paid', {
         comisionId: req.params.id,
         tipo,
         referencia,
@@ -8563,10 +7478,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.text(`Distancia: ${servicio.distanciaKm} km`);
       doc.moveDown();
 
-      doc.font('Helvetica-Bold').fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`);
-      doc.font('Helvetica').fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
-      if ((servicio as any).transactionId) {
-        doc.text(`ID de Transacción: ${(servicio as any).transactionId}`);
+      doc.fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`, { bold: true });
+      doc.fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
+      if (servicio.transactionId) {
+        doc.text(`ID de Transacción: ${servicio.transactionId}`);
       }
       doc.moveDown();
 
@@ -8625,16 +7540,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // TODO: Actualizar con campos de Azul API cuando esté implementado
-      // Bank account info is stored in operatorBankAccounts table, not on conductor
-      const bankAccount = await storage.getOperatorBankAccountByCondutorId?.(conductor.id);
       res.json({
-        hasBankAccount: !!bankAccount,
-        payoutEnabled: (conductor as any).payoutEnabled || false,
-        bankAccount: bankAccount ? {
-          bankName: bankAccount.banco,
-          accountType: bankAccount.tipoCuenta,
-          last4: bankAccount.numeroCuenta?.slice(-4),
-          accountHolder: bankAccount.nombreTitular,
+        hasBankAccount: !!conductor.bankCode,
+        payoutEnabled: conductor.payoutEnabled || false,
+        bankAccount: conductor.bankCode ? {
+          bankName: conductor.bankName,
+          accountType: conductor.accountType,
+          last4: conductor.accountNumber,
+          accountHolder: conductor.accountHolder,
         } : null,
         balance: {
           available: conductor.balanceDisponible || "0.00",
@@ -8687,9 +7600,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(methods.map(m => ({
           id: m.id,
           cardBrand: m.cardBrand,
-          lastFourDigits: m.last4,
-          expirationMonth: m.expiryMonth,
-          expirationYear: m.expiryYear,
+          lastFourDigits: m.lastFourDigits,
+          expirationMonth: m.expirationMonth,
+          expirationYear: m.expirationYear,
           isDefault: m.isDefault,
           createdAt: m.createdAt,
         })));
@@ -8702,9 +7615,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(methods.map(m => ({
           id: m.id,
           cardBrand: m.cardBrand,
-          lastFourDigits: m.last4,
-          expirationMonth: m.expiryMonth,
-          expirationYear: m.expiryYear,
+          lastFourDigits: m.lastFourDigits,
+          expirationMonth: m.expirationMonth,
+          expirationYear: m.expirationYear,
           isDefault: m.isDefault,
           createdAt: m.createdAt,
         })));
@@ -8987,16 +7900,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { montoAprobado } = validationResult.data;
       const updated = await storage.aprobarServicioAseguradora(req.params.id, req.user!.id, String(montoAprobado));
       
-      logSystem.info('Insurance approved by insurer', { userId: req.user!.id, servicioId: req.params.id, action: 'insurance_approved_by_insurer', monto: montoAprobado });
+      logService.updated(req.user!.id, req.params.id, { action: 'insurance_approved_by_insurer', monto: montoAprobado });
 
       // Send notification to client
       if (servicio.servicio?.clienteId) {
         try {
-          await pushService.sendToUser(servicio.servicio.clienteId, {
-            title: 'Servicio aprobado por aseguradora',
-            body: `Tu servicio de grúa ha sido aprobado por ${aseguradora.nombreEmpresa}`,
-            data: { type: 'insurance_approved', servicioId: servicio.servicioId }
-          });
+          await pushService.sendNotification(
+            servicio.servicio.clienteId,
+            'Servicio aprobado por aseguradora',
+            `Tu servicio de grúa ha sido aprobado por ${aseguradora.nombreEmpresa}`,
+            { type: 'insurance_approved', servicioId: servicio.servicioId }
+          );
         } catch (pushError) {
           logSystem.warn('Push notification failed for insurance approval', { servicioId: req.params.id });
         }
@@ -9042,16 +7956,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { motivo } = validationResult.data;
       const updated = await storage.rechazarServicioAseguradora(req.params.id, req.user!.id, motivo);
       
-      logSystem.info('Insurance rejected by insurer', { userId: req.user!.id, servicioId: req.params.id, action: 'insurance_rejected_by_insurer', motivo });
+      logService.updated(req.user!.id, req.params.id, { action: 'insurance_rejected_by_insurer', motivo });
 
       // Send notification to client
       if (servicio.servicio?.clienteId) {
         try {
-          await pushService.sendToUser(servicio.servicio.clienteId, {
-            title: 'Servicio rechazado por aseguradora',
-            body: `Tu servicio de grúa fue rechazado: ${motivo}`,
-            data: { type: 'insurance_rejected', servicioId: servicio.servicioId, reason: motivo }
-          });
+          await pushService.sendNotification(
+            servicio.servicio.clienteId,
+            'Servicio rechazado por aseguradora',
+            `Tu servicio de grúa fue rechazado: ${motivo}`,
+            { type: 'insurance_rejected', servicioId: servicio.servicioId, reason: motivo }
+          );
         } catch (pushError) {
           logSystem.warn('Push notification failed for insurance rejection', { servicioId: req.params.id });
         }
@@ -9350,7 +8265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             logSystem.warn('Email service not configured, skipping ticket created email');
             return;
           }
-          const user = await storage.getUserById(userId);
+          const user = await storage.getUser(userId);
           if (user?.email) {
             await emailService.sendTicketCreatedEmail(user.email, user.nombre || 'Usuario', ticketSnapshot);
           }
@@ -9462,7 +8377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               logSystem.warn('Email service not configured, skipping ticket response email');
               return;
             }
-            const ticketOwner = await storage.getUserById(ticketSnapshot.usuarioId);
+            const ticketOwner = await storage.getUser(ticketSnapshot.usuarioId);
             if (ticketOwner?.email) {
               await emailService.sendTicketSupportResponseEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
                 id: ticketSnapshot.id,
@@ -9644,7 +8559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             logSystem.warn('Email service not configured, skipping ticket status email');
             return;
           }
-          const ticketOwner = await storage.getUserById(ticketSnapshot.usuarioId);
+          const ticketOwner = await storage.getUser(ticketSnapshot.usuarioId);
           if (ticketOwner?.email) {
             await emailService.sendTicketStatusChangedEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', {
               id: ticketSnapshot.id,
@@ -9799,7 +8714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pdfBuffer = await pdfService.generarEstadoFinancieroSocio({
         socio,
         periodo,
-        distribucion: distribucionSocio as any || null,
+        distribucion: distribucionSocio || null,
         resumen,
       });
 
@@ -9904,10 +8819,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email,
         passwordHash,
         nombre,
-        apellido: '',
-        phone: telefono ?? undefined,
+        telefono: telefono || null,
         userType: 'socio',
-        emailVerificado: true,
+        verificado: true,
       });
 
       // Create partner profile
@@ -10073,9 +8987,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           periodo,
           ingresosTotales: String(calculo.ingresosTotales),
           comisionEmpresa: String(calculo.comisionEmpresa),
+          porcentajeAlMomento: String(dist.porcentajeParticipacion),
           montoSocio: String(dist.montoSocio),
           calculadoPor: req.user!.id,
-        } as any);
+        });
         distribuciones.push(distribucion);
       }
 
@@ -10315,6 +9230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombre: parsed.data.nombre,
         apellido: parsed.data.apellido || '',
         userType: 'admin',
+        estadoCuenta: 'activo',
         emailVerificado: true,
       });
 
@@ -10334,7 +9250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parsed.data.permisos
       );
 
-      logSystem.info('Administrator created', { 
+      logAuth.info('Administrator created', { 
         adminId: admin.id, 
         userId: newUser.id,
         email: parsed.data.email,
@@ -10373,7 +9289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No se pudo actualizar el administrador" });
       }
 
-      logSystem.info('Administrator updated', { 
+      logAuth.info('Administrator updated', { 
         adminId: req.params.id, 
         updatedBy: req.user!.id 
       });
@@ -10406,7 +9322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No se pudo cambiar el estado" });
       }
 
-      logSystem.info('Administrator status toggled', { 
+      logAuth.info('Administrator status toggled', { 
         adminId: req.params.id, 
         newStatus: updated.activo,
         changedBy: req.user!.id 
@@ -10993,8 +9909,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         passwordHash,
         nombre: parsed.data.nombre,
         apellido: parsed.data.apellido || "",
-        phone: parsed.data.phone ?? undefined,
+        phone: parsed.data.phone || null,
         userType: 'empresa',
+        estadoCuenta: 'activo',
       });
 
       const empresa = await storage.createEmpresa({
@@ -11589,7 +10506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!paymentResult.success) {
-        logSystem.error('Wallet debt payment failed', null, {
+        logTransaction.failed('Wallet debt payment failed', {
           conductorId: conductor.id,
           amount: paymentAmount,
           isoCode: paymentResult.isoCode,
@@ -11609,7 +10526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customOrderId,
       });
 
-      logSystem.info('Wallet debt paid with Azul', {
+      logTransaction.success('Wallet debt paid with Azul', {
         conductorId: conductor.id,
         amount: paymentAmount,
         azulOrderId: paymentResult.azulOrderId,

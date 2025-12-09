@@ -266,23 +266,18 @@ function TowTruckIcon({ className, isActive = true, customColor }: { className?:
   );
 }
 
-export interface MapMarker {
-  position: Coordinates;
-  title?: string;
-  icon?: string;
-  color?: string;
-  type?: MarkerType;
-  draggable?: boolean;
-  id?: string;
-}
-
 interface MapboxMapProps {
   center: Coordinates;
   zoom?: number;
-  markers?: MapMarker[];
+  markers?: Array<{
+    position: Coordinates;
+    title?: string;
+    icon?: string;
+    color?: string;
+    type?: MarkerType;
+  }>;
   onMapClick?: (coordinates: Coordinates) => void;
   onAddressChange?: (address: string) => void;
-  onMarkerDragEnd?: (markerId: string, coordinates: Coordinates, address: string) => void;
   className?: string;
   showHeatmap?: boolean;
   heatmapData?: Array<{ lat: number; lng: number; weight: number }>;
@@ -391,7 +386,6 @@ export function MapboxMap({
   markers = [], 
   onMapClick,
   onAddressChange,
-  onMarkerDragEnd,
   className = 'w-full h-full',
   showHeatmap = false,
   heatmapData = [],
@@ -651,26 +645,16 @@ export function MapboxMap({
           const isActive = 'isActive' in iconConfig ? iconConfig.isActive : true;
           const isInactiveDriver = markerType === 'driver_inactive';
           const hasCustomColor = marker.color && (markerType === 'driver' || markerType === 'driver_inactive');
-          const markerId = marker.id || `marker-${index}`;
-          const isDraggable = marker.draggable === true;
           
           return (
             <Marker
-              key={`${markerId}-${marker.position.lat}-${marker.position.lng}`}
+              key={`${marker.position.lat}-${marker.position.lng}-${index}`}
               longitude={marker.position.lng}
               latitude={marker.position.lat}
               anchor="bottom"
-              draggable={isDraggable}
-              onDragEnd={isDraggable ? async (event) => {
-                const newCoords = { lat: event.lngLat.lat, lng: event.lngLat.lng };
-                if (onMarkerDragEnd) {
-                  const address = await reverseGeocode(newCoords.lat, newCoords.lng);
-                  onMarkerDragEnd(markerId, newCoords, address);
-                }
-              } : undefined}
             >
               <div 
-                className={`relative flex items-end justify-center ${isDraggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                className="relative flex items-end justify-center"
                 title={marker.title}
                 style={{ 
                   filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.35)) drop-shadow(0 1px 2px rgba(0,0,0,0.25))'
@@ -684,11 +668,6 @@ export function MapboxMap({
                   />
                 ) : (
                   <Component className={`${size} ${color}`} />
-                )}
-                {isDraggable && (
-                  <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded whitespace-nowrap">
-                    Arrastra para mover
-                  </div>
                 )}
                 {isInactiveDriver && (
                   <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-slate-500 rounded-full flex items-center justify-center border border-white shadow-sm">

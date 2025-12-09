@@ -47,7 +47,6 @@ interface ServicioAseguradora {
   fechaFactura: string | null;
   fechaPago: string | null;
   fechaAprobacion: string | null;
-  aprobadoPor?: string | null;
   servicio?: {
     id: string;
     tipoServicio: string;
@@ -77,7 +76,10 @@ function FacturacionContent() {
 
   const facturarMutation = useMutation({
     mutationFn: async ({ id, numeroFactura }: { id: string; numeroFactura: string }) => {
-      return apiRequest('POST', `/api/aseguradora/servicios/${id}/facturar`, { numeroFactura });
+      return apiRequest(`/api/aseguradora/servicios/${id}/facturar`, {
+        method: 'POST',
+        body: JSON.stringify({ numeroFactura }),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/aseguradora/servicios'] });
@@ -101,7 +103,9 @@ function FacturacionContent() {
 
   const pagarMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest('POST', `/api/aseguradora/servicios/${id}/pagar`);
+      return apiRequest(`/api/aseguradora/servicios/${id}/pagar`, {
+        method: 'POST',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/aseguradora/servicios'] });

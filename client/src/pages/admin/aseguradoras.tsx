@@ -84,7 +84,10 @@ export default function AdminAseguradoras() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateAseguradoraData) => {
-      return apiRequest('POST', '/api/admin/aseguradoras', data);
+      return apiRequest('/api/admin/aseguradoras', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/aseguradoras'] });
@@ -106,7 +109,10 @@ export default function AdminAseguradoras() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Aseguradora> }) => {
-      return apiRequest('PUT', `/api/admin/aseguradoras/${id}`, data);
+      return apiRequest(`/api/admin/aseguradoras/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/aseguradoras'] });
@@ -128,7 +134,9 @@ export default function AdminAseguradoras() {
 
   const toggleActivoMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest('PUT', `/api/admin/aseguradoras/${id}/toggle-activo`);
+      return apiRequest(`/api/admin/aseguradoras/${id}/toggle-activo`, {
+        method: 'PUT',
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/aseguradoras'] });

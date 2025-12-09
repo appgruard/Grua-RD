@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { RatingModal, StarRating } from '@/components/RatingModal';
 
-interface ServiceWithRating extends Omit<ServicioWithDetails, 'calificacion'> {
+interface ServiceWithRating extends ServicioWithDetails {
   calificacion?: Calificacion | null;
 }
 

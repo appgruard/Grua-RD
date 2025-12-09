@@ -8,7 +8,7 @@
  * - Payment verification
  */
 
-import { logSystem } from '../logger';
+import { logTransaction, logSystem } from '../logger';
 import crypto from 'crypto';
 
 // Azul API Configuration
@@ -281,7 +281,7 @@ export class AzulPaymentService {
         const expiryYear = parseInt(cardData.expiration.substring(0, 4));
         const expiryMonth = parseInt(cardData.expiration.substring(4, 6));
 
-        logSystem.info('Azul token created', {
+        logTransaction.success('Azul token created', {
           last4: cleanCardNumber.slice(-4),
           cardBrand,
         });
@@ -298,7 +298,7 @@ export class AzulPaymentService {
         };
       }
 
-      logSystem.error('Azul token creation failed', {
+      logTransaction.failed('Azul token creation failed', {
         isoCode: parsed.isoCode,
         message: parsed.responseMessage,
       });
@@ -338,9 +338,9 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success) {
-        logSystem.info('Azul token deleted', { token: dataVaultToken.slice(-8) });
+        logTransaction.success('Azul token deleted', { token: dataVaultToken.slice(-8) });
       } else {
-        logSystem.error('Azul token deletion failed', {
+        logTransaction.failed('Azul token deletion failed', {
           token: dataVaultToken.slice(-8),
           isoCode: parsed.isoCode,
         });
@@ -388,13 +388,13 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success) {
-        logSystem.info('Azul payment processed', {
+        logTransaction.success('Azul payment processed', {
           amount: payment.amount / 100,
           azulOrderId: parsed.azulOrderId,
           customOrderId: payment.customOrderId,
         });
       } else {
-        logSystem.error('Azul payment failed', {
+        logTransaction.failed('Azul payment failed', {
           amount: payment.amount / 100,
           customOrderId: payment.customOrderId,
           isoCode: parsed.isoCode,
@@ -449,7 +449,7 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success) {
-        logSystem.info('Azul payment with card processed', {
+        logTransaction.success('Azul payment with card processed', {
           amount: payment.amount / 100,
           azulOrderId: parsed.azulOrderId,
           customOrderId: payment.customOrderId,
@@ -473,7 +473,7 @@ export class AzulPaymentService {
           };
         }
       } else {
-        logSystem.error('Azul payment with card failed', {
+        logTransaction.failed('Azul payment with card failed', {
           amount: payment.amount / 100,
           customOrderId: payment.customOrderId,
           isoCode: parsed.isoCode,
@@ -522,13 +522,13 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success) {
-        logSystem.info('Azul payment authorized (Hold)', {
+        logTransaction.success('Azul payment authorized (Hold)', {
           amount: payment.amount / 100,
           azulOrderId: parsed.azulOrderId,
           customOrderId: payment.customOrderId,
         });
       } else {
-        logSystem.error('Azul authorization failed', {
+        logTransaction.failed('Azul authorization failed', {
           amount: payment.amount / 100,
           customOrderId: payment.customOrderId,
           isoCode: parsed.isoCode,
@@ -573,12 +573,12 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success) {
-        logSystem.info('Azul payment captured (Post)', {
+        logTransaction.success('Azul payment captured (Post)', {
           azulOrderId,
           amount: amount ? amount / 100 : 'original',
         });
       } else {
-        logSystem.error('Azul capture failed', {
+        logTransaction.failed('Azul capture failed', {
           azulOrderId,
           isoCode: parsed.isoCode,
         });
@@ -618,9 +618,9 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success) {
-        logSystem.info('Azul payment voided', { azulOrderId });
+        logTransaction.success('Azul payment voided', { azulOrderId });
       } else {
-        logSystem.error('Azul void failed', {
+        logTransaction.failed('Azul void failed', {
           azulOrderId,
           isoCode: parsed.isoCode,
         });
@@ -666,12 +666,12 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success) {
-        logSystem.info('Azul payment refunded', {
+        logTransaction.success('Azul payment refunded', {
           azulOrderId,
           amount: amount / 100,
         });
       } else {
-        logSystem.error('Azul refund failed', {
+        logTransaction.failed('Azul refund failed', {
           azulOrderId,
           isoCode: parsed.isoCode,
         });
@@ -816,12 +816,12 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success) {
-        logSystem.info('Azul 3DS payment completed', {
+        logTransaction.success('Azul 3DS payment completed', {
           customOrderId,
           azulOrderId: parsed.azulOrderId,
         });
       } else {
-        logSystem.error('Azul 3DS payment failed', {
+        logTransaction.failed('Azul 3DS payment failed', {
           customOrderId,
           isoCode: parsed.isoCode,
         });

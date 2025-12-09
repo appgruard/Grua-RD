@@ -8,8 +8,7 @@ import {
   boolean, 
   timestamp,
   integer,
-  pgEnum,
-  uniqueIndex
+  pgEnum
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -165,14 +164,11 @@ export const tipoMensajeChatEnum = pgEnum("tipo_mensaje_chat", [
 ]);
 
 // Users Table
-// Note: email is not globally unique - users can have multiple accounts with different userTypes
-// A composite unique constraint on (email, userType) prevents duplicate accounts of the same type
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: text("email").notNull(),
+  email: text("email").notNull().unique(),
   phone: text("phone"),
   cedula: text("cedula"),
-  cedulaImageUrl: text("cedula_image_url"),
   cedulaVerificada: boolean("cedula_verificada").default(false).notNull(),
   passwordHash: text("password_hash").notNull(),
   userType: userTypeEnum("user_type").notNull().default("cliente"),
@@ -186,9 +182,7 @@ export const users = pgTable("users", {
   fotoVerificada: boolean("foto_verificada").default(false).notNull(),
   fotoVerificadaScore: decimal("foto_verificada_score", { precision: 5, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  emailUserTypeUnique: uniqueIndex("users_email_user_type_unique").on(table.email, table.userType),
-}));
+});
 
 // Conductores (Drivers) Table
 export const conductores = pgTable("conductores", {
@@ -208,11 +202,6 @@ export const conductores = pgTable("conductores", {
   licenciaRestricciones: text("licencia_restricciones"),
   licenciaCategoriaVerificada: boolean("licencia_categoria_verificada").default(false),
   licenciaFechaVencimiento: timestamp("licencia_fecha_vencimiento"),
-  licenciaFrontalUrl: text("licencia_frontal_url"),
-  licenciaTraseraUrl: text("licencia_trasera_url"),
-  licenciaVerificada: boolean("licencia_verificada").default(false),
-  categoriasConfiguradas: boolean("categorias_configuradas").default(false),
-  vehiculosRegistrados: boolean("vehiculos_registrados").default(false),
 });
 
 // Conductor Service Categories Table (driver can offer multiple service categories)
@@ -285,11 +274,6 @@ export const servicios = pgTable("servicios", {
   notasExtraccion: text("notas_extraccion"),
   descripcionSituacion: text("descripcion_situacion"),
   commissionProcessed: boolean("commission_processed").default(false).notNull(),
-  destinoExtendidoLat: decimal("destino_extendido_lat", { precision: 10, scale: 7 }),
-  destinoExtendidoLng: decimal("destino_extendido_lng", { precision: 10, scale: 7 }),
-  destinoExtendidoDireccion: text("destino_extendido_direccion"),
-  distanciaExtensionKm: decimal("distancia_extension_km", { precision: 5, scale: 2 }),
-  extensionAprobada: boolean("extension_aprobada").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   aceptadoAt: timestamp("aceptado_at"),
   conductorEnSitioAt: timestamp("conductor_en_sitio_at"),

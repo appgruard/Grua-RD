@@ -79,11 +79,12 @@ async function checkAndCancelExpiredServices() {
       await cancelPaymentAuthorization(service);
 
       try {
-        await pushService.sendToUser(service.clienteId, {
-          title: 'Servicio cancelado',
-          body: 'Tu solicitud fue cancelada porque ningún operador estuvo disponible. Por favor, intenta nuevamente.',
-          data: { type: 'service_cancelled', servicioId: service.id }
-        });
+        await pushService.sendNotification(
+          service.clienteId,
+          'Servicio cancelado',
+          'Tu solicitud fue cancelada porque ningún operador estuvo disponible. Por favor, intenta nuevamente.',
+          { type: 'service_cancelled', servicioId: service.id }
+        );
       } catch (pushError) {
         logSystem.warn('Push notification failed for auto-cancelled service', { 
           servicioId: service.id, 

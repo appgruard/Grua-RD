@@ -122,7 +122,6 @@ interface PendingCedulaUser {
   apellido: string;
   email: string;
   cedula: string | null;
-  cedulaImageUrl: string | null;
   phone: string | null;
   photoUrl: string | null;
   userType: string;
@@ -1018,11 +1017,11 @@ export default function AdminVerifications() {
       </Dialog>
 
       <Dialog open={isCedulaDialogOpen} onOpenChange={setIsCedulaDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Verificar Cédula Manualmente</DialogTitle>
             <DialogDescription>
-              Revisa la imagen de la cédula y confirma el número para verificar al usuario
+              Ingresa o confirma el número de cédula para verificar al usuario
             </DialogDescription>
           </DialogHeader>
           
@@ -1041,31 +1040,6 @@ export default function AdminVerifications() {
                   <Badge variant="outline" className="mt-1">{selectedCedulaUser.userType}</Badge>
                 </div>
               </div>
-
-              <Separator />
-
-              {selectedCedulaUser.cedulaImageUrl ? (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4" />
-                    Imagen de Cédula
-                  </label>
-                  <div className="border rounded-lg overflow-hidden bg-muted/30">
-                    <img 
-                      src={`/api/admin/cedula-image/${selectedCedulaUser.id}`}
-                      alt="Cédula del usuario"
-                      className="w-full max-h-[400px] object-contain"
-                      data-testid="img-cedula-preview"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 border rounded-lg bg-muted/30">
-                  <ImageIcon className="w-12 h-12 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">No hay imagen de cédula disponible</p>
-                  <p className="text-xs text-muted-foreground mt-1">El usuario no ha subido una imagen de su cédula</p>
-                </div>
-              )}
 
               <Separator />
 
@@ -1093,9 +1067,7 @@ export default function AdminVerifications() {
                   data-testid="input-cedula-number"
                 />
                 <p className="text-xs text-muted-foreground">
-                  {selectedCedulaUser.cedula 
-                    ? "Número detectado automáticamente. Puedes modificarlo si es incorrecto."
-                    : "Ingresa el número de cédula que aparece en la imagen"}
+                  Ingresa o modifica el número de cédula antes de aprobar
                 </p>
               </div>
             </div>

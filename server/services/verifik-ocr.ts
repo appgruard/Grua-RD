@@ -1,10 +1,7 @@
 import { logger } from "../logger";
 
+const VERIFIK_API_KEY = process.env.VERIFIK_API_KEY;
 const VERIFIK_BASE_URL = "https://api.verifik.co/v2";
-
-function getVerifikApiKey(): string | undefined {
-  return process.env.VERIFIK_API_KEY;
-}
 
 function normalizeText(text: string): string {
   return text
@@ -61,29 +58,11 @@ export function compareNames(
     docLastTokens.some(dt => dt === rt || dt.includes(rt) || rt.includes(dt))
   );
   
-  // Increased threshold from 0.5 to 0.6, and require BOTH first AND last name match
-  const match = similarity >= 0.6 && firstNameMatch && lastNameMatch;
-  
-  // Log edge cases for analysis
-  if (similarity >= 0.5 && similarity < 0.6) {
-    console.warn("Name match edge case - borderline similarity:", {
-      registeredNombre, registeredApellido,
-      documentNombre, documentApellido,
-      similarity, firstNameMatch, lastNameMatch
-    });
-  }
+  const match = similarity >= 0.5 && (firstNameMatch || lastNameMatch);
   
   let details = "";
   if (!match) {
-    if (!firstNameMatch && !lastNameMatch) {
-      details = `El nombre registrado "${registeredNombre} ${registeredApellido}" no coincide con el nombre en la cédula "${documentNombre} ${documentApellido}"`;
-    } else if (!firstNameMatch) {
-      details = `El nombre "${registeredNombre}" no coincide con "${documentNombre}" en la cédula`;
-    } else if (!lastNameMatch) {
-      details = `El apellido "${registeredApellido}" no coincide con "${documentApellido}" en la cédula`;
-    } else {
-      details = `La similitud (${Math.round(similarity * 100)}%) es insuficiente para verificar la identidad`;
-    }
+    details = `El nombre registrado "${registeredNombre} ${registeredApellido}" no coincide con el nombre en la cédula "${documentNombre} ${documentApellido}"`;
   }
   
   return { match, similarity, details };
@@ -175,12 +154,11 @@ interface CedulaVerifyResult {
 }
 
 export function isVerifikConfigured(): boolean {
-  return !!getVerifikApiKey();
+  return !!VERIFIK_API_KEY;
 }
 
 export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult> {
-  const apiKey = getVerifikApiKey();
-  if (!apiKey) {
+  if (!VERIFIK_API_KEY) {
     logger.warn("Verifik API key not configured");
     return {
       success: false,
@@ -188,7 +166,7 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
     };
   }
 
-  const trimmedKey = apiKey.trim();
+  const apiKey = VERIFIK_API_KEY.trim();
   logger.info("Verifik OCR scan started", { 
     apiKeyLength: apiKey.length,
     apiKeyPrefix: apiKey.substring(0, 20) + "..."
@@ -204,7 +182,7 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${trimmedKey}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         image: imageData,
@@ -251,36 +229,20 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
       ocrConfidenceScoreType: typeof ocrData?.confidenceScore
     });
     
-    // Check for confidenceScore - if undefined or 0, use conservative default
+    // Check for confidenceScore - if undefined or 0, assume document was read successfully
     const rawConfidence = ocrData?.confidenceScore;
-    const isAssumedScore = !(typeof rawConfidence === 'number' && rawConfidence > 0);
     const confidenceScore = (typeof rawConfidence === 'number' && rawConfidence > 0) 
       ? rawConfidence 
-      : (ocrData?.firstName && ocrData?.lastName ? 0.7 : 0);
-    
-    // Log when using assumed/default confidence score
-    if (isAssumedScore && confidenceScore > 0) {
-      logger.warn("Using assumed confidence score - consider manual verification", {
-        assumedScore: confidenceScore,
-        hasFirstName: !!ocrData?.firstName,
-        hasLastName: !!ocrData?.lastName,
-        firstName: ocrData?.firstName,
-        lastName: ocrData?.lastName
-      });
-    }
+      : (ocrData?.firstName && ocrData?.lastName ? 0.8 : 0);
     
     logger.info("Verifik OCR response received", { 
       hasOCRData: !!ocrData,
-      verifik_id: data._id,
-      verifik_url: data.url,
       documentType: ocrData?.documentType || data.documentType,
       firstName: ocrData?.firstName,
       lastName: ocrData?.lastName,
       documentNumber: ocrData?.documentNumber || data.documentNumber,
       confidenceScore: confidenceScore,
-      rawConfidenceScore: ocrData?.confidenceScore,
-      status: data.status,
-      validationMethod: data.validationMethod
+      rawConfidenceScore: ocrData?.confidenceScore
     });
 
     if (!ocrData && !data.documentNumber) {
@@ -334,8 +296,7 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
 }
 
 export async function verifyCedulaWithAPI(cedulaNumber: string): Promise<CedulaVerifyResult> {
-  const apiKey = getVerifikApiKey();
-  if (!apiKey) {
+  if (!VERIFIK_API_KEY) {
     logger.warn("Verifik API key not configured");
     return {
       success: false,
@@ -344,7 +305,7 @@ export async function verifyCedulaWithAPI(cedulaNumber: string): Promise<CedulaV
     };
   }
 
-  const trimmedKey = apiKey.trim();
+  const apiKey = VERIFIK_API_KEY.trim();
   const cleanCedula = cedulaNumber.replace(/[\s-]/g, '');
   
   if (!/^\d{11}$/.test(cleanCedula)) {
@@ -360,7 +321,7 @@ export async function verifyCedulaWithAPI(cedulaNumber: string): Promise<CedulaV
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${trimmedKey}`
+        'Authorization': `Bearer ${apiKey}`
       }
     });
 
@@ -547,8 +508,7 @@ export interface FaceValidationResult {
 const MINIMUM_VALIDATION_SCORE = 0.6;
 
 export async function validateFacePhoto(imageBase64: string): Promise<FaceValidationResult> {
-  const apiKey = getVerifikApiKey();
-  if (!apiKey) {
+  if (!VERIFIK_API_KEY) {
     logger.warn("Verifik API key not configured for face validation");
     return {
       success: false,
@@ -558,7 +518,7 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
     };
   }
 
-  const trimmedKey = apiKey.trim();
+  const apiKey = VERIFIK_API_KEY.trim();
   logger.info("Starting Verifik face validation");
 
   try {
@@ -573,7 +533,7 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `JWT ${trimmedKey}`
+        'Authorization': `JWT ${apiKey}`
       },
       body: JSON.stringify({
         images: [imageData],
@@ -745,8 +705,7 @@ export interface LicenseValidationResult {
 }
 
 export async function validateDriverLicense(imageBase64: string): Promise<LicenseValidationResult> {
-  const apiKey = getVerifikApiKey();
-  if (!apiKey) {
+  if (!VERIFIK_API_KEY) {
     logger.warn("Verifik API key not configured for license validation");
     return {
       success: false,
@@ -756,7 +715,7 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
     };
   }
 
-  const trimmedKey = apiKey.trim();
+  const apiKey = VERIFIK_API_KEY.trim();
   logger.info("Starting Verifik license validation");
 
   try {
@@ -770,7 +729,7 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${trimmedKey}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         image: imageData,
@@ -977,8 +936,7 @@ export interface LicenseBackValidationResult {
 }
 
 export async function validateDriverLicenseBack(imageBase64: string): Promise<LicenseBackValidationResult> {
-  const apiKey = getVerifikApiKey();
-  if (!apiKey) {
+  if (!VERIFIK_API_KEY) {
     logger.warn("Verifik API key not configured for license back validation");
     return {
       success: false,
@@ -988,7 +946,7 @@ export async function validateDriverLicenseBack(imageBase64: string): Promise<Li
     };
   }
 
-  const trimmedKey = apiKey.trim();
+  const apiKey = VERIFIK_API_KEY.trim();
   logger.info("Starting Verifik license back validation");
 
   try {
@@ -1001,7 +959,7 @@ export async function validateDriverLicenseBack(imageBase64: string): Promise<Li
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${trimmedKey}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         image: imageData,

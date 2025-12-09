@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign, Navigation, Clock, CreditCard, CheckCircle, XCircle, ShieldCheck, ShieldAlert, MoveRight } from 'lucide-react';
+import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign, Navigation, Clock, CreditCard, CheckCircle, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from '@/lib/auth';
@@ -19,7 +19,7 @@ import { getDirections, formatDuration, formatDistance, formatETATime, calculate
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { ServicioWithDetails, Calificacion } from '@shared/schema';
-import type { Coordinates, RouteGeometry } from '@/lib/maps';
+import type { Coordinates } from '@/lib/maps';
 
 interface DriverLocationUpdate {
   lat: number;
@@ -75,14 +75,13 @@ export default function ClientTracking() {
     lastUpdate: number;
   } | null>(null);
   const [eta, setEta] = useState<{ minutes: number; arrivalTime: Date } | null>(null);
-  const [routeGeometry, setRouteGeometry] = useState<RouteGeometry | null>(null);
+  const [routeGeometry, setRouteGeometry] = useState<GeoJSON.LineString | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [paymentConfirmationOpen, setPaymentConfirmationOpen] = useState(false);
   const [hasShownCompletionFlow, setHasShownCompletionFlow] = useState(false);
   const [paymentStatusShown, setPaymentStatusShown] = useState(false);
   const lastRouteCalcRef = useRef<number>(0);
-  const driverLocationRef = useRef<Coordinates | null>(null);
   const { user } = useAuth();
 
   const searchParams = new URLSearchParams(searchString);
@@ -146,9 +145,10 @@ export default function ClientTracking() {
   const { send } = useWebSocket((message) => {
     if (message.type === 'driver_location_update' && message.payload.servicioId === serviceId) {
       const payload = message.payload as DriverLocationUpdate;
-      const newDriverLocation = { lat: payload.lat, lng: payload.lng };
-      setDriverLocation(newDriverLocation);
-      driverLocationRef.current = newDriverLocation;
+      setDriverLocation({
+        lat: payload.lat,
+        lng: payload.lng,
+      });
       setDriverInfo({
         speed: payload.speed,
         statusMessage: payload.statusMessage,
@@ -159,20 +159,13 @@ export default function ClientTracking() {
       const now = Date.now();
       if (now - lastRouteCalcRef.current > 30000 && service) {
         lastRouteCalcRef.current = now;
-        let target: Coordinates;
-        if (service.estado === 'en_progreso') {
-          if (service.destinoExtendidoLat && service.destinoExtendidoLng) {
-            target = { lat: parseFloat(service.destinoExtendidoLat as string), lng: parseFloat(service.destinoExtendidoLng as string) };
-          } else {
-            target = { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) };
-          }
-        } else {
-          target = { lat: parseFloat(service.origenLat as string), lng: parseFloat(service.origenLng as string) };
-        }
+        const target = service.estado === 'en_progreso' 
+          ? { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) }
+          : { lat: parseFloat(service.origenLat as string), lng: parseFloat(service.origenLng as string) };
         
-        getDirections(newDriverLocation, target).then(result => {
+        getDirections({ lat: payload.lat, lng: payload.lng }, target).then(result => {
           if (result.geometry) {
-            setRouteGeometry(result.geometry as RouteGeometry);
+            setRouteGeometry(result.geometry);
           }
           const etaMinutes = Math.ceil(result.duration / 60);
           setEta({
@@ -183,30 +176,8 @@ export default function ClientTracking() {
       }
     }
     if (message.type === 'service_status_change' && message.payload.id === serviceId) {
-      const updatedService = message.payload;
-      
-      queryClient.setQueryData(['/api/services', serviceId], updatedService);
-      
-      const currentDriverLocation = driverLocationRef.current;
-      if (updatedService.destinoExtendidoLat && updatedService.destinoExtendidoLng && currentDriverLocation) {
-        const target: Coordinates = {
-          lat: parseFloat(updatedService.destinoExtendidoLat as string),
-          lng: parseFloat(updatedService.destinoExtendidoLng as string)
-        };
-        lastRouteCalcRef.current = Date.now();
-        getDirections(currentDriverLocation, target).then(result => {
-          if (result.geometry) {
-            setRouteGeometry(result.geometry as RouteGeometry);
-          }
-          const etaMinutes = Math.ceil(result.duration / 60);
-          setEta({
-            minutes: etaMinutes,
-            arrivalTime: calculateETATime(result.duration)
-          });
-        }).catch(console.error);
-      }
-      
-      if (updatedService.estado === 'completado' && !hasShownCompletionFlow && isRatingFetched && existingRating === null) {
+      queryClient.invalidateQueries({ queryKey: ['/api/services', serviceId] });
+      if (message.payload.estado === 'completado' && !hasShownCompletionFlow && isRatingFetched && existingRating === null) {
         setHasShownCompletionFlow(true);
         showCompletionFlow();
       }
@@ -226,29 +197,6 @@ export default function ClientTracking() {
     }
   }, [service?.estado, hasShownCompletionFlow, existingRating, isRatingFetched, service?.metodoPago]);
 
-  useEffect(() => {
-    if (!service || !driverLocation) return;
-    if (service.estado !== 'en_progreso') return;
-    if (!service.destinoExtendidoLat || !service.destinoExtendidoLng) return;
-    
-    const target: Coordinates = {
-      lat: parseFloat(service.destinoExtendidoLat as string),
-      lng: parseFloat(service.destinoExtendidoLng as string)
-    };
-    
-    lastRouteCalcRef.current = Date.now();
-    getDirections(driverLocation, target).then(result => {
-      if (result.geometry) {
-        setRouteGeometry(result.geometry as RouteGeometry);
-      }
-      const etaMinutes = Math.ceil(result.duration / 60);
-      setEta({
-        minutes: etaMinutes,
-        arrivalTime: calculateETATime(result.duration)
-      });
-    }).catch(console.error);
-  }, [service?.destinoExtendidoLat, service?.destinoExtendidoLng, driverLocation]);
-
   const origin = useMemo(() => {
     if (!service) return { lat: 0, lng: 0 };
     return { lat: parseFloat(service.origenLat as string), lng: parseFloat(service.origenLng as string) };
@@ -259,26 +207,14 @@ export default function ClientTracking() {
     return { lat: parseFloat(service.destinoLat as string), lng: parseFloat(service.destinoLng as string) };
   }, [service?.destinoLat, service?.destinoLng]);
 
-  const extendedDestination = useMemo(() => {
-    if (!service?.destinoExtendidoLat || !service?.destinoExtendidoLng) return null;
-    return { 
-      lat: parseFloat(service.destinoExtendidoLat as string), 
-      lng: parseFloat(service.destinoExtendidoLng as string) 
-    };
-  }, [service?.destinoExtendidoLat, service?.destinoExtendidoLng]);
-
   const markers = useMemo(() => {
     if (!service) return [];
-    const markersList = [
+    return [
       { position: origin, title: 'Origen', color: '#22c55e', type: 'origin' as const },
-      { position: destination, title: 'Destino original', color: extendedDestination ? '#6b7280' : '#ef4444', type: extendedDestination ? 'default' as const : 'destination' as const },
+      { position: destination, title: 'Destino', color: '#ef4444', type: 'destination' as const },
       driverLocation && { position: driverLocation, title: 'Operador', color: '#3b82f6', type: 'driver' as const },
-    ];
-    if (extendedDestination) {
-      markersList.push({ position: extendedDestination, title: 'Destino extendido', color: '#ef4444', type: 'destination' as const });
-    }
-    return markersList.filter(Boolean) as any[];
-  }, [origin, destination, driverLocation, service, extendedDestination]);
+    ].filter(Boolean) as any[];
+  }, [origin, destination, driverLocation, service]);
 
   if (isLoading || !service) {
     return (
@@ -453,18 +389,6 @@ export default function ClientTracking() {
             <DollarSign className="h-4 w-4 text-blue-500" />
             <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
               El operador ha propuesto un precio. Abre el chat para ver y responder.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {service.destinoExtendidoLat && service.estado === 'en_progreso' && (
-          <Alert className="bg-blue-500/10 border-blue-500/30" data-testid="alert-extended-destination">
-            <MoveRight className="h-4 w-4 text-blue-500" />
-            <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
-              <span className="font-medium">Destino extendido:</span> {service.destinoExtendidoDireccion}
-              {service.distanciaExtensionKm && (
-                <span className="block mt-0.5 text-xs">+{parseFloat(service.distanciaExtensionKm as string).toFixed(2)} km adicionales</span>
-              )}
             </AlertDescription>
           </Alert>
         )}

@@ -75,7 +75,10 @@ function PendientesContent() {
 
   const aprobarMutation = useMutation({
     mutationFn: async ({ id, montoAprobado }: { id: string; montoAprobado: string }) => {
-      return apiRequest('POST', `/api/aseguradora/servicios/${id}/aprobar`, { montoAprobado });
+      return apiRequest(`/api/aseguradora/servicios/${id}/aprobar`, {
+        method: 'POST',
+        body: JSON.stringify({ montoAprobado }),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/aseguradora/servicios/pendientes'] });
@@ -99,7 +102,10 @@ function PendientesContent() {
 
   const rechazarMutation = useMutation({
     mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
-      return apiRequest('POST', `/api/aseguradora/servicios/${id}/rechazar`, { motivo });
+      return apiRequest(`/api/aseguradora/servicios/${id}/rechazar`, {
+        method: 'POST',
+        body: JSON.stringify({ motivo }),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/aseguradora/servicios/pendientes'] });

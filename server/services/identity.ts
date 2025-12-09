@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { users } from "../../shared/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { logger } from "../logger";
 
 /**
@@ -92,40 +92,19 @@ export async function verifyCedula(
   userId: string,
   cedula: string,
   ipAddress?: string,
-  userAgent?: string,
-  isOCRVerified: boolean = false
-): Promise<{ success: boolean; error?: string; formatted?: string; pendingReview?: boolean }> {
+  userAgent?: string
+): Promise<{ success: boolean; error?: string; formatted?: string }> {
   try {
-    // Validate format and checksum using existing validation
-    const validation = validateCedulaFormat(cedula);
-    
-    if (!validation.valid) {
-      return {
-        success: false,
-        error: validation.error
-      };
-    }
-    
-    const formatted = validation.formatted!;
+    // Clean and format the cedula (remove dashes/spaces)
     const cleaned = cedula.replace(/[\s-]/g, '');
     
-    // Get the current user's email to allow same cedula for same person's accounts
-    const currentUser = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      columns: { email: true }
-    });
+    // Format with dashes: XXX-XXXXXXX-X
+    const formatted = cleaned.length === 11 
+      ? `${cleaned.slice(0, 3)}-${cleaned.slice(3, 10)}-${cleaned.slice(10)}`
+      : cedula;
     
-    if (!currentUser) {
-      return {
-        success: false,
-        error: "Usuario no encontrado."
-      };
-    }
-    
-    // Check if cédula is already in use by a DIFFERENT person (different email)
-    // Allow same cedula for same person's multiple accounts (e.g., cliente and conductor)
-    // Only allow duplicate if BOTH emails match and are non-null
-    const allUsersWithCedula = await db.query.users.findMany({
+    // Check if cédula is already in use by another user
+    const existing = await db.query.users.findFirst({
       where: (users, { and, eq, ne }) => 
         and(
           eq(users.cedula, formatted),
@@ -133,20 +112,8 @@ export async function verifyCedula(
         )
     });
     
-    // Check if any of the users with this cedula have a different email
-    // Null emails should not match - treat null as distinct
-    const hasDuplicateFromDifferentPerson = allUsersWithCedula.some(existingUser => {
-      // If either email is null/undefined, don't allow (can't verify same person)
-      if (!currentUser.email || !existingUser.email) {
-        return true; // Block duplicate
-      }
-      // Normalize emails: trim whitespace and lowercase before comparison
-      // Different email = different person = block
-      return existingUser.email.trim().toLowerCase() !== currentUser.email.trim().toLowerCase();
-    });
-    
-    if (hasDuplicateFromDifferentPerson) {
-      logger.warn(`Duplicate cedula attempt for user ${userId} - cedula belongs to different person`);
+    if (existing) {
+      logger.warn(`Duplicate cedula attempt for user ${userId}`);
       
       return {
         success: false,
@@ -154,28 +121,19 @@ export async function verifyCedula(
       };
     }
     
-    // For clients without OCR verification, mark for pending review
-    // For OCR-verified users, mark as fully verified
-    const pendingReview = !isOCRVerified;
-    
+    // Update user with verified cédula
     await db.update(users)
       .set({
         cedula: formatted,
-        cedulaVerificada: isOCRVerified,
-        cedulaPendingReview: pendingReview
+        cedulaVerificada: true
       })
       .where(eq(users.id, userId));
     
-    if (pendingReview) {
-      logger.info(`Cedula submitted for manual review for user ${userId} (client - no OCR)`);
-    } else {
-      logger.info(`Cedula fully verified for user ${userId} (OCR verified)`);
-    }
+    logger.info(`Successful cedula verification for user ${userId}`);
     
     return {
       success: true,
-      formatted: formatted,
-      pendingReview: pendingReview
+      formatted: formatted
     };
     
   } catch (error) {

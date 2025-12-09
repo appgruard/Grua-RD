@@ -117,15 +117,7 @@ function ProtectedRoute({
   if (user.userType === 'conductor') {
     // Either telefonoVerificado OR emailVerificado counts as contact verified
     const contactoVerificado = user.telefonoVerificado || (user as any).emailVerificado;
-    // Conductors also need photo verification
-    const fotoVerificada = (user as any).fotoVerificada;
-    // Additional driver verification checks from conductor data
-    const licenciaVerificada = (user as any).conductor?.licenciaVerificada;
-    const categoriasConfiguradas = (user as any).conductor?.categoriasConfiguradas;
-    const vehiculosRegistrados = (user as any).conductor?.vehiculosRegistrados;
-    // Driver needs ALL 6 verification steps completed
-    const needsVerification = !user.cedulaVerificada || !contactoVerificado || !fotoVerificada || 
-      !licenciaVerificada || !categoriasConfiguradas || !vehiculosRegistrados;
+    const needsVerification = !user.cedulaVerificada || !contactoVerificado;
     if (needsVerification) {
       return <Redirect to="/verify-pending" />;
     }

@@ -183,7 +183,7 @@ export default function ForgotPassword() {
                     value={phone}
                     onChange={(e) => {
                       setPhone(e.target.value);
-                      setErrors({ ...errors, phone: '' });
+                      setErrors({ ...errors, phone: undefined });
                     }}
                     disabled={loading}
                     data-testid="input-forgot-phone"
@@ -224,7 +224,7 @@ export default function ForgotPassword() {
                   value={codigo}
                   onChange={(e) => {
                     setCodigo(e.target.value.replace(/\D/g, ''));
-                    setErrors({ ...errors, codigo: '' });
+                    setErrors({ ...errors, codigo: undefined });
                   }}
                   disabled={loading}
                   data-testid="input-forgot-otp"
@@ -271,7 +271,7 @@ export default function ForgotPassword() {
                     value={nuevaPassword}
                     onChange={(e) => {
                       setNuevaPassword(e.target.value);
-                      setErrors({ ...errors, nuevaPassword: '' });
+                      setErrors({ ...errors, nuevaPassword: undefined });
                     }}
                     disabled={loading}
                     data-testid="input-new-password"
@@ -299,7 +299,7 @@ export default function ForgotPassword() {
                     value={confirmarPassword}
                     onChange={(e) => {
                       setConfirmarPassword(e.target.value);
-                      setErrors({ ...errors, confirmarPassword: '' });
+                      setErrors({ ...errors, confirmarPassword: undefined });
                     }}
                     disabled={loading}
                     data-testid="input-confirm-password"
@@ -329,7 +329,7 @@ export default function ForgotPassword() {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               <Button
-                variant="ghost"
+                variant="link"
                 className="p-0 h-auto"
                 onClick={() => setLocation('/login')}
                 data-testid="link-back-to-login"

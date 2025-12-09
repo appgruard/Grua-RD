@@ -71,12 +71,6 @@ interface Socio {
   };
 }
 
-interface DistribucionPreview {
-  ingresosTotales: number;
-  comisionEmpresa: number;
-  sociosActivos: { id: string; nombre: string; porcentaje: number }[];
-}
-
 interface Distribucion {
   id: string;
   socioId: string;
@@ -145,7 +139,7 @@ export default function AdminSocios() {
     queryKey: ['/api/admin/distribuciones'],
   });
 
-  const { data: previewData, isLoading: previewLoading } = useQuery<DistribucionPreview>({
+  const { data: previewData, isLoading: previewLoading } = useQuery({
     queryKey: ['/api/admin/distribuciones/preview', periodoPreview],
     enabled: !!periodoPreview && periodoPreview.match(/^\d{4}-\d{2}$/) !== null,
   });

@@ -8,9 +8,6 @@ interface VerificationStatus {
   cedulaVerificada: boolean;
   telefonoVerificado: boolean;
   fotoVerificada?: boolean;
-  licenciaVerificada?: boolean;
-  categoriasConfiguradas?: boolean;
-  vehiculosRegistrados?: boolean;
 }
 
 interface VerificationError extends Error {
@@ -20,29 +17,12 @@ interface VerificationError extends Error {
   user: UserWithConductor;
 }
 
-interface AccountInfo {
-  userType: 'cliente' | 'conductor';
-  nombre: string;
-  apellido: string | null;
-  fotoUrl: string | null;
-}
-
-interface CheckAccountsResult {
-  requiresDisambiguation: boolean;
-  accounts: AccountInfo[];
-}
-
-interface LoginOptions {
-  userType?: string;
-}
-
 interface AuthContextType {
   user: UserWithConductor | null;
   isLoading: boolean;
   pendingVerification: VerificationStatus | null;
   pendingVerificationUser: UserWithConductor | null;
-  login: (email: string, password: string, options?: LoginOptions) => Promise<UserWithConductor>;
-  checkAccounts: (email: string, password: string) => Promise<CheckAccountsResult>;
+  login: (email: string, password: string) => Promise<UserWithConductor>;
   register: (data: RegisterData) => Promise<UserWithConductor>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -92,7 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLoading = cookieExists ? queryLoading : false;
 
   const loginMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; userType?: string }) => {
+    mutationFn: async (data: { email: string; password: string }) => {
+      // Use fetch directly instead of apiRequest to handle 403 verification cases
       const API_BASE_URL = import.meta.env.VITE_API_URL || '';
       const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/login` : '/api/auth/login';
       
@@ -103,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: 'include',
       });
       
+      // Try to parse JSON response
       let responseData;
       try {
         responseData = await res.json();
@@ -111,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { user: null };
       }
       
+      // Handle 403 with verification required - throw special error for redirect
       if (res.status === 403 && responseData?.requiresVerification) {
         const verificationError = new Error(responseData.message) as VerificationError;
         verificationError.requiresVerification = true;
@@ -140,14 +123,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Also invalidate to ensure fresh data
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
     },
-    onError: async (error: any) => {
+    onError: (error: any) => {
       // If verification is required, store the state temporarily
       if (error?.requiresVerification) {
         setPendingVerification(error.verificationStatus);
         setPendingVerificationUser(error.user);
-        // Session is kept active on server, so invalidate query to get authenticated user
-        // This allows verification endpoints to work properly
-        await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       }
     },
   });
@@ -156,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: async (data: RegisterData) => {
       const res = await apiRequest('POST', '/api/auth/register', data);
       if (!res.ok) throw new Error('Registration failed');
-      return await res.json();
+      return res.json();
     },
     onSuccess: async (data) => {
       queryClient.setQueryData(['/api/auth/me'], data.user);
@@ -169,44 +149,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest('POST', '/api/auth/logout', {});
       if (!res.ok) throw new Error('Logout failed');
     },
-    onSuccess: async () => {
-      // Clear all auth-related cache immediately
+    onSuccess: () => {
       queryClient.setQueryData(['/api/auth/me'], null);
       setPendingVerification(null);
       setPendingVerificationUser(null);
-      // Also invalidate to prevent stale data on next login
-      await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
-      // Clear all queries to ensure fresh state for next login
-      queryClient.clear();
     },
   });
 
-  const checkAccounts = async (email: string, password: string): Promise<CheckAccountsResult> => {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-    const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/check-accounts` : '/api/auth/check-accounts';
-    
-    const res = await fetch(fullUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include',
-    });
-    
-    const data = await res.json();
-    
-    if (!res.ok) {
-      throw new Error(data?.message || 'Error verificando cuentas');
-    }
-    
-    return data;
-  };
-
-  const login = async (email: string, password: string, options?: LoginOptions) => {
-    const result = await loginMutation.mutateAsync({ 
-      email, 
-      password, 
-      userType: options?.userType,
-    });
+  const login = async (email: string, password: string) => {
+    const result = await loginMutation.mutateAsync({ email, password });
     return result.user;
   };
 
@@ -234,8 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading, 
       pendingVerification,
       pendingVerificationUser,
-      login,
-      checkAccounts,
+      login, 
       register, 
       logout, 
       refreshUser,

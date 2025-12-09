@@ -29,6 +29,9 @@ interface EditProfileModalProps {
   fotoVerificadaScore?: number | null;
   conductorData?: {
     licencia: string;
+    placaGrua: string;
+    marcaGrua: string;
+    modeloGrua: string;
   };
 }
 
@@ -67,6 +70,9 @@ export function EditProfileModal({
   const [isReverifying, setIsReverifying] = useState(false);
   
   const [licencia, setLicencia] = useState(conductorData?.licencia || '');
+  const [placaGrua, setPlacaGrua] = useState(conductorData?.placaGrua || '');
+  const [marcaGrua, setMarcaGrua] = useState(conductorData?.marcaGrua || '');
+  const [modeloGrua, setModeloGrua] = useState(conductorData?.modeloGrua || '');
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: {
@@ -75,6 +81,9 @@ export function EditProfileModal({
       phone?: string;
       conductorData?: {
         licencia?: string;
+        placaGrua?: string;
+        marcaGrua?: string;
+        modeloGrua?: string;
       };
     }) => {
       const response = await apiRequest('PATCH', '/api/users/me', data);
@@ -327,6 +336,9 @@ export function EditProfileModal({
     if (isDriver) {
       const conductorUpdates: any = {};
       if (licencia !== conductorData?.licencia) conductorUpdates.licencia = licencia;
+      if (placaGrua !== conductorData?.placaGrua) conductorUpdates.placaGrua = placaGrua;
+      if (marcaGrua !== conductorData?.marcaGrua) conductorUpdates.marcaGrua = marcaGrua;
+      if (modeloGrua !== conductorData?.modeloGrua) conductorUpdates.modeloGrua = modeloGrua;
       
       if (Object.keys(conductorUpdates).length > 0) {
         updateData.conductorData = conductorUpdates;
@@ -567,19 +579,59 @@ export function EditProfileModal({
             {isDriver && (
               <>
                 <Separator className="my-4" />
-                <div className="space-y-2">
-                  <Label htmlFor="licencia">Número de Licencia</Label>
-                  <Input
-                    id="licencia"
-                    value={licencia}
-                    onChange={(e) => setLicencia(e.target.value)}
-                    placeholder="Número de licencia de conducir"
-                    disabled={isLoading}
-                    data-testid="input-licencia"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Para gestionar tus vehículos, ve a la sección "Vehículos por Categoría" en tu perfil.
-                  </p>
+                <div>
+                  <h4 className="text-sm font-semibold mb-3">Información de la Grúa</h4>
+                  
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="licencia">Licencia</Label>
+                      <Input
+                        id="licencia"
+                        value={licencia}
+                        onChange={(e) => setLicencia(e.target.value)}
+                        placeholder="Número de licencia"
+                        disabled={isLoading}
+                        data-testid="input-licencia"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="placaGrua">Placa de la Grúa</Label>
+                      <Input
+                        id="placaGrua"
+                        value={placaGrua}
+                        onChange={(e) => setPlacaGrua(e.target.value)}
+                        placeholder="Placa del vehículo"
+                        disabled={isLoading}
+                        data-testid="input-placa"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="marcaGrua">Marca</Label>
+                        <Input
+                          id="marcaGrua"
+                          value={marcaGrua}
+                          onChange={(e) => setMarcaGrua(e.target.value)}
+                          placeholder="Marca"
+                          disabled={isLoading}
+                          data-testid="input-marca"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="modeloGrua">Modelo</Label>
+                        <Input
+                          id="modeloGrua"
+                          value={modeloGrua}
+                          onChange={(e) => setModeloGrua(e.target.value)}
+                          placeholder="Modelo"
+                          disabled={isLoading}
+                          data-testid="input-modelo"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </>
             )}

@@ -124,7 +124,8 @@ export async function processScheduledPayouts(): Promise<{ processed: number; fa
 
         logSystem.info('Scheduled payout processed', { 
           conductorId: conductor.id,
-          amount: balance
+          amount: balance,
+          payoutId: payoutResult.payoutId
         });
       } catch (payoutError: any) {
         results.failed++;
