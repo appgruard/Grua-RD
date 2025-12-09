@@ -1,61 +1,34 @@
-import { Client } from '@replit/object-storage';
 import { logger } from '../logger';
 import crypto from 'crypto';
 import path from 'path';
+import fs from 'fs/promises';
+import { existsSync, mkdirSync } from 'fs';
 
-let storage: Client | null = null;
-let storageInitAttempted = false;
+// Base upload directory - use /app/uploads for CapRover, fallback to ./uploads for local development
+const UPLOAD_BASE_DIR = process.env.UPLOAD_DIR || (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
 
-/**
- * Attempts to initialize storage client, returns null if unavailable
- * Allows retry on subsequent calls if initialization failed previously
- */
-function getStorageClient(): Client | null {
-  if (storage) {
-    return storage;
-  }
-
-  if (!storageInitAttempted) {
-    try {
-      storage = new Client();
-      storageInitAttempted = true;
-      logger.info('Replit Object Storage initialized successfully');
-      return storage;
-    } catch (error) {
-      storageInitAttempted = true;
-      logger.warn('Replit Object Storage not available. Document upload feature will not work until a bucket is created.', {
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      return null;
-    }
-  }
-
-  // On subsequent calls, allow retry by resetting the flag periodically
-  // This enables recovery if a bucket is created after startup
-  return null;
+// Ensure base upload directory exists on startup
+if (!existsSync(UPLOAD_BASE_DIR)) {
+  mkdirSync(UPLOAD_BASE_DIR, { recursive: true });
+  console.log(`Created upload directory: ${UPLOAD_BASE_DIR}`);
 }
 
 /**
- * Resets storage initialization state to allow retry
- * Called when we want to attempt reconnection
- */
-export function resetStorageClient(): void {
-  storage = null;
-  storageInitAttempted = false;
-  logger.info('Storage client reset, will retry initialization on next operation');
-}
-
-/**
- * Check if storage client is initialized and available
+ * Check if storage is initialized (always true for file-based storage)
  */
 export function isStorageInitialized(): boolean {
-  return storage !== null || (!storageInitAttempted && getStorageClient() !== null);
+  return existsSync(UPLOAD_BASE_DIR);
 }
 
 /**
- * Health check for Object Storage
- * Tests basic connectivity by attempting to list with a minimal prefix
- * Resets storage client on each check to allow recovery if storage becomes available
+ * Resets storage initialization state (no-op for file-based storage)
+ */
+export function resetStorageClient(): void {
+  logger.info('File-based storage is always available');
+}
+
+/**
+ * Health check for file storage
  */
 export async function checkStorageHealth(): Promise<{ 
   status: string; 
@@ -64,35 +37,16 @@ export async function checkStorageHealth(): Promise<{
 }> {
   const start = Date.now();
   
-  // Reset storage client to allow retry on each health check
-  // This enables recovery if storage becomes available after a previous failure
-  resetStorageClient();
-  
   try {
-    const storageClient = getStorageClient();
-    if (!storageClient) {
-      return { 
-        status: "unhealthy", 
-        responseTime: Date.now() - start,
-        error: "Storage not initialized: STORAGE_BUCKET environment variable not set"
-      };
-    }
-    
-    // Try a simple list operation with a minimal prefix to test connectivity
-    const result = await storageClient.list({ prefix: '_health_', limit: 1 });
-    const responseTime = Date.now() - start;
-    
-    if (!result.ok) {
-      return {
-        status: "unhealthy",
-        responseTime,
-        error: result.error?.message || "Storage operation failed"
-      };
-    }
+    // Test write/read/delete to verify storage is working
+    const testFile = path.join(UPLOAD_BASE_DIR, '_health_check_' + Date.now());
+    await fs.writeFile(testFile, 'health check');
+    await fs.readFile(testFile);
+    await fs.unlink(testFile);
     
     return { 
       status: "healthy", 
-      responseTime 
+      responseTime: Date.now() - start 
     };
   } catch (error) {
     return { 
@@ -152,7 +106,7 @@ export function validateFile(fileSize: number, mimeType: string): { valid: boole
 }
 
 /**
- * Generate a unique file key for object storage
+ * Generate a unique file key for storage
  */
 function generateFileKey(userId: string, documentType: string, originalName: string): string {
   const ext = path.extname(originalName);
@@ -162,7 +116,15 @@ function generateFileKey(userId: string, documentType: string, originalName: str
 }
 
 /**
- * Upload a file to Replit Object Storage
+ * Ensure directory exists for a file path
+ */
+async function ensureDirectoryExists(filePath: string): Promise<void> {
+  const dir = path.dirname(filePath);
+  await fs.mkdir(dir, { recursive: true });
+}
+
+/**
+ * Upload a file to local file storage
  */
 export async function uploadDocument(options: UploadOptions): Promise<UploadResult> {
   const { buffer, originalName, mimeType, userId, documentType } = options;
@@ -174,23 +136,17 @@ export async function uploadDocument(options: UploadOptions): Promise<UploadResu
       throw new Error(validation.error);
     }
 
-    // Check if storage is available
-    const storageClient = getStorageClient();
-    if (!storageClient) {
-      throw new Error('El servicio de almacenamiento no está disponible. Por favor contacta al administrador.');
-    }
-
     // Generate unique key
     const key = generateFileKey(userId, documentType, originalName);
+    const fullPath = path.join(UPLOAD_BASE_DIR, key);
 
-    // Upload to object storage using uploadFromBytes
-    const result = await storageClient.uploadFromBytes(key, buffer);
-    
-    if (!result.ok) {
-      throw new Error(result.error?.message || 'Failed to upload document');
-    }
+    // Ensure directory exists
+    await ensureDirectoryExists(fullPath);
 
-    logger.info('Document uploaded to object storage', {
+    // Write file to disk
+    await fs.writeFile(fullPath, buffer);
+
+    logger.info('Document uploaded to file storage', {
       key,
       userId,
       documentType,
@@ -198,17 +154,15 @@ export async function uploadDocument(options: UploadOptions): Promise<UploadResu
       mimeType,
     });
 
-    // Return result with public URL
-    // Note: Replit object storage URLs are accessible via the storage client
     return {
       key,
-      url: key, // We'll store the key as the URL and retrieve via storage client
+      url: key,
       fileName: originalName,
       fileSize: buffer.length,
       mimeType,
     };
   } catch (error) {
-    logger.error('Error uploading document to object storage', {
+    logger.error('Error uploading document to file storage', {
       error: error instanceof Error ? error.message : 'Unknown error',
       userId,
       documentType,
@@ -218,30 +172,23 @@ export async function uploadDocument(options: UploadOptions): Promise<UploadResu
 }
 
 /**
- * Retrieve a document from object storage
+ * Retrieve a document from file storage
  */
 export async function getDocument(key: string): Promise<Buffer | null> {
   try {
-    const storageClient = getStorageClient();
-    if (!storageClient) {
-      logger.warn('Storage client not available for document retrieval', { key });
+    const fullPath = path.join(UPLOAD_BASE_DIR, key);
+    
+    try {
+      await fs.access(fullPath);
+    } catch {
+      logger.warn('Document not found in file storage', { key });
       return null;
     }
     
-    const result = await storageClient.downloadAsBytes(key);
-    
-    if (!result.ok) {
-      logger.warn('Document not found in object storage', { 
-        key,
-        error: result.error?.message 
-      });
-      return null;
-    }
-    
-    // Convert Uint8Array to Buffer for compatibility
-    return Buffer.from(result.value);
+    const buffer = await fs.readFile(fullPath);
+    return buffer;
   } catch (error) {
-    logger.error('Error retrieving document from object storage', {
+    logger.error('Error retrieving document from file storage', {
       error: error instanceof Error ? error.message : 'Unknown error',
       key,
     });
@@ -250,21 +197,24 @@ export async function getDocument(key: string): Promise<Buffer | null> {
 }
 
 /**
- * Delete a document from object storage
+ * Delete a document from file storage
  */
 export async function deleteDocument(key: string): Promise<boolean> {
   try {
-    const storageClient = getStorageClient();
-    if (!storageClient) {
-      logger.warn('Storage client not available for document deletion', { key });
+    const fullPath = path.join(UPLOAD_BASE_DIR, key);
+    
+    try {
+      await fs.access(fullPath);
+    } catch {
+      logger.warn('Document not found for deletion', { key });
       return false;
     }
     
-    await storageClient.delete(key);
-    logger.info('Document deleted from object storage', { key });
+    await fs.unlink(fullPath);
+    logger.info('Document deleted from file storage', { key });
     return true;
   } catch (error) {
-    logger.error('Error deleting document from object storage', {
+    logger.error('Error deleting document from file storage', {
       error: error instanceof Error ? error.message : 'Unknown error',
       key,
     });
@@ -277,25 +227,31 @@ export async function deleteDocument(key: string): Promise<boolean> {
  */
 export async function listUserDocuments(userId: string): Promise<string[]> {
   try {
-    const storageClient = getStorageClient();
-    if (!storageClient) {
-      logger.warn('Storage client not available for listing documents', { userId });
+    const userDir = path.join(UPLOAD_BASE_DIR, 'documents', userId);
+    
+    try {
+      await fs.access(userDir);
+    } catch {
       return [];
     }
     
-    const prefix = `documents/${userId}/`;
-    const result = await storageClient.list({ prefix });
+    const results: string[] = [];
     
-    if (!result.ok) {
-      logger.error('Error listing user documents', {
-        error: result.error?.message,
-        userId,
-      });
-      return [];
+    async function walkDir(dir: string, baseKey: string): Promise<void> {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const entryPath = path.join(dir, entry.name);
+        const entryKey = path.join(baseKey, entry.name);
+        if (entry.isDirectory()) {
+          await walkDir(entryPath, entryKey);
+        } else {
+          results.push(entryKey);
+        }
+      }
     }
     
-    // Extract names from StorageObject array
-    return result.value.map((obj) => obj.name);
+    await walkDir(userDir, `documents/${userId}`);
+    return results;
   } catch (error) {
     logger.error('Error listing user documents', {
       error: error instanceof Error ? error.message : 'Unknown error',
