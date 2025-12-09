@@ -202,7 +202,7 @@ export default function VerifyOTP() {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               <Button
-                variant="link"
+                variant="ghost"
                 className="p-0 h-auto"
                 onClick={() => setLocation('/login')}
                 data-testid="link-back-login"

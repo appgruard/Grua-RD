@@ -46,7 +46,6 @@ export default defineConfig({
             '@radix-ui/react-popover',
             '@radix-ui/react-accordion',
           ],
-          'vendor-maps': ['mapbox-gl', 'react-map-gl'],
           'vendor-charts': ['recharts'],
           'vendor-forms': ['react-hook-form', '@hookform/resolvers'],
           'vendor-animations': ['framer-motion'],

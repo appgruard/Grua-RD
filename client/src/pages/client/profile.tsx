@@ -1,18 +1,19 @@
 import { useState, useRef } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2, IdCard, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2, IdCard, CheckCircle2, AlertCircle, Truck, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
 import ClientPaymentMethods from '@/components/ClientPaymentMethods';
 import { EditProfileModal } from '@/components/EditProfileModal';
+import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { CedulaScanner } from '@/components/CedulaScanner';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import {
@@ -31,6 +32,7 @@ export default function ClientProfile() {
   const { toast } = useToast();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [cedulaDialogOpen, setCedulaDialogOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const uploadPhotoMutation = useMutation({
@@ -110,6 +112,7 @@ export default function ClientProfile() {
       }
     }
   };
+
 
   if (!user) return null;
 
@@ -299,6 +302,49 @@ export default function ClientProfile() {
 
         <ThemeSettingsCard />
 
+        <Card className="overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Seguridad
+            </h3>
+          </div>
+          <div className="p-4">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setChangePasswordOpen(true)}
+              data-testid="button-change-password"
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              Cambiar Contraseña
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-driver">
+          <div className="p-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Truck className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-semibold mb-1">¿También quieres ser conductor?</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Crea una cuenta de conductor adicional y comienza a ganar dinero con tu vehículo. Podrás alternar entre ambas cuentas.
+                </p>
+                <Button 
+                  onClick={() => setLocation('/onboarding?tipo=conductor')}
+                  className="w-full"
+                  data-testid="button-become-driver"
+                >
+                  <Truck className="w-4 h-4 mr-2" />
+                  Crear cuenta de Conductor
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+
           <Button
             variant="outline"
             className="w-full h-12 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
@@ -316,6 +362,11 @@ export default function ClientProfile() {
         onOpenChange={setEditModalOpen}
         isDriver={false}
         currentPhotoUrl={user.fotoUrl}
+      />
+
+      <ChangePasswordModal
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
       />
     </div>
   );

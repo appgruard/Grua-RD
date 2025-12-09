@@ -163,7 +163,7 @@ class ResendEmailService implements EmailService {
         subject: options.subject,
         html: options.html,
         text: options.text,
-      });
+      } as any);
 
       if (error) {
         logger.error('Failed to send email:', error);

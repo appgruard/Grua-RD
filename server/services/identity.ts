@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { users } from "../../shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { logger } from "../logger";
 
 /**
@@ -103,8 +103,23 @@ export async function verifyCedula(
       ? `${cleaned.slice(0, 3)}-${cleaned.slice(3, 10)}-${cleaned.slice(10)}`
       : cedula;
     
-    // Check if cédula is already in use by another user
-    const existing = await db.query.users.findFirst({
+    // Get the current user's email to allow same cedula for same person's accounts
+    const currentUser = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { email: true }
+    });
+    
+    if (!currentUser) {
+      return {
+        success: false,
+        error: "Usuario no encontrado."
+      };
+    }
+    
+    // Check if cédula is already in use by a DIFFERENT person (different email)
+    // Allow same cedula for same person's multiple accounts (e.g., cliente and conductor)
+    // Only allow duplicate if BOTH emails match and are non-null
+    const allUsersWithCedula = await db.query.users.findMany({
       where: (users, { and, eq, ne }) => 
         and(
           eq(users.cedula, formatted),
@@ -112,8 +127,20 @@ export async function verifyCedula(
         )
     });
     
-    if (existing) {
-      logger.warn(`Duplicate cedula attempt for user ${userId}`);
+    // Check if any of the users with this cedula have a different email
+    // Null emails should not match - treat null as distinct
+    const hasDuplicateFromDifferentPerson = allUsersWithCedula.some(existingUser => {
+      // If either email is null/undefined, don't allow (can't verify same person)
+      if (!currentUser.email || !existingUser.email) {
+        return true; // Block duplicate
+      }
+      // Normalize emails: trim whitespace and lowercase before comparison
+      // Different email = different person = block
+      return existingUser.email.trim().toLowerCase() !== currentUser.email.trim().toLowerCase();
+    });
+    
+    if (hasDuplicateFromDifferentPerson) {
+      logger.warn(`Duplicate cedula attempt for user ${userId} - cedula belongs to different person`);
       
       return {
         success: false,

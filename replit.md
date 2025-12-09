@@ -1,7 +1,7 @@
 # Grúa RD - Plataforma de Servicios de Grúa
 
 ## Overview
-Grúa RD is a Progressive Web App (PWA) designed for the Dominican Republic to connect users with tow truck services and drivers in real-time. It aims to streamline service requests, enable real-time tracking, and efficiently manage operations. The platform provides distinct interfaces for Clients, Drivers, Administrators, and an enterprise portal for B2B clients, with the goal of revolutionizing the local tow truck service industry.
+Grúa RD is a Progressive Web App (PWA) for the Dominican Republic, connecting users with tow truck services and drivers in real-time. It aims to streamline service requests, enable real-time tracking, and efficiently manage operations. The platform offers distinct interfaces for Clients, Drivers, Administrators, and an enterprise portal for B2B clients, with the goal of revolutionizing the local tow truck service industry.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -19,48 +19,43 @@ Prioritize performance and scalability in new implementations.
 ## System Architecture
 
 ### UI/UX Decisions
-The system features a mobile-first, responsive PWA built with `shadcn/ui` and Tailwind CSS. It uses a light mode with dark mode preparation, Inter font, and Grúa RD brand colors. Client and Driver interfaces utilize a `MobileLayout` with bottom navigation, while Admin and Enterprise interfaces use `AdminLayout` or `EmpresaLayout` with sidebars. The PWA is configured for standalone installation with Capacitor for native mobile capabilities.
+The system features a mobile-first, responsive PWA built with `shadcn/ui` and Tailwind CSS, utilizing a light mode, Inter font, and Grúa RD brand colors. Client and Driver interfaces use `MobileLayout` with bottom navigation, while Admin and Enterprise interfaces use `AdminLayout` or `EmpresaLayout` with sidebars. The PWA is configured for standalone installation with Capacitor for native mobile capabilities.
 
 ### Technical Implementations
-Grúa RD uses a React 18 (TypeScript, Vite) frontend and an Express.js (Node.js) backend. It integrates PostgreSQL (Neon) with Drizzle ORM. Authentication is handled by Passport.js (local strategy, bcrypt). Real-time features are powered by WebSockets (`ws` library). Mapbox GL JS with react-map-gl is used for mapping, routing, and geocoding. State management is handled by TanStack Query (React Query v5). The project maintains a modular structure and integrates Capacitor for native mobile functionality.
+Grúa RD uses a React 18 (TypeScript, Vite) frontend, an Express.js (Node.js) backend, and PostgreSQL (Neon) with Drizzle ORM. Authentication is handled by Passport.js (local strategy, bcrypt). Real-time features are powered by WebSockets (`ws` library). Mapbox GL JS with react-map-gl is used for mapping, routing, and geocoding. State management is handled by TanStack Query (React Query v5). The project maintains a modular structure and integrates Capacitor for native mobile functionality.
 
 ### Feature Specifications
 **Core Features:**
-- **Authentication & Security**: Role-based access with Passport.js and session management.
-- **Client Features**: Map-based service requests, real-time tracking, service history, automatic price calculation, and insurance document management.
-- **Driver Features**: Request dashboard, accept/reject services, real-time GPS updates, availability toggle, and specialized truck/vehicle management per service category. Includes an Operator Wallet System for commission calculation, debt management, and payment processing.
-- **Admin Features**: Dashboard with analytics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration with subcategory support (allowing independent pricing per service type), document validation, and support ticket system.
-- **Enterprise Portal (B2B)**: Business management, contract/tariff configuration, project tracking, scheduled services, and invoicing.
-- **Real-time Communication**: WebSockets for location updates, client-driver chat, and automatic service cancellation.
-- **Push Notifications**: Web Push API and Capacitor for service updates and chat messages.
-- **PWA & Native Capabilities**: Installable PWA with full Capacitor integration for Android/iOS.
-- **Payment Integration**: Azul API payment gateway (migración pendiente) for card payments, cash option, automatic 80/20 commission splitting, operator wallet system with scheduled payouts (Mondays/Fridays) and same-day withdrawals (100 DOP commission), and PDF receipt generation with Grúa RD branding.
-- **Robust UX**: Skeleton loaders, empty states, confirmation dialogs, toast notifications, form validations, and responsive design.
+- **Authentication & Security**: Role-based access with Passport.js.
+- **Client Features**: Map-based service requests, real-time tracking, service history, price calculation, insurance document management.
+- **Driver Features**: Request dashboard, accept/reject services, real-time GPS, availability toggle, specialized truck management, Operator Wallet System (commissions, debt, payments).
+- **Admin Features**: Dashboard with analytics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration, document validation, support ticket system.
+- **Enterprise Portal (B2B)**: Business management, contract/tariff configuration, project tracking, scheduled services, invoicing.
+- **Real-time Communication**: WebSockets for location updates, chat, automatic service cancellation.
+- **Push Notifications**: Web Push API and Capacitor for updates.
+- **PWA & Native Capabilities**: Installable PWA with Capacitor integration.
+- **Payment Integration**: Azul API (pending migration) for card payments, cash, automatic 80/20 commission splitting, operator wallet with scheduled payouts and same-day withdrawals, PDF receipts.
+- **Robust UX**: Skeleton loaders, empty states, dialogs, toast notifications, form validations, responsive design.
 - **Monitoring & Logging**: Structured logging with Winston.
-- **Identity & Compliance**: Multi-step onboarding, Dominican ID (cédula) validation (Verifik OCR API), phone OTP/SMS verification, and admin verification panel.
-- **Document Management**: Upload system with Replit Object Storage, admin review, and automated notifications.
-- **Insurance Integration**: Adapter pattern for multiple insurance company APIs, policy validation, and claim submission.
-- **Intermediate Service States**: Granular service states for detailed tracking.
-- **Support Ticket System**: Comprehensive management for clients and drivers.
-- **Negotiation Chat System**: Dual chat for standard and extraction services, with price proposal/acceptance flows, media sharing, and new service categories.
+- **Identity & Compliance**: Multi-step onboarding, Dominican ID (cédula) validation (Verifik OCR API), phone OTP/SMS verification, admin verification panel.
+- **Document Management**: Upload system with Replit Object Storage, admin review.
+- **Insurance Integration**: Adapter pattern for multiple insurance company APIs.
+- **Intermediate Service States**: Granular service states for tracking.
+- **Support Ticket System**: Comprehensive management.
+- **Negotiation Chat System**: Dual chat for standard and extraction services with price proposals.
+- **Multi-Vehicle Operator Support**: Operators can manage multiple vehicles, with vehicle documentation handled per-vehicle.
+- **Draggable Pins & Extended Destination**: Clients can drag origin/destination pins. Drivers can extend destinations up to 1.5km.
+- **Dual-Account System**: Allows the same email to be used for both client and driver accounts.
 
 ### System Design Choices
-The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage uses Replit Object Storage with strict authorization. Azul API payment integration (migración pendiente) will use server-side processing with webhook verification. Insurance API integrations use an Adapter pattern. Driver profile API is optimized for single-call data retrieval. Service auto-cancellation uses atomic updates and real-time notifications. The vehicle-per-category system enforces unique constraints for driver and category. Performance optimizations include smart location tracking with movement thresholds, lazy loading of map components, and consolidated API endpoint `/api/drivers/init` for fast driver dashboard loading. Loading optimizations include self-hosted fonts, an enhanced service worker, role-based preloading, AuthProvider cookie optimization, specialized skeleton screens, React Query optimizations, an `OptimizedImage` component, and dynamic preconnect by role. Web Vitals tracking and custom page load metrics are implemented, with an analytics API endpoint for data reception. TTFB optimizations include aggressive cache headers for static assets (fonts: 1 year immutable, hashed JS/CSS: 1 year immutable), X-Response-Time header for monitoring, Early Hints via Link headers for font preloading and Mapbox preconnect, and fast-path middleware to skip logging for static assets. These optimizations improved TTFB from 814ms to 13ms (-98%).
-
-## Recent Changes
-
-### December 2025 - Multi-Vehicle Operator Support
-- **Removed Vehicle-Specific Document Requirements**: Operators can now manage multiple tow trucks without needing to upload vehicle-specific documents (Matrícula del vehículo, Seguro de la grúa, Foto del vehículo) at the operator level. Vehicle documentation is managed per-vehicle in the `conductorVehiculos` table.
-- **Dynamic Map Marker Colors**: Admin monitoring page now displays tow truck markers with colors based on the operator's vehicle color input. The first active vehicle's color is used for map representation.
-- **Schema Updates**: Added `vehiculos` relation to `conductoresRelations` and `conductorVehiculosRelations` for proper one-to-many relationship between operators and vehicles.
-- **Required Documents Simplified**: Driver onboarding and document renewal now only require: Licencia de Conducir, Cédula (Frente/Reverso). Vehicle-specific documents are managed separately.
+The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage uses Replit Object Storage. Azul API payment integration (pending migration) will use server-side processing with webhook verification. Insurance API integrations use an Adapter pattern. Performance optimizations include smart location tracking, lazy loading of map components, consolidated API endpoints, self-hosted fonts, enhanced service worker, role-based preloading, React Query optimizations, and dynamic preconnect by role. TTFB optimizations include aggressive cache headers, X-Response-Time header, Early Hints, and fast-path middleware, reducing TTFB from 814ms to 13ms. Cedula validation allows the same cedula across multiple account types belonging to the same person.
 
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
 - **Mapbox**: Maps (Mapbox GL JS via react-map-gl), Directions API, Geocoding API.
 - **Waze**: Deep links for driver navigation.
-- **Azul API**: Payment gateway for Dominican Republic (migración pendiente) - card payments, payouts to banks, and commission tracking.
-- **Web Push API**: For sending push notifications.
+- **Azul API**: Payment gateway for Dominican Republic.
+- **Web Push API**: For push notifications.
 - **Replit Object Storage**: For document storage.
 - **Twilio**: SMS service for OTP delivery (via Replit Connector).
 - **Resend**: Email service for transactional emails and notifications (via Replit Connector).
@@ -68,3 +63,36 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Capacitor**: For native mobile app functionalities and plugins.
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
+
+## CapRover Deployment
+
+### Document Storage Configuration
+The application uses a provider-agnostic storage abstraction that automatically selects the appropriate storage backend:
+
+1. **Replit Object Storage**: Used when running inside Replit environment (default)
+2. **Filesystem Storage**: Used when running outside Replit (CapRover, Docker, local)
+
+### CapRover Volume Configuration
+When deploying to CapRover, configure a persistent volume for document uploads:
+
+1. In CapRover app settings, add a persistent volume:
+   - **Container Path**: `/app/uploads`
+   - **Host Path**: Use CapRover's default persistent storage
+
+2. Optionally set the `STORAGE_PATH` environment variable to customize the storage location:
+   ```
+   STORAGE_PATH=/app/uploads
+   ```
+
+### Environment Variables for CapRover
+Required environment variables for CapRover deployment:
+- `DATABASE_URL`: PostgreSQL connection string
+- `SESSION_SECRET`: Session encryption key
+- `MAPBOX_ACCESS_TOKEN` / `VITE_MAPBOX_ACCESS_TOKEN`: Mapbox API key
+- `RESEND_API_KEY`: Email service API key
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: Push notification keys
+- `STORAGE_PATH`: (Optional) Custom path for file storage, defaults to `/app/uploads`
+
+### Storage API Endpoints
+- `GET /api/storage/info`: Returns current storage provider status
+- `GET /api/storage/files/*`: Serves uploaded files from filesystem storage (requires authentication)

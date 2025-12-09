@@ -117,6 +117,7 @@ export function ProfileImage({
 }: Omit<OptimizedImageProps, 'width' | 'height'> & {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   fallbackInitials?: string;
+  className?: string;
 }) {
   const [error, setError] = useState(false);
 

@@ -60,12 +60,36 @@ Ya existe con todo configurado para producción:
 
 ## Paso 3: Configurar Variables de Entorno
 
-### En CapRover:
+### IMPORTANTE: Variables Build-Time vs Runtime
 
-1. En el dashboard, ve a: **Apps → Crear Nueva App**
-2. Nombra tu app: `gruard-rd`
-3. Ve a la sección **Environment Variables**
-4. Agrega TODAS las variables necesarias:
+CapRover tiene dos tipos de variables de entorno:
+
+1. **Runtime Variables**: Disponibles cuando la app corre (para el backend)
+2. **Build-Time Variables**: Disponibles durante el build de Docker (para variables VITE_)
+
+Las variables `VITE_*` se embeben en el JavaScript compilado durante el build.
+Si solo las defines como Runtime, el frontend NO las vera.
+
+### Configurar en CapRover:
+
+1. En el dashboard, ve a: **Apps -> Tu App -> App Configs**
+2. Para cada variable `VITE_*`, marca la casilla **"Is Build-Time Variable"**
+3. Para variables del backend (sin VITE_), deja esa casilla desmarcada
+
+### Variables Build-Time (marcar "Is Build-Time Variable"):
+
+```bash
+# Mapbox para el frontend (OBLIGATORIO marcar build-time)
+VITE_MAPBOX_ACCESS_TOKEN=pk.xxx
+
+# VAPID public key para push notifications (OBLIGATORIO marcar build-time)
+VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
+
+# API URL para apps moviles (opcional para web, requerido para apps nativas)
+VITE_API_URL=https://app.gruard.com
+```
+
+### Variables Runtime (NO marcar build-time):
 
 ```bash
 # Base de datos
@@ -77,40 +101,46 @@ NODE_ENV=production
 # CORS - Dominios permitidos (separados por coma)
 ALLOWED_ORIGINS=https://app.gruard.com,https://www.gruard.com
 
-# Sesión
+# Sesion
 SESSION_SECRET=your_generated_secret_32_chars_min
 
-# Push Notifications (VAPID)
+# Push Notifications - clave privada (solo backend)
 VAPID_PRIVATE_KEY=your_vapid_private_key
 VAPID_PUBLIC_KEY=your_vapid_public_key
-VITE_VAPID_PUBLIC_KEY=your_vapid_public_key
 
-# Mapbox
+# Mapbox para el backend (calculo de rutas)
 MAPBOX_ACCESS_TOKEN=pk.xxx
-VITE_MAPBOX_ACCESS_TOKEN=pk.xxx
 
 # Email (Resend)
 RESEND_API_KEY=re_xxx
 
-# Azul API (Pagos) - Migración pendiente
-AZUL_MERCHANT_ID=xxx
-AZUL_MERCHANT_NAME=xxx
-AZUL_MERCHANT_TYPE=xxx
-AZUL_AUTH1=xxx
-AZUL_AUTH2=xxx
-AZUL_ENVIRONMENT=dev
+# Azul API (Pagos) - REQUERIDO para procesar pagos
+AZUL_MERCHANT_ID=tu_merchant_id
+AZUL_MERCHANT_NAME=Grua RD
+AZUL_MERCHANT_TYPE=E-Commerce
+AZUL_AUTH1=tu_auth1
+AZUL_AUTH2=tu_auth2
+AZUL_ENVIRONMENT=production  # usar 'sandbox' para pruebas
 
-# Verificación de identidad (Verifik)
-VERIFIK_API_KEY=xxx
-
-# API URL para apps móviles (IMPORTANTE para iOS/Android)
-VITE_API_URL=https://app.gruard.com
+# Twilio (SMS/OTP) - Opcional pero recomendado
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=+1809...
 ```
 
-**IMPORTANTE**: 
-- No uses `VITE_` como prefijo para secretos en backend
-- Solo usa `VITE_` para variables que necesita el frontend compilado
-- `VITE_API_URL` es CRÍTICO para que las apps iOS/Android se conecten al servidor
+### Verificar que las variables VITE_ se aplicaron
+
+Despues de desplegar, puedes verificar en la consola del navegador:
+1. Abre la app en el navegador
+2. Abre DevTools (F12)
+3. En Console, escribe: `__MAPBOX_TOKEN__` o busca en el codigo fuente
+
+Si ves `undefined` o vacio, las variables build-time no se configuraron correctamente.
+
+**SOLUCION si las variables no se ven:**
+1. Ve a App Configs en CapRover
+2. Asegurate de que "Is Build-Time Variable" esta marcado para variables VITE_
+3. Haz un nuevo deploy (Trigger Deploy)
 
 ---
 

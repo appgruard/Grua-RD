@@ -52,9 +52,7 @@ export function AmountResponseCard({
 
   const acceptMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/services/${servicioId}/accept-amount`, {
-        method: 'POST',
-      });
+      return apiRequest('POST', `/api/services/${servicioId}/accept-amount`);
     },
     onSuccess: () => {
       toast({
@@ -76,9 +74,7 @@ export function AmountResponseCard({
 
   const rejectMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/services/${servicioId}/reject-amount`, {
-        method: 'POST',
-      });
+      return apiRequest('POST', `/api/services/${servicioId}/reject-amount`);
     },
     onSuccess: () => {
       toast({

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { useMutation } from '@tanstack/react-query';
@@ -16,11 +16,14 @@ import { cn } from '@/lib/utils';
 import { 
   Loader2, IdCard, Mail, CheckCircle2, AlertCircle, 
   Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, 
-  UserCircle, ArrowRight, Circle, CheckCircle
+  UserCircle, ArrowRight, Circle, CheckCircle, FileText, Grid3X3, Car
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
+import { FileUpload } from '@/components/FileUpload';
+import { ServiceCategoryMultiSelect, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
+import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 
-type VerificationStep = 'cedula' | 'phone' | 'photo' | 'complete';
+type VerificationStep = 'cedula' | 'email' | 'photo' | 'license' | 'categories' | 'vehicles' | 'complete';
 
 interface VerificationStepInfo {
   id: VerificationStep;
@@ -34,33 +37,47 @@ interface VerificationStepInfo {
 
 export default function VerifyPending() {
   const [, setLocation] = useLocation();
-  const { user, logout, pendingVerification, pendingVerificationUser, clearPendingVerification, refreshUser } = useAuth();
+  const { user, logout, pendingVerification, pendingVerificationUser, clearPendingVerification, refreshUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   
-  const currentUser = user || pendingVerificationUser;
-  const isDriver = currentUser?.userType === 'conductor';
-  // Either telefonoVerificado OR emailVerificado counts as contact verified
-  const contactoVerificado = currentUser?.telefonoVerificado || (currentUser as any)?.emailVerificado || false;
+  // Use user from context or pendingVerificationUser immediately
+  const contextUser = user || pendingVerificationUser;
   
-  const verificationStatus = pendingVerification || {
-    cedulaVerificada: currentUser?.cedulaVerificada || false,
-    telefonoVerificado: contactoVerificado,
-    fotoVerificada: (currentUser as any)?.fotoVerificada || false,
-  };
-
+  // State declarations - initialize with optimistic values from pendingVerification
   const [currentStep, setCurrentStep] = useState<VerificationStep>('cedula');
   const [otpCode, setOtpCode] = useState('');
   const [otpTimer, setOtpTimer] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
-  const [cedulaVerified, setCedulaVerified] = useState(verificationStatus.cedulaVerificada);
-  const [phoneVerified, setPhoneVerified] = useState(verificationStatus.telefonoVerificado);
-  const [photoVerified, setPhotoVerified] = useState(verificationStatus.fotoVerificada || false);
+  const [cedulaVerified, setCedulaVerified] = useState(pendingVerification?.cedulaVerificada || false);
+  const [emailVerified, setEmailVerified] = useState((pendingVerification as any)?.emailVerificado || false);
+  const [photoVerified, setPhotoVerified] = useState(pendingVerification?.fotoVerificada || false);
   const [profilePhotoImage, setProfilePhotoImage] = useState<string | null>(null);
   const [isValidatingPhoto, setIsValidatingPhoto] = useState(false);
   const [showProfileCamera, setShowProfileCamera] = useState(false);
+  const [licenseVerified, setLicenseVerified] = useState(false);
+  const [licenseFrontUrl, setLicenseFrontUrl] = useState<string | null>(null);
+  const [licenseBackUrl, setLicenseBackUrl] = useState<string | null>(null);
+  const [categoriesVerified, setCategoriesVerified] = useState(false);
+  const [vehiclesVerified, setVehiclesVerified] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<Array<{ categoria: string; subtipos: string[] }>>([]);
+  const [vehicles, setVehicles] = useState<VehicleData[]>([]);
+  const [isUploadingLicense, setIsUploadingLicense] = useState(false);
+  const [isSavingCategories, setIsSavingCategories] = useState(false);
+  const [isSavingVehicles, setIsSavingVehicles] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isInitializing, setIsInitializing] = useState(true); // Start as true, will be set to false when ready
+  const [initializedUser, setInitializedUser] = useState<any>(null);
+  const [initError, setInitError] = useState(false);
+  const initFetchedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Use user from context, or pendingVerificationUser, or initializedUser from API
+  const currentUser = contextUser || initializedUser;
+  const isDriver = currentUser?.userType === 'conductor';
+  // Only email verification is required (no SMS)
+  const emailVerificado = (currentUser as any)?.emailVerificado || false;
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -72,53 +89,203 @@ export default function VerifyPending() {
   const profileCanvasRef = useRef<HTMLCanvasElement>(null);
   const profileStreamRef = useRef<MediaStream | null>(null);
 
-  useEffect(() => {
-    const checkVerificationStatus = async () => {
-      try {
-        const res = await fetch('/api/identity/verification-status', {
-          credentials: 'include'
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const { cedulaVerificada, telefonoVerificado, fotoVerificada } = data.verification;
-          
-          setCedulaVerified(cedulaVerificada);
-          setPhoneVerified(telefonoVerificado);
-          setPhotoVerified(fotoVerificada);
+  // Reusable function to fetch verification status from the server
+  // When skipRedirects is true, only update local state without triggering redirects
+  const fetchVerificationStatusFromServer = useCallback(async (signal?: AbortSignal, options?: { skipRedirects?: boolean }) => {
+    try {
+      const res = await fetch('/api/identity/verification-status', {
+        credentials: 'include',
+        signal
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        const { 
+          cedulaVerificada, 
+          cedulaPendingReview, 
+          emailVerificado, 
+          fotoVerificada,
+          licenciaVerificada,
+          licenciaFrontalUrl,
+          licenciaTraseraUrl,
+          categoriasConfiguradas,
+          vehiculosRegistrados
+        } = data.verification;
+        
+        // Store user data from the response if we don't have context user
+        if (data.user && !contextUser) {
+          setInitializedUser(data.user);
+        }
+        
+        // For onboarding flow, cedula step is complete if verified OR pending review
+        const cedulaStepComplete = cedulaVerificada || cedulaPendingReview;
+        
+        // Always update local verification state
+        setCedulaVerified(cedulaStepComplete);
+        setEmailVerified(emailVerificado);
+        setPhotoVerified(fotoVerificada);
 
-          if (isDriver) {
-            if (cedulaVerificada && telefonoVerificado && fotoVerificada) {
+        // Determine user type from API response or context
+        const checkUser = data.user || contextUser;
+        const isDriverCheck = checkUser?.userType === 'conductor';
+
+        if (isDriverCheck) {
+          // Update driver-specific verification states
+          setLicenseVerified(licenciaVerificada || false);
+          if (licenciaFrontalUrl) setLicenseFrontUrl(licenciaFrontalUrl);
+          if (licenciaTraseraUrl) setLicenseBackUrl(licenciaTraseraUrl);
+          setCategoriesVerified(categoriasConfiguradas || false);
+          setVehiclesVerified(vehiculosRegistrados || false);
+
+          // Check if all 6 steps are complete for driver
+          const allDriverStepsComplete = cedulaVerificada && emailVerificado && fotoVerificada && 
+            licenciaVerificada && categoriasConfiguradas && vehiculosRegistrados;
+
+          if (allDriverStepsComplete) {
+            if (!options?.skipRedirects) {
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/driver');
               });
-            } else if (cedulaVerificada && telefonoVerificado && !fotoVerificada) {
-              setCurrentStep('photo');
-            } else if (cedulaVerificada && !telefonoVerificado) {
-              setCurrentStep('phone');
-            } else {
-              setCurrentStep('cedula');
             }
-          } else {
-            if (cedulaVerificada && telefonoVerificado) {
+          } else if (!cedulaStepComplete) {
+            setCurrentStep('cedula');
+          } else if (!emailVerificado) {
+            setCurrentStep('email');
+          } else if (!fotoVerificada) {
+            setCurrentStep('photo');
+          } else if (!licenciaVerificada) {
+            setCurrentStep('license');
+          } else if (!categoriasConfiguradas) {
+            setCurrentStep('categories');
+          } else if (!vehiculosRegistrados) {
+            setCurrentStep('vehicles');
+          }
+        } else {
+          // Client verification flow
+          if (cedulaVerificada && emailVerificado) {
+            // Fully verified - redirect if skipRedirects is not true
+            if (!options?.skipRedirects) {
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/client');
               });
-            } else if (cedulaVerificada) {
-              setCurrentStep('phone');
             }
+          } else if (cedulaStepComplete && !emailVerificado) {
+            // Cedula done, needs email verification
+            setCurrentStep('email');
+          } else {
+            // Needs cedula verification first
+            setCurrentStep('cedula');
           }
         }
-      } catch (error) {
-        console.error('Error checking verification status:', error);
+        return { success: true };
+      } else if (res.status === 401) {
+        if (!options?.skipRedirects) {
+          setLocation('/login');
+        }
+        return { success: false, unauthorized: true };
+      } else {
+        return { success: false };
+      }
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return { success: false, aborted: true };
+      console.error('Error checking verification status:', error);
+      return { success: false };
+    }
+  }, [contextUser, setLocation, clearPendingVerification, refreshUser]);
+
+  // Function to manually refetch verification status (for focus events, retry, etc.)
+  // Always passes skipRedirects: true to avoid duplicate redirects after mutations
+  const refetchVerificationStatus = useCallback(async (options?: { bypassInitGuard?: boolean }) => {
+    // Skip if init hasn't completed yet, unless bypassInitGuard is true
+    if (!options?.bypassInitGuard && !initFetchedRef.current) {
+      return false;
+    }
+    
+    // Cancel any ongoing fetch
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
+    // Always skip redirects when refetching - caller handles navigation
+    const result = await fetchVerificationStatusFromServer(controller.signal, { skipRedirects: true });
+    return result.success;
+  }, [fetchVerificationStatusFromServer]);
+
+  // Single effect to fetch verification status on mount - runs once per session
+  // Wait for auth loading to complete before fetching verification status
+  useEffect(() => {
+    // If auth is still loading, wait for it to complete
+    if (authLoading) {
+      return;
+    }
+    
+    // Skip if already fetched this session
+    if (initFetchedRef.current) {
+      setIsInitializing(false);
+      return;
+    }
+    
+    // If we have no user and no pending verification user, redirect to login
+    if (!contextUser && !pendingVerificationUser) {
+      setLocation('/login');
+      return;
+    }
+    
+    initFetchedRef.current = true;
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      setInitError(true);
+      setCedulaVerified(false);
+      setEmailVerified(false);
+      setPhotoVerified(false);
+      setCurrentStep('cedula');
+      setIsInitializing(false);
+    }, 10000);
+    
+    const doFetch = async () => {
+      // Initial fetch can do redirects (skipRedirects: false by default)
+      const result = await fetchVerificationStatusFromServer(controller.signal);
+      clearTimeout(timeoutId);
+      if (!result.success && !result.aborted && !result.unauthorized) {
+        setInitError(true);
+        setCedulaVerified(false);
+        setEmailVerified(false);
+        setPhotoVerified(false);
+        setCurrentStep('cedula');
+      }
+      setIsInitializing(false);
+    };
+
+    doFetch();
+    
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [authLoading, contextUser, pendingVerificationUser, fetchVerificationStatusFromServer, setLocation]);
+
+  // Effect to refetch verification status when tab regains focus (handles multi-tab scenarios)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Only refetch if page becomes visible and we have a user
+      if (document.visibilityState === 'visible' && currentUser && initFetchedRef.current) {
+        refetchVerificationStatus();
       }
     };
 
-    if (currentUser) {
-      checkVerificationStatus();
-    }
-  }, [currentUser, isDriver, setLocation, clearPendingVerification, refreshUser]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUser, refetchVerificationStatus]);
 
   useEffect(() => {
     if (otpTimer > 0) {
@@ -139,13 +306,13 @@ export default function VerifyPending() {
         current: currentStep === 'cedula'
       },
       {
-        id: 'phone',
+        id: 'email',
         title: 'Verificar Correo',
         shortTitle: 'Correo',
         description: 'Confirma tu correo electrónico con un código',
         icon: Mail,
-        completed: phoneVerified,
-        current: currentStep === 'phone'
+        completed: emailVerified,
+        current: currentStep === 'email'
       }
     ];
 
@@ -158,6 +325,33 @@ export default function VerifyPending() {
         icon: UserCircle,
         completed: photoVerified,
         current: currentStep === 'photo'
+      });
+      baseSteps.push({
+        id: 'license',
+        title: 'Licencia de Conducir',
+        shortTitle: 'Licencia',
+        description: 'Sube fotos de tu licencia (frontal y trasera)',
+        icon: FileText,
+        completed: licenseVerified,
+        current: currentStep === 'license'
+      });
+      baseSteps.push({
+        id: 'categories',
+        title: 'Categorías de Servicio',
+        shortTitle: 'Categorías',
+        description: 'Selecciona los servicios que ofreces',
+        icon: Grid3X3,
+        completed: categoriesVerified,
+        current: currentStep === 'categories'
+      });
+      baseSteps.push({
+        id: 'vehicles',
+        title: 'Vehículos',
+        shortTitle: 'Vehículos',
+        description: 'Registra los datos de tus vehículos',
+        icon: Car,
+        completed: vehiclesVerified,
+        current: currentStep === 'vehicles'
       });
     }
 
@@ -220,8 +414,15 @@ export default function VerifyPending() {
 
       if (data.verified) {
         setCedulaVerified(true);
+        setCurrentStep('email');
         toast({ title: 'Cédula verificada', description: 'Tu identidad ha sido verificada exitosamente' });
-        setCurrentStep('phone');
+      } else if (data.success && data.manualVerificationRequired) {
+        setCedulaVerified(true);
+        setCurrentStep('email');
+        toast({ 
+          title: 'Cédula recibida', 
+          description: 'Tu cédula será verificada manualmente por un administrador' 
+        });
       } else if (data.success && !data.verified) {
         setErrors({ cedula: data.error || 'El nombre en la cédula no coincide con el nombre registrado' });
         toast({ 
@@ -354,9 +555,7 @@ export default function VerifyPending() {
       if (data.verified) {
         setPhotoVerified(true);
         toast({ title: 'Foto verificada', description: `Verificación exitosa (${Math.round((data.score || 0) * 100)}%)` });
-        clearPendingVerification();
-        await refreshUser();
-        setLocation('/driver');
+        setCurrentStep('license');
       } else {
         setErrors({ profilePhoto: data.error || 'La foto no cumple con los requisitos' });
         toast({ 
@@ -406,6 +605,127 @@ export default function VerifyPending() {
     if (profileFileInputRef.current) profileFileInputRef.current.value = '';
   };
 
+  const handleLicenseUpload = async (file: File, type: 'licencia' | 'licencia_trasera') => {
+    setIsUploadingLicense(true);
+    setErrors({});
+
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('type', type);
+
+      const response = await fetch('/api/driver/documents', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al subir el documento');
+
+      if (type === 'licencia') {
+        setLicenseFrontUrl(data.url);
+      } else {
+        setLicenseBackUrl(data.url);
+      }
+
+      toast({ title: 'Documento subido', description: `${type === 'licencia' ? 'Parte frontal' : 'Parte trasera'} de la licencia subida exitosamente` });
+    } catch (err: any) {
+      setErrors({ [type]: err.message || 'Error al subir el documento' });
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingLicense(false);
+    }
+  };
+
+  const handleLicenseContinue = async () => {
+    if (!licenseFrontUrl || !licenseBackUrl) {
+      setErrors({ license: 'Debes subir ambos lados de la licencia' });
+      return;
+    }
+
+    setLicenseVerified(true);
+    setCurrentStep('categories');
+    toast({ title: 'Licencia subida', description: 'Ahora selecciona las categorías de servicio' });
+  };
+
+  const handleSaveCategories = async () => {
+    if (selectedCategories.length === 0) {
+      setErrors({ categories: 'Debes seleccionar al menos una categoría de servicio' });
+      return;
+    }
+
+    setIsSavingCategories(true);
+    setErrors({});
+
+    try {
+      const response = await fetch('/api/drivers/me/servicios', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ categorias: selectedCategories }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Error al guardar las categorías');
+
+      setCategoriesVerified(true);
+      setCurrentStep('vehicles');
+      toast({ title: 'Categorías guardadas', description: 'Ahora registra los datos de tus vehículos' });
+    } catch (err: any) {
+      setErrors({ categories: err.message || 'Error al guardar las categorías' });
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSavingCategories(false);
+    }
+  };
+
+  const handleSaveVehicles = async () => {
+    const categoryIds = selectedCategories.map(c => c.categoria);
+    const vehicleErrors: Record<string, string> = {};
+    
+    for (const catId of categoryIds) {
+      const vehicle = vehicles.find(v => v.categoria === catId);
+      if (!vehicle || !vehicle.placa || !vehicle.color || !vehicle.modelo) {
+        vehicleErrors[`vehicle_${catId}`] = 'Completa los campos requeridos';
+      }
+    }
+
+    if (Object.keys(vehicleErrors).length > 0) {
+      setErrors(vehicleErrors);
+      return;
+    }
+
+    setIsSavingVehicles(true);
+    setErrors({});
+
+    try {
+      for (const vehicle of vehicles) {
+        const response = await fetch('/api/drivers/me/vehiculos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(vehicle),
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Error al registrar el vehículo');
+      }
+
+      setVehiclesVerified(true);
+      toast({ title: 'Registro completado', description: 'Todos los vehículos han sido registrados exitosamente' });
+      
+      clearPendingVerification();
+      await refreshUser();
+      setLocation('/driver');
+    } catch (err: any) {
+      setErrors({ vehicles: err.message || 'Error al registrar los vehículos' });
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSavingVehicles(false);
+    }
+  };
+
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/auth/send-otp', {
@@ -441,7 +761,7 @@ export default function VerifyPending() {
       return res.json();
     },
     onSuccess: async () => {
-      setPhoneVerified(true);
+      setEmailVerified(true);
       toast({ title: 'Correo verificado', description: 'Tu correo electrónico ha sido verificado' });
       
       if (isDriver) {
@@ -463,6 +783,39 @@ export default function VerifyPending() {
     clearPendingVerification();
     setLocation('/login');
   };
+
+  // Show loading state while initializing or waiting for auth
+  if (isInitializing || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
+            <h2 className="text-lg font-semibold mb-2">Cargando...</h2>
+            <p className="text-muted-foreground mb-4">Verificando tu sesión</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state if initialization failed
+  if (initError && !currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Error de conexión</h2>
+            <p className="text-muted-foreground mb-4">No pudimos verificar tu sesión. Intenta nuevamente.</p>
+            <Button onClick={() => setLocation('/login')} data-testid="button-go-login-error">
+              Ir a iniciar sesión
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (
@@ -713,16 +1066,16 @@ export default function VerifyPending() {
 
           <Card className={cn(
             "transition-all",
-            phoneVerified ? "border-green-500/50 bg-green-500/5" : 
-            currentStep === 'phone' && cedulaVerified ? "ring-2 ring-primary" : "opacity-60"
+            emailVerified ? "border-green-500/50 bg-green-500/5" : 
+            currentStep === 'email' && cedulaVerified ? "ring-2 ring-primary" : "opacity-60"
           )} data-testid="card-phone-verification">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "w-10 h-10 rounded-full flex items-center justify-center",
-                  phoneVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  emailVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
                 )}>
-                  {phoneVerified ? (
+                  {emailVerified ? (
                     <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
                   ) : (
                     <Mail className="w-5 h-5" />
@@ -731,18 +1084,18 @@ export default function VerifyPending() {
                 <div className="flex-1">
                   <CardTitle className="text-base flex items-center justify-between gap-2">
                     <span>Paso 2: Verificación de Correo</span>
-                    {phoneVerified && (
+                    {emailVerified && (
                       <Badge className="bg-green-500 hover:bg-green-600">Verificado</Badge>
                     )}
                   </CardTitle>
                   <CardDescription>
-                    {phoneVerified ? 'Tu correo ha sido verificado' : currentUser?.email || 'Sin correo registrado'}
+                    {emailVerified ? 'Tu correo ha sido verificado' : currentUser?.email || 'Sin correo registrado'}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             
-            {!phoneVerified && currentStep === 'phone' && cedulaVerified && (
+            {!emailVerified && currentStep === 'email' && cedulaVerified && (
               <CardContent className="space-y-4">
                 {errors.otp && (
                   <Alert variant="destructive">
@@ -809,7 +1162,7 @@ export default function VerifyPending() {
             <Card className={cn(
               "transition-all",
               photoVerified ? "border-green-500/50 bg-green-500/5" : 
-              currentStep === 'photo' && cedulaVerified && phoneVerified ? "ring-2 ring-primary" : "opacity-60"
+              currentStep === 'photo' && cedulaVerified && emailVerified ? "ring-2 ring-primary" : "opacity-60"
             )} data-testid="card-photo-verification">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-3">
@@ -837,7 +1190,7 @@ export default function VerifyPending() {
                 </div>
               </CardHeader>
               
-              {!photoVerified && currentStep === 'photo' && cedulaVerified && phoneVerified && (
+              {!photoVerified && currentStep === 'photo' && cedulaVerified && emailVerified && (
                 <CardContent className="space-y-4">
                   {errors.profilePhoto && (
                     <Alert variant="destructive">
@@ -900,6 +1253,252 @@ export default function VerifyPending() {
                     </div>
                   )}
                   <canvas ref={profileCanvasRef} className="hidden" />
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {isDriver && (
+            <Card className={cn(
+              "transition-all",
+              licenseVerified ? "border-green-500/50 bg-green-500/5" : 
+              currentStep === 'license' && cedulaVerified && emailVerified && photoVerified ? "ring-2 ring-primary" : "opacity-60"
+            )} data-testid="card-license-verification">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    licenseVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  )}>
+                    {licenseVerified ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <FileText className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <span>Paso 4: Licencia de Conducir</span>
+                      {licenseVerified && (
+                        <Badge className="bg-green-500 hover:bg-green-600">Verificado</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {licenseVerified ? 'Tu licencia ha sido subida' : 'Sube fotos de tu licencia (frontal y trasera)'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              {!licenseVerified && currentStep === 'license' && cedulaVerified && emailVerified && photoVerified && (
+                <CardContent className="space-y-4">
+                  {errors.license && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{errors.license}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="grid gap-4">
+                    <div>
+                      <p className="text-sm font-medium mb-2">Parte Frontal de la Licencia</p>
+                      {licenseFrontUrl ? (
+                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                          <img src={licenseFrontUrl} alt="Licencia frontal" className="w-full h-full object-contain" />
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="absolute top-2 right-2"
+                            onClick={() => setLicenseFrontUrl(null)}
+                            data-testid="button-remove-license-front"
+                          >
+                            Cambiar
+                          </Button>
+                        </div>
+                      ) : (
+                        <FileUpload
+                          label=""
+                          helperText="Arrastra o selecciona la parte frontal de tu licencia"
+                          onFileSelect={(file) => handleLicenseUpload(file, 'licencia')}
+                          disabled={isUploadingLicense}
+                        />
+                      )}
+                      {errors.licencia && (
+                        <p className="text-sm text-destructive mt-1">{errors.licencia}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium mb-2">Parte Trasera de la Licencia</p>
+                      {licenseBackUrl ? (
+                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+                          <img src={licenseBackUrl} alt="Licencia trasera" className="w-full h-full object-contain" />
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="absolute top-2 right-2"
+                            onClick={() => setLicenseBackUrl(null)}
+                            data-testid="button-remove-license-back"
+                          >
+                            Cambiar
+                          </Button>
+                        </div>
+                      ) : (
+                        <FileUpload
+                          label=""
+                          helperText="Arrastra o selecciona la parte trasera de tu licencia"
+                          onFileSelect={(file) => handleLicenseUpload(file, 'licencia_trasera')}
+                          disabled={isUploadingLicense}
+                        />
+                      )}
+                      {errors.licencia_trasera && (
+                        <p className="text-sm text-destructive mt-1">{errors.licencia_trasera}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={handleLicenseContinue} 
+                    className="w-full"
+                    disabled={!licenseFrontUrl || !licenseBackUrl || isUploadingLicense}
+                    data-testid="button-continue-license"
+                  >
+                    {isUploadingLicense ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
+                    ) : (
+                      <>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
+                    )}
+                  </Button>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {isDriver && (
+            <Card className={cn(
+              "transition-all",
+              categoriesVerified ? "border-green-500/50 bg-green-500/5" : 
+              currentStep === 'categories' && cedulaVerified && emailVerified && photoVerified && licenseVerified ? "ring-2 ring-primary" : "opacity-60"
+            )} data-testid="card-categories-verification">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    categoriesVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  )}>
+                    {categoriesVerified ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Grid3X3 className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <span>Paso 5: Categorías de Servicio</span>
+                      {categoriesVerified && (
+                        <Badge className="bg-green-500 hover:bg-green-600">Configurado</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {categoriesVerified ? 'Has configurado tus categorías de servicio' : 'Selecciona los tipos de servicio que ofreces'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              {!categoriesVerified && currentStep === 'categories' && cedulaVerified && emailVerified && photoVerified && licenseVerified && (
+                <CardContent className="space-y-4">
+                  {errors.categories && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{errors.categories}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <ServiceCategoryMultiSelect
+                    value={selectedCategories}
+                    onChange={setSelectedCategories}
+                    disabled={isSavingCategories}
+                  />
+
+                  <Button 
+                    onClick={handleSaveCategories} 
+                    className="w-full"
+                    disabled={selectedCategories.length === 0 || isSavingCategories}
+                    data-testid="button-save-categories"
+                  >
+                    {isSavingCategories ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                    ) : (
+                      <>Guardar y Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
+                    )}
+                  </Button>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {isDriver && (
+            <Card className={cn(
+              "transition-all",
+              vehiclesVerified ? "border-green-500/50 bg-green-500/5" : 
+              currentStep === 'vehicles' && cedulaVerified && emailVerified && photoVerified && licenseVerified && categoriesVerified ? "ring-2 ring-primary" : "opacity-60"
+            )} data-testid="card-vehicles-verification">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    vehiclesVerified ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  )}>
+                    {vehiclesVerified ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Car className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <span>Paso 6: Registro de Vehículos</span>
+                      {vehiclesVerified && (
+                        <Badge className="bg-green-500 hover:bg-green-600">Registrado</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {vehiclesVerified ? 'Tus vehículos han sido registrados' : 'Registra los datos de tus vehículos para cada categoría'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              {!vehiclesVerified && currentStep === 'vehicles' && cedulaVerified && emailVerified && photoVerified && licenseVerified && categoriesVerified && (
+                <CardContent className="space-y-4">
+                  {errors.vehicles && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{errors.vehicles}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <VehicleCategoryForm
+                    selectedCategories={selectedCategories.map(c => c.categoria)}
+                    vehicles={vehicles}
+                    onChange={setVehicles}
+                    disabled={isSavingVehicles}
+                    errors={errors}
+                  />
+
+                  <Button 
+                    onClick={handleSaveVehicles} 
+                    className="w-full"
+                    disabled={isSavingVehicles}
+                    data-testid="button-complete-registration"
+                  >
+                    {isSavingVehicles ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Registrando...</>
+                    ) : (
+                      <>Completar Registro<CheckCircle className="w-4 h-4 ml-2" /></>
+                    )}
+                  </Button>
                 </CardContent>
               )}
             </Card>

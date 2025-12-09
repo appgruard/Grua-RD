@@ -3,9 +3,6 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -18,38 +15,52 @@ export function log(message: string, source = "express") {
 }
 
 export function serveStatic(app: Express) {
-  // In production, static files are in dist/public relative to the executable
-  // Try multiple possible paths
-  const possiblePaths = [
-    path.resolve(__dirname, "public"),
-    path.resolve(process.cwd(), "dist", "public"),
-    path.resolve(process.cwd(), "public"),
-  ];
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const distPath = path.resolve(__dirname, "public");
 
-  let distPath: string | null = null;
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p) && fs.existsSync(path.join(p, "index.html"))) {
-      distPath = p;
-      log(`Found static files at: ${p}`);
-      break;
+  log(`Static files directory: ${distPath}`);
+  log(`Current working directory: ${process.cwd()}`);
+  log(`__dirname: ${__dirname}`);
+
+  if (!fs.existsSync(distPath)) {
+    log(`ERROR: Build directory not found at ${distPath}`, "error");
+    
+    const altPath = path.resolve(process.cwd(), "dist", "public");
+    log(`Trying alternative path: ${altPath}`);
+    
+    if (fs.existsSync(altPath)) {
+      log(`Found build directory at alternative path: ${altPath}`);
+      setupStaticServing(app, altPath);
+      return;
     }
-  }
-
-  if (!distPath) {
-    log(`Static paths checked: ${possiblePaths.join(", ")}`, "error");
+    
     throw new Error(
-      `Could not find the build directory with index.html. Checked: ${possiblePaths.join(", ")}`,
+      `Could not find the build directory: ${distPath}, make sure to build the client first`,
     );
   }
 
-  app.use(express.static(distPath));
+  const files = fs.readdirSync(distPath);
+  log(`Files in dist directory: ${files.join(", ")}`);
 
-  // Catch-all for SPA routing - only for non-API routes
-  app.use("*", (req, res, next) => {
-    // Skip API routes and health checks
-    if (req.originalUrl.startsWith("/api") || req.originalUrl === "/health") {
-      return next();
+  setupStaticServing(app, distPath);
+}
+
+function setupStaticServing(app: Express, distPath: string) {
+  app.use(express.static(distPath, {
+    maxAge: '1d',
+    etag: true,
+    lastModified: true,
+  }));
+
+  app.use("*", (_req, res) => {
+    const indexPath = path.resolve(distPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(500).send("index.html not found");
     }
-    res.sendFile(path.resolve(distPath, "index.html"));
   });
+
+  log(`Static file serving configured for: ${distPath}`);
 }

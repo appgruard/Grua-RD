@@ -74,10 +74,7 @@ function PerfilContent() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: PerfilFormData) => {
-      return apiRequest('/api/aseguradora/perfil', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
+      return apiRequest('PUT', '/api/aseguradora/perfil', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/aseguradora/perfil'] });

@@ -17,7 +17,7 @@ import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCateg
 import { 
   Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard,
   CheckCircle2, ArrowRight, Clock, Upload, Truck, Camera, ScanLine, RefreshCcw,
-  UserCircle, XCircle
+  UserCircle, XCircle, Edit3
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
@@ -55,9 +55,14 @@ export default function OnboardingWizard() {
   const { register, user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   
+  // Read ?tipo= query parameter to pre-select user type
+  const urlParams = new URLSearchParams(window.location.search);
+  const preselectedType = urlParams.get('tipo') as UserType | null;
+  const isAddingSecondaryAccount = preselectedType === 'conductor' || preselectedType === 'cliente';
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<OnboardingData>({
-    email: '', password: '', userType: 'cliente', cedula: '', phone: '',
+    email: '', password: '', userType: preselectedType || 'cliente', cedula: '', phone: '',
     otpCode: '', nombre: '', apellido: '', licencia: '',
     placaGrua: '', marcaGrua: '', modeloGrua: '',
   });
@@ -69,6 +74,10 @@ export default function OnboardingWizard() {
   const [licenseBackFile, setLicenseBackFile] = useState<File | null>(null);
   const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
   const [uploadingDocs, setUploadingDocs] = useState(false);
+  
+  // Client insurance fields
+  const [clientInsuranceName, setClientInsuranceName] = useState('');
+  const [clientPolicyNumber, setClientPolicyNumber] = useState('');
   const [selectedServices, setSelectedServices] = useState<ServiceSelection[]>([]);
   const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
   
@@ -77,6 +86,44 @@ export default function OnboardingWizard() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cedulaVerified, setCedulaVerified] = useState(false);
+  
+  // Name editing state for operators (to correct name before cedula verification)
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempNombre, setTempNombre] = useState('');
+  const [tempApellido, setTempApellido] = useState('');
+  
+  // Track userType changes to distinguish user-initiated vs hydration changes
+  const userTypeChangeCountRef = useRef(0);
+  const lastSyncedUserTypeRef = useRef<string | null>(null);
+  
+  // Check if user already has cedula saved (for page refresh persistence)
+  // This runs once when user data is available to restore verification state
+  useEffect(() => {
+    if (user && !authLoading && lastSyncedUserTypeRef.current === null) {
+      const userData = user as any;
+      const syncedUserType = userData.userType || 'cliente';
+      
+      // Mark this userType as the initial synced value (prevents reset effect)
+      lastSyncedUserTypeRef.current = syncedUserType;
+      
+      // Sync userType from authenticated user
+      if (syncedUserType !== formData.userType) {
+        setFormData(prev => ({ ...prev, userType: syncedUserType }));
+      }
+      
+      // Check if driver already has cedula saved or verified
+      if (syncedUserType === 'conductor') {
+        if (userData.cedulaVerificada || userData.cedula || userData.cedulaImageUrl) {
+          setCedulaVerified(true);
+          if (userData.cedula) {
+            setFormData(prev => ({ ...prev, cedula: userData.cedula }));
+          }
+          // Mark step 2 as completed if cedula exists
+          setCompletedSteps(prev => new Set(prev).add(2));
+        }
+      }
+    }
+  }, [user, authLoading]);
   const [ocrScore, setOcrScore] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -119,13 +166,28 @@ export default function OnboardingWizard() {
     setShowCamera(false);
   };
 
-  // Reset OCR state when user type changes
+  // Reset OCR state when user type changes (only for user-initiated changes, not hydration)
   useEffect(() => {
+    // Track change count
+    userTypeChangeCountRef.current += 1;
+    
+    // Skip first change (initial mount) and skip if this matches the synced userType
+    if (userTypeChangeCountRef.current <= 1) return;
+    if (lastSyncedUserTypeRef.current === formData.userType) {
+      // Clear the ref after using it to allow future changes from same type to reset
+      lastSyncedUserTypeRef.current = null;
+      return;
+    }
+    
     setCedulaVerified(false);
     setOcrScore(null);
     setCapturedImage(null);
     setErrors({});
     stopOCRCameraEarly();
+    // Reset client insurance fields when switching user type
+    setClientInsuranceName('');
+    setClientPolicyNumber('');
+    setInsuranceFile(null);
   }, [formData.userType]);
 
   // Advance to next step when cedula is verified for operators
@@ -229,6 +291,15 @@ export default function OnboardingWizard() {
         updateField('cedula', data.cedula);
         setCedulaVerified(true);
         toast({ title: 'Cédula verificada', description: `Verificación exitosa (${Math.round((data.confidenceScore || 0) * 100)}%)` });
+        setCompletedSteps(prev => new Set(prev).add(2));
+        setCurrentStep(3);
+      } else if (data.success && data.manualVerificationRequired) {
+        updateField('cedula', data.cedula || '');
+        setCedulaVerified(true);
+        toast({ 
+          title: 'Cédula recibida', 
+          description: 'Tu cédula será verificada manualmente por un administrador' 
+        });
         setCompletedSteps(prev => new Set(prev).add(2));
         setCurrentStep(3);
       } else if (data.success && !data.verified) {
@@ -355,29 +426,38 @@ export default function OnboardingWizard() {
 
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/identity/send-phone-otp', { phone: formData.phone });
+      if (!formData.email || !formData.email.trim()) {
+        throw new Error('Correo electrónico es requerido');
+      }
+      const res = await apiRequest('POST', '/api/auth/send-otp', { 
+        email: formData.email.trim(),
+        tipoOperacion: 'registro'
+      });
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: (data) => {
       setOtpTimer(data.expiresIn || 600);
-      toast({ title: 'Código enviado', description: 'Revisa tu teléfono para el código' });
+      toast({ title: 'Código enviado', description: 'Revisa tu correo electrónico para el código' });
     },
     onError: (error: any) => {
-      setErrors({ phone: error?.message });
+      setErrors({ otpCode: error?.message });
       toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
 
   const verifyOtpMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/identity/verify-phone-otp',
-        { phone: formData.phone, code: formData.otpCode });
+      const res = await apiRequest('POST', '/api/auth/verify-otp', {
+        email: formData.email,
+        codigo: formData.otpCode,
+        tipoOperacion: 'registro'
+      });
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: '¡Teléfono verificado!', description: 'Tu número ha sido verificado' });
+      toast({ title: '¡Correo verificado!', description: 'Tu correo electrónico ha sido verificado' });
       setCompletedSteps(prev => new Set(prev).add(3));
       setCurrentStep(4);
     },
@@ -386,6 +466,45 @@ export default function OnboardingWizard() {
       toast({ title: 'Error', description: error?.message, variant: 'destructive' });
     },
   });
+
+  const updateNameMutation = useMutation({
+    mutationFn: async () => {
+      if (!tempNombre.trim() || !tempApellido.trim()) {
+        throw new Error('Nombre y apellido son requeridos');
+      }
+      const res = await apiRequest('PATCH', '/api/users/me', {
+        nombre: tempNombre.trim(),
+        apellido: tempApellido.trim()
+      });
+      if (!res.ok) throw new Error((await res.json()).message || 'Error al actualizar nombre');
+      return res.json();
+    },
+    onSuccess: () => {
+      updateField('nombre', tempNombre.trim());
+      updateField('apellido', tempApellido.trim());
+      setIsEditingName(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      toast({ title: 'Nombre actualizado', description: 'Tu nombre ha sido corregido correctamente' });
+    },
+    onError: (error: any) => {
+      setErrors({ nombre: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
+    },
+  });
+
+  const startEditingName = () => {
+    setTempNombre(formData.nombre);
+    setTempApellido(formData.apellido);
+    setIsEditingName(true);
+    setErrors({});
+  };
+
+  const cancelEditingName = () => {
+    setIsEditingName(false);
+    setTempNombre('');
+    setTempApellido('');
+    setErrors({});
+  };
 
   const uploadDocsMutation = useMutation({
     mutationFn: async () => {
@@ -815,6 +934,71 @@ export default function OnboardingWizard() {
                 Tomar otra foto
               </Button>
             </div>
+          ) : isEditingName ? (
+            <div className="space-y-4">
+              <div className="text-center py-2">
+                <Edit3 className="w-12 h-12 mx-auto text-primary mb-2" />
+                <p className="text-sm font-medium">Corregir nombre</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Corrige tu nombre antes de escanear tu cédula
+                </p>
+              </div>
+              {errors.nombre && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{errors.nombre}</AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="tempNombre">Nombre</Label>
+                  <Input 
+                    id="tempNombre" 
+                    placeholder="Tu nombre" 
+                    value={tempNombre} 
+                    onChange={(e) => setTempNombre(e.target.value)} 
+                    disabled={updateNameMutation.isPending} 
+                    data-testid="input-edit-nombre" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tempApellido">Apellido</Label>
+                  <Input 
+                    id="tempApellido" 
+                    placeholder="Tu apellido" 
+                    value={tempApellido} 
+                    onChange={(e) => setTempApellido(e.target.value)} 
+                    disabled={updateNameMutation.isPending} 
+                    data-testid="input-edit-apellido" 
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={cancelEditingName} 
+                  disabled={updateNameMutation.isPending}
+                  data-testid="button-cancel-edit-name"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="button" 
+                  className="flex-1" 
+                  onClick={() => updateNameMutation.mutate()} 
+                  disabled={updateNameMutation.isPending || !tempNombre.trim() || !tempApellido.trim()}
+                  data-testid="button-save-name"
+                >
+                  {updateNameMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                  ) : (
+                    <>Guardar<CheckCircle2 className="w-4 h-4 ml-2" /></>
+                  )}
+                </Button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="text-center py-2">
@@ -823,6 +1007,16 @@ export default function OnboardingWizard() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Tu nombre debe coincidir con el registrado: <strong>{formData.nombre} {formData.apellido}</strong>
                 </p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="mt-2 text-primary" 
+                  onClick={startEditingName}
+                  data-testid="button-edit-name"
+                >
+                  <Edit3 className="w-3 h-3 mr-1" />
+                  ¿Nombre incorrecto? Editar
+                </Button>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Button variant="outline" onClick={startOCRCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-camera">
@@ -861,14 +1055,16 @@ export default function OnboardingWizard() {
 
   const renderStep3 = () => (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="phone">Número de Teléfono</Label>
-        <Input id="phone" type="tel" placeholder="+1 809 555 0100" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} disabled={sendOtpMutation.isPending} data-testid="input-phone" />
-        {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
+      <div className="text-center py-2">
+        <Mail className="w-12 h-12 mx-auto text-primary mb-2" />
+        <p className="text-sm font-medium">Verificación de Correo Electrónico</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Enviaremos un código de verificación a: <strong>{formData.email}</strong>
+        </p>
       </div>
       {otpTimer === 0 ? (
-        <Button type="button" variant="outline" className="w-full" onClick={sendOtpMutation.mutate} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
-          {sendOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>) : 'Enviar Código'}
+        <Button type="button" variant="outline" className="w-full" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
+          {sendOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>) : 'Enviar Código de Verificación'}
         </Button>
       ) : (
         <>
@@ -881,10 +1077,10 @@ export default function OnboardingWizard() {
             <Clock className="h-4 w-4" />
             <span>Expira en: {formatTime(otpTimer)}</span>
           </div>
-          <Button type="button" className="w-full" onClick={verifyOtpMutation.mutate} disabled={verifyOtpMutation.isPending || !formData.otpCode} data-testid="button-verify-otp">
+          <Button type="button" className="w-full" onClick={() => verifyOtpMutation.mutate()} disabled={verifyOtpMutation.isPending || !formData.otpCode} data-testid="button-verify-otp">
             {verifyOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar<ArrowRight className="w-4 h-4 ml-2" /></>)}
           </Button>
-          <Button type="button" variant="ghost" className="w-full" onClick={sendOtpMutation.mutate} disabled={sendOtpMutation.isPending || otpTimer > 60} data-testid="button-resend-otp">
+          <Button type="button" variant="ghost" className="w-full" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending || otpTimer > 60} data-testid="button-resend-otp">
             {otpTimer > 60 ? (<><Clock className="w-4 h-4 mr-2" />Reenviar en {formatTime(otpTimer - 60)}</>) : 'Reenviar Código'}
           </Button>
         </>
@@ -892,19 +1088,140 @@ export default function OnboardingWizard() {
     </div>
   );
 
+  const handleSkipStep4ForClient = () => {
+    setCompletedSteps(prev => new Set(prev).add(4));
+    setCurrentStep(8);
+    toast({ title: 'Paso omitido', description: 'Puedes subir tu seguro más tarde desde tu perfil' });
+  };
+
+  const uploadClientInsuranceMutation = useMutation({
+    mutationFn: async () => {
+      if (!insuranceFile) {
+        throw new Error('Debe seleccionar un documento de seguro');
+      }
+      if (!clientInsuranceName.trim()) {
+        throw new Error('Nombre de aseguradora es requerido');
+      }
+      if (!clientPolicyNumber.trim()) {
+        throw new Error('Número de póliza es requerido');
+      }
+
+      const formDataIns = new FormData();
+      formDataIns.append('document', insuranceFile);
+      formDataIns.append('aseguradoraNombre', clientInsuranceName.trim());
+      formDataIns.append('numeroPoliza', clientPolicyNumber.trim());
+
+      const insRes = await fetch('/api/client/insurance', {
+        method: 'POST',
+        credentials: 'include',
+        body: formDataIns,
+      });
+      
+      if (!insRes.ok) {
+        const errorData = await insRes.json();
+        throw new Error(errorData.message || 'Error al subir documento de seguro');
+      }
+      
+      return insRes.json();
+    },
+    onSuccess: () => {
+      toast({ title: '¡Seguro subido!', description: 'Tu documento de seguro ha sido guardado' });
+      setInsuranceFile(null);
+      setClientInsuranceName('');
+      setClientPolicyNumber('');
+      setCompletedSteps(prev => new Set(prev).add(4));
+      setCurrentStep(8);
+    },
+    onError: (error: any) => {
+      setErrors({ documents: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
+    },
+  });
+
   const renderStep4 = () => (
     <div className="space-y-4">
       {errors.documents && (<Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errors.documents}</AlertDescription></Alert>)}
-      {formData.userType === 'conductor' && (
+      {formData.userType === 'conductor' ? (
         <>
           <FileUpload label="Licencia de Conducir (Frente)" required onFileSelect={setLicenseFile} fileName={licenseFile?.name} error={errors.licenseFile} testId="input-license-file" />
           <FileUpload label="Licencia de Conducir (Reverso)" required onFileSelect={setLicenseBackFile} fileName={licenseBackFile?.name} error={errors.licenseBackFile} testId="input-license-back-file" />
+          <FileUpload label="Documento de Seguro de Grúa" onFileSelect={setInsuranceFile} fileName={insuranceFile?.name} required testId="input-insurance-file" />
+          <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
+            {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Subir Documentos<Upload className="w-4 h-4 ml-2" /></>)}
+          </Button>
         </>
+      ) : (
+        <div className="space-y-4">
+          <div className="text-center py-2">
+            <FileText className="w-12 h-12 mx-auto text-primary mb-2" />
+            <p className="text-sm font-medium">Documento de Seguro (Opcional)</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Si tienes un seguro de vehículo, puedes subirlo ahora o hacerlo después desde tu perfil.
+            </p>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="clientInsuranceName">Nombre de Aseguradora</Label>
+              <Input 
+                id="clientInsuranceName" 
+                placeholder="Ej: Seguros Reservas, Mapfre, etc." 
+                value={clientInsuranceName} 
+                onChange={(e) => setClientInsuranceName(e.target.value)} 
+                disabled={uploadClientInsuranceMutation.isPending}
+                data-testid="input-client-insurance-name" 
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="clientPolicyNumber">Número de Póliza</Label>
+              <Input 
+                id="clientPolicyNumber" 
+                placeholder="Número de tu póliza de seguro" 
+                value={clientPolicyNumber} 
+                onChange={(e) => setClientPolicyNumber(e.target.value)} 
+                disabled={uploadClientInsuranceMutation.isPending}
+                data-testid="input-client-policy-number" 
+              />
+            </div>
+            
+            <FileUpload 
+              label="Documento de Seguro" 
+              onFileSelect={setInsuranceFile} 
+              fileName={insuranceFile?.name} 
+              testId="input-client-insurance-file" 
+            />
+          </div>
+          
+          <div className="flex flex-col gap-2">
+            <Button 
+              type="button" 
+              className="w-full" 
+              onClick={() => uploadClientInsuranceMutation.mutate()} 
+              disabled={uploadClientInsuranceMutation.isPending || !insuranceFile || !clientInsuranceName.trim() || !clientPolicyNumber.trim()} 
+              data-testid="button-upload-client-insurance"
+            >
+              {uploadClientInsuranceMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
+              ) : (
+                <><Upload className="w-4 h-4 mr-2" />Subir Seguro</>
+              )}
+            </Button>
+            
+            <Button 
+              type="button" 
+              variant="ghost" 
+              className="w-full" 
+              onClick={handleSkipStep4ForClient} 
+              disabled={uploadClientInsuranceMutation.isPending}
+              data-testid="button-skip-documents"
+            >
+              Omitir y continuar
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
       )}
-      <FileUpload label={formData.userType === 'conductor' ? 'Documento de Seguro de Grúa' : 'Documento de Seguro'} onFileSelect={setInsuranceFile} fileName={insuranceFile?.name} required={formData.userType === 'conductor'} testId="input-insurance-file" />
-      <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
-        {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Subir Documentos<Upload className="w-4 h-4 ml-2" /></>)}
-      </Button>
     </div>
   );
 
@@ -1106,7 +1423,7 @@ export default function OnboardingWizard() {
   );
 
   const getStepTitle = () => {
-    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Teléfono', 'Subir Documentos', 'Foto de Perfil', 'Servicios Ofrecidos', 'Vehículos por Categoría', 'Confirmación'];
+    const titles = ['Crea tu Cuenta', 'Verificación de Cédula', 'Verificación de Correo', 'Subir Documentos', 'Foto de Perfil', 'Servicios Ofrecidos', 'Vehículos por Categoría', 'Confirmación'];
     return titles[currentStep - 1] || '';
   };
 
@@ -1116,7 +1433,7 @@ export default function OnboardingWizard() {
       formData.userType === 'conductor' 
         ? 'Escanea tu cédula para verificar que tu nombre coincide'
         : 'Valida tu identidad con cédula',
-      'Verifica tu número de teléfono',
+      'Verifica tu correo electrónico con un código',
       'Sube tus documentos requeridos',
       'Sube una foto de tu rostro para tu perfil verificado',
       'Selecciona los servicios que ofreces',

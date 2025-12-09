@@ -1,23 +1,17 @@
 import { logSystem } from './logger';
-import fs from 'fs/promises';
-import { existsSync, mkdirSync } from 'fs';
-import path from 'path';
-
-// Base upload directory - use /app/uploads for CapRover, fallback to ./uploads for local development
-const UPLOAD_BASE_DIR = process.env.UPLOAD_DIR || (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
-
-// Ensure base upload directory exists on startup
-if (!existsSync(UPLOAD_BASE_DIR)) {
-  mkdirSync(UPLOAD_BASE_DIR, { recursive: true });
-}
+import {
+  uploadDocument,
+  downloadDocument,
+  deleteDocument,
+  listDocuments,
+  isStorageAvailable,
+  getActiveProviderName,
+} from './services/storage-provider';
 
 class StorageService {
-  private initialized = true;
-
-  private ensureDirectoryExists(filePath: string): void {
-    const dir = path.dirname(filePath);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
+  private checkAvailability() {
+    if (!isStorageAvailable()) {
+      throw new Error('El servicio de almacenamiento no está disponible. Por favor contacta al administrador.');
     }
   }
 
@@ -26,80 +20,119 @@ class StorageService {
     folder: string,
     customName?: string
   ): Promise<{ url: string; filename: string }> {
+    this.checkAvailability();
+
     const timestamp = Date.now();
     const filename = customName || `${timestamp}-${file.originalname}`;
-    const objectPath = `${folder}/${filename}`;
-    const fullPath = path.join(UPLOAD_BASE_DIR, objectPath);
 
-    try {
-      this.ensureDirectoryExists(fullPath);
-      await fs.writeFile(fullPath, file.buffer);
+    const result = await uploadDocument({
+      buffer: file.buffer,
+      originalName: filename,
+      mimeType: file.mimetype,
+      userId: folder,
+      documentType: 'files',
+    });
 
-      logSystem.info('File uploaded successfully', { objectPath });
+    logSystem.info('File uploaded via StorageService', { 
+      provider: getActiveProviderName(),
+      key: result.key 
+    });
 
-      return {
-        url: objectPath,
-        filename: file.originalname,
-      };
-    } catch (error) {
-      logSystem.error('Error uploading file', error instanceof Error ? error : new Error('Unknown error'), { objectPath });
-      throw new Error(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    return {
+      url: result.url,
+      filename: file.originalname,
+    };
   }
 
   async downloadFile(objectPath: string): Promise<Buffer> {
-    const fullPath = path.join(UPLOAD_BASE_DIR, objectPath);
+    this.checkAvailability();
 
-    try {
-      const buffer = await fs.readFile(fullPath);
-      return buffer;
-    } catch (error) {
-      logSystem.error('Error downloading file', error instanceof Error ? error : new Error('Unknown error'), { objectPath });
-      throw new Error(`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    const buffer = await downloadDocument(objectPath);
+
+    if (!buffer) {
+      throw new Error(`Failed to download file: ${objectPath}`);
     }
+
+    return buffer;
   }
 
   async deleteFile(objectPath: string): Promise<void> {
-    const fullPath = path.join(UPLOAD_BASE_DIR, objectPath);
+    this.checkAvailability();
 
-    try {
-      await fs.unlink(fullPath);
-      logSystem.info('File deleted successfully', { objectPath });
-    } catch (error) {
-      logSystem.error('Error deleting file', error instanceof Error ? error : new Error('Unknown error'), { objectPath });
-      throw new Error(`Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    const success = await deleteDocument(objectPath);
+    if (!success) {
+      throw new Error(`Failed to delete file: ${objectPath}`);
     }
   }
 
   async listFiles(prefix?: string): Promise<string[]> {
-    const searchDir = prefix ? path.join(UPLOAD_BASE_DIR, prefix) : UPLOAD_BASE_DIR;
+    this.checkAvailability();
+    return listDocuments(prefix || '');
+  }
 
-    try {
-      if (!existsSync(searchDir)) {
-        return [];
+  async uploadBase64Image(
+    base64Data: string,
+    folder: string,
+    filename: string,
+    maxSizeBytes: number = 5 * 1024 * 1024
+  ): Promise<{ url: string; filename: string }> {
+    this.checkAvailability();
+    
+    let mimeType = 'image/jpeg';
+    let base64Content = base64Data;
+    
+    if (base64Data.includes('base64,')) {
+      const parts = base64Data.split('base64,');
+      const mimeMatch = parts[0].match(/data:([^;]+);/);
+      if (mimeMatch) {
+        mimeType = mimeMatch[1];
       }
-
-      const results: string[] = [];
-
-      async function walkDir(dir: string, baseKey: string): Promise<void> {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          const entryPath = path.join(dir, entry.name);
-          const entryKey = baseKey ? path.join(baseKey, entry.name) : entry.name;
-          if (entry.isDirectory()) {
-            await walkDir(entryPath, entryKey);
-          } else {
-            results.push(entryKey);
-          }
-        }
-      }
-
-      await walkDir(searchDir, prefix || '');
-      return results;
-    } catch (error) {
-      logSystem.error('Error listing files', error instanceof Error ? error : new Error('Unknown error'), { prefix });
-      throw new Error(`Failed to list files: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      base64Content = parts[1];
     }
+    
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedMimeTypes.includes(mimeType)) {
+      logSystem.warn('Invalid MIME type for image upload', { mimeType, folder });
+      throw new Error('Tipo de archivo no permitido. Solo se permiten imágenes (JPEG, PNG, WebP, GIF).');
+    }
+    
+    const buffer = Buffer.from(base64Content, 'base64');
+    
+    if (buffer.length > maxSizeBytes) {
+      logSystem.warn('Image too large for upload', { size: buffer.length, maxSize: maxSizeBytes });
+      throw new Error(`La imagen es demasiado grande. Máximo ${Math.round(maxSizeBytes / 1024 / 1024)}MB.`);
+    }
+    
+    if (buffer.length < 12) {
+      logSystem.warn('Image buffer too small', { size: buffer.length, folder });
+      throw new Error('El archivo es demasiado pequeño para ser una imagen válida.');
+    }
+    
+    const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+    const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+    const isGif = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
+    const isWebp = buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 && 
+                   buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+    
+    if (!isJpeg && !isPng && !isGif && !isWebp) {
+      logSystem.warn('Invalid image magic bytes', { folder });
+      throw new Error('El archivo no parece ser una imagen válida.');
+    }
+
+    const result = await uploadDocument({
+      buffer,
+      originalName: filename,
+      mimeType,
+      userId: folder,
+      documentType: 'images',
+    });
+
+    logSystem.info('Base64 image uploaded via StorageService', { 
+      provider: getActiveProviderName(),
+      key: result.key 
+    });
+
+    return { url: result.url, filename };
   }
 }
 

@@ -74,21 +74,31 @@ Migrar el sistema de pagos a Azul API con tokenización (DataVault) y crear un s
 
 ## Credenciales Necesarias (Variables de Entorno)
 
-**Ya configuradas:**
+**Configuracion por defecto (no requieren cambios):**
 ```
-AZUL_ENVIRONMENT=sandbox    # sandbox o production
 AZUL_CHANNEL=EC             # E-Commerce
 AZUL_POS_INPUT_MODE=E-Commerce
 ```
 
-**Pendientes (solicitar al usuario):**
+**Configurar en CapRover o Replit Secrets:**
 ```
-AZUL_MERCHANT_ID=           # ID del comercio
-AZUL_MERCHANT_NAME=         # Nombre del comercio
-AZUL_MERCHANT_TYPE=         # Tipo de comercio
-AZUL_AUTH1=                 # Credencial Auth1
-AZUL_AUTH2=                 # Credencial Auth2
+AZUL_ENVIRONMENT=production # 'sandbox' para pruebas, 'production' para pagos reales
+AZUL_MERCHANT_ID=           # ID del comercio (proporcionado por Azul)
+AZUL_MERCHANT_NAME=         # Nombre del comercio registrado en Azul
+AZUL_MERCHANT_TYPE=         # Tipo de comercio (ej: "E-Commerce")
+AZUL_AUTH1=                 # Credencial Auth1 (proporcionada por Azul)
+AZUL_AUTH2=                 # Credencial Auth2 (proporcionada por Azul)
 ```
+
+**Estado de la integracion:**
+- Codigo: COMPLETO
+- Credenciales: PENDIENTE (solicitar al comercio registrado en Azul)
+
+Para obtener las credenciales:
+1. Registrarse como comercio en Azul (https://www.azul.com.do)
+2. Solicitar acceso a la API de pagos
+3. Obtener credenciales de sandbox primero para pruebas
+4. Una vez validado, solicitar credenciales de produccion
 
 ## URLs de Azul
 

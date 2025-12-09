@@ -10,6 +10,12 @@ import { checkStorageHealth } from "./services/object-storage";
 
 const app = express();
 
+// Trust proxy when behind reverse proxy (CapRover/nginx)
+// This is required for secure cookies to work correctly with HTTPS
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 const STATIC_FILE_EXTENSIONS = /\.(js|css|woff2|woff|ttf|eot|otf|png|jpg|jpeg|gif|svg|ico|webp|avif|mp4|webm|pdf|map)$/i;
 const FONT_EXTENSIONS = /\.(woff2|woff|ttf|eot|otf)$/i;
 const HASHED_ASSET_PATTERN = /[-_.][A-Za-z0-9_-]{6,}\.(js|css)$/;
@@ -181,7 +187,7 @@ const allowedOrigins = isDevelopment
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (isDevelopment) {
         return callback(null, true);
       }
@@ -219,6 +225,38 @@ app.use(
   })
 );
 
+app.get("/debug/env", (_req: Request, res: Response) => {
+  const envVars = [
+    'NODE_ENV',
+    'PORT',
+    'DATABASE_URL',
+    'SESSION_SECRET',
+    'ALLOWED_ORIGINS',
+    'MAPBOX_ACCESS_TOKEN',
+    'VITE_MAPBOX_ACCESS_TOKEN',
+    'VAPID_PUBLIC_KEY',
+    'VAPID_PRIVATE_KEY',
+    'RESEND_API_KEY',
+    'TWILIO_ACCOUNT_SID',
+  ];
+  
+  const status: Record<string, string> = {};
+  for (const key of envVars) {
+    const value = process.env[key];
+    if (value) {
+      status[key] = `SET (${value.length} chars)`;
+    } else {
+      status[key] = 'NOT SET';
+    }
+  }
+  
+  res.json({
+    timestamp: new Date().toISOString(),
+    trustProxy: app.get("trust proxy"),
+    envStatus: status,
+  });
+});
+
 app.get("/health", async (_req: Request, res: Response) => {
   const timestamp = new Date().toISOString();
   const uptime = process.uptime();
@@ -230,7 +268,7 @@ app.get("/health", async (_req: Request, res: Response) => {
   let databaseError: string | undefined;
   const dbStart = Date.now();
   try {
-    await pool.query('SELECT 1');
+    await pool.query('SELECT 1' as any);
     databaseResponseTime = Date.now() - dbStart;
   } catch (error) {
     databaseStatus = "unhealthy";
@@ -360,9 +398,10 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
-    // Dynamic import with variable path to prevent esbuild from bundling vite
-    const vitePath = "./vite" + ".js";
-    const { setupVite } = await import(/* @vite-ignore */ vitePath);
+    // Use Function wrapper to prevent esbuild from statically bundling vite.ts
+    // This ensures the vite package (devDependency) is not required in production
+    const loadVite = new Function('return import("./vite")') as () => Promise<typeof import("./vite")>;
+    const { setupVite } = await loadVite();
     await setupVite(app, server);
   } else {
     serveStatic(app);

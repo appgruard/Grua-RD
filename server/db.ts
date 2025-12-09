@@ -79,7 +79,7 @@ export async function initializeTicketTables(): Promise<void> {
     throw connectionError;
   }
   try {
-    await client.query(`
+    await (client as any).query(`
       DO $$ BEGIN
         CREATE TYPE "ticket_categoria" AS ENUM (
           'problema_tecnico', 'consulta_servicio', 'queja', 'sugerencia', 'problema_pago', 'otro'
@@ -87,19 +87,19 @@ export async function initializeTicketTables(): Promise<void> {
       EXCEPTION WHEN duplicate_object THEN null; END $$;
     `);
     
-    await client.query(`
+    await (client as any).query(`
       DO $$ BEGIN
         CREATE TYPE "ticket_prioridad" AS ENUM ('baja', 'media', 'alta', 'urgente');
       EXCEPTION WHEN duplicate_object THEN null; END $$;
     `);
     
-    await client.query(`
+    await (client as any).query(`
       DO $$ BEGIN
         CREATE TYPE "ticket_estado" AS ENUM ('abierto', 'en_proceso', 'resuelto', 'cerrado');
       EXCEPTION WHEN duplicate_object THEN null; END $$;
     `);
     
-    await client.query(`
+    await (client as any).query(`
       CREATE TABLE IF NOT EXISTS "tickets" (
         "id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         "usuario_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
@@ -117,7 +117,7 @@ export async function initializeTicketTables(): Promise<void> {
       );
     `);
     
-    await client.query(`
+    await (client as any).query(`
       CREATE TABLE IF NOT EXISTS "mensajes_ticket" (
         "id" varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         "ticket_id" varchar NOT NULL REFERENCES "tickets"("id") ON DELETE CASCADE,
@@ -129,15 +129,15 @@ export async function initializeTicketTables(): Promise<void> {
       );
     `);
     
-    await client.query(`CREATE INDEX IF NOT EXISTS "tickets_usuario_id_idx" ON "tickets"("usuario_id");`);
-    await client.query(`CREATE INDEX IF NOT EXISTS "tickets_estado_idx" ON "tickets"("estado");`);
-    await client.query(`CREATE INDEX IF NOT EXISTS "tickets_prioridad_idx" ON "tickets"("prioridad");`);
-    await client.query(`CREATE INDEX IF NOT EXISTS "tickets_categoria_idx" ON "tickets"("categoria");`);
-    await client.query(`CREATE INDEX IF NOT EXISTS "tickets_asignado_a_idx" ON "tickets"("asignado_a");`);
-    await client.query(`CREATE INDEX IF NOT EXISTS "tickets_created_at_idx" ON "tickets"("created_at" DESC);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS "mensajes_ticket_ticket_id_idx" ON "mensajes_ticket"("ticket_id");`);
-    await client.query(`CREATE INDEX IF NOT EXISTS "mensajes_ticket_usuario_id_idx" ON "mensajes_ticket"("usuario_id");`);
-    await client.query(`CREATE INDEX IF NOT EXISTS "mensajes_ticket_created_at_idx" ON "mensajes_ticket"("created_at" DESC);`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "tickets_usuario_id_idx" ON "tickets"("usuario_id");`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "tickets_estado_idx" ON "tickets"("estado");`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "tickets_prioridad_idx" ON "tickets"("prioridad");`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "tickets_categoria_idx" ON "tickets"("categoria");`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "tickets_asignado_a_idx" ON "tickets"("asignado_a");`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "tickets_created_at_idx" ON "tickets"("created_at" DESC);`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "mensajes_ticket_ticket_id_idx" ON "mensajes_ticket"("ticket_id");`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "mensajes_ticket_usuario_id_idx" ON "mensajes_ticket"("usuario_id");`);
+    await (client as any).query(`CREATE INDEX IF NOT EXISTS "mensajes_ticket_created_at_idx" ON "mensajes_ticket"("created_at" DESC);`);
     
     console.log("Ticket tables initialized successfully");
   } catch (error) {

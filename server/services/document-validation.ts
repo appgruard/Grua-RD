@@ -150,12 +150,11 @@ export class DocumentValidationService {
         const docTypeName = DOCUMENT_TYPE_NAMES[doc.tipo] || doc.tipo;
         const diasRestantes = Math.ceil((new Date(doc.validoHasta!).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
         
-        await pushService.sendNotification(
-          userId,
-          `${docTypeName} por vencer`,
-          `${config.mensaje} (${diasRestantes} días restantes)`,
-          { type: 'document_expiring', documentId: doc.id }
-        );
+        await pushService.sendToUser(userId, {
+          title: `${docTypeName} por vencer`,
+          body: `${config.mensaje} (${diasRestantes} días restantes)`,
+          data: { type: 'document_expiring', documentId: doc.id }
+        });
 
         await storage.registrarRecordatorioEnviado(doc.id, config.tipo);
         count++;
@@ -184,15 +183,15 @@ export class DocumentValidationService {
       conductorDocuments.set(doc.conductor.id, existing);
     }
 
-    for (const [conductorId, docs] of conductorDocuments) {
+    for (const [conductorId, docs] of Array.from(conductorDocuments.entries())) {
       try {
         const conductor = docs[0].conductor;
         if (!conductor) continue;
 
-        const documentosTipos = docs.map(d => DOCUMENT_TYPE_NAMES[d.tipo] || d.tipo).join(', ');
+        const documentosTipos = docs.map((d: typeof documentosVencidos[0]) => DOCUMENT_TYPE_NAMES[d.tipo] || d.tipo).join(', ');
         
         const alreadyNotified = await Promise.all(
-          docs.map(d => storage.hasRecordatorioSent(d.id, 'vencido'))
+          docs.map((d: typeof documentosVencidos[0]) => storage.hasRecordatorioSent(d.id, 'vencido'))
         );
         
         const allNotified = alreadyNotified.every(n => n);
@@ -202,12 +201,11 @@ export class DocumentValidationService {
           
           const user = await storage.getUserById(conductor.userId);
           if (user) {
-            await pushService.sendNotification(
-              user.id,
-              'Cuenta Suspendida',
-              `Tu cuenta ha sido suspendida por documentos vencidos: ${documentosTipos}. Por favor, renueva tus documentos.`,
-              { type: 'account_suspended', reason: 'expired_documents' }
-            );
+            await pushService.sendToUser(user.id, {
+              title: 'Cuenta Suspendida',
+              body: `Tu cuenta ha sido suspendida por documentos vencidos: ${documentosTipos}. Por favor, renueva tus documentos.`,
+              data: { type: 'account_suspended', reason: 'expired_documents' }
+            });
           }
 
           for (const doc of docs) {
