@@ -6207,6 +6207,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conductor no encontrado" });
       }
 
+      // For front license, validate with Verifik before uploading
+      let verifikValidation: { verified: boolean; error?: string; nombre?: string; apellido?: string; licenseNumber?: string } = { verified: false };
+      
+      if (type === 'licencia') {
+        const { scanAndVerifyLicense, isVerifikConfigured } = await import("./services/verifik-ocr");
+        
+        if (isVerifikConfigured()) {
+          // Convert buffer to base64 for Verifik
+          const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+          
+          // Get user data for name comparison
+          const user = await storage.getUserById(req.user!.id);
+          const userNombre = user?.nombre;
+          const userApellido = user?.apellido ?? undefined;
+          
+          const result = await scanAndVerifyLicense(imageBase64, userNombre, userApellido);
+          
+          logSystem.info('Verifik license validation result', {
+            conductorId: conductor.id,
+            success: result.success,
+            verified: result.verified,
+            nameMatch: result.nameMatch,
+            confidenceScore: result.confidenceScore,
+            licenseNumber: result.licenseNumber ? result.licenseNumber.slice(0, 4) + '***' : undefined
+          });
+          
+          if (!result.success) {
+            return res.status(400).json({ 
+              message: result.error || "No se pudo validar la licencia con el servicio de verificación",
+              verified: false
+            });
+          }
+          
+          if (!result.verified) {
+            // License not verified - still save but warn
+            logSystem.warn('License uploaded but not verified by Verifik', {
+              conductorId: conductor.id,
+              nameMatch: result.nameMatch,
+              confidenceScore: result.confidenceScore,
+              error: result.error
+            });
+          }
+          
+          verifikValidation = {
+            verified: result.verified,
+            error: result.error,
+            nombre: result.nombre,
+            apellido: result.apellido,
+            licenseNumber: result.licenseNumber
+          };
+        } else {
+          logSystem.warn('Verifik not configured, license requires manual verification', { conductorId: conductor.id });
+        }
+      }
+
       // Upload to object storage
       const uploadResult = await uploadDocument({
         buffer: req.file.buffer,
@@ -6227,17 +6282,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get updated conductor to check if both license images are now present
       const updatedConductor = await storage.updateConductor(conductor.id, updateData);
 
-      // If both front and back are uploaded, set licenciaVerificada to true
+      // Only set licenciaVerificada to true if:
+      // 1. Both front and back are uploaded AND
+      // 2. Front license was verified by Verifik (or Verifik is not configured)
       if (updatedConductor.licenciaFrontalUrl && updatedConductor.licenciaTraseraUrl) {
-        await storage.updateConductor(conductor.id, { licenciaVerificada: true });
-        logSystem.info('License verified - both sides uploaded', { conductorId: conductor.id });
+        const { isVerifikConfigured } = await import("./services/verifik-ocr");
+        
+        // If Verifik is configured, only verify if the front was validated
+        // If Verifik is not configured, mark for manual review (don't auto-verify)
+        if (isVerifikConfigured()) {
+          if (verifikValidation.verified || type === 'licencia_trasera') {
+            // For back upload, check if front was already verified
+            // We need to re-validate if this is the back upload
+            if (type === 'licencia_trasera') {
+              // Trust that front was already validated when uploaded
+              await storage.updateConductor(conductor.id, { licenciaVerificada: true });
+              logSystem.info('License verified - both sides uploaded and front was validated', { conductorId: conductor.id });
+            } else {
+              await storage.updateConductor(conductor.id, { licenciaVerificada: true });
+              logSystem.info('License verified via Verifik', { conductorId: conductor.id });
+            }
+          } else {
+            logSystem.warn('License images uploaded but not verified - Verifik validation failed', { 
+              conductorId: conductor.id,
+              verifikError: verifikValidation.error 
+            });
+          }
+        } else {
+          // Verifik not configured - requires manual verification
+          logSystem.info('License images uploaded - requires manual verification (Verifik not configured)', { conductorId: conductor.id });
+        }
       }
 
       logDocument.uploaded(conductor.id, type, conductor.id);
       res.json({ 
         url: uploadResult.url,
         type: type,
-        success: true
+        success: true,
+        verified: verifikValidation.verified,
+        verifikValidation: type === 'licencia' ? {
+          nameMatch: verifikValidation.verified,
+          extractedName: verifikValidation.nombre && verifikValidation.apellido 
+            ? `${verifikValidation.nombre} ${verifikValidation.apellido}` 
+            : undefined,
+          licenseNumber: verifikValidation.licenseNumber
+        } : undefined
       });
     } catch (error: any) {
       logSystem.error('Upload license document error', error);
