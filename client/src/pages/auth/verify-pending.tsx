@@ -663,7 +663,7 @@ export default function VerifyPending() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ servicios: selectedCategories }),
+        body: JSON.stringify({ categorias: selectedCategories }),
       });
 
       const data = await response.json();
