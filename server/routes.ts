@@ -8,6 +8,8 @@ import { getSMSService, generateOTP } from "./sms-service";
 import { getEmailService } from "./email-service";
 import { getVerificationHistory } from "./services/identity";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { Pool } from "pg";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcryptjs";
@@ -277,8 +279,20 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id: string, done) => {
   try {
     const user = await storage.getUserById(id);
+    
+    if (!user) {
+      logSystem.warn("DeserializeUser: User not found", { userId: id });
+      return done(null, false);
+    }
+    
+    if (user.estadoCuenta === 'suspendido' || user.estadoCuenta === 'rechazado') {
+      logSystem.warn("DeserializeUser: User suspended/rejected", { userId: id, estado: user.estadoCuenta });
+      return done(null, false);
+    }
+    
     done(null, user as any);
   } catch (error) {
+    logSystem.error("DeserializeUser error", error);
     done(error);
   }
 });
@@ -403,7 +417,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const isProduction = process.env.NODE_ENV === "production";
   
+  // Configure trust proxy for CapRover/reverse proxy deployments
+  if (isProduction) {
+    app.set('trust proxy', 1);
+  }
+  
+  // Configure persistent session store for production
+  let sessionStore: session.Store | undefined = undefined;
+  
+  if (isProduction && process.env.DATABASE_URL) {
+    try {
+      const PgSession = connectPgSimple(session);
+      const pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined
+      });
+      
+      sessionStore = new PgSession({
+        pool,
+        tableName: 'user_sessions',
+        createTableIfMissing: true,
+        pruneSessionInterval: 60 * 15 // Clean expired sessions every 15 minutes
+      });
+      
+      logSystem.info("PostgreSQL session store initialized");
+    } catch (error) {
+      logSystem.error("Failed to initialize PostgreSQL session store, falling back to memory", error);
+    }
+  }
+  
   const sessionParser = session({
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || "gruard-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
@@ -411,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     cookie: {
       secure: isProduction,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "lax", // "lax" es más compatible con CapRover que termina TLS en proxy
       maxAge: 30 * 24 * 60 * 60 * 1000,
     },
   });
@@ -1327,78 +1371,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", passport.authenticate("local"), async (req: Request, res: Response) => {
-    const user = req.user as any;
-    
-    // Skip verification check for admin, aseguradora, socio, and empresa users
-    const skipVerificationTypes = ['admin', 'aseguradora', 'socio', 'empresa'];
-    
-    // For clientes and conductores, validate that identity verification is complete
-    if (user && !skipVerificationTypes.includes(user.userType)) {
-      // Only email verification is required (no SMS)
-      const emailVerificado = user.emailVerificado === true;
+  app.post("/api/auth/login", (req: Request, res: Response, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) {
+        logSystem.error("Login authentication error", err);
+        return res.status(500).json({ message: "Error de autenticación interno" });
+      }
       
-      const verificationStatus = {
-        cedulaVerificada: user.cedulaVerificada === true,
-        emailVerificado: emailVerificado,
-        fotoVerificada: user.fotoVerificada === true,
-      };
-      
-      // Determine what's required based on user type
-      const isConductor = user.userType === 'conductor';
-      const needsVerification = isConductor 
-        ? (!verificationStatus.cedulaVerificada || !emailVerificado || !verificationStatus.fotoVerificada)
-        : (!verificationStatus.cedulaVerificada || !emailVerificado);
-      
-      // If verification is missing, return 403 but KEEP session active
-      // This allows the user to complete verification steps (photo upload, OTP, etc.)
-      if (needsVerification) {
-        // Return only safe, non-sensitive user data for the verification page
-        const safeUserData = {
-          id: user.id,
-          email: user.email,
-          nombre: user.nombre,
-          apellido: user.apellido,
-          userType: user.userType,
-          cedulaVerificada: user.cedulaVerificada,
-          emailVerificado: user.emailVerificado,
-          fotoVerificada: user.fotoVerificada,
-        };
-        
-        // Keep session active so user can complete verification steps
-        // The frontend will redirect to verify-pending page
-        // Verification endpoints will work since req.isAuthenticated() will return true
-        return res.status(403).json({
-          message: "Debe completar la verificación de identidad antes de acceder",
-          requiresVerification: true,
-          verificationStatus,
-          redirectTo: '/verify-pending',
-          user: safeUserData,
+      if (!user) {
+        logAuth.loginFailed(req.body.email || "unknown", info?.message || "Invalid credentials");
+        return res.status(401).json({ 
+          message: info?.message || "Credenciales inválidas. Verifica tu correo y contraseña." 
         });
       }
-    }
-    
-    // Check for socio first login and send welcome email
-    if (user && user.userType === 'socio') {
-      try {
-        const socio = await storage.getSocioByUserId(user.id);
-        if (socio && socio.primerInicioSesion) {
-          // Send first login email
-          const emailService = await getEmailService();
-          await emailService.sendSocioFirstLoginEmail(user.email, user.nombre || 'Socio');
-          
-          // Mark first login as completed
-          await storage.updateSocio(socio.id, { primerInicioSesion: false });
-          
-          logSystem.info('Socio first login processed', { socioId: socio.id, userId: user.id });
+      
+      req.login(user, async (loginErr) => {
+        if (loginErr) {
+          logSystem.error("Session establishment error", loginErr);
+          return res.status(500).json({ message: "Error al establecer sesión" });
         }
-      } catch (error) {
-        logSystem.error('Error processing socio first login', error, { userId: user.id });
-      }
-    }
-    
-    // Return sanitized user data (without passwordHash)
-    res.json({ user: getSafeUser(user) });
+        
+        // Skip verification check for admin, aseguradora, socio, and empresa users
+        const skipVerificationTypes = ['admin', 'aseguradora', 'socio', 'empresa'];
+        
+        // For clientes and conductores, validate that identity verification is complete
+        if (user && !skipVerificationTypes.includes(user.userType)) {
+          // Only email verification is required (no SMS)
+          const emailVerificado = user.emailVerificado === true;
+          
+          const verificationStatus = {
+            cedulaVerificada: user.cedulaVerificada === true,
+            emailVerificado: emailVerificado,
+            fotoVerificada: user.fotoVerificada === true,
+          };
+          
+          // Determine what's required based on user type
+          const isConductor = user.userType === 'conductor';
+          const needsVerification = isConductor 
+            ? (!verificationStatus.cedulaVerificada || !emailVerificado || !verificationStatus.fotoVerificada)
+            : (!verificationStatus.cedulaVerificada || !emailVerificado);
+          
+          // If verification is missing, return 403 but KEEP session active
+          // This allows the user to complete verification steps (photo upload, OTP, etc.)
+          if (needsVerification) {
+            // Return only safe, non-sensitive user data for the verification page
+            const safeUserData = {
+              id: user.id,
+              email: user.email,
+              nombre: user.nombre,
+              apellido: user.apellido,
+              userType: user.userType,
+              cedulaVerificada: user.cedulaVerificada,
+              emailVerificado: user.emailVerificado,
+              fotoVerificada: user.fotoVerificada,
+            };
+            
+            // Keep session active so user can complete verification steps
+            // The frontend will redirect to verify-pending page
+            // Verification endpoints will work since req.isAuthenticated() will return true
+            return res.status(403).json({
+              message: "Debe completar la verificación de identidad antes de acceder",
+              requiresVerification: true,
+              verificationStatus,
+              redirectTo: '/verify-pending',
+              user: safeUserData,
+            });
+          }
+        }
+        
+        // Check for socio first login and send welcome email
+        if (user && user.userType === 'socio') {
+          try {
+            const socio = await storage.getSocioByUserId(user.id);
+            if (socio && socio.primerInicioSesion) {
+              // Send first login email
+              const emailService = await getEmailService();
+              await emailService.sendSocioFirstLoginEmail(user.email, user.nombre || 'Socio');
+              
+              // Mark first login as completed
+              await storage.updateSocio(socio.id, { primerInicioSesion: false });
+              
+              logSystem.info('Socio first login processed', { socioId: socio.id, userId: user.id });
+            }
+          } catch (error) {
+            logSystem.error('Error processing socio first login', error, { userId: user.id });
+          }
+        }
+        
+        // Return sanitized user data (without passwordHash)
+        res.json({ user: getSafeUser(user) });
+      });
+    })(req, res, next);
   });
 
   app.post("/api/auth/logout", (req: Request, res: Response) => {

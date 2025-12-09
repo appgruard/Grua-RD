@@ -35,7 +35,20 @@ Este plan unifica las correcciones necesarias para resolver todos los problemas 
 
 ## Fases de Implementación
 
-### FASE 1: Correcciones Críticas de Autenticación (Prioridad: URGENTE)
+### FASE 1: Correcciones Críticas de Autenticación (Prioridad: URGENTE) ✅ COMPLETADA - 9 Dic 2025
+
+**Estado:** Implementada y verificada
+
+**Cambios realizados:**
+- ✅ 1.1 Login cambiado a usar callback de passport.authenticate - Ahora devuelve 401 claro en lugar de quedarse cargando
+- ✅ 1.2 Session store PostgreSQL agregado para producción - Sesiones persisten tras reinicio del contenedor
+- ✅ 1.3 DeserializeUser mejorado - Maneja usuarios eliminados y suspendidos correctamente
+- ✅ Configuración de cookies corregida - `sameSite: "lax"` para compatibilidad con CapRover
+
+**Archivos modificados:**
+- `server/routes.ts`
+
+---
 
 #### 1.1 Corregir Login con passport.authenticate (Problema #1)
 
