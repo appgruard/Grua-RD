@@ -1429,6 +1429,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rate limiters for OTP endpoints (must be declared before use)
+  const verifyOTPLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10, // max 10 requests per hour per IP
+    message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora.",
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logSystem.warn('Rate limit exceeded for OTP verification', { 
+        ip: req.ip, 
+        userId: req.user?.id 
+      });
+      res.status(429).json({ 
+        message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora." 
+      });
+    }
+  });
+
   app.post("/api/auth/send-otp", async (req: Request, res: Response) => {
     try {
       const { email, tipoOperacion } = req.body;
@@ -1579,23 +1597,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.status(429).json({ 
         message: "Demasiados intentos de envío de código. Intenta nuevamente en 1 hora." 
-      });
-    }
-  });
-
-  const verifyOTPLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // max 10 requests per hour per IP
-    message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora.",
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (req, res) => {
-      logSystem.warn('Rate limit exceeded for OTP verification', { 
-        ip: req.ip, 
-        userId: req.user?.id 
-      });
-      res.status(429).json({ 
-        message: "Demasiados intentos de verificación. Intenta nuevamente en 1 hora." 
       });
     }
   });
