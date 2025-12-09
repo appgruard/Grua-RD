@@ -432,9 +432,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     const isConductor = user.userType === 'conductor';
-    const cedulaVerificada = user.cedulaVerificada === true;
-    const emailVerificado = user.emailVerificado === true;
-    const fotoVerificada = user.fotoVerificada === true;
+    // Use truthy checks to handle both boolean true and integer 1 (database type mismatch)
+    const cedulaVerificada = !!user.cedulaVerificada;
+    const emailVerificado = !!user.emailVerificado;
+    const fotoVerificada = !!user.fotoVerificada;
 
     if (!isConductor) {
       // Client only needs cedula and email
@@ -442,10 +443,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // Driver needs 6 verifications - check conductor data for additional fields
+    // Use truthy checks to handle integer values from database (vehiculosRegistrados is stored as int)
     const conductor = user.conductor;
-    const licenciaVerificada = conductor?.licenciaVerificada === true;
-    const categoriasConfiguradas = conductor?.categoriasConfiguradas === true;
-    const vehiculosRegistrados = conductor?.vehiculosRegistrados === true;
+    const licenciaVerificada = !!conductor?.licenciaVerificada;
+    const categoriasConfiguradas = !!conductor?.categoriasConfiguradas;
+    const vehiculosRegistrados = !!conductor?.vehiculosRegistrados;
 
     return !cedulaVerificada || !emailVerificado || !fotoVerificada || 
            !licenciaVerificada || !categoriasConfiguradas || !vehiculosRegistrados;
