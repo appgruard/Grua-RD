@@ -3183,9 +3183,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const conductor = await storage.getConductorByUserId(req.user!.id);
+      let conductor = await storage.getConductorByUserId(req.user!.id);
       if (!conductor) {
-        return res.status(404).json({ message: "Conductor no encontrado" });
+        // Auto-create conductor record if it doesn't exist
+        logSystem.info('Creating conductor record for user during get services', { userId: req.user!.id });
+        conductor = await storage.createConductor({
+          userId: req.user!.id,
+          licencia: '',
+          placaGrua: '',
+          marcaGrua: '',
+          modeloGrua: '',
+        });
       }
 
       const servicios = await storage.getConductorServicios(conductor.id);
@@ -3203,9 +3211,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const conductor = await storage.getConductorByUserId(req.user!.id);
+      let conductor = await storage.getConductorByUserId(req.user!.id);
       if (!conductor) {
-        return res.status(404).json({ message: "Conductor no encontrado" });
+        // Auto-create conductor record if it doesn't exist
+        logSystem.info('Creating conductor record for user during set services', { userId: req.user!.id });
+        conductor = await storage.createConductor({
+          userId: req.user!.id,
+          licencia: '',
+          placaGrua: '',
+          marcaGrua: '',
+          modeloGrua: '',
+        });
       }
 
       const { categorias } = req.body;
@@ -6202,9 +6218,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Tipo de documento inválido. Debe ser 'licencia' o 'licencia_trasera'" });
       }
 
-      const conductor = await storage.getConductorByUserId(req.user!.id);
+      let conductor = await storage.getConductorByUserId(req.user!.id);
       if (!conductor) {
-        return res.status(404).json({ message: "Conductor no encontrado" });
+        // Auto-create conductor record if it doesn't exist (for operators who registered without vehicle data)
+        logSystem.info('Creating conductor record for user during document upload', { userId: req.user!.id });
+        conductor = await storage.createConductor({
+          userId: req.user!.id,
+          licencia: '',
+          placaGrua: '',
+          marcaGrua: '',
+          modeloGrua: '',
+        });
       }
 
       // For front license, validate with Verifik before uploading
