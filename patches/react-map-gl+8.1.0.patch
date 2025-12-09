@@ -1,0 +1,16 @@
+diff --git a/node_modules/react-map-gl/package.json b/node_modules/react-map-gl/package.json
+index 1234567..abcdefg 100644
+--- a/node_modules/react-map-gl/package.json
++++ b/node_modules/react-map-gl/package.json
+@@ -15,6 +15,11 @@
+   "license": "MIT",
+   "type": "module",
+   "exports": {
++    ".": {
++      "types": "./dist/mapbox.d.ts",
++      "require": "./dist/mapbox.cjs",
++      "import": "./dist/mapbox.js"
++    },
+     "./mapbox": {
+       "types": "./dist/mapbox.d.ts",
+       "require": "./dist/mapbox.cjs",
