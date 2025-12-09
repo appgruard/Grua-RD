@@ -17,7 +17,7 @@ import { insertUserSchema, insertServicioSchema, insertTarifaSchema, insertMensa
 import type { User, Servicio, Empresa } from "@shared/schema";
 import { logAuth, logTransaction, logService, logDocument, logSystem } from "./logger";
 import { z } from "zod";
-import { uploadDocument, getDocument, isStorageInitialized } from "./services/object-storage";
+import { uploadDocument, getDocument, isStorageInitialized, getFilesystemProvider, getActiveProviderName } from "./services/object-storage";
 import { pdfService } from "./services/pdf-service";
 import { insuranceValidationService, getSupportedInsurers, InsurerCode } from "./services/insurance";
 import { documentValidationService } from "./services/document-validation";
@@ -957,6 +957,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timestamp: new Date().toISOString(),
         error: error.message
       });
+    }
+  });
+
+  // Storage provider info
+  app.get("/api/storage/info", async (_req: Request, res: Response) => {
+    res.json({
+      provider: getActiveProviderName(),
+      initialized: isStorageInitialized(),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Serve files from filesystem storage (for CapRover/local deployments)
+  app.get("/api/storage/files/*", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const key = req.path.replace('/api/storage/files/', '');
+      
+      if (!key || key.includes('..')) {
+        return res.status(400).json({ message: "Invalid file path" });
+      }
+
+      const fileBuffer = await getDocument(key);
+      if (!fileBuffer) {
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      const ext = key.split('.').pop()?.toLowerCase() || '';
+      const mimeTypes: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'pdf': 'application/pdf',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+      };
+
+      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.send(fileBuffer);
+    } catch (error: any) {
+      logSystem.error('Error serving file from storage', error);
+      res.status(500).json({ message: "Failed to retrieve file" });
     }
   });
 

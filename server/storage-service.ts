@@ -1,28 +1,17 @@
-import { Client } from '@replit/object-storage';
 import { logSystem } from './logger';
+import {
+  uploadDocument,
+  downloadDocument,
+  deleteDocument,
+  listDocuments,
+  isStorageAvailable,
+  getActiveProviderName,
+} from './services/storage-provider';
 
 class StorageService {
-  private client: Client | null = null;
-  private initialized = false;
-  private initError: Error | null = null;
-
-  private ensureInitialized() {
-    if (this.initialized) {
-      if (!this.client) {
-        throw this.initError || new Error('Object Storage is not available. Please create a bucket in your Replit workspace.');
-      }
-      return;
-    }
-
-    try {
-      this.client = new Client();
-      this.initialized = true;
-      logSystem.info('Replit Object Storage initialized successfully');
-    } catch (error) {
-      this.initialized = true;
-      this.initError = error instanceof Error ? error : new Error('Failed to initialize Object Storage');
-      logSystem.warn('Replit Object Storage not available. Documents upload feature will not work until a bucket is created.', { error: this.initError.message });
-      throw this.initError;
+  private checkAvailability() {
+    if (!isStorageAvailable()) {
+      throw new Error('El servicio de almacenamiento no está disponible. Por favor contacta al administrador.');
     }
   }
 
@@ -31,74 +20,64 @@ class StorageService {
     folder: string,
     customName?: string
   ): Promise<{ url: string; filename: string }> {
-    this.ensureInitialized();
+    this.checkAvailability();
 
     const timestamp = Date.now();
     const filename = customName || `${timestamp}-${file.originalname}`;
-    const objectPath = `${folder}/${filename}`;
 
-    const { ok, error } = await this.client!.uploadFromBytes(
-      objectPath,
-      file.buffer
-    );
+    const result = await uploadDocument({
+      buffer: file.buffer,
+      originalName: filename,
+      mimeType: file.mimetype,
+      userId: folder,
+      documentType: 'files',
+    });
 
-    if (!ok) {
-      logSystem.error('Error uploading file', error, { objectPath });
-      throw new Error(`Failed to upload file: ${error}`);
-    }
+    logSystem.info('File uploaded via StorageService', { 
+      provider: getActiveProviderName(),
+      key: result.key 
+    });
 
     return {
-      url: objectPath,
+      url: result.url,
       filename: file.originalname,
     };
   }
 
   async downloadFile(objectPath: string): Promise<Buffer> {
-    this.ensureInitialized();
+    this.checkAvailability();
 
-    const { ok, value, error } = await this.client!.downloadAsBytes(objectPath);
+    const buffer = await downloadDocument(objectPath);
 
-    if (!ok) {
-      logSystem.error('Error downloading file', error, { objectPath });
-      throw new Error(`Failed to download file: ${error}`);
+    if (!buffer) {
+      throw new Error(`Failed to download file: ${objectPath}`);
     }
 
-    return Buffer.from(value as unknown as Uint8Array);
+    return buffer;
   }
 
   async deleteFile(objectPath: string): Promise<void> {
-    this.ensureInitialized();
+    this.checkAvailability();
 
-    const { ok, error } = await this.client!.delete(objectPath);
-
-    if (!ok) {
-      logSystem.error('Error deleting file', error, { objectPath });
-      throw new Error(`Failed to delete file: ${error}`);
+    const success = await deleteDocument(objectPath);
+    if (!success) {
+      throw new Error(`Failed to delete file: ${objectPath}`);
     }
   }
 
   async listFiles(prefix?: string): Promise<string[]> {
-    this.ensureInitialized();
-
-    const { ok, value, error } = await this.client!.list({ prefix });
-
-    if (!ok) {
-      logSystem.error('Error listing files', error, { prefix });
-      throw new Error(`Failed to list files: ${error}`);
-    }
-
-    return value.map((obj) => obj.name);
+    this.checkAvailability();
+    return listDocuments(prefix || '');
   }
 
   async uploadBase64Image(
     base64Data: string,
     folder: string,
     filename: string,
-    maxSizeBytes: number = 5 * 1024 * 1024 // Default 5MB max
+    maxSizeBytes: number = 5 * 1024 * 1024
   ): Promise<{ url: string; filename: string }> {
-    this.ensureInitialized();
+    this.checkAvailability();
     
-    // Extract base64 content and validate MIME type
     let mimeType = 'image/jpeg';
     let base64Content = base64Data;
     
@@ -111,7 +90,6 @@ class StorageService {
       base64Content = parts[1];
     }
     
-    // Validate MIME type - only allow images
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!allowedMimeTypes.includes(mimeType)) {
       logSystem.warn('Invalid MIME type for image upload', { mimeType, folder });
@@ -120,19 +98,16 @@ class StorageService {
     
     const buffer = Buffer.from(base64Content, 'base64');
     
-    // Validate file size
     if (buffer.length > maxSizeBytes) {
       logSystem.warn('Image too large for upload', { size: buffer.length, maxSize: maxSizeBytes });
       throw new Error(`La imagen es demasiado grande. Máximo ${Math.round(maxSizeBytes / 1024 / 1024)}MB.`);
     }
     
-    // Validate minimum buffer size for magic bytes check
     if (buffer.length < 12) {
       logSystem.warn('Image buffer too small', { size: buffer.length, folder });
       throw new Error('El archivo es demasiado pequeño para ser una imagen válida.');
     }
     
-    // Validate magic bytes to ensure it's actually an image
     const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
     const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
     const isGif = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
@@ -143,17 +118,21 @@ class StorageService {
       logSystem.warn('Invalid image magic bytes', { folder });
       throw new Error('El archivo no parece ser una imagen válida.');
     }
-    
-    const objectPath = `${folder}/${filename}`;
 
-    const { ok, error } = await this.client!.uploadFromBytes(objectPath, buffer);
+    const result = await uploadDocument({
+      buffer,
+      originalName: filename,
+      mimeType,
+      userId: folder,
+      documentType: 'images',
+    });
 
-    if (!ok) {
-      logSystem.error('Error uploading base64 image', error, { objectPath });
-      throw new Error(`Failed to upload image: ${error}`);
-    }
+    logSystem.info('Base64 image uploaded via StorageService', { 
+      provider: getActiveProviderName(),
+      key: result.key 
+    });
 
-    return { url: objectPath, filename };
+    return { url: result.url, filename };
   }
 }
 
