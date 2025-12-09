@@ -133,8 +133,11 @@ export default function VerifyPending() {
         if (isDriverCheck) {
           // Update driver-specific verification states
           setLicenseVerified(licenciaVerificada || false);
-          if (licenciaFrontalUrl) setLicenseFrontUrl(licenciaFrontalUrl);
-          if (licenciaTraseraUrl) setLicenseBackUrl(licenciaTraseraUrl);
+          // Sync OCR verification state with server - set true if URL exists, false if not
+          setLicenseFrontUrl(licenciaFrontalUrl || null);
+          setLicenseFrontVerified(!!licenciaFrontalUrl);
+          setLicenseBackUrl(licenciaTraseraUrl || null);
+          setLicenseBackVerified(!!licenciaTraseraUrl);
           setCategoriesVerified(categoriasConfiguradas || false);
           setVehiclesVerified(vehiculosRegistrados || false);
 
@@ -637,34 +640,140 @@ export default function VerifyPending() {
     if (profileFileInputRef.current) profileFileInputRef.current.value = '';
   };
 
+  // State for license OCR validation details
+  const [licenseFrontVerified, setLicenseFrontVerified] = useState(false);
+  const [licenseBackVerified, setLicenseBackVerified] = useState(false);
+  const [licenseOcrDetails, setLicenseOcrDetails] = useState<{
+    licenseNumber?: string;
+    licenseClass?: string;
+    expirationDate?: string;
+    confidenceScore?: number;
+  }>({});
+
   const handleLicenseUpload = async (file: File, type: 'licencia' | 'licencia_trasera') => {
     setIsUploadingLicense(true);
     setErrors({});
 
     try {
-      const formData = new FormData();
-      formData.append('document', file);
-      formData.append('type', type);
+      // Validate file
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Solo se permiten imágenes');
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error('La imagen es muy grande. Máximo 10MB.');
+      }
 
-      const response = await fetch('/api/driver/documents', {
+      // Convert file to base64
+      const base64 = await convertToBase64(file);
+      
+      // Determine which OCR endpoint to use
+      const endpoint = type === 'licencia' 
+        ? '/api/identity/scan-license' 
+        : '/api/identity/scan-license-back';
+
+      // Call OCR validation endpoint
+      const response = await fetch(endpoint, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: formData,
+        body: JSON.stringify({ image: base64 }),
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Error al subir el documento');
-
-      if (type === 'licencia') {
-        setLicenseFrontUrl(data.url);
-      } else {
-        setLicenseBackUrl(data.url);
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'No se pudo verificar la licencia');
       }
 
-      toast({ title: 'Documento subido', description: `${type === 'licencia' ? 'Parte frontal' : 'Parte trasera'} de la licencia subida exitosamente` });
+      // Check if OCR validation was successful
+      if (type === 'licencia') {
+        // Front side - check success and verified status from backend
+        // Backend returns: { success, verified, nameMatch, licenseNumber, confidenceScore, ... }
+        if (!data.success || !data.verified) {
+          throw new Error(data.message || 'La licencia no pudo ser verificada. Intenta con otra foto más clara.');
+        }
+        
+        setLicenseFrontUrl(base64);
+        setLicenseFrontVerified(true);
+        setLicenseOcrDetails(prev => ({
+          ...prev,
+          licenseNumber: data.licenseNumber,
+          expirationDate: data.expirationDate,
+          confidenceScore: data.confidenceScore
+        }));
+        
+        const scorePercent = Math.round((data.confidenceScore || 0) * 100);
+        toast({ 
+          title: 'Licencia frontal verificada', 
+          description: data.licenseNumber 
+            ? `Número: ${data.licenseNumber.slice(0, 3)}*** - Confianza: ${scorePercent}%`
+            : `Verificación exitosa - Confianza: ${scorePercent}%`
+        });
+      } else {
+        // Back side - check success and isValid status from backend
+        // Backend returns: { success, isValid, category, restrictions, confidenceScore, ... }
+        if (!data.success || !data.isValid) {
+          throw new Error(data.message || 'No se pudo leer la parte trasera. Intenta con otra foto más clara.');
+        }
+        
+        setLicenseBackUrl(base64);
+        setLicenseBackVerified(true);
+        setLicenseOcrDetails(prev => ({
+          ...prev,
+          licenseClass: data.category,
+        }));
+        
+        const scorePercent = Math.round((data.confidenceScore || 0) * 100);
+        toast({ 
+          title: 'Licencia trasera verificada', 
+          description: data.category 
+            ? `Categoría: ${data.category} - Confianza: ${scorePercent}%`
+            : `Verificación exitosa - Confianza: ${scorePercent}%`
+        });
+      }
+
+      // Also upload to document storage for record keeping
+      try {
+        const formData = new FormData();
+        formData.append('document', file);
+        formData.append('type', type);
+        const uploadRes = await fetch('/api/driver/documents', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          // Document storage failed - reset verification and ask user to retry
+          console.warn('Document upload returned error but OCR passed');
+          if (type === 'licencia') {
+            setLicenseFrontVerified(false);
+            setLicenseFrontUrl(null);
+          } else {
+            setLicenseBackVerified(false);
+            setLicenseBackUrl(null);
+          }
+          throw new Error('Verificación exitosa pero falló el guardado. Por favor intenta de nuevo.');
+        }
+      } catch (uploadErr: any) {
+        // If error was thrown by our check above, re-throw it
+        if (uploadErr.message?.includes('guardado')) {
+          throw uploadErr;
+        }
+        // Network/other error - reset verification and ask user to retry  
+        console.warn('Document upload failed but OCR passed:', uploadErr);
+        if (type === 'licencia') {
+          setLicenseFrontVerified(false);
+          setLicenseFrontUrl(null);
+        } else {
+          setLicenseBackVerified(false);
+          setLicenseBackUrl(null);
+        }
+        throw new Error('Verificación exitosa pero falló el guardado. Por favor intenta de nuevo.');
+      }
+
     } catch (err: any) {
-      setErrors({ [type]: err.message || 'Error al subir el documento' });
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      setErrors({ [type]: err.message || 'Error al procesar la licencia' });
+      toast({ title: 'Error de verificación', description: err.message, variant: 'destructive' });
     } finally {
       setIsUploadingLicense(false);
     }
@@ -676,9 +785,55 @@ export default function VerifyPending() {
       return;
     }
 
-    setLicenseVerified(true);
-    setCurrentStep('categories');
-    toast({ title: 'Licencia subida', description: 'Ahora selecciona las categorías de servicio' });
+    if (!licenseFrontVerified || !licenseBackVerified) {
+      setErrors({ license: 'Ambos lados de la licencia deben ser verificados con OCR' });
+      return;
+    }
+
+    // Update conductor record to mark license as verified
+    try {
+      setIsUploadingLicense(true);
+      setErrors({});
+      
+      const response = await fetch('/api/drivers/me/vehiculos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          licenciaVerificada: true,
+          licenciaNumero: licenseOcrDetails.licenseNumber,
+          licenciaClase: licenseOcrDetails.licenseClass,
+          licenciaVencimiento: licenseOcrDetails.expirationDate
+        }),
+      });
+      
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || 'Error al guardar datos de licencia');
+      }
+      
+      // Refetch verification status to sync with server truth
+      await refetchVerificationStatus();
+      
+      // Only mark complete after server confirms
+      setLicenseVerified(true);
+      setCurrentStep('categories');
+      toast({ 
+        title: 'Licencia verificada con OCR', 
+        description: licenseOcrDetails.licenseClass 
+          ? `Categoría: ${licenseOcrDetails.licenseClass}. Ahora selecciona tus servicios.`
+          : 'Ahora selecciona las categorías de servicio'
+      });
+    } catch (err: any) {
+      setErrors({ license: err.message || 'Error al guardar datos de licencia' });
+      toast({ 
+        title: 'Error', 
+        description: err.message || 'No se pudo guardar la información. Intenta de nuevo.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUploadingLicense(false);
+    }
   };
 
   const handleSaveCategories = async () => {
@@ -1346,7 +1501,7 @@ export default function VerifyPending() {
                       )}
                     </CardTitle>
                     <CardDescription>
-                      {licenseVerified ? 'Tu licencia ha sido subida' : 'Sube fotos de tu licencia (frontal y trasera)'}
+                      {licenseVerified ? 'Tu licencia ha sido verificada con OCR' : 'Escanea tu licencia con validación OCR (frontal y trasera)'}
                     </CardDescription>
                   </div>
                 </div>
@@ -1371,15 +1526,31 @@ export default function VerifyPending() {
 
                       <div className="grid gap-4">
                         <div>
-                          <p className="text-sm font-medium mb-2">Parte Frontal de la Licencia</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-medium">Parte Frontal de la Licencia</p>
+                            {licenseFrontVerified && (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                OCR Verificado
+                              </Badge>
+                            )}
+                          </div>
                           {licenseFrontUrl ? (
                             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
                               <img src={licenseFrontUrl} alt="Licencia frontal" className="w-full h-full object-contain" />
+                              {isUploadingLicense && (
+                                <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                                    <p className="text-sm">Verificando con OCR...</p>
+                                  </div>
+                                </div>
+                              )}
                               <Button 
                                 variant="secondary" 
                                 size="sm" 
                                 className="absolute top-2 right-2"
-                                onClick={() => setLicenseFrontUrl(null)}
+                                onClick={() => { setLicenseFrontUrl(null); setLicenseFrontVerified(false); }}
                                 data-testid="button-remove-license-front"
                               >
                                 Cambiar
@@ -1396,18 +1567,39 @@ export default function VerifyPending() {
                           {errors.licencia && (
                             <p className="text-sm text-destructive mt-1">{errors.licencia}</p>
                           )}
+                          {licenseOcrDetails.licenseNumber && licenseFrontVerified && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Número detectado: {licenseOcrDetails.licenseNumber.slice(0, 4)}***
+                            </p>
+                          )}
                         </div>
 
                         <div>
-                          <p className="text-sm font-medium mb-2">Parte Trasera de la Licencia</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-medium">Parte Trasera de la Licencia</p>
+                            {licenseBackVerified && (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                OCR Verificado
+                              </Badge>
+                            )}
+                          </div>
                           {licenseBackUrl ? (
                             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
                               <img src={licenseBackUrl} alt="Licencia trasera" className="w-full h-full object-contain" />
+                              {isUploadingLicense && (
+                                <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                                    <p className="text-sm">Verificando con OCR...</p>
+                                  </div>
+                                </div>
+                              )}
                               <Button 
                                 variant="secondary" 
                                 size="sm" 
                                 className="absolute top-2 right-2"
-                                onClick={() => setLicenseBackUrl(null)}
+                                onClick={() => { setLicenseBackUrl(null); setLicenseBackVerified(false); }}
                                 data-testid="button-remove-license-back"
                               >
                                 Cambiar
@@ -1424,17 +1616,24 @@ export default function VerifyPending() {
                           {errors.licencia_trasera && (
                             <p className="text-sm text-destructive mt-1">{errors.licencia_trasera}</p>
                           )}
+                          {licenseOcrDetails.licenseClass && licenseBackVerified && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Categoría detectada: {licenseOcrDetails.licenseClass}
+                            </p>
+                          )}
                         </div>
                       </div>
 
                       <Button 
                         onClick={handleLicenseContinue} 
                         className="w-full"
-                        disabled={!licenseFrontUrl || !licenseBackUrl || isUploadingLicense}
+                        disabled={!licenseFrontVerified || !licenseBackVerified || isUploadingLicense}
                         data-testid="button-continue-license"
                       >
                         {isUploadingLicense ? (
-                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando OCR...</>
+                        ) : !licenseFrontVerified || !licenseBackVerified ? (
+                          <>Verificar ambos lados de la licencia</>
                         ) : (
                           <>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
                         )}
