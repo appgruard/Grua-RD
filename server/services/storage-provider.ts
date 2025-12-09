@@ -306,7 +306,12 @@ let activeProvider: StorageProvider | null = null;
 const filesystemProvider = new FilesystemStorageProvider();
 
 // Solo inicializar Replit provider si no estamos forzando filesystem
-const forceFilesystem = process.env.STORAGE_PROVIDER === 'filesystem' || process.env.CAPROVER === 'true';
+// Soporta múltiples formatos de variable de entorno
+const forceFilesystem = 
+  process.env.STORAGE_PROVIDER === 'filesystem' || 
+  process.env.storage_provider === 'filesystem' ||
+  process.env.CAPROVER === 'true' ||
+  process.env.caprover === 'true';
 const replitProvider = forceFilesystem ? null : new ReplitStorageProvider();
 
 if (forceFilesystem) {
