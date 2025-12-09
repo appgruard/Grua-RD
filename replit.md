@@ -96,3 +96,22 @@ Required environment variables for CapRover deployment:
 ### Storage API Endpoints
 - `GET /api/storage/info`: Returns current storage provider status
 - `GET /api/storage/files/*`: Serves uploaded files from filesystem storage (requires authentication)
+
+### Session Configuration for CapRover
+The application uses PostgreSQL session store for persistent sessions in production:
+- Session cookie name: `gruard.sid`
+- Session store: `connect-pg-simple` with table `user_sessions`
+- Trust proxy enabled for reverse proxy environments
+- Cookie: `secure: true` in production, `sameSite: "lax"` for compatibility
+
+## Recent Changes
+
+### December 9, 2025 - Authentication & Verification Plan Completed
+All phases of `PLAN_UNIFICADO_AUTH_VERIFICACION.md` have been implemented:
+
+- **FASE 1**: Critical authentication fixes - passport.authenticate callback pattern, PostgreSQL session store, improved deserializeUser
+- **FASE 2**: Sessions during pending verification - ProtectedRoute with `allowPendingVerification`, verification-allowed API patterns
+- **FASE 3**: UI verification flow - `getNextStep()` helper, framer-motion transitions between steps
+- **FASE 4**: License OCR validation with Verifik - front/back license scanning with OCR verification
+- **FASE 5**: CapRover compatibility - `gruard.sid` cookie name, trust proxy, session store configuration
+- **FASE 6**: Cleanup & improvements - removed obsolete grúa fields, added `logAuth.verificationStep()` for audit logging

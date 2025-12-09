@@ -75,6 +75,17 @@ export const logAuth = {
   },
   phoneVerified: (userId: string, phone: string) => {
     logger.info('Phone verified', { userId, phone, category: 'auth' });
+  },
+  verificationStep: (userId: string, step: string, success: boolean, details?: Record<string, any>) => {
+    const level = success ? 'info' : 'warn';
+    logger[level](`Verification step: ${step}`, {
+      userId,
+      step,
+      success,
+      details,
+      category: 'verification',
+      timestamp: new Date().toISOString()
+    });
   }
 };
 
