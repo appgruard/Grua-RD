@@ -1066,7 +1066,7 @@ export default function DriverProfile() {
                     Crea una cuenta de cliente adicional para poder solicitar servicios de grúa cuando lo necesites.
                   </p>
                   <Button 
-                    onClick={() => setLocation('/onboarding?tipo=cliente')}
+                    onClick={() => setLocation('/onboarding')}
                     className="w-full"
                     data-testid="button-become-client"
                   >
