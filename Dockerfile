@@ -7,6 +7,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
+COPY scripts ./scripts
 
 RUN npm ci
 
@@ -22,6 +23,7 @@ WORKDIR /app
 RUN apk add --no-cache dumb-init
 
 COPY package*.json ./
+COPY scripts ./scripts
 
 RUN npm ci --only=production && npm cache clean --force
 
