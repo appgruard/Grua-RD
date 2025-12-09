@@ -87,38 +87,6 @@ export default function OnboardingWizard() {
   const [tempNombre, setTempNombre] = useState('');
   const [tempApellido, setTempApellido] = useState('');
   
-  // Track userType changes to distinguish user-initiated vs hydration changes
-  const userTypeChangeCountRef = useRef(0);
-  const lastSyncedUserTypeRef = useRef<string | null>(null);
-  
-  // Check if user already has cedula saved (for page refresh persistence)
-  // This runs once when user data is available to restore verification state
-  useEffect(() => {
-    if (user && !authLoading && lastSyncedUserTypeRef.current === null) {
-      const userData = user as any;
-      const syncedUserType = userData.userType || 'cliente';
-      
-      // Mark this userType as the initial synced value (prevents reset effect)
-      lastSyncedUserTypeRef.current = syncedUserType;
-      
-      // Sync userType from authenticated user
-      if (syncedUserType !== formData.userType) {
-        setFormData(prev => ({ ...prev, userType: syncedUserType }));
-      }
-      
-      // Check if driver already has cedula saved or verified
-      if (syncedUserType === 'conductor') {
-        if (userData.cedulaVerificada || userData.cedula || userData.cedulaImageUrl) {
-          setCedulaVerified(true);
-          if (userData.cedula) {
-            setFormData(prev => ({ ...prev, cedula: userData.cedula }));
-          }
-          // Mark step 2 as completed if cedula exists
-          setCompletedSteps(prev => new Set(prev).add(2));
-        }
-      }
-    }
-  }, [user, authLoading]);
   const [ocrScore, setOcrScore] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -135,24 +103,12 @@ export default function OnboardingWizard() {
   const profileVideoRef = useRef<HTMLVideoElement>(null);
   const profileCanvasRef = useRef<HTMLCanvasElement>(null);
   const profileStreamRef = useRef<MediaStream | null>(null);
-
-  useEffect(() => {
-    if (user && !authLoading) {
-      if (currentStep === 1) {
-        setCurrentStep(2);
-        setCompletedSteps(new Set([1]));
-      }
-    }
-  }, [user, authLoading, currentStep]);
-
-  useEffect(() => {
-    if (otpTimer > 0) {
-      const timer = setTimeout(() => setOtpTimer(otpTimer - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [otpTimer]);
-
-  // Define stopOCRCamera early
+  
+  // Refs for tracking user type changes (to avoid resetting on hydration)
+  const userTypeChangeCountRef = useRef(0);
+  const lastSyncedUserTypeRef = useRef<UserType | null>(null);
+  
+  // Define stopOCRCamera early for use in effects
   const stopOCRCameraEarly = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -160,6 +116,14 @@ export default function OnboardingWizard() {
     }
     setShowCamera(false);
   };
+
+  // OTP timer effect
+  useEffect(() => {
+    if (otpTimer > 0) {
+      const timer = setTimeout(() => setOtpTimer(otpTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpTimer]);
 
   // Reset OCR state when user type changes (only for user-initiated changes, not hydration)
   useEffect(() => {
@@ -193,6 +157,7 @@ export default function OnboardingWizard() {
     }
   }, [cedulaVerified, formData.userType, currentStep]);
 
+  // Restore wizard state from session storage
   useEffect(() => {
     try {
       const savedState = sessionStorage.getItem(WIZARD_STORAGE_KEY);
@@ -211,6 +176,7 @@ export default function OnboardingWizard() {
     }
   }, []);
 
+  // Save wizard state to session storage
   useEffect(() => {
     if (!isInitialized) return;
     try {
@@ -225,6 +191,30 @@ export default function OnboardingWizard() {
       console.error('Error saving wizard state:', error);
     }
   }, [currentStep, formData, completedSteps, selectedServices, vehicleData, isInitialized]);
+
+  // Redirect authenticated users to their dashboard
+  useEffect(() => {
+    if (user && !authLoading) {
+      const userData = user as any;
+      const userType = userData.userType || 'cliente';
+      if (userType === 'conductor') {
+        setLocation('/driver');
+      } else if (userType === 'cliente') {
+        setLocation('/client');
+      } else if (userType === 'admin') {
+        setLocation('/admin');
+      }
+    }
+  }, [user, authLoading, setLocation]);
+  
+  // Show loading while checking auth or redirecting authenticated users
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const updateField = (field: keyof OnboardingData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
