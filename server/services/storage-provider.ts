@@ -305,13 +305,23 @@ class FilesystemStorageProvider implements StorageProvider {
 let activeProvider: StorageProvider | null = null;
 const filesystemProvider = new FilesystemStorageProvider();
 
+// Log de variables de entorno para depuración
+logger.info('Storage environment variables', {
+  STORAGE_PROVIDER: process.env.STORAGE_PROVIDER,
+  CAPROVER: process.env.CAPROVER,
+  STORAGE_PATH: process.env.STORAGE_PATH,
+  NODE_ENV: process.env.NODE_ENV,
+});
+
 // Solo inicializar Replit provider si no estamos forzando filesystem
-// Soporta múltiples formatos de variable de entorno
+// Soporta múltiples formatos y también detecta si CAPROVER tiene cualquier valor
 const forceFilesystem = 
   process.env.STORAGE_PROVIDER === 'filesystem' || 
-  process.env.storage_provider === 'filesystem' ||
-  process.env.CAPROVER === 'true' ||
-  process.env.caprover === 'true';
+  process.env.CAPROVER !== undefined ||
+  process.env.NODE_ENV === 'production';
+
+logger.info('Force filesystem decision', { forceFilesystem });
+
 const replitProvider = forceFilesystem ? null : new ReplitStorageProvider();
 
 if (forceFilesystem) {
