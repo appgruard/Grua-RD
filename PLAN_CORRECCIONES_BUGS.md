@@ -81,13 +81,13 @@ ALTER COLUMN vehiculos_registrados SET DEFAULT false;
 
 ### Análisis
 
-- El botón en `client/src/pages/client/profile.tsx` (línea 336) redirige a `/onboarding?tipo=conductor`
+- El botón en `client/src/pages/client/profile.tsx` (línea 336) redirige a `/onboarding`
 - `isAddingSecondaryAccount` estaba definido (línea 61) pero **NUNCA SE USABA** en el resto del código
 - El useEffect en líneas 101-118 **SOBRESCRIBÍA** el `userType` del formulario con el del usuario autenticado
 
 ### Causa Raíz Confirmada
 
-Cuando un cliente autenticado va a `/onboarding?tipo=conductor`:
+Cuando un cliente autenticado va a `/onboarding`:
 
 1. `preselectedType` = 'conductor' (correcto)
 2. `formData.userType` se inicializa como 'conductor' (correcto)
@@ -193,5 +193,5 @@ Revisión confirmada:
 1. **Bug 1**: Depurar con logs del servidor para identificar el endpoint exacto bloqueado
 2. ~~Probar el flujo completo de creación de cuenta secundaria de conductor~~ ✅ Validado por arquitecto
 3. ~~Verificar que el registro de vehículos funciona correctamente con la columna boolean~~ ✅ Pendiente prueba en producción
-4. Agregar test automatizado de regresión para el flujo `/onboarding?tipo=conductor` (recomendado)
+4. Agregar test automatizado de regresión para el flujo `/onboarding` de cuenta secundaria (recomendado)
 5. Monitorear logs de producción para detectar casos edge en flujos de onboarding y verificación
