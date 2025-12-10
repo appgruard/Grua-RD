@@ -1798,23 +1798,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await scanAndVerifyCedula(image, userNombre, userApellido);
 
-      // Save cedula image if user is authenticated (regardless of OCR result)
-      if (req.isAuthenticated() && image) {
-        try {
-          const timestamp = Date.now();
-          const filename = `cedula_${req.user!.id}_${timestamp}.jpg`;
-          const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
-          
-          await storage.updateUser(req.user!.id, {
-            cedulaImageUrl: uploadResult.url
-          });
-          
-          logSystem.info('Cedula image saved', { userId: req.user!.id, url: uploadResult.url });
-        } catch (uploadError) {
-          logSystem.warn('Failed to save cedula image', { userId: req.user!.id, error: uploadError });
-        }
-      }
-
+      // Only save cedula image if OCR was successful (has cedula number)
+      // This prevents marking the step as "pending review" when OCR completely fails
       if (!result.success) {
         logSystem.warn('OCR scan failed', { 
           error: result.error, 
@@ -1952,6 +1937,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user's cedula verification status if authenticated and verified
       if (req.isAuthenticated() && !skipVerification && result.cedula && result.verified) {
+        // Save cedula image for verified cedulas
+        if (image) {
+          try {
+            const timestamp = Date.now();
+            const filename = `cedula_verified_${req.user!.id}_${timestamp}.jpg`;
+            const uploadResult = await storageService.uploadBase64Image(image, 'cedulas', filename);
+            
+            await storage.updateUser(req.user!.id, {
+              cedulaImageUrl: uploadResult.url
+            });
+            
+            logSystem.info('Verified cedula image saved', { userId: req.user!.id, url: uploadResult.url });
+          } catch (uploadError) {
+            logSystem.warn('Failed to save verified cedula image', { userId: req.user!.id, error: uploadError });
+          }
+        }
+        
         const { verifyCedula } = await import("./services/identity");
         const verifyResult = await verifyCedula(
           req.user!.id,
