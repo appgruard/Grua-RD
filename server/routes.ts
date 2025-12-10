@@ -567,12 +567,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return next();
     }
 
-    // Block access to other endpoints
-    logSystem.warn('Unverified user blocked from endpoint', { 
+    // Block access to other endpoints - detailed logging for Bug 1 debugging
+    const matchDetails = VERIFICATION_ALLOWED_PATTERNS.map(pattern => ({
+      pattern: `${pattern.method} ${pattern.path}${pattern.prefix ? ' (prefix)' : ''}`,
+      methodMatch: pattern.method === requestMethod,
+      pathMatch: pattern.prefix 
+        ? (requestPath === pattern.path || requestPath.startsWith(pattern.path + '/'))
+        : pattern.path === requestPath
+    })).filter(d => d.methodMatch || d.pathMatch);
+    
+    logSystem.warn('VERIFICATION_BLOCKED: Unverified user blocked from endpoint', { 
       userId: user.id, 
       userType: user.userType, 
       path: requestPath, 
-      method: requestMethod 
+      method: requestMethod,
+      emailVerificado: user.emailVerificado,
+      cedulaVerificada: user.cedulaVerificada,
+      fotoVerificada: user.fotoVerificada,
+      licenciaVerificada: user.licenciaVerificada,
+      partialMatches: matchDetails.length > 0 ? matchDetails : 'none',
+      expectedLicensePatterns: [
+        'POST /api/identity/scan-license',
+        'POST /api/identity/scan-license-back'
+      ]
     });
     
     return res.status(403).json({
@@ -2023,6 +2040,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // License OCR Scan endpoint for operators during registration
   app.post("/api/identity/scan-license", ocrScanLimiter, async (req: Request, res: Response) => {
+    // Bug 1 debugging: Log when request reaches this endpoint
+    const user = req.user as any;
+    logSystem.info('LICENSE_SCAN_FRONT: Request received', {
+      userId: user?.id,
+      userType: user?.userType,
+      isAuthenticated: req.isAuthenticated(),
+      hasImage: !!req.body?.image,
+      emailVerificado: user?.emailVerificado,
+      cedulaVerificada: user?.cedulaVerificada,
+      fotoVerificada: user?.fotoVerificada
+    });
+    
     try {
       const { image, nombre, apellido } = req.body;
 
@@ -2116,6 +2145,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Scan license back side (category and restrictions)
   app.post("/api/identity/scan-license-back", ocrScanLimiter, async (req: Request, res: Response) => {
+    // Bug 1 debugging: Log when request reaches this endpoint
+    const user = req.user as any;
+    logSystem.info('LICENSE_SCAN_BACK: Request received', {
+      userId: user?.id,
+      userType: user?.userType,
+      isAuthenticated: req.isAuthenticated(),
+      hasImage: !!req.body?.image,
+      emailVerificado: user?.emailVerificado,
+      cedulaVerificada: user?.cedulaVerificada,
+      fotoVerificada: user?.fotoVerificada
+    });
+    
     try {
       const { image } = req.body;
 

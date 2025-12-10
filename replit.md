@@ -111,7 +111,7 @@ Implemented and validated fixes from `PLAN_CORRECCIONES_BUGS.md`:
 
 - **Bug 3 (Alta prioridad)**: ✅ Fixed and validated - secondary account flow uses `/onboarding` route (user selects conductor type in wizard step 1)
 - **Bug 2 (Alta prioridad)**: ✅ Fixed - migrated `vehiculos_registrados` column from INTEGER to BOOLEAN
-- **Bug 1 (Media prioridad)**: 🟡 Pending - requires server log analysis for license upload endpoint blocking
+- **Bug 1 (Media prioridad)**: 🟡 Logging added - search for `VERIFICATION_BLOCKED`, `LICENSE_SCAN_FRONT`, `LICENSE_SCAN_BACK` in CapRover logs
 - **Bug 4**: ✅ Validated as not a bug - insurance is optional during client verification, redirection logic only requires cedula and email verification
 
 ### December 9, 2025 - Authentication & Verification Plan Completed

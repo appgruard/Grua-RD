@@ -7,7 +7,7 @@
 
 ## Bug 1: Error al subir licencia - "Debe completar la verificación de identidad"
 
-### Estado: 🟡 Pendiente de depuración (Prioridad Media)
+### Estado: 🟡 Logging agregado - Esperando datos de producción (Prioridad Media)
 
 ### Análisis
 
@@ -19,16 +19,36 @@
 
 El middleware verifica si `req.user.userType === 'conductor'` pero si el usuario está autenticado como `cliente` e intenta acceder a estos endpoints de conductor, podría fallar en otro lugar del código (no en el middleware de verificación).
 
-### Solución Propuesta
+### Logging Agregado (10 Diciembre 2025)
 
-1. Verificar que el usuario tenga `userType: 'conductor'` antes de permitir subida de licencia
-2. El problema puede estar en que el usuario está autenticado como cliente pero intenta usar endpoints de conductor
-3. Revisar logs del servidor para identificar el endpoint exacto que se está bloqueando
+Se agregó logging detallado en `server/routes.ts` para identificar el endpoint exacto bloqueado:
 
-### Archivos a Revisar
+1. **Middleware de verificación** (líneas 573-596):
+   - Log `VERIFICATION_BLOCKED` con detalles del usuario, endpoint, método
+   - Incluye estado de verificación: emailVerificado, cedulaVerificada, fotoVerificada, licenciaVerificada
+   - Muestra qué patrones coincidieron parcialmente para diagnóstico
 
-- `server/routes.ts` (endpoints de licencia)
-- Flujo de autenticación
+2. **Endpoint scan-license** (líneas 2046-2056):
+   - Log `LICENSE_SCAN_FRONT: Request received` cuando la solicitud llega exitosamente
+   
+3. **Endpoint scan-license-back** (líneas 2151-2161):
+   - Log `LICENSE_SCAN_BACK: Request received` cuando la solicitud llega exitosamente
+
+### Cómo usar los logs
+
+Buscar en los logs de CapRover:
+```bash
+# Si la solicitud es bloqueada, buscar:
+VERIFICATION_BLOCKED
+
+# Si la solicitud llega al endpoint, buscar:
+LICENSE_SCAN_FRONT
+LICENSE_SCAN_BACK
+```
+
+### Archivos Modificados
+
+- `server/routes.ts` - Logging detallado en middleware y endpoints de licencia
 
 ---
 
@@ -190,7 +210,7 @@ Revisión confirmada:
 
 ## Próximos Pasos (Fase 2)
 
-1. **Bug 1**: Depurar con logs del servidor para identificar el endpoint exacto bloqueado
+1. **Bug 1**: ✅ Logging agregado - Desplegar a CapRover y revisar logs cuando ocurra el error
 2. ~~Probar el flujo completo de creación de cuenta secundaria de conductor~~ ✅ Validado por arquitecto
 3. ~~Verificar que el registro de vehículos funciona correctamente con la columna boolean~~ ✅ Pendiente prueba en producción
 4. Agregar test automatizado de regresión para el flujo `/onboarding` de cuenta secundaria (recomendado)
