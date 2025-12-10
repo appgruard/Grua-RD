@@ -1558,7 +1558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/verify-otp", async (req: Request, res: Response) => {
     try {
-      const { email, codigo, tipoOperacion } = req.body;
+      const { email, codigo, tipoOperacion, userType } = req.body;
 
       if (!email || !codigo || !tipoOperacion) {
         return res.status(400).json({ message: "Datos incompletos" });
@@ -1586,12 +1586,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.markVerificationCodeAsUsed(verificationCode.id);
 
       if (tipoOperacion === 'registro') {
-        const user = await storage.getUserByEmail(email);
+        // Priority: 1) Authenticated session user, 2) userType parameter, 3) first user by email
+        let user;
+        if (req.isAuthenticated() && req.user) {
+          // Use the currently authenticated user's account
+          user = await storage.getUserById(req.user.id);
+          logSystem.info('OTP verification using authenticated session', { userId: req.user.id, email });
+        } else if (userType) {
+          // Use userType to find the specific account
+          user = await storage.getUserByEmailAndType(email, userType);
+          logSystem.info('OTP verification using userType', { userType, email });
+        } else {
+          // Fallback to first user by email (backwards compatibility)
+          user = await storage.getUserByEmail(email);
+          logSystem.info('OTP verification using email only (fallback)', { email });
+        }
+        
         if (user) {
           await storage.updateUser(user.id, { 
             emailVerificado: true,
             estadoCuenta: 'activo'
           });
+          logSystem.info('Email verified for user', { userId: user.id, userType: user.userType });
         }
       }
 

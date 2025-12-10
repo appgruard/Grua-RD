@@ -96,7 +96,7 @@ export default function OnboardingWizard() {
   const userTypeChangeCountRef = useRef(0);
   const lastSyncedUserTypeRef = useRef<string | null>(null);
   
-  // Check if user already has cedula saved (for page refresh persistence)
+  // Check if user already has verification state saved (for page refresh persistence)
   // This runs once when user data is available to restore verification state
   useEffect(() => {
     if (user && !authLoading && lastSyncedUserTypeRef.current === null) {
@@ -106,9 +106,15 @@ export default function OnboardingWizard() {
       // Mark this userType as the initial synced value (prevents reset effect)
       lastSyncedUserTypeRef.current = syncedUserType;
       
-      // Sync userType from authenticated user
-      if (syncedUserType !== formData.userType) {
-        setFormData(prev => ({ ...prev, userType: syncedUserType }));
+      // Sync userType and email from authenticated user
+      if (syncedUserType !== formData.userType || userData.email !== formData.email) {
+        setFormData(prev => ({ 
+          ...prev, 
+          userType: syncedUserType,
+          email: userData.email || prev.email,
+          nombre: userData.nombre || prev.nombre,
+          apellido: userData.apellido || prev.apellido
+        }));
       }
       
       // Check if driver already has cedula saved or verified
@@ -120,6 +126,16 @@ export default function OnboardingWizard() {
           }
           // Mark step 2 as completed if cedula exists
           setCompletedSteps(prev => new Set(prev).add(2));
+        }
+      }
+      
+      // Check if email is already verified - sync from server state
+      if (userData.emailVerificado === true) {
+        // Mark step 3 as completed if email is verified
+        setCompletedSteps(prev => new Set(prev).add(3));
+        // If currently on step 3 (email verification), advance to step 4
+        if (currentStep === 3) {
+          setCurrentStep(4);
         }
       }
     }
@@ -451,7 +467,8 @@ export default function OnboardingWizard() {
       const res = await apiRequest('POST', '/api/auth/verify-otp', {
         email: formData.email,
         codigo: formData.otpCode,
-        tipoOperacion: 'registro'
+        tipoOperacion: 'registro',
+        userType: formData.userType
       });
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
@@ -460,6 +477,8 @@ export default function OnboardingWizard() {
       toast({ title: '¡Correo verificado!', description: 'Tu correo electrónico ha sido verificado' });
       setCompletedSteps(prev => new Set(prev).add(3));
       setCurrentStep(4);
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/identity/verification-status'] });
     },
     onError: (error: any) => {
       setErrors({ otpCode: error?.message });
