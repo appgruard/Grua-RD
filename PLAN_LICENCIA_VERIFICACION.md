@@ -118,3 +118,22 @@ app.patch('/api/identity/email', async (req, res) => {
 - Cuando se cambia el correo, `emailVerificado` se pone en `false`
 - El usuario debe verificar el nuevo correo con OTP
 - Se valida que el nuevo correo no esté en uso por otro usuario del mismo tipo
+
+---
+
+## Fase 5: Limpieza de datos de prueba ✅
+
+### Estado: ✅ COMPLETADO
+
+### Fecha: 10 de Diciembre, 2025
+
+### Usuarios Eliminados
+
+| Email | Tipo | Nombre |
+|-------|------|--------|
+| khris2135@gmail.com | cliente | Khristopher Angel Tavarez Ureña |
+| info@assanpos.com | conductor | Khristopher Angel Tavarez Ureña |
+| khris2135@hotmail.com | conductor | Khristopher Angel Tavarez Ureña |
+| khris2135@gmail.com | conductor | Khristopher Tavarez |
+
+Todos los datos relacionados (conductor, documentos, servicios, etc.) fueron eliminados automáticamente por las restricciones CASCADE de la base de datos.
