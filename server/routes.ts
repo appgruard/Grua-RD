@@ -2351,6 +2351,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const progress = Math.round((completedSteps / totalRequiredSteps) * 100);
       const allCompleted = steps.filter(s => s.required).every(s => s.completed);
 
+      // Check for active OTP for email verification
+      let otpStatus: { hasActiveOtp: boolean; otpExpiresIn: number | null; otpCreatedSecondsAgo: number | null } = {
+        hasActiveOtp: false,
+        otpExpiresIn: null,
+        otpCreatedSecondsAgo: null
+      };
+      
+      if (user.email && !emailVerificado) {
+        const activeOtp = await storage.getActiveVerificationCode(user.email, 'registro');
+        if (activeOtp && activeOtp.expiraEn) {
+          const now = Date.now();
+          const expiresAt = new Date(activeOtp.expiraEn).getTime();
+          const createdAt = activeOtp.createdAt ? new Date(activeOtp.createdAt).getTime() : now;
+          const expiresInSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
+          const createdSecondsAgo = Math.floor((now - createdAt) / 1000);
+          
+          if (expiresInSeconds > 0) {
+            otpStatus = {
+              hasActiveOtp: true,
+              otpExpiresIn: expiresInSeconds,
+              otpCreatedSecondsAgo: createdSecondsAgo
+            };
+          }
+        }
+      }
+
       res.json({
         userType: user.userType,
         // Include basic user data for the verification page
