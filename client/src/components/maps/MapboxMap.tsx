@@ -687,7 +687,7 @@ export function MapboxMap({
                 )}
                 {isDraggable && (
                   <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded whitespace-nowrap">
-                    Arrastra para mover
+                Arrastra
                   </div>
                 )}
                 {isInactiveDriver && (
