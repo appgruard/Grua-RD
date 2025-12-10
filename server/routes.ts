@@ -527,6 +527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { method: 'DELETE', path: '/api/drivers/me/vehiculos', prefix: true },
     { method: 'POST', path: '/api/users/profile-photo' },
     { method: 'POST', path: '/api/client/insurance' },
+    { method: 'GET', path: '/api/client/insurance/status' },
     { method: 'POST', path: '/api/analytics/web-vitals' },
     { method: 'GET', path: '/api/storage/files', prefix: true },
   ];
