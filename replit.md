@@ -106,6 +106,15 @@ The application uses PostgreSQL session store for persistent sessions in product
 
 ## Recent Changes
 
+### December 10, 2025 - Bug Corrections Phase 3 Completed
+Added robust regression test for secondary account onboarding flow:
+
+- **Test de regresión**: ✅ Added and validated in `e2e/06-onboarding-wizard.spec.ts`
+  - Test name: `REGRESIÓN: Cliente autenticado debe poder completar registro de conductor secundario y redirigir a /driver`
+  - Validates that when a client navigates to `/onboarding?tipo=conductor`, the userType is preserved as "conductor"
+  - Strict assertions: driver fields must appear, complete button must be visible, final URL must be /driver or /verify-pending
+  - Modified `e2e/helpers.ts` to export `generateUniqueId()` function
+
 ### December 10, 2025 - Bug Corrections Phase 2 Completed
 Implemented fix for license back validation from `PLAN_CORRECCIONES_BUGS.md`:
 
