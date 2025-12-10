@@ -1,7 +1,7 @@
 # Plan de Correcciones - Grúa RD
 
 **Fecha:** 10 de Diciembre, 2025  
-**Estado:** ✅ FASE 3 COMPLETADA - Test de Regresión Agregado
+**Estado:** 🟡 FASE 4 EN PROGRESO - Monitoreo en Producción
 
 ---
 
@@ -272,11 +272,94 @@ Se agregó un test automatizado de regresión estricto para validar que el bug 3
 
 ---
 
-## Próximos Pasos (Fase 4 - Monitoreo)
+## Fase 4 - Monitoreo en Producción (En Progreso)
 
-1. ~~**Bug 1**: Logging agregado - Desplegar a CapRover y revisar logs cuando ocurra el error~~ ✅ Corregido en Fase 2
-2. ~~Probar el flujo completo de creación de cuenta secundaria de conductor~~ ✅ Validado por arquitecto
-3. ~~Verificar que el registro de vehículos funciona correctamente con la columna boolean~~ ✅ Pendiente prueba en producción
-4. ~~Agregar test automatizado de regresión para el flujo `/onboarding` de cuenta secundaria~~ ✅ Completado en Fase 3
-5. **[En Producción]** Monitorear logs de producción para detectar casos edge en flujos de onboarding y verificación
-6. **[En Producción]** Validar en producción que el error 409 ya no bloquea la validación de licencia trasera
+**Estado:** 🟡 EN PROGRESO
+
+### Objetivo
+Validar que las correcciones aplicadas funcionan correctamente en el entorno de producción (CapRover).
+
+### Tareas de Monitoreo
+
+#### 1. Validar corrección de error 409 en licencia trasera
+**Qué buscar en logs de CapRover:**
+```bash
+# Logs exitosos - La licencia trasera fue aceptada
+grep "LICENSE_SCAN_BACK" logs
+
+# Si el manejo especial del 409 se activó
+grep "failed_to_read" logs
+
+# Errores que aún podrían ocurrir
+grep "license back validation" logs
+```
+
+**Resultado esperado:** 
+- Los usuarios pueden subir la parte trasera de su licencia sin recibir error 409
+- Si la API Verifik no puede leer el OCR, el sistema acepta la imagen con score mínimo
+
+#### 2. Validar flujo de cuenta secundaria de conductor
+**Qué buscar en logs de CapRover:**
+```bash
+# Registros de conductor creados exitosamente
+grep "CONDUCTOR_CREATED" logs
+
+# Errores en onboarding
+grep "onboarding" logs | grep -i error
+```
+
+**Resultado esperado:**
+- Un cliente puede crear cuenta de conductor desde su perfil
+- El wizard muestra campos de conductor (licencia, vehículo)
+- La redirección va a `/driver` o `/verify-pending`, NO a `/client`
+
+#### 3. Validar columna vehiculosRegistrados (BOOLEAN)
+**Qué buscar en logs de CapRover:**
+```bash
+# Ya no debería aparecer este error
+grep "invalid input syntax for type integer" logs
+```
+
+**Resultado esperado:**
+- No aparece el error "invalid input syntax for type integer: true"
+- Los vehículos se registran correctamente para conductores
+
+### Comandos de CapRover para Monitoreo
+
+```bash
+# Ver últimos 100 logs de la app
+caprover logs --name=<app-name> --lines=100
+
+# Buscar errores específicos
+docker logs <container-id> 2>&1 | grep -i "error"
+
+# Monitoreo en tiempo real
+docker logs -f <container-id>
+```
+
+### Lista de Verificación en Producción
+
+| # | Verificación | Estado | Notas |
+|---|--------------|--------|-------|
+| 1 | Error 409 ya no bloquea licencia trasera | ⏳ Pendiente | Probar con conductor nuevo |
+| 2 | Flujo cliente → conductor funciona | ⏳ Pendiente | Crear cuenta secundaria |
+| 3 | Sin error "integer: true" | ⏳ Pendiente | Registrar vehículo |
+| 4 | Logs de verificación funcionando | ⏳ Pendiente | Verificar `VERIFICATION_BLOCKED` no aparece incorrectamente |
+
+### Próximos Pasos (Fase 5 - Cierre)
+
+1. Marcar verificaciones como completadas cuando se validen en producción
+2. Documentar cualquier caso edge encontrado
+3. Cerrar el plan de correcciones
+
+---
+
+## Historial de Fases
+
+| Fase | Descripción | Estado | Fecha |
+|------|-------------|--------|-------|
+| 1 | Corrección de bugs iniciales (2, 3, 4) y logging para bug 1 | ✅ Completada | 10 Dic 2025 |
+| 2 | Corrección de error 409 en licencia trasera | ✅ Completada | 10 Dic 2025 |
+| 3 | Tests de regresión E2E | ✅ Completada | 10 Dic 2025 |
+| 4 | Monitoreo en producción | 🟡 En Progreso | 10 Dic 2025 |
+| 5 | Cierre y documentación final | ⏳ Pendiente | - |
