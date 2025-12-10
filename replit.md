@@ -106,6 +106,17 @@ The application uses PostgreSQL session store for persistent sessions in product
 
 ## Recent Changes
 
+### December 10, 2025 - Privacy Section Added to User Profiles
+Added privacy and account deletion functionality for both clients and drivers:
+
+- **New Component**: `PrivacySection.tsx` - Reusable component with privacy info and account deletion
+- **Backend Endpoint**: `DELETE /api/users/me` with comprehensive safeguards:
+  - Checks for active services (pendiente, aceptado, conductor_en_sitio, cargando, en_progreso)
+  - Drivers must have zero balancePendiente and balanceDisponible
+  - Proper session cleanup and cascade deletion
+- **Frontend Integration**: Added to both driver (`/driver/profile`) and client (`/client/profile`) pages
+- **UX**: User-friendly error messages mapped from backend errors, confirmation dialog prevents accidental deletion
+
 ### December 10, 2025 - Bug Corrections Phase 4 Started (Production Monitoring)
 Transitioned to production monitoring phase. All code fixes are complete and deployed to CapRover.
 
