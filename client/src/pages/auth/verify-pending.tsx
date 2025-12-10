@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Loader2, IdCard, Mail, CheckCircle2, AlertCircle, 
   Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, 
-  UserCircle, ArrowRight, Circle, CheckCircle, FileText, Grid3X3, Car, Shield, Plus, Clock, XCircle, Trash2, Building2
+  UserCircle, ArrowRight, Circle, CheckCircle, FileText, Grid3X3, Car, Shield, Plus, Clock, XCircle, Trash2, Building2, Pencil
 } from 'lucide-react';
 import {
   Select,
@@ -102,6 +102,9 @@ export default function VerifyPending() {
   const [isSavingCategories, setIsSavingCategories] = useState(false);
   const [isSavingVehicles, setIsSavingVehicles] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true); // Start as true, will be set to false when ready
   const [initializedUser, setInitializedUser] = useState<any>(null);
   const [initError, setInitError] = useState(false);
@@ -1173,6 +1176,46 @@ export default function VerifyPending() {
     }
   });
 
+  const handleUpdateEmail = async () => {
+    if (!newEmail || newEmail === currentUser?.email) {
+      setIsEditingEmail(false);
+      return;
+    }
+
+    setIsUpdatingEmail(true);
+    setErrors({});
+
+    try {
+      const res = await fetch('/api/identity/email', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: newEmail }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Error al actualizar el correo');
+      }
+
+      // Refresh user data to get the new email
+      await refreshUser();
+      setEmailVerified(false);
+      setIsEditingEmail(false);
+      setNewEmail('');
+      toast({ 
+        title: 'Correo actualizado', 
+        description: 'Por favor, verifica tu nuevo correo electrónico' 
+      });
+    } catch (error: any) {
+      setErrors({ email: error.message });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsUpdatingEmail(false);
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     clearPendingVerification();
@@ -1517,10 +1560,77 @@ export default function VerifyPending() {
                       </Alert>
                     )}
 
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm text-muted-foreground mb-1">Enviaremos un código a:</p>
-                      <p className="font-medium">{currentUser?.email}</p>
-                    </div>
+                    {errors.email && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{errors.email}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {isEditingEmail ? (
+                      <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+                        <Label htmlFor="new-email">Nuevo correo electrónico</Label>
+                        <Input
+                          id="new-email"
+                          type="email"
+                          placeholder="nuevo@correo.com"
+                          value={newEmail}
+                          onChange={(e) => {
+                            setNewEmail(e.target.value);
+                            setErrors({});
+                          }}
+                          disabled={isUpdatingEmail}
+                          data-testid="input-new-email"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsEditingEmail(false);
+                              setNewEmail('');
+                              setErrors({});
+                            }}
+                            disabled={isUpdatingEmail}
+                            className="flex-1"
+                            data-testid="button-cancel-email"
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            onClick={handleUpdateEmail}
+                            disabled={!newEmail || isUpdatingEmail}
+                            className="flex-1"
+                            data-testid="button-save-email"
+                          >
+                            {isUpdatingEmail ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              'Guardar'
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-muted/50 p-3 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Enviaremos un código a:</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{currentUser?.email}</p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsEditingEmail(true);
+                              setNewEmail(currentUser?.email || '');
+                            }}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            data-testid="button-edit-email"
+                          >
+                            <Pencil className="w-3 h-3 mr-1" />
+                            Cambiar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="otp">Código de verificación</Label>

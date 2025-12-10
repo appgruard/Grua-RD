@@ -2212,6 +2212,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update email during verification flow
+  app.patch("/api/identity/email", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "El correo electrónico es requerido" });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Formato de correo electrónico inválido" });
+      }
+
+      // Check if email is already in use by another user of the same type
+      const existingUser = await storage.getUserByEmailAndType(email, req.user!.userType);
+      if (existingUser && existingUser.id !== req.user!.id) {
+        return res.status(409).json({ 
+          message: "Este correo electrónico ya está en uso por otra cuenta" 
+        });
+      }
+
+      // Update email and reset emailVerificado to false (requires re-verification)
+      await storage.updateUser(req.user!.id, { 
+        email: email,
+        emailVerificado: false 
+      });
+
+      logSystem.info('User email updated during verification', { 
+        userId: req.user!.id, 
+        newEmail: email.replace(/(.{2}).*@/, '$1***@') // Mask email for logging
+      });
+
+      res.json({
+        success: true,
+        message: "Correo electrónico actualizado. Por favor, verifica tu nuevo correo.",
+        requiresVerification: true
+      });
+    } catch (error: any) {
+      logSystem.error('Update email error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al actualizar el correo electrónico" });
+    }
+  });
+
   app.post("/api/identity/send-phone-otp", sendOTPLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {

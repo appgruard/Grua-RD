@@ -927,6 +927,8 @@ export default function DriverProfile() {
                 if (d.tipo === 'foto_perfil') return false;
                 // Skip cedula documents if user has cedulaVerificada = true (verified via identity scan)
                 if ((d.tipo === 'cedula_frontal' || d.tipo === 'cedula_trasera') && user?.cedulaVerificada) return false;
+                // Skip license documents if license is already verified via OCR during verification flow
+                if ((d.tipo === 'licencia' || d.tipo === 'licencia_trasera') && driverData?.licenciaVerificada) return false;
                 return true;
               }).map((docType) => {
                 const documento = getDocumentStatus(docType.tipo);
