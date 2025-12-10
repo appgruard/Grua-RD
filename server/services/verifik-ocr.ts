@@ -537,20 +537,30 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
       ? imageBase64.split('base64,')[1] 
       : imageBase64;
 
+    // Add timeout to prevent hanging requests (30 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     // Use the face-recognition/search endpoint for human face detection
-    const response = await fetch(`${VERIFIK_BASE_URL}/face-recognition/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `JWT ${trimmedKey}`
-      },
-      body: JSON.stringify({
-        images: [imageData],
-        min_score: 0.6,
-        search_mode: "FAST"
-      })
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${VERIFIK_BASE_URL}/face-recognition/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `JWT ${trimmedKey}`
+        },
+        body: JSON.stringify({
+          images: [imageData],
+          min_score: 0.6,
+          search_mode: "FAST"
+        }),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -656,6 +666,17 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
     };
 
   } catch (error: any) {
+    // Handle timeout (AbortError)
+    if (error?.name === 'AbortError') {
+      logger.error("Verifik face validation timeout", { error: error.message });
+      return {
+        success: false,
+        isHumanFace: false,
+        score: 0,
+        error: "La verificación está tardando demasiado. Intenta de nuevo."
+      };
+    }
+    
     logger.error("Error in Verifik face validation", error);
     return {
       success: false,

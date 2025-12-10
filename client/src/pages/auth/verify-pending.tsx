@@ -141,6 +141,29 @@ export default function VerifyPending() {
           setCategoriesVerified(categoriasConfiguradas || false);
           setVehiclesVerified(vehiculosRegistrados || false);
 
+          // If categories are configured, load them from the server
+          if (categoriasConfiguradas) {
+            try {
+              const serviciosRes = await fetch('/api/drivers/me/servicios', {
+                credentials: 'include',
+                signal
+              });
+              if (serviciosRes.ok) {
+                const serviciosData = await serviciosRes.json();
+                if (Array.isArray(serviciosData) && serviciosData.length > 0) {
+                  // Transform server data to selectedCategories format
+                  const categoriesFromServer = serviciosData.map((s: any) => ({
+                    categoria: s.categoriaServicio || s.categoria_servicio,
+                    subtipos: []
+                  }));
+                  setSelectedCategories(categoriesFromServer);
+                }
+              }
+            } catch (err) {
+              console.error('Error loading saved categories:', err);
+            }
+          }
+
           // Check if all 6 steps are complete for driver
           const allDriverStepsComplete = cedulaVerificada && emailVerificado && fotoVerificada && 
             licenciaVerificada && categoriasConfiguradas && vehiculosRegistrados;
