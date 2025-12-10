@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { MapboxMapWithFastLoad } from '@/components/maps/LazyMapboxMap';
 import { AddressSearchInput } from '@/components/maps/AddressSearchInput';
@@ -24,6 +24,8 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import type { Servicio } from '@shared/schema';
 import { useServiceRequest } from '@/lib/serviceRequestContext';
+
+const DEFAULT_COORDINATES: Coordinates = { lat: 18.4861, lng: -69.9312 };
 
 const ONSITE_SUBTYPES = [
   'cambio_goma',
@@ -89,10 +91,12 @@ export default function ClientHome() {
     resetServiceRequest,
   } = useServiceRequest();
 
-  const [currentLocation, setCurrentLocation] = useState<Coordinates>({ lat: 18.4861, lng: -69.9312 });
+  // Use persisted origin from context as initial location, or default coordinates
+  const [currentLocation, setCurrentLocation] = useState<Coordinates>(() => origin || DEFAULT_COORDINATES);
   const [isCalculating, setIsCalculating] = useState(false);
   const [showExpandedCard, setShowExpandedCard] = useState(true);
   const distanceRef = useRef<number | null>(null);
+  const hasInitialLocationRef = useRef(origin !== null);
 
   const { data: insuranceStatus } = useQuery<{
     hasApprovedInsurance: boolean;
@@ -193,57 +197,79 @@ export default function ClientHome() {
     },
   });
 
-  const [locationReady, setLocationReady] = useState(false);
-  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
+  // Start ready if we have persisted location
+  const [locationReady, setLocationReady] = useState(() => origin !== null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(() => origin === null);
 
-  useEffect(() => {
+  // Function to fetch current geolocation
+  const fetchGeolocation = useCallback(async () => {
     if (!('geolocation' in navigator)) {
       setIsLoadingLocation(false);
       setLocationReady(true);
       return;
     }
 
-    const getLocation = () => {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const coords = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setCurrentLocation(coords);
-          setLocationReady(true);
-          setIsLoadingLocation(false);
-          
-          try {
-            const response = await fetch(
-              `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}&language=es`
-            );
-            if (response.ok) {
-              const data = await response.json();
-              const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
-              setOrigin(coords);
-              setOrigenDireccion(address);
-            }
-          } catch (error) {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setCurrentLocation(coords);
+        setLocationReady(true);
+        setIsLoadingLocation(false);
+        
+        try {
+          const response = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}&language=es`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
             setOrigin(coords);
-            setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
+            setOrigenDireccion(address);
           }
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          setIsLoadingLocation(false);
-          setLocationReady(true);
-        },
-        { 
-          enableHighAccuracy: false,
-          timeout: 5000,
-          maximumAge: 60000
+        } catch (error) {
+          setOrigin(coords);
+          setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
         }
-      );
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        setIsLoadingLocation(false);
+        setLocationReady(true);
+      },
+      { 
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: 60000
+      }
+    );
+  }, [setOrigin, setOrigenDireccion]);
+
+  // Initial geolocation fetch (skip if we have persisted location, but still update in background)
+  useEffect(() => {
+    // Always fetch fresh geolocation, but if we have persisted location, don't block the UI
+    if (hasInitialLocationRef.current) {
+      // We already have a location, so just update in background
+      fetchGeolocation();
+    } else {
+      // No persisted location, need to fetch and wait
+      fetchGeolocation();
+    }
+  }, [fetchGeolocation]);
+
+  // Re-fetch location when tab becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchGeolocation();
+      }
     };
 
-    getLocation();
-  }, []);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [fetchGeolocation]);
 
   useEffect(() => {
     if (origin && destination && servicioCategoria && requiresTransport()) {

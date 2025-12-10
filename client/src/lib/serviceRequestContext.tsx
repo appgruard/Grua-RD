@@ -1,8 +1,41 @@
-import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import type { Coordinates, RouteGeometry } from '@/lib/maps';
 import { useAuth } from '@/lib/auth';
 
 type Step = 'serviceCategory' | 'serviceSubtype' | 'extractionDescription' | 'location' | 'vehicleType' | 'payment' | 'confirm';
+
+const LOCATION_STORAGE_KEY = 'gruard_client_location';
+
+interface PersistedLocation {
+  origin: Coordinates | null;
+  origenDireccion: string;
+  currentLocation: Coordinates | null;
+  timestamp: number;
+}
+
+function saveLocationToStorage(data: PersistedLocation) {
+  try {
+    sessionStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Failed to save location to sessionStorage:', e);
+  }
+}
+
+function loadLocationFromStorage(): PersistedLocation | null {
+  try {
+    const stored = sessionStorage.getItem(LOCATION_STORAGE_KEY);
+    if (!stored) return null;
+    const data = JSON.parse(stored) as PersistedLocation;
+    // Check if data is still fresh (within 30 minutes)
+    if (Date.now() - data.timestamp > 30 * 60 * 1000) {
+      sessionStorage.removeItem(LOCATION_STORAGE_KEY);
+      return null;
+    }
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
 
 interface ServiceRequestState {
   step: Step;
@@ -73,7 +106,36 @@ const ServiceRequestContext = createContext<ServiceRequestContextType | null>(nu
 
 export function ServiceRequestProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [state, setState] = useState<ServiceRequestState>(initialState);
+  const isHydrated = useRef(false);
+  
+  // Initialize state with persisted location if available
+  const [state, setState] = useState<ServiceRequestState>(() => {
+    const persisted = loadLocationFromStorage();
+    if (persisted && persisted.origin) {
+      return {
+        ...initialState,
+        origin: persisted.origin,
+        origenDireccion: persisted.origenDireccion || '',
+      };
+    }
+    return initialState;
+  });
+
+  // Persist location changes to sessionStorage
+  useEffect(() => {
+    if (!isHydrated.current) {
+      isHydrated.current = true;
+      return;
+    }
+    if (state.origin) {
+      saveLocationToStorage({
+        origin: state.origin,
+        origenDireccion: state.origenDireccion,
+        currentLocation: state.origin,
+        timestamp: Date.now(),
+      });
+    }
+  }, [state.origin, state.origenDireccion]);
 
   useEffect(() => {
     if (!user || user.userType !== 'cliente') {
