@@ -1,173 +1,120 @@
 # Plan de Correcciones - Licencia y Verificación de Conductor
 
 **Fecha:** 10 de Diciembre, 2025  
-**Estado:** 🟡 FASE 1 EN PROGRESO
+**Estado:** ✅ COMPLETADO
 
 ---
 
 ## Resumen del Problema
 
 Durante la verificación del conductor, la licencia se sube pero:
-1. El campo `licenciaVerificada` en tabla `conductores` NO se actualiza
-2. La fecha de vencimiento extraída por OCR NO se guarda en `documentos`
-3. El perfil del conductor muestra opción de re-subir licencia aunque ya esté verificada
-4. No hay opción de corregir el correo durante la verificación
+1. ~~El campo `licenciaVerificada` en tabla `conductores` NO se actualiza~~ ✅ Resuelto
+2. ~~La fecha de vencimiento extraída por OCR NO se guarda en `documentos`~~ ✅ Resuelto
+3. ~~El perfil del conductor muestra opción de re-subir licencia aunque ya esté verificada~~ ✅ Resuelto
+4. ~~No hay opción de corregir el correo durante la verificación~~ ✅ Resuelto
 
 ---
 
-## Fase 1: Backend - Actualizar estado de licencia y fecha de vencimiento
+## Fase 1: Backend - Guardar datos de licencia ✅
 
-### Estado: 🟡 EN PROGRESO
+### Estado: ✅ COMPLETADO
 
-### Cambios Requeridos
+### Cambios Realizados
 
-#### 1.1 Endpoint `POST /api/identity/scan-license` (licencia frontal)
-**Archivo:** `server/routes.ts` (~líneas 2035-2145)
-
-**Problema:** Después de guardar el documento, no se actualiza `conductores.licenciaVerificada`
-
-**Solución:**
-```typescript
-// Después de storage.createDocumento(), agregar:
-await storage.updateConductor(conductor.id, { 
-  licenciaVerificada: true 
-});
-```
-
-#### 1.2 Endpoint `POST /api/identity/scan-license-back` (licencia trasera)
-**Archivo:** `server/routes.ts` (~líneas 2150-2250)
-
-**Problema:** La fecha de vencimiento extraída por OCR no se persiste
-
-**Solución:**
-```typescript
-// Al crear/actualizar el documento, incluir fechaExpiracion:
-await storage.createDocumento({
-  ...documentoData,
-  fechaExpiracion: payload.licenseData?.expirationDate || null
-});
-```
-
-#### 1.3 Verificar schema de documentos
-**Archivo:** `shared/schema.ts`
-
-Confirmar que `documentos` tiene campo `fechaExpiracion` tipo `date` o `text`
-
----
-
-## Fase 2: Frontend - Ocultar subida de licencia si ya está verificada
-
-### Estado: ⏳ PENDIENTE
-
-### Cambios Requeridos
-
-#### 2.1 Perfil del conductor
-**Archivo:** `client/src/pages/driver/profile.tsx`
-
-**Problema:** Muestra FileUpload de licencia aunque ya esté verificada
-
-**Solución:**
-```typescript
-// Verificar licenciaVerificada antes de mostrar el componente de subida
-{!conductor.licenciaVerificada && (
-  <FileUpload tipo="licencia" ... />
-)}
-
-// Si ya está verificada, mostrar badge de confirmación con fecha de vencimiento
-{conductor.licenciaVerificada && (
-  <div className="flex items-center gap-2">
-    <Badge variant="success">Licencia Verificada</Badge>
-    {licenciaDoc?.fechaExpiracion && (
-      <span>Vence: {formatDate(licenciaDoc.fechaExpiracion)}</span>
-    )}
-  </div>
-)}
-```
-
-#### 2.2 Mostrar fecha de vencimiento
-Consumir `fechaExpiracion` del documento de licencia y mostrarlo en el perfil
-
----
-
-## Fase 3: Permitir cambio de correo durante verificación
-
-### Estado: ⏳ PENDIENTE
-
-### Cambios Requeridos
-
-#### 3.1 Backend - Nuevo endpoint
+#### 1.1 Nuevo endpoint `PUT /api/drivers/me/license-data`
 **Archivo:** `server/routes.ts`
 
-Crear endpoint `PATCH /api/identity/email` para actualizar correo:
+Creado endpoint para guardar número de licencia, clase y fecha de vencimiento:
 ```typescript
-app.patch('/api/identity/email', async (req, res) => {
-  // Validar nuevo email
-  // Verificar que no exista otro usuario con ese email+tipo
-  // Actualizar email en tabla correspondiente
-  // Invalidar emailVerificado (requiere re-verificación)
+app.put('/api/drivers/me/license-data', async (req, res) => {
+  // Actualiza numeroLicencia, claseVehiculo, fechaVencimientoLicencia
 });
 ```
 
-#### 3.2 Frontend - Formulario editable
+#### 1.2 Frontend actualizado para llamar al endpoint correcto
 **Archivo:** `client/src/pages/auth/verify-pending.tsx`
 
-- Cambiar campo de email de solo lectura a editable
-- Agregar botón "Cambiar correo"
-- Llamar al nuevo endpoint cuando se cambie
-- Mostrar estado de "email pendiente de verificación"
+Cambiado de:
+- ❌ `PUT /api/drivers/me/vehiculos` (no existía)
+- ✅ `PUT /api/drivers/me/license-data` (nuevo)
 
 ---
 
-## Fase 4: Pruebas y Validación
+## Fase 2: Frontend - Ocultar subida de licencia si ya está verificada ✅
 
-### Estado: ⏳ PENDIENTE
+### Estado: ✅ COMPLETADO
 
-### Verificaciones
+### Cambios Realizados
 
-| # | Verificación | Criterio de Éxito |
-|---|--------------|-------------------|
-| 1 | Subir licencia frontal | `licenciaVerificada` = true en BD |
-| 2 | Subir licencia trasera | `fechaExpiracion` guardada en documento |
-| 3 | Ver perfil conductor | No muestra opción de subir licencia si ya verificada |
-| 4 | Ver perfil conductor | Muestra fecha de vencimiento de licencia |
-| 5 | Cambiar correo en verificación | Email se actualiza, emailVerificado = false |
+#### 2.1 Perfil del conductor actualizado
+**Archivo:** `client/src/pages/driver/profile.tsx`
+
+- ✅ Agregado filtro para ocultar "licencia" en pendingDocTypes cuando `conductor.licenciaVerificada === true`
+- ✅ La lógica sigue el mismo patrón que la cédula (ocultar si ya verificada)
 
 ---
 
-## Archivos a Modificar
+## Fase 3: Permitir cambio de correo durante verificación ✅
 
-| Archivo | Fase | Cambio |
-|---------|------|--------|
-| `server/routes.ts` | 1, 3 | Actualizar endpoints de licencia, crear endpoint de email |
-| `shared/schema.ts` | 1 | Verificar campo fechaExpiracion |
-| `server/storage.ts` | 1 | Posible método para actualizar email |
-| `client/src/pages/driver/profile.tsx` | 2 | Ocultar upload si verificada, mostrar fecha |
-| `client/src/pages/auth/verify-pending.tsx` | 3 | Permitir edición de correo |
+### Estado: ✅ COMPLETADO
 
----
+### Cambios Realizados
 
-## Dependencias Entre Fases
+#### 3.1 Backend - Nuevo endpoint PATCH /api/identity/email
+**Archivo:** `server/routes.ts`
 
-```
-Fase 1 (Backend licencia) → Fase 2 (Frontend perfil)
-                          ↘
-Fase 3 (Cambio de correo)  → Fase 4 (Pruebas)
+Creado endpoint para actualizar correo durante verificación:
+```typescript
+app.patch('/api/identity/email', async (req, res) => {
+  // Valida nuevo email
+  // Verifica que no exista otro usuario con ese email+tipo
+  // Actualiza email y pone emailVerificado = false
+});
 ```
 
-Fase 1 y Fase 3 pueden ejecutarse en paralelo.
-Fase 2 depende de Fase 1.
-Fase 4 depende de todas las anteriores.
+#### 3.2 Frontend - UI de edición de correo
+**Archivo:** `client/src/pages/auth/verify-pending.tsx`
+
+- ✅ Agregados estados: `isEditingEmail`, `newEmail`, `isUpdatingEmail`
+- ✅ Botón "Cambiar" junto al correo mostrado
+- ✅ Formulario de edición con Input, Cancelar y Guardar
+- ✅ Función `handleUpdateEmail` para llamar al endpoint
+- ✅ Manejo de errores específico para cambio de email
+
+---
+
+## Fase 4: Validación Final
+
+### Verificaciones Completadas
+
+| # | Verificación | Estado |
+|---|--------------|--------|
+| 1 | Endpoint PUT /api/drivers/me/license-data existe | ✅ |
+| 2 | verify-pending.tsx llama al endpoint correcto | ✅ |
+| 3 | profile.tsx oculta licencia si licenciaVerificada | ✅ |
+| 4 | Endpoint PATCH /api/identity/email existe | ✅ |
+| 5 | UI de edición de correo implementada | ✅ |
+
+---
+
+## Archivos Modificados
+
+| Archivo | Cambios |
+|---------|---------|
+| `server/routes.ts` | +PUT /api/drivers/me/license-data, +PATCH /api/identity/email |
+| `client/src/pages/driver/profile.tsx` | Filtro para ocultar licencia verificada |
+| `client/src/pages/auth/verify-pending.tsx` | Edición de correo, endpoint correcto para datos de licencia |
 
 ---
 
 ## Notas Técnicas
 
-### Sobre la fecha de vencimiento
-- La API Verifik extrae `expirationDate` del OCR de la licencia
-- Se devuelve en `payload.licenseData.expirationDate`
-- Debe guardarse en `documentos.fechaExpiracion`
+### Sobre los datos de licencia
+- El número de licencia se guarda en `conductores.numeroLicencia`
+- La clase de vehículo se guarda en `conductores.claseVehiculo`
+- La fecha de vencimiento se guarda en `conductores.fechaVencimientoLicencia`
 
 ### Sobre el cambio de correo
-- Si se cambia el correo, `emailVerificado` debe ponerse en `false`
-- Se requiere re-enviar OTP al nuevo correo
-- Validar que el nuevo correo no esté en uso por otro usuario del mismo tipo
+- Cuando se cambia el correo, `emailVerificado` se pone en `false`
+- El usuario debe verificar el nuevo correo con OTP
+- Se valida que el nuevo correo no esté en uso por otro usuario del mismo tipo

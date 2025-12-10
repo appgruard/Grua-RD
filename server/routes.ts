@@ -2212,8 +2212,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update email during verification flow
-  app.patch("/api/identity/email", async (req: Request, res: Response) => {
+  // Update email during verification flow (with rate limiting to prevent abuse)
+  app.patch("/api/identity/email", sendOTPLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "No autenticado" });
@@ -2231,16 +2231,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Formato de correo electrónico inválido" });
       }
 
-      // Check if email is already in use by another user of the same type
-      const existingUser = await storage.getUserByEmailAndType(email, req.user!.userType);
-      if (existingUser && existingUser.id !== req.user!.id) {
+      // Validate that the new email is different from the current one
+      if (email.toLowerCase() === req.user!.email.toLowerCase()) {
+        return res.status(400).json({ 
+          message: "El nuevo correo debe ser diferente al actual" 
+        });
+      }
+
+      // Check if email is already in use by ANY user (not just same type)
+      const existingUsers = await storage.getUsersByEmail(email);
+      const otherUser = existingUsers.find(u => u.id !== req.user!.id);
+      if (otherUser) {
         return res.status(409).json({ 
           message: "Este correo electrónico ya está en uso por otra cuenta" 
         });
       }
 
       // Update email and reset emailVerificado to false (requires re-verification)
-      await storage.updateUser(req.user!.id, { 
+      const updatedUser = await storage.updateUser(req.user!.id, { 
         email: email,
         emailVerificado: false 
       });
@@ -2250,10 +2258,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newEmail: email.replace(/(.{2}).*@/, '$1***@') // Mask email for logging
       });
 
+      // Update session to reflect the new email
+      await new Promise<void>((resolve, reject) => {
+        req.login(updatedUser, (err) => {
+          if (err) {
+            logSystem.error('Failed to update session after email change', err, { userId: req.user?.id });
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // Automatically send OTP to the new email
+      let otpSent = false;
+      try {
+        const codigo = generateOTP();
+        const expiraEn = new Date(Date.now() + 10 * 60 * 1000);
+
+        await storage.deleteExpiredVerificationCodes();
+        await storage.deletePriorVerificationCodes(email, 'registro');
+
+        await storage.createVerificationCode({
+          telefono: email, // Using telefono field to store email (consistent with /api/auth/send-otp)
+          codigo,
+          expiraEn,
+          tipoOperacion: 'registro',
+        });
+
+        // Send verification code via email
+        const emailService = await getEmailService();
+        const sent = await emailService.sendOTPEmail(email, codigo, updatedUser.nombre || undefined);
+
+        if (sent) {
+          otpSent = true;
+          logAuth.otpSent(email);
+        } else {
+          logSystem.error('Failed to send OTP email after email update', null, { email });
+        }
+      } catch (otpError: any) {
+        logSystem.error('Error sending OTP after email update', otpError, { userId: req.user?.id });
+        // Don't fail the whole request, just note OTP wasn't sent
+      }
+
+      // Return updated user data so frontend can update its state
       res.json({
         success: true,
-        message: "Correo electrónico actualizado. Por favor, verifica tu nuevo correo.",
-        requiresVerification: true
+        message: otpSent 
+          ? "Correo actualizado. Hemos enviado un código de verificación a tu nuevo correo." 
+          : "Correo electrónico actualizado. Por favor, solicita un código de verificación.",
+        requiresVerification: true,
+        otpSent,
+        expiresIn: otpSent ? 600 : undefined,
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          emailVerificado: updatedUser.emailVerificado,
+          nombre: updatedUser.nombre,
+          userType: updatedUser.userType
+        }
       });
     } catch (error: any) {
       logSystem.error('Update email error', error, { userId: req.user?.id });
@@ -6731,6 +6794,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (documento.estado === 'aprobado') {
           return res.status(403).json({ message: "No puedes eliminar documentos aprobados" });
+        }
+        // Protect verified license documents from deletion
+        if ((documento.tipo === 'licencia' || documento.tipo === 'licencia_trasera') && conductor.licenciaVerificada) {
+          return res.status(403).json({ 
+            message: "No puedes eliminar documentos de licencia verificados. Tu licencia ha sido validada por el sistema." 
+          });
         }
       } else if (req.user!.userType !== 'admin') {
         return res.status(403).json({ message: "No autorizado" });

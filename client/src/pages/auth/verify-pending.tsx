@@ -1204,10 +1204,21 @@ export default function VerifyPending() {
       setEmailVerified(false);
       setIsEditingEmail(false);
       setNewEmail('');
-      toast({ 
-        title: 'Correo actualizado', 
-        description: 'Por favor, verifica tu nuevo correo electrónico' 
-      });
+      
+      // Handle the automatic OTP send from backend
+      if (data.otpSent) {
+        // Start the OTP timer since code was already sent
+        setOtpTimer(data.expiresIn || 600);
+        toast({ 
+          title: 'Correo actualizado', 
+          description: 'Hemos enviado un código de verificación a tu nuevo correo electrónico' 
+        });
+      } else {
+        toast({ 
+          title: 'Correo actualizado', 
+          description: 'Por favor, solicita un código de verificación para tu nuevo correo' 
+        });
+      }
     } catch (error: any) {
       setErrors({ email: error.message });
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
