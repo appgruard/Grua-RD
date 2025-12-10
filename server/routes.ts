@@ -515,6 +515,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { method: 'PATCH', path: '/api/users/me' },
     { method: 'POST', path: '/api/documents/upload' },
     { method: 'POST', path: '/api/driver/documents' },
+    { method: 'GET', path: '/api/drivers/me' },
+    { method: 'GET', path: '/api/drivers/init' },
     { method: 'GET', path: '/api/drivers/me/servicios' },
     { method: 'PUT', path: '/api/drivers/me/servicios' },
     { method: 'GET', path: '/api/drivers/me/vehiculos', prefix: true },
