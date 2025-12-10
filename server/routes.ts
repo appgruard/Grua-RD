@@ -3431,6 +3431,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update driver's license data (from verification flow)
+  app.put("/api/drivers/me/license-data", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      let conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        logSystem.info('Creating conductor record for user during license data update', { userId: req.user!.id });
+        conductor = await storage.createConductor({
+          userId: req.user!.id,
+          licencia: '',
+          placaGrua: '',
+          marcaGrua: '',
+          modeloGrua: '',
+        });
+      }
+
+      const { licenciaVerificada, licenciaNumero, licenciaClase, licenciaVencimiento } = req.body;
+      
+      const updateData: Record<string, any> = {};
+      
+      if (licenciaVerificada !== undefined) {
+        updateData.licenciaVerificada = licenciaVerificada;
+      }
+      
+      if (licenciaNumero) {
+        updateData.licencia = licenciaNumero;
+      }
+      
+      if (licenciaClase) {
+        updateData.licenciaCategoria = licenciaClase;
+        updateData.licenciaCategoriaVerificada = true;
+      }
+      
+      if (licenciaVencimiento) {
+        const parsedDate = new Date(licenciaVencimiento);
+        if (!isNaN(parsedDate.getTime())) {
+          updateData.licenciaFechaVencimiento = parsedDate;
+        }
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No hay datos válidos para actualizar" });
+      }
+      
+      await storage.updateConductor(conductor.id, updateData);
+      
+      logSystem.info('Driver license data updated', { 
+        conductorId: conductor.id, 
+        licenciaVerificada: updateData.licenciaVerificada,
+        hasLicenseNumber: !!updateData.licencia,
+        hasCategory: !!updateData.licenciaCategoria,
+        hasExpiration: !!updateData.licenciaFechaVencimiento
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Datos de licencia actualizados correctamente" 
+      });
+    } catch (error: any) {
+      logSystem.error('Update driver license data error', error);
+      res.status(500).json({ message: "Error al actualizar datos de licencia" });
+    }
+  });
+
   // Get all vehicles for the current driver
   app.get("/api/drivers/me/vehiculos", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'conductor') {

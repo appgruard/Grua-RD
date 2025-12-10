@@ -889,7 +889,7 @@ export default function VerifyPending() {
       setIsUploadingLicense(true);
       setErrors({});
       
-      const response = await fetch('/api/drivers/me/vehiculos', {
+      const response = await fetch('/api/drivers/me/license-data', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
