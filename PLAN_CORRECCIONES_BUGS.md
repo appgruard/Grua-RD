@@ -1,7 +1,7 @@
 # Plan de Correcciones - Grúa RD
 
 **Fecha:** 10 de Diciembre, 2025  
-**Estado:** ✅ FASE 1 COMPLETADA Y VALIDADA
+**Estado:** ✅ FASE 3 COMPLETADA - Test de Regresión Agregado
 
 ---
 
@@ -238,11 +238,45 @@ Revisión confirmada:
 
 ---
 
-## Próximos Pasos (Fase 3)
+## Fase 3 - Completada (10 Diciembre 2025)
+
+### Test de Regresión Robusto Agregado
+
+**Estado:** ✅ COMPLETADO Y VALIDADO
+
+**Descripción:**
+Se agregó un test automatizado de regresión estricto para validar que el bug 3 (flujo de cuenta secundaria) no vuelva a ocurrir.
+
+**Test agregado en `e2e/06-onboarding-wizard.spec.ts`:**
+- Nombre: `REGRESIÓN: Cliente autenticado debe poder completar registro de conductor secundario y redirigir a /driver`
+- Flujo probado:
+  1. Crear cuenta de cliente nuevo completa (registro, cédula, OTP)
+  2. Verificar redirección a `/client` dashboard
+  3. Navegar a `/onboarding?tipo=conductor`
+  4. Verificar que la página contiene contexto de conductor (palabras clave: conductor, licencia, grúa)
+  5. Navegar a través del wizard buscando campos específicos de conductor
+  6. **ASERCIÓN CRÍTICA:** `expect(driverFieldsFound).toBe(true)` - Falla si los campos de conductor no aparecen
+  7. Llenar datos de conductor (licencia, placa, marca, modelo)
+  8. Hacer click en completar registro
+  9. **ASERCIÓN CRÍTICA:** Verificar que la URL final es `/driver` o `/verify-pending`
+  10. **ASERCIÓN CRÍTICA:** Verificar que la URL NO es `/client` sin parámetro tipo
+
+**Por qué este test detecta el bug:**
+- Si `userType` se sobrescribe a 'cliente', los campos de conductor no aparecen → test falla en paso 6
+- Si el registro se completa como cliente, redirige a `/client` → test falla en paso 9/10
+- No hay rutas de escape silenciosas - todas las fallas son explícitas
+
+**Archivos modificados:**
+- `e2e/06-onboarding-wizard.spec.ts` - Test de regresión robusto agregado
+- `e2e/helpers.ts` - Exportada función `generateUniqueId()`
+
+---
+
+## Próximos Pasos (Fase 4 - Monitoreo)
 
 1. ~~**Bug 1**: Logging agregado - Desplegar a CapRover y revisar logs cuando ocurra el error~~ ✅ Corregido en Fase 2
 2. ~~Probar el flujo completo de creación de cuenta secundaria de conductor~~ ✅ Validado por arquitecto
 3. ~~Verificar que el registro de vehículos funciona correctamente con la columna boolean~~ ✅ Pendiente prueba en producción
-4. Agregar test automatizado de regresión para el flujo `/onboarding` de cuenta secundaria (recomendado)
-5. Monitorear logs de producción para detectar casos edge en flujos de onboarding y verificación
-6. Validar en producción que el error 409 ya no bloquea la validación de licencia trasera
+4. ~~Agregar test automatizado de regresión para el flujo `/onboarding` de cuenta secundaria~~ ✅ Completado en Fase 3
+5. **[En Producción]** Monitorear logs de producción para detectar casos edge en flujos de onboarding y verificación
+6. **[En Producción]** Validar en producción que el error 409 ya no bloquea la validación de licencia trasera
