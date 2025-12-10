@@ -106,12 +106,20 @@ The application uses PostgreSQL session store for persistent sessions in product
 
 ## Recent Changes
 
+### December 10, 2025 - Bug Corrections Phase 2 Completed
+Implemented fix for license back validation from `PLAN_CORRECCIONES_BUGS.md`:
+
+- **Bug 1 (Licencia trasera)**: ✅ Fixed - Verifik 409 "failed_to_read" error now handled gracefully
+  - Added `MINIMUM_LICENSE_BACK_SCORE = 0.5` (lower than general 0.6 threshold)
+  - Error 409 "failed_to_read" now accepts license with default score since front license already validated identity
+  - Modified `server/services/verifik-ocr.ts` lines 521, 1020-1042, 1075-1085
+
 ### December 10, 2025 - Bug Corrections Phase 1 Completed and Validated
 Implemented and validated fixes from `PLAN_CORRECCIONES_BUGS.md`:
 
 - **Bug 3 (Alta prioridad)**: ✅ Fixed and validated - secondary account flow uses `/onboarding` route (user selects conductor type in wizard step 1)
 - **Bug 2 (Alta prioridad)**: ✅ Fixed - migrated `vehiculos_registrados` column from INTEGER to BOOLEAN
-- **Bug 1 (Media prioridad)**: 🟡 Logging added - search for `VERIFICATION_BLOCKED`, `LICENSE_SCAN_FRONT`, `LICENSE_SCAN_BACK` in CapRover logs
+- **Bug 1 (Media prioridad)**: ✅ Fixed in Phase 2 - license back validation error 409 handled
 - **Bug 4**: ✅ Validated as not a bug - insurance is optional during client verification, redirection logic only requires cedula and email verification
 
 ### December 9, 2025 - Authentication & Verification Plan Completed

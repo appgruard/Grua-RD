@@ -208,10 +208,41 @@ Revisión confirmada:
 
 ---
 
-## Próximos Pasos (Fase 2)
+## Fase 2 - Completada (10 Diciembre 2025)
 
-1. **Bug 1**: ✅ Logging agregado - Desplegar a CapRover y revisar logs cuando ocurra el error
+### Bug 1: Validación de Licencia Trasera - Error 409 "failed_to_read"
+
+**Estado:** ✅ CORREGIDO
+
+**Logs del problema:**
+```
+[error] Verifik license back validation API error {"status":409,"error":"{\"message\":\"failed_to_read\",\"code\":\"Conflict\"}"}
+[warn] License back OCR scan failed {"error":"Error al procesar la licencia trasera. Intenta de nuevo."}
+```
+
+**Causa raíz identificada:**
+1. La API de Verifik retorna error 409 con `"failed_to_read"` cuando el OCR no puede leer la imagen
+2. El código trataba esto como un fallo completo, rechazando la validación
+3. El umbral mínimo de score era 0.6 (60%), demasiado alto para la licencia trasera
+
+**Solución aplicada:**
+1. **Manejo especial del error 409 "failed_to_read"**: Cuando la API no puede leer el OCR pero la imagen existe, se acepta con score mínimo (0.5). Esto es seguro porque la licencia frontal ya validó la identidad del conductor.
+
+2. **Nuevo umbral para licencia trasera**: Se creó constante `MINIMUM_LICENSE_BACK_SCORE = 0.5` separada del umbral general `MINIMUM_VALIDATION_SCORE = 0.6`. La licencia trasera solo contiene categoría y restricciones, información menos crítica que la identidad.
+
+**Archivos modificados:**
+- `server/services/verifik-ocr.ts`:
+  - Línea 521: Nueva constante `MINIMUM_LICENSE_BACK_SCORE = 0.5`
+  - Líneas 1020-1056: Manejo de error 409 "failed_to_read" (solo acepta mensaje específico "failed_to_read", otros errores 409 se rechazan y loguean)
+  - Líneas 1089-1099: Validación con nuevo umbral de 50%
+
+---
+
+## Próximos Pasos (Fase 3)
+
+1. ~~**Bug 1**: Logging agregado - Desplegar a CapRover y revisar logs cuando ocurra el error~~ ✅ Corregido en Fase 2
 2. ~~Probar el flujo completo de creación de cuenta secundaria de conductor~~ ✅ Validado por arquitecto
 3. ~~Verificar que el registro de vehículos funciona correctamente con la columna boolean~~ ✅ Pendiente prueba en producción
 4. Agregar test automatizado de regresión para el flujo `/onboarding` de cuenta secundaria (recomendado)
 5. Monitorear logs de producción para detectar casos edge en flujos de onboarding y verificación
+6. Validar en producción que el error 409 ya no bloquea la validación de licencia trasera

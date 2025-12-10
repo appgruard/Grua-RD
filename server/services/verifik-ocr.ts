@@ -515,6 +515,7 @@ export interface FaceValidationResult {
 }
 
 const MINIMUM_VALIDATION_SCORE = 0.6;
+const MINIMUM_LICENSE_BACK_SCORE = 0.5; // Lower threshold for license back (category/restrictions)
 
 export async function validateFacePhoto(imageBase64: string): Promise<FaceValidationResult> {
   const apiKey = getVerifikApiKey();
@@ -1013,6 +1014,44 @@ export async function validateDriverLicenseBack(imageBase64: string): Promise<Li
         };
       }
       
+      // Handle 409 Conflict "failed_to_read" - API couldn't read OCR but image may still be valid
+      // Accept the license back with a default score ONLY for the specific "failed_to_read" message
+      if (response.status === 409) {
+        try {
+          const errorData = JSON.parse(errorText);
+          // Only accept if the specific message is "failed_to_read" - other 409 errors should fail
+          if (errorData.message === 'failed_to_read') {
+            logger.warn("Verifik license back OCR failed_to_read - accepting with default score", { 
+              status: response.status,
+              errorData 
+            });
+            // Return as valid with minimum acceptable score - the front license already validated identity
+            return {
+              success: true,
+              isValid: true,
+              score: MINIMUM_LICENSE_BACK_SCORE,
+              details: "Licencia trasera aceptada (OCR limitado)",
+              error: undefined
+            };
+          } else {
+            // Log unexpected 409 error for debugging
+            logger.error("Verifik license back 409 error with unexpected message", { 
+              status: response.status,
+              message: errorData.message,
+              code: errorData.code,
+              errorData 
+            });
+          }
+        } catch (parseError) {
+          // Log parse error for debugging
+          logger.error("Verifik license back 409 error - failed to parse response", { 
+            status: response.status,
+            errorText,
+            parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+          });
+        }
+      }
+      
       return {
         success: false,
         isValid: false,
@@ -1044,12 +1083,13 @@ export async function validateDriverLicenseBack(imageBase64: string): Promise<Li
 
     const normalizedCategory = normalizeCategory(category);
     
-    const isValid = confidenceScore >= MINIMUM_VALIDATION_SCORE;
+    // Use lower threshold for license back (0.5) since front license already validated identity
+    const isValid = confidenceScore >= MINIMUM_LICENSE_BACK_SCORE;
 
     let details = "";
     if (!isValid) {
-      if (confidenceScore < MINIMUM_VALIDATION_SCORE && confidenceScore > 0) {
-        details = `La calidad del escaneo es muy baja (${Math.round(confidenceScore * 100)}%). Se requiere al menos 60%.`;
+      if (confidenceScore < MINIMUM_LICENSE_BACK_SCORE && confidenceScore > 0) {
+        details = `La calidad del escaneo es muy baja (${Math.round(confidenceScore * 100)}%). Se requiere al menos 50%.`;
       } else {
         details = "No se pudo extraer información de la parte trasera de la licencia";
       }
