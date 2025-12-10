@@ -60,11 +60,24 @@ export function PrivacySection({ userType }: PrivacySectionProps) {
       setLocation('/login');
     },
     onError: (error: Error) => {
+      // Map known error messages to user-friendly versions
+      let userMessage = 'Ocurrió un problema al eliminar tu cuenta. Intenta nuevamente.';
+      
+      if (error.message.includes('servicios activos') || error.message.includes('servicios pendientes')) {
+        userMessage = 'No puedes eliminar tu cuenta mientras tengas servicios en curso. Espera a que se completen.';
+      } else if (error.message.includes('balance pendiente') || error.message.includes('balance disponible')) {
+        userMessage = 'Tienes dinero en tu cuenta. Retira tu balance antes de eliminar tu cuenta.';
+      } else if (error.message.includes('No autenticado')) {
+        userMessage = 'Tu sesión ha expirado. Inicia sesión nuevamente.';
+      }
+      
       toast({
-        title: 'Error',
-        description: error.message,
+        title: 'No se pudo eliminar la cuenta',
+        description: userMessage,
         variant: 'destructive',
       });
+      setDeleteDialogOpen(false);
+      setConfirmText('');
     },
   });
 

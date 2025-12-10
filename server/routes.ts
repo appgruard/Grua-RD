@@ -2847,21 +2847,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user!.id;
       const userType = req.user!.userType;
 
-      // Check for pending services (for both clients and drivers)
-      const pendingServices = await storage.getServiciosPendientes();
-      const userPendingServices = pendingServices.filter(
-        s => s.clienteId === userId || s.conductorId === userId
-      );
-      
-      // Also check active services (aceptado, conductor_en_sitio, cargando, en_progreso)
-      const activeServices = userPendingServices.filter(
-        s => ['pendiente', 'aceptado', 'conductor_en_sitio', 'cargando', 'en_progreso'].includes(s.estado)
+      // Check for active services (for both clients and drivers)
+      // Get all user services to check if any are active
+      const allServices = await storage.getAllServicios();
+      const userActiveServices = allServices.filter(
+        s => (s.clienteId === userId || s.conductorId === userId) &&
+             ['pendiente', 'aceptado', 'conductor_en_sitio', 'cargando', 'en_progreso'].includes(s.estado)
       );
 
-      if (activeServices.length > 0) {
+      if (userActiveServices.length > 0) {
         return res.status(400).json({ 
           message: "No puedes eliminar tu cuenta mientras tengas servicios activos o pendientes. Por favor, espera a que se completen o cancelen." 
         });
+      }
+
+      // For drivers, check for pending wallet balance
+      if (userType === 'conductor') {
+        const conductor = await storage.getConductorByUserId(userId);
+        if (conductor) {
+          const pendingBalance = parseFloat(conductor.balancePendiente || '0');
+          const availableBalance = parseFloat(conductor.balanceDisponible || '0');
+          if (pendingBalance > 0 || availableBalance > 0) {
+            return res.status(400).json({ 
+              message: `No puedes eliminar tu cuenta mientras tengas balance pendiente (RD$${pendingBalance.toFixed(2)}) o disponible (RD$${availableBalance.toFixed(2)}). Por favor, retira tu dinero primero.` 
+            });
+          }
+        }
       }
 
       logSystem.info('User account deletion requested', { 
@@ -2870,7 +2881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: req.user!.email 
       });
 
-      // Delete the user - CASCADE will handle related records
+      // Delete the user - CASCADE will handle related records (vehicles, documents, subscriptions, etc.)
       await storage.deleteUser(userId);
 
       // Logout the user
@@ -2880,7 +2891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      logAuth.info('User account deleted successfully', { 
+      logSystem.info('User account deleted successfully', { 
         userId, 
         userType,
         email: req.user!.email 

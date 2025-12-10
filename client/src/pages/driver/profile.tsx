@@ -21,6 +21,7 @@ import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import { WalletSection } from '@/components/wallet';
+import { PrivacySection } from '@/components/PrivacySection';
 import type { Conductor, Documento, ConductorVehiculo } from '@shared/schema';
 
 interface VerifikValidation {
@@ -1098,6 +1099,8 @@ export default function DriverProfile() {
               </Button>
             </div>
           </Card>
+
+          <PrivacySection userType="conductor" />
 
           <Button
             variant="destructive"

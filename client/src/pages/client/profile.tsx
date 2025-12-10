@@ -16,6 +16,7 @@ import { EditProfileModal } from '@/components/EditProfileModal';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { CedulaScanner } from '@/components/CedulaScanner';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
+import { PrivacySection } from '@/components/PrivacySection';
 import {
   Dialog,
   DialogContent,
@@ -320,6 +321,8 @@ export default function ClientProfile() {
             </Button>
           </div>
         </Card>
+
+        <PrivacySection userType="cliente" />
 
         <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-driver">
           <div className="p-4">
