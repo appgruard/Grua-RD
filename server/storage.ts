@@ -163,6 +163,7 @@ export interface IStorage {
   getBasicUsersByEmail(email: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User>;
+  deleteUser(id: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
 
   // Conductores
@@ -693,6 +694,10 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: string, data: Partial<User>): Promise<User> {
     const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
     return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
   }
 
   async getAllUsers(): Promise<User[]> {

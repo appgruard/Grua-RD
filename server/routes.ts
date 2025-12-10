@@ -2837,6 +2837,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete user account - permanent deletion with all related data
+  app.delete("/api/users/me", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "No autenticado" });
+      }
+
+      const userId = req.user!.id;
+      const userType = req.user!.userType;
+
+      // Check for pending services (for both clients and drivers)
+      const pendingServices = await storage.getServiciosPendientes();
+      const userPendingServices = pendingServices.filter(
+        s => s.clienteId === userId || s.conductorId === userId
+      );
+      
+      // Also check active services (aceptado, conductor_en_sitio, cargando, en_progreso)
+      const activeServices = userPendingServices.filter(
+        s => ['pendiente', 'aceptado', 'conductor_en_sitio', 'cargando', 'en_progreso'].includes(s.estado)
+      );
+
+      if (activeServices.length > 0) {
+        return res.status(400).json({ 
+          message: "No puedes eliminar tu cuenta mientras tengas servicios activos o pendientes. Por favor, espera a que se completen o cancelen." 
+        });
+      }
+
+      logSystem.info('User account deletion requested', { 
+        userId, 
+        userType,
+        email: req.user!.email 
+      });
+
+      // Delete the user - CASCADE will handle related records
+      await storage.deleteUser(userId);
+
+      // Logout the user
+      req.logout((err) => {
+        if (err) {
+          logSystem.error('Logout error during account deletion', err, { userId });
+        }
+      });
+
+      logAuth.info('User account deleted successfully', { 
+        userId, 
+        userType,
+        email: req.user!.email 
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Tu cuenta ha sido eliminada exitosamente" 
+      });
+    } catch (error: any) {
+      logSystem.error('Delete user account error', error, { userId: req.user?.id });
+      res.status(500).json({ message: "Error al eliminar la cuenta" });
+    }
+  });
+
   // Profile photo upload - needs multer configuration first
   const profilePhotoUpload = multer({
     storage: multer.memoryStorage(),
