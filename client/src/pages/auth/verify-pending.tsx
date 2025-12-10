@@ -17,14 +17,33 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Loader2, IdCard, Mail, CheckCircle2, AlertCircle, 
   Camera, Upload, RefreshCcw, ScanLine, LogOut, ShieldCheck, 
-  UserCircle, ArrowRight, Circle, CheckCircle, FileText, Grid3X3, Car
+  UserCircle, ArrowRight, Circle, CheckCircle, FileText, Grid3X3, Car, Shield, Plus, Clock, XCircle, Trash2, Building2
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 import { FileUpload } from '@/components/FileUpload';
 import { ServiceCategoryMultiSelect, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 
-type VerificationStep = 'cedula' | 'email' | 'photo' | 'license' | 'categories' | 'vehicles' | 'complete';
+type VerificationStep = 'cedula' | 'email' | 'insurance' | 'photo' | 'license' | 'categories' | 'vehicles' | 'complete';
+
+const insuranceCompanies = [
+  'Seguros Reservas',
+  'Mapfre BHD',
+  'La Colonial',
+  'SEMMA',
+  'Universal de Seguros',
+  'Seguros Patria',
+  'Atlantic Insurance',
+  'Banreservas Seguros',
+  'Otra',
+];
 
 interface VerificationStepInfo {
   id: VerificationStep;
@@ -64,6 +83,21 @@ export default function VerifyPending() {
   const [vehiclesVerified, setVehiclesVerified] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<Array<{ categoria: string; subtipos: string[] }>>([]);
   const [vehicles, setVehicles] = useState<VehicleData[]>([]);
+  const [insuranceCompleted, setInsuranceCompleted] = useState(false);
+  const [insuranceDocuments, setInsuranceDocuments] = useState<Array<{
+    id: string;
+    aseguradoraNombre: string;
+    numeroPoliza: string;
+    fechaVencimiento?: string;
+    estado: 'pendiente' | 'aprobado' | 'rechazado';
+    createdAt: string;
+  }>>([]);
+  const [isUploadingInsurance, setIsUploadingInsurance] = useState(false);
+  const [insuranceAseguradora, setInsuranceAseguradora] = useState('');
+  const [insurancePoliza, setInsurancePoliza] = useState('');
+  const [insuranceFechaVencimiento, setInsuranceFechaVencimiento] = useState('');
+  const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
+  const [showInsuranceForm, setShowInsuranceForm] = useState(false);
   const [isUploadingLicense, setIsUploadingLicense] = useState(false);
   const [isSavingCategories, setIsSavingCategories] = useState(false);
   const [isSavingVehicles, setIsSavingVehicles] = useState(false);
@@ -190,6 +224,30 @@ export default function VerifyPending() {
           }
         } else {
           // Client verification flow
+          // Load existing insurance documents for clients
+          try {
+            const insuranceRes = await fetch('/api/client/insurance/status', {
+              credentials: 'include',
+              signal
+            });
+            if (insuranceRes.ok) {
+              const insuranceData = await insuranceRes.json();
+              if (insuranceData.insuranceDocuments && insuranceData.insuranceDocuments.length > 0) {
+                setInsuranceDocuments(insuranceData.insuranceDocuments.map((doc: any) => ({
+                  id: doc.id,
+                  aseguradoraNombre: doc.aseguradoraNombre || doc.tipo || '',
+                  numeroPoliza: doc.numeroPoliza || '',
+                  fechaVencimiento: doc.validoHasta,
+                  estado: doc.estado || 'pendiente',
+                  createdAt: doc.createdAt || new Date().toISOString(),
+                })));
+                setInsuranceCompleted(true);
+              }
+            }
+          } catch (err) {
+            console.error('Error loading insurance documents:', err);
+          }
+
           if (cedulaVerificada && emailVerificado) {
             // Fully verified - redirect if skipRedirects is not true
             if (!options?.skipRedirects) {
@@ -343,6 +401,18 @@ export default function VerifyPending() {
       }
     ];
 
+    if (!isDriver) {
+      baseSteps.push({
+        id: 'insurance',
+        title: 'Documentos de Seguro',
+        shortTitle: 'Seguro',
+        description: 'Agrega tus pólizas de seguro (opcional)',
+        icon: Shield,
+        completed: insuranceCompleted,
+        current: currentStep === 'insurance'
+      });
+    }
+
     if (isDriver) {
       baseSteps.push({
         id: 'photo',
@@ -394,8 +464,9 @@ export default function VerifyPending() {
   // Helper function to determine the next verification step
   const getNextStep = useCallback((completedStep: VerificationStep): VerificationStep => {
     if (!isDriver) {
-      // Client flow: cedula -> email -> complete
+      // Client flow: cedula -> email -> insurance -> complete
       if (completedStep === 'cedula') return 'email';
+      if (completedStep === 'email') return 'insurance';
       return 'complete';
     }
     
@@ -936,6 +1007,122 @@ export default function VerifyPending() {
     }
   };
 
+  const resetInsuranceForm = () => {
+    setInsuranceAseguradora('');
+    setInsurancePoliza('');
+    setInsuranceFechaVencimiento('');
+    setInsuranceFile(null);
+    setShowInsuranceForm(false);
+  };
+
+  const handleInsuranceUpload = async () => {
+    if (!insuranceFile || !insuranceAseguradora || !insurancePoliza) {
+      toast({
+        title: 'Error',
+        description: 'Por favor completa todos los campos requeridos',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploadingInsurance(true);
+    setErrors({});
+
+    try {
+      const formData = new FormData();
+      formData.append('document', insuranceFile);
+      formData.append('aseguradoraNombre', insuranceAseguradora);
+      formData.append('numeroPoliza', insurancePoliza);
+      if (insuranceFechaVencimiento) {
+        formData.append('fechaVencimiento', insuranceFechaVencimiento);
+      }
+
+      const res = await fetch('/api/client/insurance', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Error al subir documento');
+      }
+
+      const data = await res.json();
+      
+      setInsuranceDocuments(prev => [...prev, {
+        id: data.document?.id || data.id || Date.now().toString(),
+        aseguradoraNombre: data.aseguradoraNombre || insuranceAseguradora,
+        numeroPoliza: data.numeroPoliza || insurancePoliza,
+        fechaVencimiento: data.validoHasta || insuranceFechaVencimiento || undefined,
+        estado: data.estado || 'pendiente',
+        createdAt: data.createdAt || new Date().toISOString(),
+      }]);
+      
+      setInsuranceCompleted(true);
+      resetInsuranceForm();
+      toast({
+        title: 'Seguro agregado',
+        description: 'Tu documento de seguro ha sido enviado para revisión.',
+      });
+    } catch (err: any) {
+      setErrors({ insurance: err.message || 'Error al subir el documento' });
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingInsurance(false);
+    }
+  };
+
+  const handleInsuranceSkip = async () => {
+    setInsuranceCompleted(true);
+    toast({
+      title: 'Paso omitido',
+      description: 'Puedes agregar seguros más tarde desde tu perfil.',
+    });
+    clearPendingVerification();
+    await refreshUser();
+    setLocation('/client');
+  };
+
+  const handleInsuranceContinue = async () => {
+    setInsuranceCompleted(true);
+    toast({
+      title: 'Documentos registrados',
+      description: 'Tus seguros han sido enviados para revisión.',
+    });
+    clearPendingVerification();
+    await refreshUser();
+    setLocation('/client');
+  };
+
+  const getInsuranceStatusBadge = (estado: string) => {
+    switch (estado) {
+      case 'aprobado':
+        return (
+          <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Aprobado
+          </Badge>
+        );
+      case 'pendiente':
+        return (
+          <Badge variant="secondary">
+            <Clock className="w-3 h-3 mr-1" />
+            En revisión
+          </Badge>
+        );
+      case 'rechazado':
+        return (
+          <Badge variant="destructive">
+            <XCircle className="w-3 h-3 mr-1" />
+            Rechazado
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
+
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/auth/send-otp', {
@@ -977,9 +1164,7 @@ export default function VerifyPending() {
       if (isDriver) {
         setCurrentStep('photo');
       } else {
-        clearPendingVerification();
-        await refreshUser();
-        setLocation('/client');
+        setCurrentStep('insurance');
       }
     },
     onError: (error: any) => {
@@ -1387,6 +1572,204 @@ export default function VerifyPending() {
               )}
             </AnimatePresence>
           </Card>
+
+          {!isDriver && (
+            <Card className={cn(
+              "transition-all",
+              insuranceCompleted ? "border-green-500/50 bg-green-500/5" : 
+              currentStep === 'insurance' && cedulaVerified && emailVerified ? "ring-2 ring-primary" : "opacity-60"
+            )} data-testid="card-insurance-verification">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    insuranceCompleted ? "bg-green-100 dark:bg-green-900/30" : "bg-muted"
+                  )}>
+                    {insuranceCompleted ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Shield className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base flex items-center justify-between gap-2">
+                      <span>Paso 3: Documentos de Seguro</span>
+                      {insuranceCompleted && (
+                        <Badge className="bg-green-500 hover:bg-green-600">Completado</Badge>
+                      )}
+                      {!insuranceCompleted && currentStep === 'insurance' && (
+                        <Badge variant="outline">Opcional</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {insuranceCompleted 
+                        ? (insuranceDocuments.length > 0 ? 'Tus seguros han sido registrados' : 'Paso omitido') 
+                        : 'Agrega tus pólizas de seguro para usar "Aseguradora" como método de pago'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <AnimatePresence mode="wait">
+                {!insuranceCompleted && currentStep === 'insurance' && cedulaVerified && emailVerified && (
+                  <motion.div
+                    key="insurance-content"
+                    initial={stepVariants.initial}
+                    animate={stepVariants.animate}
+                    exit={stepVariants.exit}
+                    transition={stepTransition}
+                  >
+                    <CardContent className="space-y-4">
+                      {errors.insurance && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{errors.insurance}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          Este paso es opcional. Si tienes una póliza de seguro con cobertura de asistencia vial, 
+                          puedes agregarla aquí para usarla como método de pago.
+                        </p>
+                      </div>
+
+                      {insuranceDocuments.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">Seguros agregados:</p>
+                          {insuranceDocuments.map((doc) => (
+                            <div 
+                              key={doc.id}
+                              className="p-3 bg-muted/50 rounded-lg flex items-center justify-between gap-2"
+                              data-testid={`insurance-doc-${doc.id}`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Shield className="w-4 h-4 text-primary flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium truncate">{doc.aseguradoraNombre}</p>
+                                  <p className="text-xs text-muted-foreground">Póliza: {doc.numeroPoliza}</p>
+                                </div>
+                              </div>
+                              {getInsuranceStatusBadge(doc.estado)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {showInsuranceForm ? (
+                        <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+                          <div className="space-y-2">
+                            <Label htmlFor="insurance-aseguradora">Aseguradora *</Label>
+                            <Select value={insuranceAseguradora} onValueChange={setInsuranceAseguradora}>
+                              <SelectTrigger id="insurance-aseguradora" className="h-11" data-testid="select-insurance-company">
+                                <SelectValue placeholder="Selecciona tu aseguradora" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {insuranceCompanies.map((company) => (
+                                  <SelectItem key={company} value={company}>
+                                    {company}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="insurance-poliza">Número de Póliza *</Label>
+                            <Input
+                              id="insurance-poliza"
+                              value={insurancePoliza}
+                              onChange={(e) => setInsurancePoliza(e.target.value)}
+                              placeholder="Ej: POL-12345678"
+                              className="h-11"
+                              data-testid="input-policy-number"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="insurance-fecha">Fecha de Vencimiento (opcional)</Label>
+                            <Input
+                              id="insurance-fecha"
+                              type="date"
+                              value={insuranceFechaVencimiento}
+                              onChange={(e) => setInsuranceFechaVencimiento(e.target.value)}
+                              min={new Date().toISOString().split('T')[0]}
+                              className="h-11"
+                              data-testid="input-expiry-date"
+                            />
+                          </div>
+
+                          <FileUpload
+                            label="Documento de Póliza *"
+                            helperText="Sube tu documento de póliza (imagen o PDF)"
+                            onFileSelect={setInsuranceFile}
+                            onFileRemove={() => setInsuranceFile(null)}
+                            maxSizeMB={5}
+                          />
+
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={resetInsuranceForm}
+                              className="flex-1"
+                              data-testid="button-cancel-insurance"
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              onClick={handleInsuranceUpload}
+                              disabled={isUploadingInsurance || !insuranceFile || !insuranceAseguradora || !insurancePoliza}
+                              className="flex-1"
+                              data-testid="button-submit-insurance"
+                            >
+                              {isUploadingInsurance ? (
+                                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
+                              ) : (
+                                'Agregar Seguro'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowInsuranceForm(true)}
+                          className="w-full"
+                          data-testid="button-add-insurance"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          {insuranceDocuments.length > 0 ? 'Agregar Otro Seguro' : 'Agregar Seguro'}
+                        </Button>
+                      )}
+
+                      <Separator />
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={handleInsuranceSkip}
+                          className="flex-1"
+                          data-testid="button-skip-insurance"
+                        >
+                          Saltar este paso
+                        </Button>
+                        {insuranceDocuments.length > 0 && (
+                          <Button
+                            onClick={handleInsuranceContinue}
+                            className="flex-1"
+                            data-testid="button-continue-insurance"
+                          >
+                            Continuar
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </Card>
+          )}
 
           {isDriver && (
             <Card className={cn(
