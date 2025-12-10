@@ -106,8 +106,17 @@ export default function OnboardingWizard() {
       // Mark this userType as the initial synced value (prevents reset effect)
       lastSyncedUserTypeRef.current = syncedUserType;
       
-      // Sync userType and email from authenticated user
-      if (syncedUserType !== formData.userType || userData.email !== formData.email) {
+      // When adding a secondary account, preserve the preselected userType
+      // Only sync email and name, not the userType
+      if (isAddingSecondaryAccount) {
+        setFormData(prev => ({ 
+          ...prev, 
+          email: userData.email || prev.email,
+          nombre: userData.nombre || prev.nombre,
+          apellido: userData.apellido || prev.apellido
+        }));
+      } else if (syncedUserType !== formData.userType || userData.email !== formData.email) {
+        // Normal flow: sync userType and email from authenticated user
         setFormData(prev => ({ 
           ...prev, 
           userType: syncedUserType,

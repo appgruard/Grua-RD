@@ -1,11 +1,13 @@
 # Plan de Correcciones - Grúa RD
 
 **Fecha:** 10 de Diciembre, 2025  
-**Estado:** Pendiente de aprobación
+**Estado:** ✅ FASE 1 COMPLETADA
 
 ---
 
 ## Bug 1: Error al subir licencia - "Debe completar la verificación de identidad"
+
+### Estado: 🟡 Pendiente de depuración (Prioridad Media)
 
 ### Análisis
 
@@ -32,6 +34,8 @@ El middleware verifica si `req.user.userType === 'conductor'` pero si el usuario
 
 ## Bug 2: Error "invalid input syntax for type integer: true"
 
+### Estado: ✅ CORREGIDO (10 Diciembre 2025)
+
 ### Análisis
 
 - Campo `vehiculosRegistrados` está definido como `boolean` en `shared/schema.ts` (línea 215)
@@ -40,37 +44,46 @@ El middleware verifica si `req.user.userType === 'conductor'` pero si el usuario
 
 ### Causa Raíz Identificada
 
-El problema está en cómo Drizzle ORM maneja el tipo boolean en PostgreSQL. El comentario en línea 491-495 de routes.ts indica que ya hay problemas de tipo:
+La columna `vehiculos_registrados` en la base de datos estaba definida como `INTEGER` en lugar de `BOOLEAN`, mientras que el schema de Drizzle la define como `boolean`. Esto causaba un conflicto de tipos al guardar el valor.
 
-```javascript
-// Use truthy checks to handle integer values from database (vehiculosRegistrados is stored as int)
+```sql
+-- Antes (incorrecto):
+vehiculos_registrados INTEGER
+
+-- Después (correcto):
+vehiculos_registrados BOOLEAN DEFAULT false
 ```
 
-Esto sugiere que **la columna en la base de datos puede estar definida como INTEGER en lugar de BOOLEAN**, causando el conflicto.
+### Solución Aplicada
 
-### Solución Propuesta
+Se ejecutó una migración directa en la base de datos para cambiar el tipo de columna:
 
-1. Verificar el esquema de la tabla `conductores` en PostgreSQL
-2. Si la columna es INTEGER, convertir el boolean a integer antes de guardar:
-   ```javascript
-   vehiculosRegistrados: true ? 1 : 0
-   ```
-3. O correr una migración para cambiar el tipo de columna a BOOLEAN
+```sql
+ALTER TABLE conductores 
+ALTER COLUMN vehiculos_registrados TYPE boolean 
+USING CASE WHEN vehiculos_registrados = 1 THEN true 
+           WHEN vehiculos_registrados = 0 THEN false 
+           ELSE false END;
 
-### Archivos a Modificar
+ALTER TABLE conductores 
+ALTER COLUMN vehiculos_registrados SET DEFAULT false;
+```
 
-- `server/routes.ts` - Agregar conversión explícita si la columna es INTEGER
-- O `shared/schema.ts` + migración de base de datos
+### Archivos Modificados
+
+- Base de datos PostgreSQL: columna `vehiculos_registrados` ahora es `BOOLEAN`
 
 ---
 
 ## Bug 3: Flujo incorrecto al crear cuenta de conductor desde perfil de cliente
 
+### Estado: ✅ CORREGIDO (10 Diciembre 2025)
+
 ### Análisis
 
 - El botón en `client/src/pages/client/profile.tsx` (línea 336) redirige a `/onboarding?tipo=conductor`
-- `isAddingSecondaryAccount` está definido (línea 61) pero **NUNCA SE USA** en el resto del código
-- El useEffect en líneas 101-118 **SOBRESCRIBE** el `userType` del formulario con el del usuario autenticado
+- `isAddingSecondaryAccount` estaba definido (línea 61) pero **NUNCA SE USABA** en el resto del código
+- El useEffect en líneas 101-118 **SOBRESCRIBÍA** el `userType` del formulario con el del usuario autenticado
 
 ### Causa Raíz Confirmada
 
@@ -78,79 +91,44 @@ Cuando un cliente autenticado va a `/onboarding?tipo=conductor`:
 
 1. `preselectedType` = 'conductor' (correcto)
 2. `formData.userType` se inicializa como 'conductor' (correcto)
-3. El useEffect sincroniza `userType` desde el usuario autenticado (cliente) → **SOBRESCRIBE a 'cliente'**
-4. El usuario queda atrapado en el flujo de cliente
+3. El useEffect sincronizaba `userType` desde el usuario autenticado (cliente) → **SOBRESCRIBÍA a 'cliente'**
+4. El usuario quedaba atrapado en el flujo de cliente
 
-### Código Problemático
+### Solución Aplicada
 
-```javascript
-// onboarding-wizard.tsx líneas 101-118
-useEffect(() => {
-  if (user && !authLoading && lastSyncedUserTypeRef.current === null) {
-    const userData = user as any;
-    const syncedUserType = userData.userType || 'cliente';
-    
-    // PROBLEMA: Esto sobrescribe el userType preseleccionado
-    if (syncedUserType !== formData.userType || userData.email !== formData.email) {
-      setFormData(prev => ({ 
-        ...prev, 
-        userType: syncedUserType,  // Sobrescribe "conductor" con "cliente"
-        email: userData.email || prev.email,
-        nombre: userData.nombre || prev.nombre,
-        apellido: userData.apellido || prev.apellido
-      }));
-    }
-    // ...
-  }
-}, [user, authLoading]);
-```
-
-### Solución Propuesta
-
-1. Modificar el useEffect para NO sobrescribir `userType` cuando `isAddingSecondaryAccount === true`
-2. Agregar lógica para crear una nueva cuenta de conductor con el mismo email
-3. El servidor ya permite esto (verifica email + tipo, no solo email)
-
-### Archivos a Modificar
-
-- `client/src/pages/auth/onboarding-wizard.tsx` - Líneas 101-118
-
-### Código Corregido Propuesto
+Se modificó el useEffect en `onboarding-wizard.tsx` para verificar `isAddingSecondaryAccount` antes de sincronizar el `userType`:
 
 ```javascript
-useEffect(() => {
-  if (user && !authLoading && lastSyncedUserTypeRef.current === null) {
-    const userData = user as any;
-    const syncedUserType = userData.userType || 'cliente';
-    
-    lastSyncedUserTypeRef.current = syncedUserType;
-    
-    // NO sobrescribir userType si estamos agregando cuenta secundaria
-    if (isAddingSecondaryAccount) {
-      // Solo sincronizar email y nombre, mantener el userType preseleccionado
-      setFormData(prev => ({ 
-        ...prev, 
-        email: userData.email || prev.email,
-        nombre: userData.nombre || prev.nombre,
-        apellido: userData.apellido || prev.apellido
-      }));
-    } else if (syncedUserType !== formData.userType || userData.email !== formData.email) {
-      setFormData(prev => ({ 
-        ...prev, 
-        userType: syncedUserType,
-        email: userData.email || prev.email,
-        nombre: userData.nombre || prev.nombre,
-        apellido: userData.apellido || prev.apellido
-      }));
-    }
-    // ...
-  }
-}, [user, authLoading]);
+// Cuando se está agregando cuenta secundaria, preservar el userType preseleccionado
+// Solo sincronizar email y nombre, no el userType
+if (isAddingSecondaryAccount) {
+  setFormData(prev => ({ 
+    ...prev, 
+    email: userData.email || prev.email,
+    nombre: userData.nombre || prev.nombre,
+    apellido: userData.apellido || prev.apellido
+  }));
+} else if (syncedUserType !== formData.userType || userData.email !== formData.email) {
+  // Flujo normal: sincronizar userType y email desde usuario autenticado
+  setFormData(prev => ({ 
+    ...prev, 
+    userType: syncedUserType,
+    email: userData.email || prev.email,
+    nombre: userData.nombre || prev.nombre,
+    apellido: userData.apellido || prev.apellido
+  }));
+}
 ```
+
+### Archivos Modificados
+
+- `client/src/pages/auth/onboarding-wizard.tsx` - Líneas 101-130
 
 ---
 
 ## Bug 4 (Extra): Múltiples seguros en verificación de cliente
+
+### Estado: ⚪ No es un bug
 
 ### Análisis
 
@@ -168,34 +146,43 @@ Esto **NO es un bug** - el flujo de verificación del cliente solo requiere céd
 
 ---
 
-## Resumen de Cambios Requeridos
+## Resumen de Cambios Fase 1
 
-| Prioridad | Bug | Archivo(s) | Tipo de Cambio |
-|-----------|-----|------------|----------------|
-| **Alta** | Bug 3: Flujo conductor secundario | `onboarding-wizard.tsx` | Modificar useEffect líneas 101-118 |
-| **Alta** | Bug 2: Integer "true" | `server/routes.ts` + verificar DB | Conversión de tipo o migración |
-| **Media** | Bug 1: Licencia bloqueada | Revisar logs + `routes.ts` | Depuración necesaria |
-| **Baja** | Bug 4: Seguros | N/A | No es bug, clarificar flujo |
+| Prioridad | Bug | Estado | Acción Realizada |
+|-----------|-----|--------|------------------|
+| **Alta** | Bug 3: Flujo conductor secundario | ✅ Completado | Modificado useEffect para respetar `isAddingSecondaryAccount` |
+| **Alta** | Bug 2: Integer "true" | ✅ Completado | Migración de columna de INTEGER a BOOLEAN |
+| **Media** | Bug 1: Licencia bloqueada | 🟡 Pendiente | Requiere depuración con logs del servidor |
+| **Baja** | Bug 4: Seguros | ⚪ N/A | No es bug, comportamiento intencional |
 
 ---
 
-## Hallazgos Adicionales
+## Hallazgos Resueltos
 
-1. **Variable sin usar:** `isAddingSecondaryAccount` está definido pero nunca se utiliza
-2. **Comentario en código indica problema conocido:** Línea 491-495 menciona "vehiculosRegistrados is stored as int" sugiriendo inconsistencia de tipos ya conocida
+1. ~~**Variable sin usar:** `isAddingSecondaryAccount` está definido pero nunca se utiliza~~ ✅ **RESUELTO** - Ahora se usa correctamente
+2. ~~**Comentario en código indica problema conocido:** Línea 491-495 menciona "vehiculosRegistrados is stored as int" sugiriendo inconsistencia de tipos ya conocida~~ ✅ **RESUELTO** - Columna convertida a BOOLEAN
 3. **El servidor SÍ soporta cuentas múltiples:** `getUserByEmailAndType()` permite el mismo email con diferentes tipos de cuenta
 
 ---
 
 ## Archivos Clave Involucrados
 
-| Archivo | Propósito |
-|---------|-----------|
-| `server/routes.ts` | Endpoints API y middleware de verificación |
-| `server/storage.ts` | Funciones de acceso a base de datos |
-| `client/src/pages/auth/onboarding-wizard.tsx` | Wizard de registro/onboarding |
-| `client/src/pages/auth/verify-pending.tsx` | Flujo de verificación pendiente |
-| `client/src/pages/client/profile.tsx` | Perfil del cliente (botón "Crear cuenta conductor") |
-| `client/src/components/ClientInsuranceManager.tsx` | Gestión de seguros del cliente |
-| `shared/schema.ts` | Esquema de base de datos Drizzle |
-| `client/src/components/VehicleCategoryForm.tsx` | Formulario de vehículos por categoría |
+| Archivo | Propósito | Modificado |
+|---------|-----------|------------|
+| `server/routes.ts` | Endpoints API y middleware de verificación | No |
+| `server/storage.ts` | Funciones de acceso a base de datos | No |
+| `client/src/pages/auth/onboarding-wizard.tsx` | Wizard de registro/onboarding | ✅ Sí |
+| `client/src/pages/auth/verify-pending.tsx` | Flujo de verificación pendiente | No |
+| `client/src/pages/client/profile.tsx` | Perfil del cliente (botón "Crear cuenta conductor") | No |
+| `client/src/components/ClientInsuranceManager.tsx` | Gestión de seguros del cliente | No |
+| `shared/schema.ts` | Esquema de base de datos Drizzle | No |
+| `client/src/components/VehicleCategoryForm.tsx` | Formulario de vehículos por categoría | No |
+| Base de datos PostgreSQL | Tabla `conductores` columna `vehiculos_registrados` | ✅ Sí |
+
+---
+
+## Próximos Pasos (Fase 2)
+
+1. **Bug 1**: Depurar con logs del servidor para identificar el endpoint exacto bloqueado
+2. Probar el flujo completo de creación de cuenta secundaria de conductor
+3. Verificar que el registro de vehículos funciona correctamente con la columna boolean
