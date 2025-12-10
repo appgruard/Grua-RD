@@ -510,6 +510,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { method: 'POST', path: '/api/identity/scan-cedula' },
     { method: 'POST', path: '/api/identity/verify-cedula' },
     { method: 'POST', path: '/api/identity/verify-profile-photo' },
+    { method: 'POST', path: '/api/identity/scan-license' },
+    { method: 'POST', path: '/api/identity/scan-license-back' },
     { method: 'GET', path: '/api/identity/verification-status' },
     { method: 'GET', path: '/api/identity/status' },
     { method: 'PATCH', path: '/api/users/me' },
@@ -524,6 +526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { method: 'PATCH', path: '/api/drivers/me/vehiculos', prefix: true },
     { method: 'DELETE', path: '/api/drivers/me/vehiculos', prefix: true },
     { method: 'POST', path: '/api/users/profile-photo' },
+    { method: 'POST', path: '/api/client/insurance' },
     { method: 'POST', path: '/api/analytics/web-vitals' },
     { method: 'GET', path: '/api/storage/files', prefix: true },
   ];
