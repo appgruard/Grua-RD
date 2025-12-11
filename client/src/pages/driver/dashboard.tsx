@@ -1047,16 +1047,33 @@ export default function DriverDashboard() {
       )}
 
       {!activeService && driverData?.disponible && nearbyRequests && nearbyRequests.length === 0 && (
-        <div className="bg-background border-t border-border p-4 safe-area-inset-bottom">
-          <div className="flex flex-col items-center justify-center text-center py-6 space-y-2" data-testid="no-services-message">
-            <MapPin className="w-10 h-10 text-muted-foreground opacity-50" />
-            <p className="text-sm font-medium text-muted-foreground">
-              Aún no hay servicios cerca de tu zona
-            </p>
-            <p className="text-xs text-muted-foreground/70">
-              Te notificaremos cuando haya nuevas solicitudes
-            </p>
-          </div>
+        <div 
+          className={cn(
+            "bg-background border-t border-border transition-all duration-300 ease-in-out safe-area-inset-bottom flex-shrink-0",
+            showExpandedCard ? "max-h-[30vh]" : "h-12"
+          )}
+        >
+          <button 
+            className="w-full flex items-center justify-center py-2 text-muted-foreground"
+            onClick={() => setShowExpandedCard(!showExpandedCard)}
+            data-testid="button-toggle-no-services"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium">Sin servicios cercanos</span>
+              {showExpandedCard ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            </div>
+          </button>
+          {showExpandedCard && (
+            <div className="flex flex-col items-center justify-center text-center px-4 pb-4 space-y-2" data-testid="no-services-message">
+              <MapPin className="w-8 h-8 text-muted-foreground opacity-50" />
+              <p className="text-sm font-medium text-muted-foreground">
+                Aún no hay servicios cerca de tu zona
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                Te notificaremos cuando haya nuevas solicitudes
+              </p>
+            </div>
+          )}
         </div>
       )}
 
