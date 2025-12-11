@@ -17,7 +17,6 @@ const REMINDER_CONFIGS: DocumentReminderConfig[] = [
 const DOCUMENT_TYPE_NAMES: Record<string, string> = {
   'licencia': 'Licencia de Conducir',
   'matricula': 'Matrícula del Vehículo',
-  'seguro_grua': 'Seguro de Grúa',
   'poliza': 'Póliza de Seguro',
 };
 

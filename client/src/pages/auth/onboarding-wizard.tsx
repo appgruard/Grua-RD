@@ -17,7 +17,7 @@ import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCateg
 import { 
   Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard,
   CheckCircle2, ArrowRight, Clock, Upload, Truck, Camera, ScanLine, RefreshCcw,
-  UserCircle, XCircle, Edit3
+  UserCircle, XCircle, Edit3, Eye, EyeOff
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
@@ -48,7 +48,7 @@ interface OnboardingData {
 type StepErrors = Record<string, string>;
 
 const WIZARD_STORAGE_KEY = 'gruard_onboarding_wizard_state';
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 8; // Base total, will use dynamic calculation when needed
 
 export default function OnboardingWizard() {
   const [location, setLocation] = useLocation();
@@ -59,6 +59,9 @@ export default function OnboardingWizard() {
   const urlParams = new URLSearchParams(window.location.search);
   const preselectedType = urlParams.get('tipo') as UserType | null;
   const isAddingSecondaryAccount = preselectedType === 'conductor' || preselectedType === 'cliente';
+  
+  // Fase 2: Detect if existing client is adding a driver account
+  const isClientAddingDriverAccount = Boolean(user && (user as any).userType === 'cliente' && preselectedType === 'conductor');
   
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<OnboardingData>({
@@ -74,6 +77,9 @@ export default function OnboardingWizard() {
   const [licenseBackFile, setLicenseBackFile] = useState<File | null>(null);
   const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
   const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Client insurance fields
   const [clientInsuranceName, setClientInsuranceName] = useState('');
@@ -100,38 +106,73 @@ export default function OnboardingWizard() {
   // This runs once when user data is available to restore verification state
   useEffect(() => {
     if (user && !authLoading && lastSyncedUserTypeRef.current === null) {
-      const userData = user as any;
-      const syncedUserType = userData.userType || 'cliente';
+      const userDataSync = user as any;
+      const syncedUserType = userDataSync.userType || 'cliente';
       
       // Mark this userType as the initial synced value (prevents reset effect)
       lastSyncedUserTypeRef.current = syncedUserType;
+      
+      // Fase 2: Client → Conductor flow optimization
+      if (isClientAddingDriverAccount) {
+        // Pre-fill formData with user's existing data
+        setFormData(prev => ({ 
+          ...prev, 
+          email: userDataSync.email || prev.email,
+          nombre: userDataSync.nombre || prev.nombre,
+          apellido: userDataSync.apellido || prev.apellido,
+          phone: userDataSync.phone || prev.phone,
+          cedula: userDataSync.cedula || prev.cedula,
+        }));
+        
+        // Mark completed steps based on existing verifications
+        const stepsToComplete = new Set<number>([1]); // Step 1 (account) always completed for existing users
+        
+        if (userDataSync.cedulaVerificada || userDataSync.cedula) {
+          stepsToComplete.add(2);
+          setCedulaVerified(true);
+        }
+        
+        if (userDataSync.emailVerificado) {
+          stepsToComplete.add(3);
+        }
+        
+        setCompletedSteps(stepsToComplete);
+        
+        // Jump to first visible step that needs to be completed
+        const firstVisibleStepId = getFirstVisibleStep();
+        if (currentStep < firstVisibleStepId) {
+          setCurrentStep(firstVisibleStepId);
+        }
+        
+        return; // Don't continue with normal flow logic
+      }
       
       // When adding a secondary account, preserve the preselected userType
       // Only sync email and name, not the userType
       if (isAddingSecondaryAccount) {
         setFormData(prev => ({ 
           ...prev, 
-          email: userData.email || prev.email,
-          nombre: userData.nombre || prev.nombre,
-          apellido: userData.apellido || prev.apellido
+          email: userDataSync.email || prev.email,
+          nombre: userDataSync.nombre || prev.nombre,
+          apellido: userDataSync.apellido || prev.apellido
         }));
-      } else if (syncedUserType !== formData.userType || userData.email !== formData.email) {
+      } else if (syncedUserType !== formData.userType || userDataSync.email !== formData.email) {
         // Normal flow: sync userType and email from authenticated user
         setFormData(prev => ({ 
           ...prev, 
           userType: syncedUserType,
-          email: userData.email || prev.email,
-          nombre: userData.nombre || prev.nombre,
-          apellido: userData.apellido || prev.apellido
+          email: userDataSync.email || prev.email,
+          nombre: userDataSync.nombre || prev.nombre,
+          apellido: userDataSync.apellido || prev.apellido
         }));
       }
       
       // Check if driver already has cedula saved or verified
       if (syncedUserType === 'conductor') {
-        if (userData.cedulaVerificada || userData.cedula || userData.cedulaImageUrl) {
+        if (userDataSync.cedulaVerificada || userDataSync.cedula || userDataSync.cedulaImageUrl) {
           setCedulaVerified(true);
-          if (userData.cedula) {
-            setFormData(prev => ({ ...prev, cedula: userData.cedula }));
+          if (userDataSync.cedula) {
+            setFormData(prev => ({ ...prev, cedula: userDataSync.cedula }));
           }
           // Mark step 2 as completed if cedula exists
           setCompletedSteps(prev => new Set(prev).add(2));
@@ -139,7 +180,7 @@ export default function OnboardingWizard() {
       }
       
       // Check if email is already verified - sync from server state
-      if (userData.emailVerificado === true) {
+      if (userDataSync.emailVerificado === true) {
         // Mark step 3 as completed if email is verified
         setCompletedSteps(prev => new Set(prev).add(3));
         // If currently on step 3 (email verification), advance to step 4
@@ -148,7 +189,7 @@ export default function OnboardingWizard() {
         }
       }
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, isClientAddingDriverAccount]);
   const [ocrScore, setOcrScore] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -166,14 +207,51 @@ export default function OnboardingWizard() {
   const profileCanvasRef = useRef<HTMLCanvasElement>(null);
   const profileStreamRef = useRef<MediaStream | null>(null);
 
+  // Fase 2: Dynamic step configuration for client→conductor flow
+  const userData = user as any;
+  const stepConfig = [
+    { id: 1, name: 'Cuenta', show: !isClientAddingDriverAccount },
+    { id: 2, name: 'Cédula', show: !isClientAddingDriverAccount || !userData?.cedulaVerificada },
+    { id: 3, name: 'Email', show: !isClientAddingDriverAccount || !userData?.emailVerificado },
+    { id: 4, name: 'Documentos', show: true },
+    { id: 5, name: 'Foto', show: formData.userType === 'conductor' },
+    { id: 6, name: 'Servicios', show: formData.userType === 'conductor' },
+    { id: 7, name: 'Vehículos', show: formData.userType === 'conductor' },
+    { id: 8, name: 'Confirmar', show: true },
+  ];
+  const visibleSteps = stepConfig.filter(s => s.show);
+  const TOTAL_VISIBLE_STEPS = visibleSteps.length;
+  
+  // Helper to find next visible step
+  const getNextVisibleStep = (fromStep: number): number => {
+    for (let i = fromStep + 1; i <= 8; i++) {
+      const stepItem = stepConfig.find(s => s.id === i);
+      if (stepItem?.show) return i;
+    }
+    return fromStep;
+  };
+  
+  // Helper to find first visible step
+  const getFirstVisibleStep = (): number => {
+    const first = visibleSteps[0];
+    return first ? first.id : 1;
+  };
+
   useEffect(() => {
     if (user && !authLoading) {
       if (currentStep === 1) {
-        setCurrentStep(2);
-        setCompletedSteps(new Set([1]));
+        // For client→conductor flow, skip to first visible step
+        if (isClientAddingDriverAccount) {
+          const firstVisible = getFirstVisibleStep();
+          setCurrentStep(firstVisible);
+          setCompletedSteps(new Set([1]));
+        } else {
+          setCurrentStep(2);
+          setCompletedSteps(new Set([1]));
+        }
       }
     }
-  }, [user, authLoading, currentStep]);
+  }, [user, authLoading, currentStep, isClientAddingDriverAccount]);
 
   useEffect(() => {
     if (otpTimer > 0) {
@@ -736,6 +814,32 @@ export default function OnboardingWizard() {
 
   const finalizeProfileMutation = useMutation({
     mutationFn: async () => {
+      // Fase 3: If client is adding driver account, create the new conductor user first
+      if (isClientAddingDriverAccount) {
+        const addDriverRes = await apiRequest('POST', '/api/auth/add-driver-account', {});
+        if (!addDriverRes.ok) {
+          const errorData = await addDriverRes.json();
+          throw new Error(errorData.message || 'Error al crear cuenta de conductor');
+        }
+        // The backend logs us into the new conductor account
+        // Now update conductor-specific data
+        const firstVehicle = vehicleData[0];
+        const updateData: any = {
+          nombre: formData.nombre,
+          apellido: formData.apellido,
+          conductorData: {
+            licencia: formData.licencia,
+            placaGrua: firstVehicle?.placa || formData.placaGrua || '',
+            marcaGrua: firstVehicle?.marca || formData.marcaGrua || '',
+            modeloGrua: firstVehicle?.modelo || formData.modeloGrua || '',
+          }
+        };
+        const res = await apiRequest('PATCH', '/api/users/me', updateData);
+        if (!res.ok) throw new Error((await res.json()).message);
+        return res.json();
+      }
+      
+      // Normal flow for new registrations
       const updateData: any = { nombre: formData.nombre, apellido: formData.apellido };
       if (formData.userType === 'conductor') {
         const firstVehicle = vehicleData[0];
@@ -781,6 +885,8 @@ export default function OnboardingWizard() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Correo inválido';
     if (!formData.password) newErrors.password = 'Contraseña requerida';
     else if (formData.password.length < 6) newErrors.password = 'Mínimo 6 caracteres';
+    if (!confirmPassword) newErrors.confirmPassword = 'Confirma tu contraseña';
+    else if (formData.password !== confirmPassword) newErrors.confirmPassword = 'Las contraseñas no coinciden';
     if (!formData.nombre.trim()) newErrors.nombre = 'Nombre requerido';
     if (!formData.apellido.trim()) newErrors.apellido = 'Apellido requerido';
     if (!formData.phone.trim()) newErrors.phone = 'Teléfono requerido';
@@ -853,7 +959,12 @@ export default function OnboardingWizard() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const getProgressValue = () => (currentStep / TOTAL_STEPS) * 100;
+  // Fase 2: Calculate progress based on visible steps only
+  const getProgressValue = () => {
+    const currentVisibleIndex = visibleSteps.findIndex(s => s.id === currentStep);
+    if (currentVisibleIndex === -1) return 0;
+    return ((currentVisibleIndex + 1) / TOTAL_VISIBLE_STEPS) * 100;
+  };
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
 
   const renderStep1 = () => (
@@ -886,8 +997,51 @@ export default function OnboardingWizard() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Contraseña</Label>
-        <Input id="password" type="password" placeholder="Mínimo 6 caracteres" value={formData.password} onChange={(e) => updateField('password', e.target.value)} disabled={registerMutation.isPending} data-testid="input-password" />
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" className="pl-10 pr-10" value={formData.password} onChange={(e) => updateField('password', e.target.value)} disabled={registerMutation.isPending} data-testid="input-password" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
+            data-testid="button-toggle-password"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+          </Button>
+        </div>
         {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            id="confirmPassword" 
+            type={showConfirmPassword ? 'text' : 'password'} 
+            placeholder="Repite tu contraseña" 
+            className="pl-10 pr-10" 
+            value={confirmPassword} 
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setErrors(prev => ({ ...prev, confirmPassword: '' }));
+            }} 
+            disabled={registerMutation.isPending} 
+            data-testid="input-confirm-password" 
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            data-testid="button-toggle-confirm-password"
+          >
+            {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+          </Button>
+        </div>
+        {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
       </div>
       <div className="space-y-2">
         <Label htmlFor="phone">Teléfono</Label>
@@ -1173,7 +1327,6 @@ export default function OnboardingWizard() {
         <>
           <FileUpload label="Licencia de Conducir (Frente)" required onFileSelect={setLicenseFile} fileName={licenseFile?.name} error={errors.licenseFile} testId="input-license-file" />
           <FileUpload label="Licencia de Conducir (Reverso)" required onFileSelect={setLicenseBackFile} fileName={licenseBackFile?.name} error={errors.licenseBackFile} testId="input-license-back-file" />
-          <FileUpload label="Documento de Seguro de Grúa" onFileSelect={setInsuranceFile} fileName={insuranceFile?.name} required testId="input-insurance-file" />
           <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
             {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Subir Documentos<Upload className="w-4 h-4 ml-2" /></>)}
           </Button>
@@ -1484,9 +1637,17 @@ export default function OnboardingWizard() {
           <CardDescription>{getStepDescription()}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {isClientAddingDriverAccount && (
+            <Alert className="mb-4 bg-primary/10 border-primary/30">
+              <Truck className="h-4 w-4" />
+              <AlertDescription>
+                Estás añadiendo una cuenta de conductor a tu perfil existente. Podrás alternar entre ambas cuentas.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Paso {currentStep} de {TOTAL_STEPS}</span>
+              <span>Paso {visibleSteps.findIndex(s => s.id === currentStep) + 1} de {TOTAL_VISIBLE_STEPS}</span>
               <span>{Math.round(getProgressValue())}%</span>
             </div>
             <Progress value={getProgressValue()} data-testid="progress-wizard" />

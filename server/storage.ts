@@ -2728,7 +2728,7 @@ export class DatabaseStorage implements IStorage {
       return expDate >= now && expDate <= in30Days;
     });
     
-    const requiredTypes = ['licencia', 'matricula', 'seguro_grua', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
+    const requiredTypes = ['licencia', 'matricula', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
     const validDocs = aprobados.filter(d => {
       if (!d.validoHasta) return true;
       return new Date(d.validoHasta) >= now;

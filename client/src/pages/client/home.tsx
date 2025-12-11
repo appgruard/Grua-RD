@@ -739,8 +739,8 @@ export default function ClientHome() {
 
       <div 
         className={cn(
-          "bg-background border-t border-border transition-all duration-300 flex flex-col overflow-hidden relative z-20 flex-shrink-0",
-          showExpandedCard ? "min-h-[45vh] max-h-[60vh]" : "h-14"
+          "bg-background border-t border-border transition-all duration-300 ease-in-out flex flex-col overflow-hidden relative z-20",
+          showExpandedCard ? "flex-shrink-0 min-h-[45vh] max-h-[60vh]" : "flex-shrink-0 h-14"
         )}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
