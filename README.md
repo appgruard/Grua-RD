@@ -9,6 +9,12 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/PWA-Ready-5A0FC8?style=flat-square&logo=pwa&logoColor=white" alt="PWA" />
+  <img src="https://img.shields.io/badge/Google%20Play-Available-414141?style=flat-square&logo=googleplay&logoColor=white" alt="Google Play" />
+  <img src="https://img.shields.io/badge/App%20Store-Available-0D96F6?style=flat-square&logo=appstore&logoColor=white" alt="App Store" />
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/License-Proprietary-red?style=flat-square" alt="Proprietary License" />
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React" />
@@ -31,7 +37,7 @@
 
 ## Descripción
 
-**Grúa RD** es una Progressive Web App (PWA) diseñada para revolucionar la industria de servicios de grúa en República Dominicana. Conecta usuarios con operadores de grúa en tiempo real, permitiendo solicitar servicios, rastrear ubicaciones y gestionar operaciones de manera eficiente.
+**Grúa RD** es una plataforma multiplataforma disponible como **Progressive Web App (PWA)** y **aplicaciones móviles nativas** para **Google Play** y **App Store**, diseñada para revolucionar la industria de servicios de grúa en República Dominicana. Conecta usuarios con operadores de grúa en tiempo real, permitiendo solicitar servicios, rastrear ubicaciones y gestionar operaciones de manera eficiente.
 
 La plataforma ofrece interfaces especializadas para:
 - **Clientes** - Solicitud y seguimiento de servicios
@@ -71,11 +77,13 @@ La plataforma ofrece interfaces especializadas para:
 | Sistema de Tickets | Soporte y resolución de incidencias |
 
 ### Características Técnicas
-- **PWA Instalable** - Funciona como app nativa en móviles
-- **Notificaciones Push** - Alertas en tiempo real
+- **Multiplataforma** - PWA + Apps nativas para iOS y Android con Capacitor
+- **Disponible en Tiendas** - Google Play Store y Apple App Store
+- **Notificaciones Push** - Alertas nativas en tiempo real
 - **Verificación de Identidad** - OCR de cédula dominicana con Verifik
-- **Geolocalización Precisa** - Tracking GPS optimizado
+- **Geolocalización Precisa** - Tracking GPS nativo optimizado
 - **Modo Offline** - Service Worker para operación sin conexión
+- **Cámara Nativa** - Captura de documentos y fotos de servicio
 
 ---
 
@@ -91,7 +99,16 @@ shadcn/ui         →  Component Library
 TanStack Query    →  State Management
 Mapbox GL JS      →  Maps & Routing
 Framer Motion     →  Animations
-Capacitor         →  Native Mobile
+```
+
+### Mobile Nativo
+```
+Capacitor         →  Framework híbrido para iOS/Android
+Camera            →  Captura de fotos y documentos
+Geolocation       →  GPS nativo de alta precisión
+Push Notifications→  Notificaciones nativas
+Filesystem        →  Almacenamiento local
+Network           →  Detección de conectividad
 ```
 
 ### Backend
