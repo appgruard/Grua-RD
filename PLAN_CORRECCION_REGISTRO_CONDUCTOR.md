@@ -1,5 +1,43 @@
 # Plan de Corrección: Registro de Conductor para Usuarios Existentes
 
+## ✅ Estado de Implementación (11 Dic 2025)
+
+**TODAS LAS FASES COMPLETADAS**
+
+### Fase 1: Correcciones Críticas ✅
+| Corrección | Estado | Descripción |
+|------------|--------|-------------|
+| 1.1 | ✅ Completado | Agregada ruta `/api/drivers/me/license-data` a `VERIFICATION_ALLOWED_PATTERNS` |
+| 1.2 | ✅ Completado | Función `userNeedsVerification` convertida a async - obtiene conductor de storage, no de sesión |
+| 1.3 | ✅ Completado | Auto-creación de conductor en `/api/documents/upload` |
+
+### Fase 2: Correcciones de Consistencia ✅
+| Corrección | Estado | Descripción |
+|------------|--------|-------------|
+| 2.1 | ✅ Completado | Auto-creación de conductor en `/api/auth/register` y `/api/auth/add-driver-account` |
+| 2.2 | ✅ Completado | Refresh de sesión después de crear conductor en endpoints de documentos |
+| 2.3 | ✅ Verificado | `getUserById` ya incluye relación con conductor (`with: { conductor: true }`) |
+
+### Fase 3: Mejoras Adicionales ✅
+| Corrección | Estado | Descripción |
+|------------|--------|-------------|
+| 3.1 | ✅ Verificado | Asociación de documentos correcta - conductores usan `conductorId`, clientes usan `usuarioId` |
+| 3.2 | ✅ Verificado | Endpoint `/api/identity/verification-status` ya obtiene datos frescos de storage |
+| 3.3 | ✅ Completado | Endpoint `become-driver` ahora crea registro de conductor automáticamente |
+
+### Cambios Realizados en `server/routes.ts`:
+1. **Líneas 527-529**: Agregadas rutas permitidas durante verificación
+2. **Líneas 472-509**: `userNeedsVerification` ahora es async y obtiene conductor de DB
+3. **Líneas 548-562**: Middleware convertido a async
+4. **Líneas 675**: WebSocket handler actualizado para usar await
+5. **Líneas 915-924**: Auto-creación de conductor en registro
+6. **Líneas 1017-1024**: Auto-creación de conductor en add-driver-account
+7. **Líneas 6727-6753**: Auto-creación + refresh de sesión en `/api/documents/upload`
+8. **Líneas 6835-6861**: Refresh de sesión en `/api/driver/documents`
+9. **Líneas 3525-3532**: Creación de conductor en `become-driver`
+
+---
+
 ## Resumen del Problema
 
 Cuando un usuario que ya existe como **cliente** intenta registrarse como **conductor**, el proceso falla durante la verificación. Los logs muestran `VERIFICATION_BLOCKED` o errores al intentar avanzar, incluso cuando los documentos ya están subidos.
