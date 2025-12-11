@@ -4129,16 +4129,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userInfo = await storage.getUserById(req.user!.id);
         
         // Required document types
-        const requiredTypes = ['licencia', 'matricula', 'seguro_grua', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
+        const requiredTypes = ['licencia', 'matricula', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
         
         // Document types that can expire
-        const documentosConVencimiento = ['seguro_grua', 'licencia', 'matricula'];
+        const documentosConVencimiento = ['licencia', 'matricula'];
         
         // Map document types to Spanish names for user-friendly messages
         const documentTypeNames: Record<string, string> = {
           'licencia': 'Licencia de Conducir',
           'matricula': 'Matrícula del Vehículo',
-          'seguro_grua': 'Seguro de Grúa',
           'foto_vehiculo': 'Foto del Vehículo',
           'cedula_frontal': 'Cédula (Frente)',
           'cedula_trasera': 'Cédula (Atrás)',
@@ -6652,7 +6651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Document types that require expiration date
-      const documentosConVencimiento = ['seguro_grua', 'licencia', 'matricula'];
+      const documentosConVencimiento = ['licencia', 'matricula'];
       
       // Validate expiration date is required for all documents with expiration
       if (documentosConVencimiento.includes(tipoDocumento) && !fechaVencimiento) {

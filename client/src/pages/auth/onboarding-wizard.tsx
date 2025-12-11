@@ -1293,7 +1293,6 @@ export default function OnboardingWizard() {
         <>
           <FileUpload label="Licencia de Conducir (Frente)" required onFileSelect={setLicenseFile} fileName={licenseFile?.name} error={errors.licenseFile} testId="input-license-file" />
           <FileUpload label="Licencia de Conducir (Reverso)" required onFileSelect={setLicenseBackFile} fileName={licenseBackFile?.name} error={errors.licenseBackFile} testId="input-license-back-file" />
-          <FileUpload label="Documento de Seguro de Grúa" onFileSelect={setInsuranceFile} fileName={insuranceFile?.name} required testId="input-insurance-file" />
           <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
             {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Subir Documentos<Upload className="w-4 h-4 ml-2" /></>)}
           </Button>

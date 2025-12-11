@@ -181,7 +181,6 @@ async function seedTestUsers(): Promise<void> {
           { tipo: "cedula_frontal" as const, nombre: "cedula_frontal.jpg" },
           { tipo: "cedula_trasera" as const, nombre: "cedula_trasera.jpg" },
           { tipo: "matricula" as const, nombre: "matricula_vehiculo.pdf" },
-          { tipo: "seguro_grua" as const, nombre: "seguro_grua.pdf" },
           { tipo: "foto_vehiculo" as const, nombre: "foto_grua.jpg" },
           { tipo: "foto_perfil" as const, nombre: "foto_perfil.jpg" },
         ];
