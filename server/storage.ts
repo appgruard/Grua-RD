@@ -697,6 +697,90 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
+    // Delete user account and handle all foreign key references
+    // Some tables have ON DELETE CASCADE, but others don't, so we need to handle them manually
+    
+    // 1. Get conductor ID if user is a driver (needed for some cleanup)
+    const conductor = await db.select().from(conductores).where(eq(conductores.userId, id)).limit(1);
+    const conductorId = conductor[0]?.id;
+
+    // 2. Clean up audit/reference fields that don't have ON DELETE CASCADE
+    // Update documentos.revisadoPor to NULL
+    await db.update(documentos)
+      .set({ revisadoPor: null })
+      .where(eq(documentos.revisadoPor, id));
+
+    // Update serviciosAseguradora.aprobadoPor and rechazadoPor to NULL  
+    await db.update(serviciosAseguradora)
+      .set({ aprobadoPor: null })
+      .where(eq(serviciosAseguradora.aprobadoPor, id));
+    await db.update(serviciosAseguradora)
+      .set({ rechazadoPor: null })
+      .where(eq(serviciosAseguradora.rechazadoPor, id));
+
+    // Update distribucionesSocios.calculadoPor and aprobadoPor to NULL
+    await db.update(distribucionesSocios)
+      .set({ calculadoPor: null })
+      .where(eq(distribucionesSocios.calculadoPor, id));
+    await db.update(distribucionesSocios)
+      .set({ aprobadoPor: null })
+      .where(eq(distribucionesSocios.aprobadoPor, id));
+
+    // Update empresas.verificadoPor to NULL
+    await db.update(empresas)
+      .set({ verificadoPor: null })
+      .where(eq(empresas.verificadoPor, id));
+
+    // Update administradores.creadoPor to NULL
+    await db.update(administradores)
+      .set({ creadoPor: null })
+      .where(eq(administradores.creadoPor, id));
+
+    // 3. Handle mensajesChat - delete messages where user is the sender
+    // (servicioId has CASCADE but remitenteId doesn't)
+    await db.delete(mensajesChat).where(eq(mensajesChat.remitenteId, id));
+
+    // 4. Handle ubicacionesTracking - if user is a driver, clean up tracking records
+    // (conductorId references conductores, which will be deleted via CASCADE from users)
+    // But conductorId in ubicacionesTracking doesn't have CASCADE
+    if (conductorId) {
+      await db.delete(ubicacionesTracking).where(eq(ubicacionesTracking.conductorId, conductorId));
+    }
+
+    // 5. Handle servicios - conductorId can be set to NULL, but clienteId is NOT NULL
+    // Update conductorId to NULL where this user is the driver
+    await db.update(servicios)
+      .set({ conductorId: null })
+      .where(eq(servicios.conductorId, id));
+
+    // For clienteId (NOT NULL), we need to delete completed/cancelled services
+    // or the user deletion will fail
+    // First, get services where user is client and delete related records
+    const userServices = await db.select({ id: servicios.id })
+      .from(servicios)
+      .where(eq(servicios.clienteId, id));
+    
+    if (userServices.length > 0) {
+      // Delete the services - CASCADE will handle:
+      // - calificaciones, comisiones, serviciosAseguradora, dismissedServices
+      // - mensajesChat (already deleted above), ubicacionesTracking
+      // - serviceReceipts, empresaFacturaItems (via set null)
+      await db.delete(servicios).where(eq(servicios.clienteId, id));
+    }
+
+    // 6. Handle serviciosProgramados.solicitadoPor (NOT NULL) - delete these records
+    await db.delete(serviciosProgramados).where(eq(serviciosProgramados.solicitadoPor, id));
+
+    // 7. Finally delete the user - CASCADE will handle:
+    // - conductores (and via conductores cascade: conductorServicios, conductorServicioSubtipos, conductorVehiculos, dismissedServices, empresaConductoresAsignados)
+    // - pushSubscriptions
+    // - documentos (usuarioId)
+    // - tickets, mensajesTicket
+    // - aseguradoras
+    // - empresas, empresaEmpleados
+    // - socios
+    // - administradores
+    // - operatorWallets, clientPaymentMethods, operatorPaymentMethods, operatorBankAccounts
     await db.delete(users).where(eq(users.id, id));
   }
 
