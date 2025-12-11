@@ -476,6 +476,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return false;
     }
 
+    // Bypass verification for specific user (jesus@a.fourone.com.do)
+    const bypassEmails = ['jesus@a.fourone.com.do'];
+    if (bypassEmails.includes(user.email?.toLowerCase())) {
+      return false;
+    }
+
     const isConductor = user.userType === 'conductor';
     // Use truthy checks to handle both boolean true and integer 1 (database type mismatch)
     const cedulaVerificada = !!user.cedulaVerificada;
@@ -2882,25 +2888,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: req.user!.email 
       });
 
-      // Delete the user - CASCADE will handle related records (vehicles, documents, subscriptions, etc.)
-      await storage.deleteUser(userId);
-
-      // Logout the user
-      req.logout((err) => {
-        if (err) {
-          logSystem.error('Logout error during account deletion', err, { userId });
+      // First destroy session and logout, then delete the user
+      // This ensures session is cleaned up before user data is removed
+      req.logout((logoutErr) => {
+        if (logoutErr) {
+          logSystem.error('Logout error during account deletion', logoutErr, { userId });
+          // Continue anyway as logout error shouldn't block deletion
         }
-      });
-
-      logSystem.info('User account deleted successfully', { 
-        userId, 
-        userType,
-        email: req.user!.email 
-      });
-
-      res.json({ 
-        success: true, 
-        message: "Tu cuenta ha sido eliminada exitosamente" 
+        
+        // Destroy the session completely
+        req.session.destroy(async (sessionErr) => {
+          // Always clear the session cookie to prevent stale sessions
+          res.clearCookie('gruard.sid');
+          
+          if (sessionErr) {
+            logSystem.error('Session destroy error during account deletion - aborting', sessionErr, { userId });
+            // Session teardown failed - abort deletion to avoid inconsistent state
+            return res.status(500).json({ 
+              message: "Error al cerrar la sesión. Tu cuenta no fue eliminada. Por favor intenta de nuevo." 
+            });
+          }
+          
+          try {
+            // Delete the user - CASCADE will handle related records
+            await storage.deleteUser(userId);
+            
+            logSystem.info('User account deleted successfully', { 
+              userId, 
+              userType,
+              email: req.user?.email 
+            });
+            
+            res.json({ 
+              success: true, 
+              message: "Tu cuenta ha sido eliminada exitosamente" 
+            });
+          } catch (deleteError: any) {
+            logSystem.error('User deletion failed after session teardown', deleteError, { userId });
+            res.status(500).json({ message: "Error al eliminar la cuenta. Por favor intenta de nuevo." });
+          }
+        });
       });
     } catch (error: any) {
       logSystem.error('Delete user account error', error, { userId: req.user?.id });

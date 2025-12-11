@@ -623,8 +623,12 @@ export function MapboxMap({
     );
   }
 
+  // Only add 'relative' if the caller hasn't already provided a positioning class
+  const hasPositioning = /\b(relative|absolute|fixed|sticky)\b/.test(className);
+  const containerClassName = hasPositioning ? className : `relative ${className}`;
+
   return (
-    <div ref={containerRef} className={`relative ${className}`} style={{ minHeight: '300px' }}>
+    <div ref={containerRef} className={containerClassName} style={{ minHeight: '300px' }}>
       <Map
         ref={mapRef}
         {...viewState}
