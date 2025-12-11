@@ -106,6 +106,14 @@ The application uses PostgreSQL session store for persistent sessions in product
 
 ## Recent Changes
 
+### December 11, 2025 - Account Deletion & Map Expansion Fixes
+Fixed critical issues with account deletion and map display:
+
+- **Account Deletion Flow Reordered**: Session is now destroyed BEFORE user deletion to prevent orphaned state. If session teardown fails, deletion is aborted and user account remains intact.
+- **Cookie Always Cleared**: `gruard.sid` cookie is always cleared during deletion, even on session destroy errors.
+- **Verification Bypass**: Added bypass for test user `jesus@a.fourone.com.do` in `userNeedsVerification()` function.
+- **Map Positioning Fix**: MapboxMap component now preserves caller-provided positioning classes (absolute, fixed, sticky) instead of overwriting with `relative`. This fixes the map not expanding when the categories panel is minimized.
+
 ### December 10, 2025 - Privacy Section Added to User Profiles
 Added privacy and account deletion functionality for both clients and drivers:
 
