@@ -1167,7 +1167,11 @@ export default function VerifyPending() {
       if (isDriver) {
         setCurrentStep('photo');
       } else {
-        setCurrentStep('insurance');
+        // Client is fully verified after email verification (cedula + email)
+        // Redirect directly to client dashboard - insurance can be added later
+        clearPendingVerification();
+        await refreshUser();
+        setLocation('/client');
       }
     },
     onError: (error: any) => {
