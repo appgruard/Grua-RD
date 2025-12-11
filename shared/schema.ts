@@ -1260,10 +1260,10 @@ export const insertUserSchema = createInsertSchema(users, {
 });
 
 export const insertConductorSchema = createInsertSchema(conductores, {
-  licencia: z.string().min(1),
-  placaGrua: z.string().min(1),
-  marcaGrua: z.string().min(1),
-  modeloGrua: z.string().min(1),
+  licencia: z.string().optional().default(''),
+  placaGrua: z.string().optional().default(''),
+  marcaGrua: z.string().optional().default(''),
+  modeloGrua: z.string().optional().default(''),
 }).omit({
   id: true,
   disponible: true,

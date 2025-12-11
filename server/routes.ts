@@ -467,7 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.session());
 
   // Helper function to check if user needs verification
-  const userNeedsVerification = (user: any): boolean => {
+  const userNeedsVerification = async (user: any): Promise<boolean> => {
     if (!user) return false;
     
     // Skip verification check for admin, aseguradora, socio, and empresa users
@@ -487,12 +487,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return !cedulaVerificada || !emailVerificado;
     }
 
-    // Driver needs 6 verifications - check conductor data for additional fields
+    // Driver needs 6 verifications - ALWAYS fetch conductor from storage (not session)
+    // This fixes the bug where session data was stale after conductor creation
+    const conductor = await storage.getConductorByUserId(user.id);
+    
+    // If no conductor exists yet, user needs verification but we allow verification routes
+    if (!conductor) {
+      return true;
+    }
+    
     // Use truthy checks to handle integer values from database (vehiculosRegistrados is stored as int)
-    const conductor = user.conductor;
-    const licenciaVerificada = !!conductor?.licenciaVerificada;
-    const categoriasConfiguradas = !!conductor?.categoriasConfiguradas;
-    const vehiculosRegistrados = !!conductor?.vehiculosRegistrados;
+    const licenciaVerificada = !!conductor.licenciaVerificada;
+    const categoriasConfiguradas = !!conductor.categoriasConfiguradas;
+    const vehiculosRegistrados = !!conductor.vehiculosRegistrados;
 
     return !cedulaVerificada || !emailVerificado || !fotoVerificada || 
            !licenciaVerificada || !categoriasConfiguradas || !vehiculosRegistrados;
@@ -521,6 +528,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { method: 'GET', path: '/api/drivers/init' },
     { method: 'GET', path: '/api/drivers/me/servicios' },
     { method: 'PUT', path: '/api/drivers/me/servicios' },
+    { method: 'PUT', path: '/api/drivers/me/license-data' },
+    { method: 'POST', path: '/api/auth/add-driver-account' },
+    { method: 'POST', path: '/api/drivers/become-driver' },
     { method: 'GET', path: '/api/drivers/me/vehiculos', prefix: true },
     { method: 'POST', path: '/api/drivers/me/vehiculos' },
     { method: 'PATCH', path: '/api/drivers/me/vehiculos', prefix: true },
@@ -532,7 +542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { method: 'GET', path: '/api/storage/files', prefix: true },
   ];
 
-  app.use((req: Request, res: Response, next) => {
+  app.use(async (req: Request, res: Response, next) => {
     // Skip check for non-API routes (allow frontend/SPA routes to pass through)
     if (!req.path.startsWith('/api/')) {
       return next();
@@ -546,7 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = req.user as any;
     
     // If user is fully verified or exempt, allow all endpoints
-    if (!userNeedsVerification(user)) {
+    if (!(await userNeedsVerification(user))) {
       return next();
     }
 
@@ -659,7 +669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Block unverified users from WebSocket access
-      if (userNeedsVerification(user)) {
+      if (await userNeedsVerification(user)) {
         logSystem.warn('WebSocket rejected: User needs verification', { 
           userId: user.id, 
           userType: user.userType,
@@ -899,13 +909,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         passwordHash,
       });
 
-      if (userType === 'conductor' && conductorData) {
+      if (userType === 'conductor') {
+        // Always create conductor record for conductor users (fixes Bug #1)
         await storage.createConductor({
           userId: user.id,
-          licencia: conductorData.licencia,
-          placaGrua: conductorData.placaGrua,
-          marcaGrua: conductorData.marcaGrua,
-          modeloGrua: conductorData.modeloGrua,
+          licencia: conductorData?.licencia || '',
+          placaGrua: conductorData?.placaGrua || '',
+          marcaGrua: conductorData?.marcaGrua || '',
+          modeloGrua: conductorData?.modeloGrua || '',
         });
       }
 
@@ -989,18 +1000,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: currentUser.email,
         passwordHash: currentUser.passwordHash,
         userType: 'conductor',
-        estadoCuenta: 'pendiente_verificacion',
         nombre: currentUser.nombre,
         apellido: currentUser.apellido || '',
-        phone: currentUser.phone,
-        cedula: currentUser.cedula,
-        cedulaImageUrl: currentUser.cedulaImageUrl,
+        phone: currentUser.phone || undefined,
+        cedula: currentUser.cedula || undefined,
+        cedulaImageUrl: currentUser.cedulaImageUrl || undefined,
         cedulaVerificada: currentUser.cedulaVerificada,
-        telefonoVerificado: currentUser.telefonoVerificado || false,
         emailVerificado: currentUser.emailVerificado || false,
       });
+      
+      // Update fields that are omitted from insert schema
+      await storage.updateUser(newConductorUser.id, {
+        estadoCuenta: 'pendiente_verificacion',
+        telefonoVerificado: currentUser.telefonoVerificado || false,
+      });
 
-      logAuth.registerSuccess(newConductorUser.email, 'conductor', req.ip);
+      // Create conductor record for the new driver user (fixes Bug #1)
+      await storage.createConductor({
+        userId: newConductorUser.id,
+        licencia: '',
+        placaGrua: '',
+        marcaGrua: '',
+        modeloGrua: '',
+      });
+
+      logAuth.registerSuccess(newConductorUser.email, 'conductor', req.ip || 'unknown');
       logSystem.info("Client added driver account", { 
         clientUserId: currentUser.id, 
         driverUserId: newConductorUser.id,
@@ -2148,20 +2172,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get user name for comparison (from authenticated user or request body for registration)
+      // Get user data for comparison (from authenticated user or request body for registration)
       let userNombre: string | undefined;
       let userApellido: string | undefined;
+      let userCedula: string | undefined;
       
       if (req.isAuthenticated()) {
         userNombre = req.user!.nombre;
         userApellido = req.user!.apellido ?? undefined;
+        userCedula = req.user!.cedula ?? undefined;
       } else if (nombre && apellido) {
         // For registration flow - name provided in request body
         userNombre = nombre;
         userApellido = apellido;
+        // Cedula may be provided in request body for registration flow
+        userCedula = req.body.cedula;
       }
 
-      const result = await scanAndVerifyLicense(image, userNombre, userApellido);
+      const result = await scanAndVerifyLicense(image, userNombre, userApellido, userCedula);
 
       if (!result.success) {
         logSystem.warn('License OCR scan failed', { 
@@ -2170,6 +2198,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         return res.status(400).json({ 
           message: result.error || "No se pudo escanear la licencia"
+        });
+      }
+
+      // Check cedula match result first (more critical than name match)
+      if (result.cedulaMatch === false && userCedula) {
+        logSystem.warn('Cedula mismatch during license verification', {
+          userId: req.user?.id,
+          hasCedulaMatch: result.cedulaMatch
+        });
+        
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          cedulaMatch: false,
+          nameMatch: result.nameMatch,
+          confidenceScore: result.confidenceScore,
+          message: result.error || `El número de cédula en la licencia no coincide con su cédula verificada.`
         });
       }
 
@@ -2186,6 +2231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: false,
           verified: false,
           nameMatch: false,
+          cedulaMatch: result.cedulaMatch,
           confidenceScore: result.confidenceScore,
           similarity: result.nameSimilarity,
           message: result.error || `La licencia no coincide con sus datos de registro.`
@@ -2197,6 +2243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verified: result.verified,
         confidenceScore: result.confidenceScore,
         nameMatch: result.nameMatch,
+        cedulaMatch: result.cedulaMatch,
         userId: req.user?.id 
       });
 
@@ -2209,6 +2256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         licenseClass: result.licenseClass,
         verified: result.verified,
         nameMatch: result.nameMatch,
+        cedulaMatch: result.cedulaMatch,
         confidenceScore: result.confidenceScore,
         message: result.verified 
           ? "Licencia escaneada y verificada exitosamente"
@@ -3473,6 +3521,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUser(user.id, { 
         userType: 'conductor',
         estadoCuenta: 'pendiente_verificacion'
+      });
+      
+      // Create conductor record (fixes Bug #1 - conductor not created during become-driver)
+      await storage.createConductor({
+        userId: user.id,
+        licencia: '',
+        placaGrua: '',
+        marcaGrua: '',
+        modeloGrua: '',
       });
       
       // Update session with new user data
@@ -6677,9 +6734,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Tipo de documento es requerido" });
       }
 
-      const conductor = await storage.getConductorByUserId(req.user!.id);
+      let conductor = await storage.getConductorByUserId(req.user!.id);
+      let conductorCreated = false;
       if (!conductor) {
-        return res.status(404).json({ message: "Conductor no encontrado" });
+        // Auto-create conductor record if it doesn't exist (fixes Bug #1 - conductor not found)
+        logSystem.info('Creating conductor record for user during document upload', { userId: req.user!.id });
+        conductor = await storage.createConductor({
+          userId: req.user!.id,
+          licencia: '',
+          placaGrua: '',
+          marcaGrua: '',
+          modeloGrua: '',
+        });
+        conductorCreated = true;
+      }
+
+      // Refresh session with updated user data if conductor was created (fixes stale session bug)
+      if (conductorCreated) {
+        const updatedUser = await storage.getUserById(req.user!.id);
+        if (updatedUser) {
+          await new Promise<void>((resolve, reject) => {
+            req.login(updatedUser as any, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+        }
       }
 
       // Upload to object storage
@@ -6763,6 +6843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let conductor = await storage.getConductorByUserId(req.user!.id);
+      let conductorCreated = false;
       if (!conductor) {
         // Auto-create conductor record if it doesn't exist (for operators who registered without vehicle data)
         logSystem.info('Creating conductor record for user during document upload', { userId: req.user!.id });
@@ -6773,6 +6854,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           marcaGrua: '',
           modeloGrua: '',
         });
+        conductorCreated = true;
+      }
+
+      // Refresh session with updated user data if conductor was created (fixes stale session bug)
+      if (conductorCreated) {
+        const updatedUser = await storage.getUserById(req.user!.id);
+        if (updatedUser) {
+          await new Promise<void>((resolve, reject) => {
+            req.login(updatedUser as any, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+        }
       }
 
       // For front license, validate with Verifik before uploading
