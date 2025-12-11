@@ -60,3 +60,12 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Capacitor**: For native mobile app functionalities and plugins.
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
+
+## Recent Changes
+
+### December 11, 2025 - License Category Storage Fix
+- **Issue**: License category was not being saved after OCR scan of the back of the driver's license. This caused drivers to remain with pending validation and unable to activate services.
+- **Root Cause**: The `/api/identity/scan-license-back` endpoint was only performing OCR scan and returning results, but not persisting the extracted category to the database.
+- **Fix**: Modified the endpoint to save `licenciaCategoria`, `licenciaCategoriaVerificada`, `licenciaRestricciones`, and `licenciaFechaVencimiento` to the `conductores` table after a successful scan.
+- **Files Changed**: `server/routes.ts` (lines 2278-2316)
+- **Note**: Drivers who previously scanned their license back will need to re-scan after deploying this fix to have their category saved.

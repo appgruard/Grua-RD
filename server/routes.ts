@@ -2272,6 +2272,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.user?.id 
       });
 
+      // Save license category to database if scan was valid and user is a conductor
+      if (result.isValid && user?.userType === 'conductor') {
+        try {
+          const conductor = await storage.getConductorByUserId(user.id);
+          if (conductor) {
+            const updateData: any = {
+              licenciaCategoriaVerificada: true,
+            };
+            
+            if (result.category) {
+              updateData.licenciaCategoria = result.category;
+            }
+            if (result.restrictions) {
+              updateData.licenciaRestricciones = result.restrictions;
+            }
+            if (result.expirationDate) {
+              const parsedDate = new Date(result.expirationDate);
+              if (!isNaN(parsedDate.getTime())) {
+                updateData.licenciaFechaVencimiento = parsedDate;
+              }
+            }
+            
+            await storage.updateConductor(conductor.id, updateData);
+            
+            logSystem.info('Conductor license category saved', {
+              conductorId: conductor.id,
+              userId: user.id,
+              category: result.category,
+              restrictions: result.restrictions ? 'yes' : 'no',
+              hasExpirationDate: !!result.expirationDate
+            });
+          }
+        } catch (saveError: any) {
+          logSystem.error('Failed to save license category to database', saveError, { 
+            userId: user.id,
+            category: result.category
+          });
+          // Don't fail the request, just log the error - OCR was successful
+        }
+      }
+
       res.json({
         success: true,
         isValid: result.isValid,
