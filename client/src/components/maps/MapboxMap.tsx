@@ -399,6 +399,7 @@ export function MapboxMap({
   focusOnOrigin = false
 }: MapboxMapProps) {
   const mapRef = useRef<MapRef>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewState, setViewState] = useState({
@@ -406,6 +407,22 @@ export function MapboxMap({
     latitude: center.lat,
     zoom: zoom
   });
+
+  useEffect(() => {
+    if (!containerRef.current || !mapRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [loading]);
 
   useEffect(() => {
     if (focusOnOrigin && markers.length > 0 && mapRef.current) {
@@ -607,7 +624,7 @@ export function MapboxMap({
   }
 
   return (
-    <div className={`relative ${className}`} style={{ minHeight: '300px' }}>
+    <div ref={containerRef} className={`relative ${className}`} style={{ minHeight: '300px' }}>
       <Map
         ref={mapRef}
         {...viewState}
