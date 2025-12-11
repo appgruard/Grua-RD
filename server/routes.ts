@@ -2148,20 +2148,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get user name for comparison (from authenticated user or request body for registration)
+      // Get user data for comparison (from authenticated user or request body for registration)
       let userNombre: string | undefined;
       let userApellido: string | undefined;
+      let userCedula: string | undefined;
       
       if (req.isAuthenticated()) {
         userNombre = req.user!.nombre;
         userApellido = req.user!.apellido ?? undefined;
+        userCedula = req.user!.cedula ?? undefined;
       } else if (nombre && apellido) {
         // For registration flow - name provided in request body
         userNombre = nombre;
         userApellido = apellido;
+        // Cedula may be provided in request body for registration flow
+        userCedula = req.body.cedula;
       }
 
-      const result = await scanAndVerifyLicense(image, userNombre, userApellido);
+      const result = await scanAndVerifyLicense(image, userNombre, userApellido, userCedula);
 
       if (!result.success) {
         logSystem.warn('License OCR scan failed', { 
@@ -2170,6 +2174,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         return res.status(400).json({ 
           message: result.error || "No se pudo escanear la licencia"
+        });
+      }
+
+      // Check cedula match result first (more critical than name match)
+      if (result.cedulaMatch === false && userCedula) {
+        logSystem.warn('Cedula mismatch during license verification', {
+          userId: req.user?.id,
+          hasCedulaMatch: result.cedulaMatch
+        });
+        
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          cedulaMatch: false,
+          nameMatch: result.nameMatch,
+          confidenceScore: result.confidenceScore,
+          message: result.error || `El número de cédula en la licencia no coincide con su cédula verificada.`
         });
       }
 
@@ -2186,6 +2207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: false,
           verified: false,
           nameMatch: false,
+          cedulaMatch: result.cedulaMatch,
           confidenceScore: result.confidenceScore,
           similarity: result.nameSimilarity,
           message: result.error || `La licencia no coincide con sus datos de registro.`
@@ -2197,6 +2219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verified: result.verified,
         confidenceScore: result.confidenceScore,
         nameMatch: result.nameMatch,
+        cedulaMatch: result.cedulaMatch,
         userId: req.user?.id 
       });
 
@@ -2209,6 +2232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         licenseClass: result.licenseClass,
         verified: result.verified,
         nameMatch: result.nameMatch,
+        cedulaMatch: result.cedulaMatch,
         confidenceScore: result.confidenceScore,
         message: result.verified 
           ? "Licencia escaneada y verificada exitosamente"

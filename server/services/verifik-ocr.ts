@@ -515,7 +515,29 @@ export interface FaceValidationResult {
 }
 
 const MINIMUM_VALIDATION_SCORE = 0.6;
+const MINIMUM_LICENSE_FRONT_SCORE = 0.5; // Lower threshold for license front
 const MINIMUM_LICENSE_BACK_SCORE = 0.5; // Lower threshold for license back (category/restrictions)
+
+/**
+ * Normalizes a cedula number by removing dashes and spaces.
+ * Cedula format: 402-1534383-7 -> 40215343837
+ * License format: 40215343837 (already normalized)
+ */
+export function normalizeCedulaNumber(cedula: string): string {
+  if (!cedula) return '';
+  return cedula.replace(/[-\s]/g, '').trim();
+}
+
+/**
+ * Compares two cedula numbers after normalizing their formats.
+ * Cedula format: 402-1534383-7
+ * License format: 40215343837
+ */
+export function compareCedulaNumbers(cedula1: string, cedula2: string): boolean {
+  const normalized1 = normalizeCedulaNumber(cedula1);
+  const normalized2 = normalizeCedulaNumber(cedula2);
+  return normalized1 === normalized2 && normalized1.length === 11;
+}
 
 export async function validateFacePhoto(imageBase64: string): Promise<FaceValidationResult> {
   const apiKey = getVerifikApiKey();
@@ -815,13 +837,13 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
       ? `${ocrData.firstName} ${ocrData.lastName}`.trim() 
       : undefined);
 
-    const isValidLicense = confidenceScore >= MINIMUM_VALIDATION_SCORE && !!licenseNumber;
+    const isValidLicense = confidenceScore >= MINIMUM_LICENSE_FRONT_SCORE && !!licenseNumber;
 
     let details = "";
     if (!licenseNumber) {
       details = "No se pudo detectar un número de licencia en la imagen";
-    } else if (confidenceScore < MINIMUM_VALIDATION_SCORE) {
-      details = `La calidad del escaneo es muy baja (${Math.round(confidenceScore * 100)}%). Se requiere al menos 60%.`;
+    } else if (confidenceScore < MINIMUM_LICENSE_FRONT_SCORE) {
+      details = `La calidad del escaneo es muy baja (${Math.round(confidenceScore * 100)}%). Se requiere al menos 50%.`;
     }
 
     return {
@@ -862,13 +884,15 @@ export interface ScanAndVerifyLicenseResult {
   confidenceScore?: number;
   nameMatch?: boolean;
   nameSimilarity?: number;
+  cedulaMatch?: boolean;
   error?: string;
 }
 
 export async function scanAndVerifyLicense(
   imageBase64: string, 
   userNombre?: string, 
-  userApellido?: string
+  userApellido?: string,
+  userCedula?: string
 ): Promise<ScanAndVerifyLicenseResult> {
   const scanResult = await validateDriverLicense(imageBase64);
   
@@ -881,13 +905,13 @@ export async function scanAndVerifyLicense(
     };
   }
 
-  // Check if score meets minimum requirement
-  if (scanResult.score < MINIMUM_VALIDATION_SCORE) {
+  // Check if score meets minimum requirement (using lower threshold 0.5)
+  if (scanResult.score < MINIMUM_LICENSE_FRONT_SCORE) {
     return {
       success: false,
       verified: false,
       confidenceScore: scanResult.score,
-      error: `La calidad del escaneo es muy baja (${Math.round(scanResult.score * 100)}%). Se requiere al menos 60%.`
+      error: `La calidad del escaneo es muy baja (${Math.round(scanResult.score * 100)}%). Se requiere al menos 50%.`
     };
   }
 
@@ -936,7 +960,38 @@ export async function scanAndVerifyLicense(
     nameSimilarity = 0;
   }
 
-  const isVerified = scanResult.score >= MINIMUM_VALIDATION_SCORE && nameMatch;
+  // Cedula comparison: the license number IS the cedula number (without dashes)
+  // Cedula format: 402-1534383-7 -> License format: 40215343837
+  let cedulaMatch = true;
+  let cedulaError: string | undefined;
+
+  if (userCedula && scanResult.licenseNumber) {
+    cedulaMatch = compareCedulaNumbers(userCedula, scanResult.licenseNumber);
+    
+    if (!cedulaMatch) {
+      const normalizedUserCedula = normalizeCedulaNumber(userCedula);
+      const normalizedLicenseNumber = normalizeCedulaNumber(scanResult.licenseNumber);
+      
+      logger.warn("Cedula mismatch during license verification", {
+        userCedula: normalizedUserCedula,
+        licenseNumber: normalizedLicenseNumber
+      });
+      
+      cedulaError = `El número de cédula en la licencia (${normalizedLicenseNumber}) no coincide con la cédula verificada (${normalizedUserCedula})`;
+    }
+  }
+
+  const isVerified = scanResult.score >= MINIMUM_LICENSE_FRONT_SCORE && nameMatch && cedulaMatch;
+  
+  // Determine the error message to return
+  let finalError: string | undefined;
+  if (!isVerified) {
+    if (!cedulaMatch && cedulaError) {
+      finalError = cedulaError;
+    } else if (!nameMatch && nameError) {
+      finalError = nameError;
+    }
+  }
 
   return {
     success: true,
@@ -949,7 +1004,8 @@ export async function scanAndVerifyLicense(
     confidenceScore: scanResult.score,
     nameMatch: nameMatch,
     nameSimilarity: nameSimilarity,
-    error: isVerified ? undefined : nameError
+    cedulaMatch: cedulaMatch,
+    error: finalError
   };
 }
 
