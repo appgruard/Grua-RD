@@ -1,4 +1,4 @@
-# Plan: Formulario de Onboarding para Cliente → Conductor
+# Plan: Formulario de Onboarding para Cliente → Añadir Cuenta de Conductor
 
 ## Problema Identificado
 
@@ -12,11 +12,14 @@ Cuando un cliente hace clic en "Crear cuenta de conductor" desde su perfil:
 - El wizard usa `urlParams.get('tipo')` para detectar si es una cuenta secundaria
 - Sin este parámetro, `isAddingSecondaryAccount` es `false`
 
+### Nota Importante
+El sistema soporta **cuentas duales** - el usuario puede tener AMBAS cuentas (cliente y conductor) activas simultáneamente. No es un "upgrade" que reemplace la cuenta de cliente, sino la **creación de una cuenta adicional de conductor** vinculada al mismo usuario.
+
 ---
 
 ## Solución Recomendada: Opción 1
 
-Crear un flujo optimizado para clientes existentes que quieren convertirse en conductores, omitiendo los pasos ya completados.
+Crear un flujo optimizado para clientes existentes que quieren añadir una cuenta de conductor, omitiendo los pasos ya completados como cliente.
 
 ### Cambios Necesarios
 
@@ -58,19 +61,21 @@ onClick={() => setLocation('/onboarding?tipo=conductor')}
    - Paso 7: Vehículos por categoría → MOSTRAR
    - Paso 8: Documentos adicionales → MOSTRAR
 
-4. **Crear endpoint backend para upgrade de cliente a conductor:**
-   - Ruta: `POST /api/auth/upgrade-to-driver`
+4. **Crear endpoint backend para añadir cuenta de conductor:**
+   - Ruta: `POST /api/auth/add-driver-account`
    - Crea registro en tabla `conductores` vinculado al usuario existente
-   - Actualiza `userType` a 'conductor' (o manejar cuentas duales)
+   - Crea nuevo registro en `users` con `userType: 'conductor'` vinculado al mismo email
+   - El usuario mantiene AMBAS cuentas y puede alternar entre ellas
 
-#### 3. Backend: Nuevo endpoint para upgrade
+#### 3. Backend: Nuevo endpoint para cuenta dual
 
 **Archivo:** `server/routes.ts`
 
 Crear endpoint:
 ```typescript
-POST /api/auth/upgrade-to-driver
+POST /api/auth/add-driver-account
 Body: {
+  // Datos específicos de conductor (el resto se hereda del cliente)
   licenciaFrontalUrl: string,
   licenciaTraseraUrl: string,
   fotoPerfilUrl: string,
@@ -78,6 +83,12 @@ Body: {
   vehiculos: VehicleData[]
 }
 ```
+
+**Lógica:**
+- Crear nuevo usuario con `userType: 'conductor'` usando mismo email
+- Copiar datos comunes (nombre, apellido, teléfono, cédula verificada)
+- Crear registro en tabla `conductores`
+- El usuario puede alternar entre cuentas en el login
 
 ---
 
@@ -138,9 +149,10 @@ const [showPassword, setShowPassword] = useState(false);
 - [ ] Calcular pasos totales dinámicamente (menos pasos para clientes existentes)
 
 ### Fase 3: Backend
-- [ ] Crear endpoint `/api/auth/upgrade-to-driver`
-- [ ] Manejar creación de registro en tabla `conductores`
-- [ ] Considerar si mantener cuenta dual o cambiar userType
+- [ ] Crear endpoint `/api/auth/add-driver-account`
+- [ ] Crear nuevo usuario con `userType: 'conductor'` vinculado al mismo email
+- [ ] Copiar datos comunes del cliente (nombre, apellido, teléfono, cédula)
+- [ ] Crear registro en tabla `conductores`
 
 ### Fase 4: Icono de ojo para contraseñas
 - [ ] Implementar en `login.tsx`
@@ -151,7 +163,9 @@ const [showPassword, setShowPassword] = useState(false);
 
 ## Notas Adicionales
 
+- **Sistema de cuentas duales:** El usuario mantiene AMBAS cuentas (cliente y conductor) activas
 - El cliente ya tiene: email, nombre, apellido, teléfono, contraseña, cédula verificada (posiblemente)
 - El conductor necesita adicionalmente: foto de perfil, licencia, categorías, vehículos
-- Se debe preservar la sesión del cliente durante el upgrade
-- Considerar mostrar mensaje claro de que están "añadiendo" cuenta de conductor, no creando desde cero
+- En el login, si el usuario tiene ambas cuentas, se le muestra selector para elegir con cuál ingresar
+- Se debe mostrar mensaje claro de que están "añadiendo" cuenta de conductor, no reemplazando la de cliente
+- La nueva cuenta de conductor comparte el mismo email pero es un registro separado en `users`
