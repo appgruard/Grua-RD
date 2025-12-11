@@ -1,7 +1,7 @@
 # Grúa RD - Plataforma de Servicios de Grúa
 
 ## Overview
-Grúa RD is a Progressive Web App (PWA) for the Dominican Republic, connecting users with tow truck services and drivers in real-time. It aims to streamline service requests, enable real-time tracking, and efficiently manage operations. The platform offers distinct interfaces for Clients, Drivers, Administrators, and an enterprise portal for B2B clients, with the goal of revolutionizing the local tow truck service industry.
+Grúa RD is a Progressive Web App (PWA) designed for the Dominican Republic, connecting users with tow truck services and drivers in real-time. It aims to streamline service requests, enable real-time tracking, and efficiently manage operations. The platform provides distinct interfaces for Clients, Drivers, Administrators, and an enterprise portal for B2B clients, with the vision of revolutionizing the local tow truck service industry by offering advanced features and a robust user experience.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -26,15 +26,15 @@ Grúa RD uses a React 18 (TypeScript, Vite) frontend, an Express.js (Node.js) ba
 
 ### Feature Specifications
 **Core Features:**
-- **Authentication & Security**: Role-based access with Passport.js.
-- **Client Features**: Map-based service requests, real-time tracking, service history, price calculation, insurance document management.
-- **Driver Features**: Request dashboard, accept/reject services, real-time GPS, availability toggle, specialized truck management, Operator Wallet System (commissions, debt, payments).
+- **Authentication & Security**: Role-based access with Passport.js, dual-account system.
+- **Client Features**: Map-based service requests, real-time tracking, service history, price calculation, insurance document management, draggable pins for origin/destination.
+- **Driver Features**: Request dashboard, accept/reject services, real-time GPS, availability toggle, specialized truck management, Operator Wallet System, multi-vehicle support, extended destination option.
 - **Admin Features**: Dashboard with analytics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration, document validation, support ticket system.
 - **Enterprise Portal (B2B)**: Business management, contract/tariff configuration, project tracking, scheduled services, invoicing.
 - **Real-time Communication**: WebSockets for location updates, chat, automatic service cancellation.
-- **Push Notifications**: Web Push API and Capacitor for updates.
+- **Push Notifications**: Web Push API and Capacitor.
 - **PWA & Native Capabilities**: Installable PWA with Capacitor integration.
-- **Payment Integration**: Azul API (pending migration) for card payments, cash, automatic 80/20 commission splitting, operator wallet with scheduled payouts and same-day withdrawals, PDF receipts.
+- **Payment Integration**: Azul API for card payments, cash, automatic 80/20 commission splitting, operator wallet with scheduled payouts and same-day withdrawals, PDF receipts.
 - **Robust UX**: Skeleton loaders, empty states, dialogs, toast notifications, form validations, responsive design.
 - **Monitoring & Logging**: Structured logging with Winston.
 - **Identity & Compliance**: Multi-step onboarding, Dominican ID (cédula) validation (Verifik OCR API), phone OTP/SMS verification, admin verification panel.
@@ -43,12 +43,9 @@ Grúa RD uses a React 18 (TypeScript, Vite) frontend, an Express.js (Node.js) ba
 - **Intermediate Service States**: Granular service states for tracking.
 - **Support Ticket System**: Comprehensive management.
 - **Negotiation Chat System**: Dual chat for standard and extraction services with price proposals.
-- **Multi-Vehicle Operator Support**: Operators can manage multiple vehicles, with vehicle documentation handled per-vehicle.
-- **Draggable Pins & Extended Destination**: Clients can drag origin/destination pins. Drivers can extend destinations up to 1.5km.
-- **Dual-Account System**: Allows the same email to be used for both client and driver accounts.
 
 ### System Design Choices
-The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage uses Replit Object Storage. Azul API payment integration (pending migration) will use server-side processing with webhook verification. Insurance API integrations use an Adapter pattern. Performance optimizations include smart location tracking, lazy loading of map components, consolidated API endpoints, self-hosted fonts, enhanced service worker, role-based preloading, React Query optimizations, and dynamic preconnect by role. TTFB optimizations include aggressive cache headers, X-Response-Time header, Early Hints, and fast-path middleware, reducing TTFB from 814ms to 13ms. Cedula validation allows the same cedula across multiple account types belonging to the same person.
+The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage uses Replit Object Storage or filesystem storage based on environment. Azul API payment integration uses server-side processing with webhook verification. Insurance API integrations use an Adapter pattern. Performance optimizations include smart location tracking, lazy loading of map components, consolidated API endpoints, self-hosted fonts, enhanced service worker, role-based preloading, React Query optimizations, and dynamic preconnect by role, with significant TTFB reductions. Session management uses a PostgreSQL session store with `connect-pg-simple`. Cedula validation allows the same cedula across multiple account types belonging to the same person.
 
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
@@ -56,117 +53,10 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Waze**: Deep links for driver navigation.
 - **Azul API**: Payment gateway for Dominican Republic.
 - **Web Push API**: For push notifications.
-- **Replit Object Storage**: For document storage.
+- **Replit Object Storage**: For document storage (default in Replit).
 - **Twilio**: SMS service for OTP delivery (via Replit Connector).
 - **Resend**: Email service for transactional emails and notifications (via Replit Connector).
 - **Verifik**: OCR scanning and Dominican government database verification for cédula validation.
 - **Capacitor**: For native mobile app functionalities and plugins.
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
-
-## CapRover Deployment
-
-### Document Storage Configuration
-The application uses a provider-agnostic storage abstraction that automatically selects the appropriate storage backend:
-
-1. **Replit Object Storage**: Used when running inside Replit environment (default)
-2. **Filesystem Storage**: Used when running outside Replit (CapRover, Docker, local)
-
-### CapRover Volume Configuration
-When deploying to CapRover, configure a persistent volume for document uploads:
-
-1. In CapRover app settings, add a persistent volume:
-   - **Container Path**: `/app/uploads`
-   - **Host Path**: Use CapRover's default persistent storage
-
-2. Optionally set the `STORAGE_PATH` environment variable to customize the storage location:
-   ```
-   STORAGE_PATH=/app/uploads
-   ```
-
-### Environment Variables for CapRover
-Required environment variables for CapRover deployment:
-- `DATABASE_URL`: PostgreSQL connection string
-- `SESSION_SECRET`: Session encryption key
-- `MAPBOX_ACCESS_TOKEN` / `VITE_MAPBOX_ACCESS_TOKEN`: Mapbox API key
-- `RESEND_API_KEY`: Email service API key
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`: Push notification keys
-- `STORAGE_PATH`: (Optional) Custom path for file storage, defaults to `/app/uploads`
-
-### Storage API Endpoints
-- `GET /api/storage/info`: Returns current storage provider status
-- `GET /api/storage/files/*`: Serves uploaded files from filesystem storage (requires authentication)
-
-### Session Configuration for CapRover
-The application uses PostgreSQL session store for persistent sessions in production:
-- Session cookie name: `gruard.sid`
-- Session store: `connect-pg-simple` with table `user_sessions`
-- Trust proxy enabled for reverse proxy environments
-- Cookie: `secure: true` in production, `sameSite: "lax"` for compatibility
-
-## Recent Changes
-
-### December 11, 2025 - Account Deletion & Map Expansion Fixes
-Fixed critical issues with account deletion and map display:
-
-- **Account Deletion Flow Reordered**: Session is now destroyed BEFORE user deletion to prevent orphaned state. If session teardown fails, deletion is aborted and user account remains intact.
-- **Cookie Always Cleared**: `gruard.sid` cookie is always cleared during deletion, even on session destroy errors.
-- **Verification Bypass**: Added bypass for test user `jesus@a.fourone.com.do` in `userNeedsVerification()` function.
-- **Map Positioning Fix**: MapboxMap component now preserves caller-provided positioning classes (absolute, fixed, sticky) instead of overwriting with `relative`. This fixes the map not expanding when the categories panel is minimized.
-
-### December 10, 2025 - Privacy Section Added to User Profiles
-Added privacy and account deletion functionality for both clients and drivers:
-
-- **New Component**: `PrivacySection.tsx` - Reusable component with privacy info and account deletion
-- **Backend Endpoint**: `DELETE /api/users/me` with comprehensive safeguards:
-  - Checks for active services (pendiente, aceptado, conductor_en_sitio, cargando, en_progreso)
-  - Drivers must have zero balancePendiente and balanceDisponible
-  - Proper session cleanup and cascade deletion
-- **Frontend Integration**: Added to both driver (`/driver/profile`) and client (`/client/profile`) pages
-- **UX**: User-friendly error messages mapped from backend errors, confirmation dialog prevents accidental deletion
-
-### December 10, 2025 - Bug Corrections Phase 4 Started (Production Monitoring)
-Transitioned to production monitoring phase. All code fixes are complete and deployed to CapRover.
-
-- **Fase 4 en progreso**: Monitoreo en producción para validar correcciones
-- **Documentación actualizada**: `PLAN_CORRECCIONES_BUGS.md` con instrucciones de monitoreo
-- **Verificaciones pendientes**:
-  1. Error 409 ya no bloquea licencia trasera
-  2. Flujo cliente → conductor funciona correctamente
-  3. Sin error "integer: true" al registrar vehículos
-  4. Logs de verificación funcionando correctamente
-
-### December 10, 2025 - Bug Corrections Phase 3 Completed
-Added robust regression test for secondary account onboarding flow:
-
-- **Test de regresión**: ✅ Added and validated in `e2e/06-onboarding-wizard.spec.ts`
-  - Test name: `REGRESIÓN: Cliente autenticado debe poder completar registro de conductor secundario y redirigir a /driver`
-  - Validates that when a client navigates to `/onboarding?tipo=conductor`, the userType is preserved as "conductor"
-  - Strict assertions: driver fields must appear, complete button must be visible, final URL must be /driver or /verify-pending
-  - Modified `e2e/helpers.ts` to export `generateUniqueId()` function
-
-### December 10, 2025 - Bug Corrections Phase 2 Completed
-Implemented fix for license back validation from `PLAN_CORRECCIONES_BUGS.md`:
-
-- **Bug 1 (Licencia trasera)**: ✅ Fixed - Verifik 409 "failed_to_read" error now handled gracefully
-  - Added `MINIMUM_LICENSE_BACK_SCORE = 0.5` (lower than general 0.6 threshold)
-  - Error 409 "failed_to_read" now accepts license with default score since front license already validated identity
-  - Modified `server/services/verifik-ocr.ts` lines 521, 1020-1042, 1075-1085
-
-### December 10, 2025 - Bug Corrections Phase 1 Completed and Validated
-Implemented and validated fixes from `PLAN_CORRECCIONES_BUGS.md`:
-
-- **Bug 3 (Alta prioridad)**: ✅ Fixed and validated - secondary account flow uses `/onboarding` route (user selects conductor type in wizard step 1)
-- **Bug 2 (Alta prioridad)**: ✅ Fixed - migrated `vehiculos_registrados` column from INTEGER to BOOLEAN
-- **Bug 1 (Media prioridad)**: ✅ Fixed in Phase 2 - license back validation error 409 handled
-- **Bug 4**: ✅ Validated as not a bug - insurance is optional during client verification, redirection logic only requires cedula and email verification
-
-### December 9, 2025 - Authentication & Verification Plan Completed
-All phases of `PLAN_UNIFICADO_AUTH_VERIFICACION.md` have been implemented:
-
-- **FASE 1**: Critical authentication fixes - passport.authenticate callback pattern, PostgreSQL session store, improved deserializeUser
-- **FASE 2**: Sessions during pending verification - ProtectedRoute with `allowPendingVerification`, verification-allowed API patterns
-- **FASE 3**: UI verification flow - `getNextStep()` helper, framer-motion transitions between steps
-- **FASE 4**: License OCR validation with Verifik - front/back license scanning with OCR verification
-- **FASE 5**: CapRover compatibility - `gruard.sid` cookie name, trust proxy, session store configuration
-- **FASE 6**: Cleanup & improvements - removed obsolete grúa fields, added `logAuth.verificationStep()` for audit logging
