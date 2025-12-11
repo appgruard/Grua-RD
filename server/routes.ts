@@ -965,6 +965,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add driver account for existing client (dual account system)
+  app.post("/api/auth/add-driver-account", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Debes iniciar sesión primero" });
+      }
+
+      const currentUser = req.user as Express.User;
+      
+      // Verify the current user is a client
+      if (currentUser.userType !== 'cliente') {
+        return res.status(400).json({ 
+          message: "Solo los clientes pueden añadir una cuenta de conductor" 
+        });
+      }
+
+      // Check if user already has a conductor account
+      const existingConductor = await storage.getUserByEmailAndType(currentUser.email, 'conductor');
+      if (existingConductor) {
+        return res.status(400).json({ 
+          message: "Ya tienes una cuenta de conductor con este correo. Inicia sesión con tu cuenta de conductor.",
+          hasExistingAccount: true
+        });
+      }
+
+      // Create new user with conductor type, copying data from client account
+      const newConductorUser = await storage.createUser({
+        email: currentUser.email,
+        passwordHash: currentUser.passwordHash,
+        userType: 'conductor',
+        estadoCuenta: 'pendiente_verificacion',
+        nombre: currentUser.nombre,
+        apellido: currentUser.apellido || '',
+        phone: currentUser.phone,
+        cedula: currentUser.cedula,
+        cedulaImageUrl: currentUser.cedulaImageUrl,
+        cedulaVerificada: currentUser.cedulaVerificada,
+        telefonoVerificado: currentUser.telefonoVerificado || false,
+        emailVerificado: currentUser.emailVerificado || false,
+      });
+
+      logAuth.registerSuccess(newConductorUser.email, 'conductor', req.ip);
+      logSystem.info("Client added driver account", { 
+        clientUserId: currentUser.id, 
+        driverUserId: newConductorUser.id,
+        email: currentUser.email 
+      });
+
+      // Send welcome email for new operator account
+      try {
+        const emailService = await getEmailService();
+        await emailService.sendOperatorWelcomeEmail(newConductorUser.email, newConductorUser.nombre);
+      } catch (emailError) {
+        logSystem.warn("Failed to send operator welcome email", { 
+          userId: newConductorUser.id, 
+          error: emailError instanceof Error ? emailError.message : 'Unknown error'
+        });
+      }
+
+      // Log into the new conductor account
+      req.login(newConductorUser, (err) => {
+        if (err) {
+          logSystem.error("Login failed after adding driver account", err, { userId: newConductorUser.id });
+          return res.status(500).json({ message: "Error al cambiar a cuenta de conductor" });
+        }
+        res.json({ 
+          success: true,
+          message: "Cuenta de conductor creada exitosamente",
+          user: getSafeUser(newConductorUser) 
+        });
+      });
+    } catch (error: any) {
+      logSystem.error('Add driver account error', error);
+      res.status(500).json({ message: "Error al crear cuenta de conductor" });
+    }
+  });
+
   app.get("/api/health", async (_req: Request, res: Response) => {
     try {
       const startTime = Date.now();

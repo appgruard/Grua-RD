@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertCircle, Clock, Phone, Lock } from 'lucide-react';
+import { Loader2, AlertCircle, Clock, Phone, Lock, Eye, EyeOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiRequest } from '@/lib/queryClient';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
@@ -23,6 +23,8 @@ export default function ForgotPassword() {
   const [confirmarPassword, setConfirmarPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(0);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -263,9 +265,9 @@ export default function ForgotPassword() {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="nuevaPassword"
-                    type="password"
+                    type={showNewPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className={`pl-10 ${
+                    className={`pl-10 pr-10 ${
                       errors.nuevaPassword ? 'border-destructive focus-visible:ring-destructive' : ''
                     }`}
                     value={nuevaPassword}
@@ -276,6 +278,16 @@ export default function ForgotPassword() {
                     disabled={loading}
                     data-testid="input-new-password"
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    data-testid="button-toggle-new-password"
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </Button>
                 </div>
                 {errors.nuevaPassword && (
                   <p className="text-sm text-destructive flex items-center gap-1">
@@ -291,9 +303,9 @@ export default function ForgotPassword() {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirmarPassword"
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className={`pl-10 ${
+                    className={`pl-10 pr-10 ${
                       errors.confirmarPassword ? 'border-destructive focus-visible:ring-destructive' : ''
                     }`}
                     value={confirmarPassword}
@@ -304,6 +316,16 @@ export default function ForgotPassword() {
                     disabled={loading}
                     data-testid="input-confirm-password"
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    data-testid="button-toggle-confirm-password"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </Button>
                 </div>
                 {errors.confirmarPassword && (
                   <p className="text-sm text-destructive flex items-center gap-1">

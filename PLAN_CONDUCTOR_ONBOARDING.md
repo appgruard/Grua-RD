@@ -1,5 +1,9 @@
 # Plan: Formulario de Onboarding para Cliente → Añadir Cuenta de Conductor
 
+## Estado: ✅ COMPLETADO (11 Diciembre 2025)
+
+---
+
 ## Problema Identificado
 
 Cuando un cliente hace clic en "Crear cuenta de conductor" desde su perfil:
@@ -17,17 +21,13 @@ El sistema soporta **cuentas duales** - el usuario puede tener AMBAS cuentas (cl
 
 ---
 
-## Solución Recomendada: Opción 1
+## Solución Implementada
 
-Crear un flujo optimizado para clientes existentes que quieren añadir una cuenta de conductor, omitiendo los pasos ya completados como cliente.
-
-### Cambios Necesarios
-
-#### 1. Modificar navegación en profile.tsx del cliente
+### Fase 1: Corregir navegación básica ✅
 
 **Archivo:** `client/src/pages/client/profile.tsx`
 
-Cambiar:
+Cambiado:
 ```javascript
 onClick={() => setLocation('/onboarding')}
 ```
@@ -36,128 +36,107 @@ Por:
 onClick={() => setLocation('/onboarding?tipo=conductor')}
 ```
 
-#### 2. Modificar onboarding-wizard.tsx para detectar cliente existente
+---
+
+### Fase 2: Optimizar flujo para clientes existentes ✅
 
 **Archivo:** `client/src/pages/auth/onboarding-wizard.tsx`
 
-**Cambios principales:**
+**Cambios implementados:**
 
-1. **Detectar si es un cliente autenticado añadiendo cuenta de conductor:**
-   - Si `user` existe y `user.userType === 'cliente'` y `preselectedType === 'conductor'`
-   - Entonces es un cliente que quiere convertirse en conductor
+1. **Nueva flag de detección** (línea 64):
+   ```typescript
+   const isClientAddingDriverAccount = Boolean(user && (user as any).userType === 'cliente' && preselectedType === 'conductor');
+   ```
 
-2. **Saltar pasos ya completados:**
-   - Email ya verificado (paso 3) → Saltar
-   - Nombre y apellido ya existen → Pre-llenar
-   - Teléfono ya existe → Pre-llenar
+2. **Configuración dinámica de pasos** (líneas 211-220):
+   - Array `stepConfig` con condiciones de visibilidad para cada paso
+   - `visibleSteps` filtra solo los pasos necesarios
+   - `TOTAL_VISIBLE_STEPS` proporciona el conteo correcto
 
-3. **Flujo optimizado para cliente → conductor:**
-   - Paso 1: Información básica → SALTAR (ya tiene cuenta)
-   - Paso 2: Cédula → MOSTRAR (si no verificada, o ya mostrar para conductor)
-   - Paso 3: Verificación email → SALTAR (ya verificado como cliente)
-   - Paso 4: Foto de perfil → MOSTRAR
-   - Paso 5: Licencia de conducir (frontal y trasera) → MOSTRAR
-   - Paso 6: Categorías de servicio → MOSTRAR
-   - Paso 7: Vehículos por categoría → MOSTRAR
-   - Paso 8: Documentos adicionales → MOSTRAR
+3. **Helpers de navegación** (líneas 222-235):
+   - `getNextVisibleStep()` - encuentra el siguiente paso visible
+   - `getFirstVisibleStep()` - encuentra el primer paso visible
 
-4. **Crear endpoint backend para añadir cuenta de conductor:**
-   - Ruta: `POST /api/auth/add-driver-account`
-   - Crea registro en tabla `conductores` vinculado al usuario existente
-   - Crea nuevo registro en `users` con `userType: 'conductor'` vinculado al mismo email
-   - El usuario mantiene AMBAS cuentas y puede alternar entre ellas
+4. **Banner informativo** (líneas 1581-1591):
+   - Muestra alerta cuando `isClientAddingDriverAccount` es true
+   - Mensaje: "Estás añadiendo una cuenta de conductor a tu perfil existente. Podrás alternar entre ambas cuentas."
 
-#### 3. Backend: Nuevo endpoint para cuenta dual
+5. **Auto-completar pasos en mount** (líneas 113-147):
+   - Pre-llena formData con datos existentes del usuario
+   - Marca pasos 1, 2 (si cédula verificada), 3 (si email verificado) como completados
+   - Salta al primer paso visible que necesita completarse
+
+6. **Progreso actualizado** (línea 1594):
+   - Muestra "Paso X de Y" usando índice de paso visible
+
+---
+
+### Fase 3: Backend - Endpoint para cuenta dual ✅
 
 **Archivo:** `server/routes.ts`
 
-Crear endpoint:
-```typescript
-POST /api/auth/add-driver-account
-Body: {
-  // Datos específicos de conductor (el resto se hereda del cliente)
-  licenciaFrontalUrl: string,
-  licenciaTraseraUrl: string,
-  fotoPerfilUrl: string,
-  categorias: ServiceSelection[],
-  vehiculos: VehicleData[]
-}
-```
+Nuevo endpoint: `POST /api/auth/add-driver-account`
 
-**Lógica:**
-- Crear nuevo usuario con `userType: 'conductor'` usando mismo email
-- Copiar datos comunes (nombre, apellido, teléfono, cédula verificada)
-- Crear registro en tabla `conductores`
-- El usuario puede alternar entre cuentas en el login
+**Funcionalidad:**
+- Verifica que el usuario esté autenticado y sea cliente
+- Verifica que no tenga ya una cuenta de conductor
+- Crea nuevo usuario con `userType: 'conductor'` y mismo email
+- Copia datos comunes: nombre, apellido, teléfono, cédula, verificaciones
+- Usa el mismo passwordHash (misma contraseña)
+- Envía email de bienvenida como operador
+- Inicia sesión automáticamente en la nueva cuenta de conductor
+
+**Integración con frontend:**
+- El `finalizeProfileMutation` en el wizard detecta `isClientAddingDriverAccount`
+- Llama primero al endpoint para crear la cuenta de conductor
+- Luego actualiza los datos específicos del conductor (licencia, vehículos, etc.)
 
 ---
 
-## Tarea Extra: Icono de Ojo para Contraseñas
+### Fase 4: Icono de ojo para contraseñas ✅
 
-### Archivos a modificar:
+**Archivos modificados:**
 
 1. **`client/src/pages/auth/login.tsx`**
-   - Añadir estado `showPassword`
-   - Cambiar input de password a `type={showPassword ? 'text' : 'password'}`
-   - Añadir botón con icono `Eye` / `EyeOff` de lucide-react
+   - Añadido `Eye, EyeOff` a imports
+   - Estado `showPassword`
+   - Botón toggle en campo de contraseña
 
 2. **`client/src/pages/auth/onboarding-wizard.tsx`**
-   - Mismo patrón para el campo de contraseña
-   - Y para el campo de confirmar contraseña si existe
+   - Añadido `Eye, EyeOff` a imports
+   - Estado `showPassword`
+   - Botón toggle en campo de contraseña
 
 3. **`client/src/pages/auth/forgot-password.tsx`**
-   - Si hay campo de nueva contraseña, aplicar mismo patrón
-
-### Ejemplo de implementación:
-
-```tsx
-import { Eye, EyeOff } from 'lucide-react';
-
-const [showPassword, setShowPassword] = useState(false);
-
-<div className="relative">
-  <Input
-    type={showPassword ? 'text' : 'password'}
-    value={password}
-    onChange={(e) => setPassword(e.target.value)}
-    className="pr-10"
-  />
-  <Button
-    type="button"
-    variant="ghost"
-    size="icon"
-    className="absolute right-0 top-0 h-full"
-    onClick={() => setShowPassword(!showPassword)}
-  >
-    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-  </Button>
-</div>
-```
+   - Añadido `Eye, EyeOff` a imports
+   - Estados `showNewPassword` y `showConfirmPassword`
+   - Botones toggle en ambos campos de contraseña
 
 ---
 
-## Lista de Tareas
+## Lista de Tareas Completadas
 
 ### Fase 1: Corregir navegación básica
-- [ ] Cambiar navegación en `client/profile.tsx` a `/onboarding?tipo=conductor`
-- [ ] Verificar que onboarding-wizard detecte correctamente el parámetro
+- [x] Cambiar navegación en `client/profile.tsx` a `/onboarding?tipo=conductor`
+- [x] Verificar que onboarding-wizard detecte correctamente el parámetro
 
 ### Fase 2: Optimizar flujo para clientes existentes
-- [ ] Modificar onboarding-wizard para detectar cliente autenticado → conductor
-- [ ] Implementar lógica para saltar pasos ya completados (email verificado)
-- [ ] Pre-llenar datos existentes (nombre, apellido, email, teléfono)
-- [ ] Calcular pasos totales dinámicamente (menos pasos para clientes existentes)
+- [x] Modificar onboarding-wizard para detectar cliente autenticado → conductor
+- [x] Implementar lógica para saltar pasos ya completados (email verificado)
+- [x] Pre-llenar datos existentes (nombre, apellido, email, teléfono)
+- [x] Calcular pasos totales dinámicamente (menos pasos para clientes existentes)
 
 ### Fase 3: Backend
-- [ ] Crear endpoint `/api/auth/add-driver-account`
-- [ ] Crear nuevo usuario con `userType: 'conductor'` vinculado al mismo email
-- [ ] Copiar datos comunes del cliente (nombre, apellido, teléfono, cédula)
-- [ ] Crear registro en tabla `conductores`
+- [x] Crear endpoint `/api/auth/add-driver-account`
+- [x] Crear nuevo usuario con `userType: 'conductor'` vinculado al mismo email
+- [x] Copiar datos comunes del cliente (nombre, apellido, teléfono, cédula)
+- [x] Integrar con finalizeProfileMutation en el wizard
 
 ### Fase 4: Icono de ojo para contraseñas
-- [ ] Implementar en `login.tsx`
-- [ ] Implementar en `onboarding-wizard.tsx`
-- [ ] Implementar en `forgot-password.tsx` (si aplica)
+- [x] Implementar en `login.tsx`
+- [x] Implementar en `onboarding-wizard.tsx`
+- [x] Implementar en `forgot-password.tsx`
 
 ---
 
@@ -167,5 +146,5 @@ const [showPassword, setShowPassword] = useState(false);
 - El cliente ya tiene: email, nombre, apellido, teléfono, contraseña, cédula verificada (posiblemente)
 - El conductor necesita adicionalmente: foto de perfil, licencia, categorías, vehículos
 - En el login, si el usuario tiene ambas cuentas, se le muestra selector para elegir con cuál ingresar
-- Se debe mostrar mensaje claro de que están "añadiendo" cuenta de conductor, no reemplazando la de cliente
+- Se muestra mensaje claro de que están "añadiendo" cuenta de conductor, no reemplazando la de cliente
 - La nueva cuenta de conductor comparte el mismo email pero es un registro separado en `users`
