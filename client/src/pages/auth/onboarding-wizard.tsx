@@ -78,6 +78,8 @@ export default function OnboardingWizard() {
   const [insuranceFile, setInsuranceFile] = useState<File | null>(null);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Client insurance fields
   const [clientInsuranceName, setClientInsuranceName] = useState('');
@@ -883,6 +885,8 @@ export default function OnboardingWizard() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Correo inválido';
     if (!formData.password) newErrors.password = 'Contraseña requerida';
     else if (formData.password.length < 6) newErrors.password = 'Mínimo 6 caracteres';
+    if (!confirmPassword) newErrors.confirmPassword = 'Confirma tu contraseña';
+    else if (formData.password !== confirmPassword) newErrors.confirmPassword = 'Las contraseñas no coinciden';
     if (!formData.nombre.trim()) newErrors.nombre = 'Nombre requerido';
     if (!formData.apellido.trim()) newErrors.apellido = 'Apellido requerido';
     if (!formData.phone.trim()) newErrors.phone = 'Teléfono requerido';
@@ -1008,6 +1012,36 @@ export default function OnboardingWizard() {
           </Button>
         </div>
         {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            id="confirmPassword" 
+            type={showConfirmPassword ? 'text' : 'password'} 
+            placeholder="Repite tu contraseña" 
+            className="pl-10 pr-10" 
+            value={confirmPassword} 
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setErrors(prev => ({ ...prev, confirmPassword: '' }));
+            }} 
+            disabled={registerMutation.isPending} 
+            data-testid="input-confirm-password" 
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            data-testid="button-toggle-confirm-password"
+          >
+            {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+          </Button>
+        </div>
+        {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
       </div>
       <div className="space-y-2">
         <Label htmlFor="phone">Teléfono</Label>
