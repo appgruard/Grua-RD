@@ -9,3 +9,14 @@ externalPort = 80
 
 [agent]
 integrations = ["javascript_database:1.0.0"]
+
+[workflows]
+
+[[workflows.workflow]]
+name = "Startup Application"
+mode = "sequential"
+author = 51205669
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run"
