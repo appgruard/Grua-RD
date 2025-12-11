@@ -26,9 +26,9 @@
 
 <p align="center">
   <a href="#características">Características</a> •
-  <a href="#tecnologías">Tecnologías</a> •
-  <a href="#instalación">Instalación</a> •
-  <a href="#configuración">Configuración</a> •
+  <a href="#tecnologias">Tecnologías</a> •
+  <a href="#instalacion">Instalación</a> •
+  <a href="#configuracion">Configuración</a> •
   <a href="#despliegue">Despliegue</a> •
   <a href="#arquitectura">Arquitectura</a>
 </p>
