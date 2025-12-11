@@ -336,7 +336,7 @@ export default function ClientProfile() {
                   Crea una cuenta de conductor adicional y comienza a ganar dinero con tu vehículo. Podrás alternar entre ambas cuentas.
                 </p>
                 <Button 
-                  onClick={() => setLocation('/onboarding')}
+                  onClick={() => setLocation('/onboarding?tipo=conductor')}
                   className="w-full"
                   data-testid="button-become-driver"
                 >
