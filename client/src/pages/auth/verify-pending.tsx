@@ -829,35 +829,46 @@ export default function VerifyPending() {
         });
       }
 
-      // Also upload to document storage for record keeping
-      try {
-        const formData = new FormData();
-        formData.append('document', file);
-        formData.append('type', type);
-        const uploadRes = await fetch('/api/driver/documents', {
-          method: 'POST',
-          credentials: 'include',
-          body: formData,
-        });
-        if (!uploadRes.ok) {
-          // Document storage failed - reset verification and ask user to retry
-          console.warn('Document upload returned error but OCR passed');
-          if (type === 'licencia') {
-            setLicenseFrontVerified(false);
-            setLicenseFrontUrl(null);
+      // Also upload to document storage for record keeping with retries
+      const maxRetries = 3;
+      let uploadSuccess = false;
+      let lastError: Error | null = null;
+      
+      for (let attempt = 1; attempt <= maxRetries && !uploadSuccess; attempt++) {
+        try {
+          const formData = new FormData();
+          formData.append('document', file);
+          formData.append('type', type);
+          const uploadRes = await fetch('/api/driver/documents', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+          
+          if (uploadRes.ok) {
+            uploadSuccess = true;
           } else {
-            setLicenseBackVerified(false);
-            setLicenseBackUrl(null);
+            const errorData = await uploadRes.json().catch(() => ({}));
+            // If retryable error and not last attempt, wait and retry
+            if (errorData.retryable && attempt < maxRetries) {
+              console.warn(`Document upload attempt ${attempt} failed (retryable), retrying...`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+              continue;
+            }
+            lastError = new Error(errorData.message || 'Error al guardar el documento');
           }
-          throw new Error('Verificación exitosa pero falló el guardado. Por favor intenta de nuevo.');
+        } catch (networkErr: any) {
+          console.warn(`Document upload attempt ${attempt} failed:`, networkErr);
+          lastError = new Error('Error de conexión al guardar el documento');
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          }
         }
-      } catch (uploadErr: any) {
-        // If error was thrown by our check above, re-throw it
-        if (uploadErr.message?.includes('guardado')) {
-          throw uploadErr;
-        }
-        // Network/other error - reset verification and ask user to retry  
-        console.warn('Document upload failed but OCR passed:', uploadErr);
+      }
+      
+      if (!uploadSuccess) {
+        // Document storage failed after all retries - reset verification and ask user to retry
+        console.warn('Document upload failed after all retries');
         if (type === 'licencia') {
           setLicenseFrontVerified(false);
           setLicenseFrontUrl(null);
@@ -865,7 +876,7 @@ export default function VerifyPending() {
           setLicenseBackVerified(false);
           setLicenseBackUrl(null);
         }
-        throw new Error('Verificación exitosa pero falló el guardado. Por favor intenta de nuevo.');
+        throw lastError || new Error('Verificación exitosa pero falló el guardado. Por favor intenta de nuevo.');
       }
 
     } catch (err: any) {
@@ -953,6 +964,9 @@ export default function VerifyPending() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Error al guardar las categorías');
 
+      // Refetch verification status to sync with server truth
+      await refetchVerificationStatus();
+      
       setCategoriesVerified(true);
       setCurrentStep('vehicles');
       toast({ title: 'Categorías guardadas', description: 'Ahora registra los datos de tus vehículos' });
@@ -996,11 +1010,32 @@ export default function VerifyPending() {
         if (!response.ok) throw new Error(data.message || 'Error al registrar el vehículo');
       }
 
+      // Wait for server to confirm all verifications are complete
+      // Poll verification status to ensure vehiculosRegistrados is set
+      let verificationConfirmed = false;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const statusRes = await fetch('/api/identity/verification-status', {
+          credentials: 'include'
+        });
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.verification?.vehiculosRegistrados && statusData.allCompleted) {
+            verificationConfirmed = true;
+            break;
+          }
+        }
+        // Wait 500ms before next attempt
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       setVehiclesVerified(true);
       toast({ title: 'Registro completado', description: 'Todos los vehículos han sido registrados exitosamente' });
       
       clearPendingVerification();
       await refreshUser();
+      
+      // Small delay to ensure session is fully updated before redirect
+      await new Promise(resolve => setTimeout(resolve, 300));
       setLocation('/driver');
     } catch (err: any) {
       setErrors({ vehicles: err.message || 'Error al registrar los vehículos' });

@@ -3800,6 +3800,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Mark categories as configured
       await storage.updateConductor(conductor.id, { categoriasConfiguradas: true });
       
+      // Refresh session with updated user data (includes conductor with categoriasConfiguradas)
+      const updatedUser = await storage.getUserById(req.user!.id);
+      if (updatedUser) {
+        await new Promise<void>((resolve, reject) => {
+          req.login(updatedUser as any, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
+      
       const servicios = await storage.getConductorServicios(conductor.id);
       
       logSystem.info('Driver services updated', { conductorId: conductor.id, count: servicios.length });
@@ -3858,6 +3869,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.updateConductor(conductor.id, updateData);
+      
+      // Refresh session with updated user data (includes conductor with licenciaVerificada)
+      const updatedUser = await storage.getUserById(req.user!.id);
+      if (updatedUser) {
+        await new Promise<void>((resolve, reject) => {
+          req.login(updatedUser as any, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
       
       logSystem.info('Driver license data updated', { 
         conductorId: conductor.id, 
@@ -3976,6 +3998,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (allCategoriesHaveVehicles) {
         await storage.updateConductor(conductor.id, { vehiculosRegistrados: true });
         logSystem.info('All categories have vehicles, marked vehiculosRegistrados', { conductorId: conductor.id });
+        
+        // Refresh session with updated user data (includes conductor with vehiculosRegistrados)
+        const updatedUser = await storage.getUserById(req.user!.id);
+        if (updatedUser) {
+          await new Promise<void>((resolve, reject) => {
+            req.login(updatedUser as any, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+        }
       }
 
       logSystem.info('Driver vehicle created/updated', { conductorId: conductor.id, categoria, vehiculoId: vehiculo.id });
