@@ -712,6 +712,70 @@ export async function validateFacePhoto(imageBase64: string): Promise<FaceValida
 
 // ==================== LICENSE VALIDATION ====================
 
+/**
+ * Checks if the document type indicates a driver's license.
+ * Handles various formats: "Driver's License", "Licencia de conducir", "DL", etc.
+ */
+function isDocumentTypeDriverLicense(documentType: string): boolean {
+  if (!documentType) return false;
+  
+  const normalizedType = documentType.toLowerCase().trim();
+  
+  // List of valid driver's license identifiers
+  const validTypes = [
+    'driver',
+    'license',
+    'licencia',
+    'conducir',
+    'conduccion',
+    'dl',
+    'driving',
+    'permiso de conducir',
+    'carnet de conducir'
+  ];
+  
+  return validTypes.some(type => normalizedType.includes(type));
+}
+
+/**
+ * Parses expiration date from various formats.
+ * Supports: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY
+ */
+function parseExpirationDate(dateString: string): Date | null {
+  if (!dateString) return null;
+  
+  const cleanDate = dateString.trim();
+  
+  // Try DD/MM/YYYY format (common in Dominican licenses)
+  const ddmmyyyySlash = cleanDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyySlash) {
+    const [, day, month, year] = ddmmyyyySlash;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  
+  // Try YYYY-MM-DD format (ISO)
+  const isoFormat = cleanDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoFormat) {
+    const [, year, month, day] = isoFormat;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  
+  // Try DD-MM-YYYY format
+  const ddmmyyyyDash = cleanDate.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (ddmmyyyyDash) {
+    const [, day, month, year] = ddmmyyyyDash;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  
+  // Try native Date parsing as fallback
+  const parsed = new Date(cleanDate);
+  if (!isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  
+  return null;
+}
+
 interface LicenseOCRExtraction {
   documentType?: string;
   country?: string;
@@ -817,63 +881,100 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
     const data: LicenseValidationResponse = rawResponse.data || rawResponse;
     const ocrData = data.OCRExtraction;
 
+    // Extract document type for validation
+    const documentType = ocrData?.documentType || data.documentType || '';
+    const licenseNumber = ocrData?.licenseNumber || ocrData?.documentNumber || data.documentNumber;
+    const expirationDate = ocrData?.expirationDate;
+
     logger.info("Verifik license validation response", { 
-      documentType: ocrData?.documentType || data.documentType,
-      documentNumber: ocrData?.documentNumber || ocrData?.licenseNumber || data.documentNumber,
-      confidenceScore: ocrData?.confidenceScore || data.confidenceScore,
-      imageValidated: data.imageValidated,
-      scoreValidated: data.scoreValidated
+      documentType: documentType,
+      documentNumber: licenseNumber,
+      expirationDate: expirationDate,
+      ocrDataKeys: ocrData ? Object.keys(ocrData) : [],
+      rawOcrData: ocrData
     });
 
-    // Check if Verifik explicitly rejected the image validation
-    // When imageValidated is explicitly false, the image quality or document is not acceptable
-    if (data.imageValidated === false) {
-      logger.warn("Verifik license image validation failed", {
-        imageValidated: data.imageValidated,
-        scoreValidated: data.scoreValidated
-      });
+    // Validate that the document is a driver's license by checking documentType
+    const isDriverLicense = isDocumentTypeDriverLicense(documentType);
+    
+    if (!isDriverLicense) {
+      logger.warn("Document is not a driver's license", { documentType });
       return {
         success: false,
         isValidLicense: false,
         score: 0,
-        licenseNumber: ocrData?.licenseNumber || ocrData?.documentNumber || data.documentNumber,
-        error: "La imagen de la licencia no pudo ser validada. Por favor, toma una foto más clara con buena iluminación."
+        licenseNumber: licenseNumber,
+        error: "El documento no parece ser una licencia de conducir. Por favor, sube una imagen de tu licencia de conducir."
       };
     }
 
-    // Calculate confidence score
+    // Check if license number was extracted (11-digit cedula number)
+    if (!licenseNumber) {
+      return {
+        success: false,
+        isValidLicense: false,
+        score: 0,
+        error: "No se pudo detectar el número de cédula en la licencia. Por favor, toma una foto más clara."
+      };
+    }
+
+    // Validate license number format (should be 11 digits like cedula)
+    const cleanLicenseNumber = licenseNumber.replace(/[-\s]/g, '');
+    if (cleanLicenseNumber.length !== 11 || !/^\d{11}$/.test(cleanLicenseNumber)) {
+      logger.warn("Invalid license number format", { licenseNumber, cleanLicenseNumber });
+      return {
+        success: false,
+        isValidLicense: false,
+        score: 0,
+        licenseNumber: licenseNumber,
+        error: "El número de cédula en la licencia no tiene un formato válido."
+      };
+    }
+
+    // Validate expiration date if extracted
+    let isExpired = false;
+    let parsedExpirationDate: Date | null = null;
+    
+    if (expirationDate) {
+      parsedExpirationDate = parseExpirationDate(expirationDate);
+      if (parsedExpirationDate) {
+        isExpired = parsedExpirationDate < new Date();
+        if (isExpired) {
+          logger.warn("License is expired", { expirationDate, parsedDate: parsedExpirationDate });
+          return {
+            success: false,
+            isValidLicense: false,
+            score: 0,
+            licenseNumber: cleanLicenseNumber,
+            expirationDate: expirationDate,
+            error: `La licencia está vencida (${expirationDate}). Debe renovar su licencia antes de registrarse.`
+          };
+        }
+      }
+    }
+
+    // Calculate confidence score - if we got valid license data, consider it successful
     const rawConfidence = ocrData?.confidenceScore ?? data.confidenceScore ?? 0;
-    // If we got license data but no confidence score, assume it was successfully read
     const confidenceScore = (typeof rawConfidence === 'number' && rawConfidence > 0)
       ? (rawConfidence > 1 ? rawConfidence / 100 : rawConfidence)
-      : ((ocrData?.licenseNumber || ocrData?.documentNumber || data.documentNumber) ? 0.8 : 0);
+      : 0.8; // Default to 0.8 if we successfully extracted required data
 
-    const licenseNumber = ocrData?.licenseNumber || ocrData?.documentNumber || data.documentNumber;
     const holderName = ocrData?.fullName || (ocrData?.firstName && ocrData?.lastName 
       ? `${ocrData.firstName} ${ocrData.lastName}`.trim() 
       : undefined);
 
-    const isValidLicense = confidenceScore >= MINIMUM_LICENSE_FRONT_SCORE && !!licenseNumber;
-
-    let details = "";
-    if (!licenseNumber) {
-      details = "No se pudo detectar un número de licencia en la imagen";
-    } else if (confidenceScore < MINIMUM_LICENSE_FRONT_SCORE) {
-      details = `La calidad del escaneo es muy baja (${Math.round(confidenceScore * 100)}%). Se requiere al menos 50%.`;
-    }
-
     return {
       success: true,
-      isValidLicense: isValidLicense,
+      isValidLicense: true,
       score: confidenceScore,
       scanId: data._id,
-      licenseNumber: licenseNumber,
+      licenseNumber: cleanLicenseNumber,
       licenseClass: ocrData?.licenseClass || ocrData?.category,
-      expirationDate: ocrData?.expirationDate,
+      expirationDate: expirationDate,
       holderName: holderName,
-      details: details || undefined,
+      details: undefined,
       rawResponse: data,
-      error: isValidLicense ? undefined : details
+      error: undefined
     };
 
   } catch (error: any) {
