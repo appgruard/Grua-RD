@@ -2421,6 +2421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         cedulaVerificada: user?.cedulaVerificada || false,
         telefonoVerificado: user?.telefonoVerificado || false,
+        emailVerificado: user?.emailVerificado || false,
         fotoVerificada: fotoVerificada,
         fotoVerificadaScore: fotoVerificadaScore,
         fullyVerified: isDriver 
