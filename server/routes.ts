@@ -476,12 +476,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return false;
     }
 
-    // Bypass verification for specific user (jesus@a.fourone.com.do)
-    const bypassEmails = ['jesus@a.fourone.com.do'];
-    if (bypassEmails.includes(user.email?.toLowerCase())) {
-      return false;
-    }
-
     const isConductor = user.userType === 'conductor';
     // Use truthy checks to handle both boolean true and integer 1 (database type mismatch)
     const cedulaVerificada = !!user.cedulaVerificada;
