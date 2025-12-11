@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, AlertCircle, User, Truck, ArrowLeft } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle, User, Truck, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
@@ -31,6 +31,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (pendingVerification) {
@@ -315,13 +316,13 @@ export default function Login() {
 
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <div className="relative flex items-center">
+                <Lock className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className={`pl-10 ${errors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  className={`pl-10 pr-10 ${errors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -330,6 +331,15 @@ export default function Login() {
                   disabled={loading}
                   data-testid="input-password"
                 />
+                <button
+                  type="button"
+                  className="absolute right-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                  data-testid="button-toggle-password"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
               {errors.password && (
                 <p className="text-sm text-destructive flex items-center gap-1">
