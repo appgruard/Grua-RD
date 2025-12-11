@@ -825,6 +825,22 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
       scoreValidated: data.scoreValidated
     });
 
+    // Check if Verifik explicitly rejected the image validation
+    // When imageValidated is explicitly false, the image quality or document is not acceptable
+    if (data.imageValidated === false) {
+      logger.warn("Verifik license image validation failed", {
+        imageValidated: data.imageValidated,
+        scoreValidated: data.scoreValidated
+      });
+      return {
+        success: false,
+        isValidLicense: false,
+        score: 0,
+        licenseNumber: ocrData?.licenseNumber || ocrData?.documentNumber || data.documentNumber,
+        error: "La imagen de la licencia no pudo ser validada. Por favor, toma una foto más clara con buena iluminación."
+      };
+    }
+
     // Calculate confidence score
     const rawConfidence = ocrData?.confidenceScore ?? data.confidenceScore ?? 0;
     // If we got license data but no confidence score, assume it was successfully read

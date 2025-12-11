@@ -2663,7 +2663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: 'license',
           name: 'Subir Licencia',
           description: 'Sube fotos de tu licencia (frente y reverso)',
-          completed: !!(conductor?.licenciaFrontalUrl && conductor?.licenciaTraseraUrl),
+          completed: !!(conductor?.licenciaVerificada && conductor?.licenciaFrontalUrl && conductor?.licenciaTraseraUrl),
           required: true
         });
         steps.push({
@@ -6987,16 +6987,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If Verifik is configured, only verify if the front was validated
         // If Verifik is not configured, mark for manual review (don't auto-verify)
         if (isVerifikConfigured()) {
-          if (verifikValidation.verified || type === 'licencia_trasera') {
-            // For back upload, check if front was already verified
-            // We need to re-validate if this is the back upload
-            if (type === 'licencia_trasera') {
-              // Trust that front was already validated when uploaded
+          if (type === 'licencia' && verifikValidation.verified) {
+            // Front license was just verified
+            await storage.updateConductor(conductor.id, { licenciaVerificada: true });
+            logSystem.info('License verified via Verifik', { conductorId: conductor.id });
+          } else if (type === 'licencia_trasera') {
+            // For back upload, check if front license document was actually verified
+            // Look for an approved front license document in the database
+            const frontLicenseDoc = await storage.getDocumentoByConductorAndTipo(conductor.id, 'licencia');
+            const frontIsVerified = frontLicenseDoc && frontLicenseDoc.estado === 'aprobado';
+            
+            if (frontIsVerified) {
               await storage.updateConductor(conductor.id, { licenciaVerificada: true });
               logSystem.info('License verified - both sides uploaded and front was validated', { conductorId: conductor.id });
             } else {
-              await storage.updateConductor(conductor.id, { licenciaVerificada: true });
-              logSystem.info('License verified via Verifik', { conductorId: conductor.id });
+              logSystem.warn('Back license uploaded but front was not verified', { 
+                conductorId: conductor.id,
+                frontDocExists: !!frontLicenseDoc,
+                frontDocEstado: frontLicenseDoc?.estado
+              });
             }
           } else {
             logSystem.warn('License images uploaded but not verified - Verifik validation failed', { 
