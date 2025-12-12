@@ -6828,26 +6828,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Upload to object storage
-      const uploadResult = await uploadDocument({
-        buffer: req.file.buffer,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        userId: conductor.id,
-        documentType: tipoDocumento,
-      });
-
       // Document types that require expiration date
       const documentosConVencimiento = ['licencia', 'matricula'];
       
-      // Validate expiration date is required for all documents with expiration
-      if (documentosConVencimiento.includes(tipoDocumento) && !fechaVencimiento) {
-        return res.status(400).json({ message: "La fecha de vencimiento es requerida para este tipo de documento" });
-      }
-      
       // Parse expiration date if provided and document type supports it
       let validoHasta: Date | undefined = undefined;
-      if (fechaVencimiento && documentosConVencimiento.includes(tipoDocumento)) {
+      let expirationDateSource: 'manual' | 'ocr' | 'calculated' = 'manual';
+      
+      // For license documents, try OCR if no expiration date provided
+      if (tipoDocumento === 'licencia' && !fechaVencimiento) {
+        const { validateDriverLicense, isVerifikConfigured } = await import("./services/verifik-ocr");
+        
+        if (isVerifikConfigured()) {
+          // Try to extract expiration date via OCR
+          const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+          const ocrResult = await validateDriverLicense(imageBase64);
+          
+          logSystem.info('License OCR for expiration date extraction', {
+            success: ocrResult.success,
+            expirationDate: ocrResult.expirationDate,
+            expirationDateSource: ocrResult.expirationDateSource
+          });
+          
+          if (ocrResult.success && ocrResult.expirationDate && ocrResult.expirationDateSource !== 'manual_required') {
+            // Parse the OCR extracted date (formats: DD/MM/YYYY or YYYY-MM-DD)
+            let parsedOcrDate: Date | undefined;
+            const dateStr = ocrResult.expirationDate;
+            
+            // Try DD/MM/YYYY format first
+            const dmyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (dmyMatch) {
+              parsedOcrDate = new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1]));
+            } else {
+              // Try ISO format
+              parsedOcrDate = new Date(dateStr);
+            }
+            
+            if (parsedOcrDate && !isNaN(parsedOcrDate.getTime())) {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              
+              if (parsedOcrDate <= today) {
+                return res.status(400).json({ 
+                  message: `La licencia está vencida (${ocrResult.expirationDate}). Debe renovar su licencia.`,
+                  requiresManualDate: false
+                });
+              }
+              
+              validoHasta = parsedOcrDate;
+              expirationDateSource = ocrResult.expirationDateSource === 'calculated_from_issue' ? 'calculated' : 'ocr';
+              logSystem.info('Using OCR extracted expiration date', {
+                expirationDate: ocrResult.expirationDate,
+                source: expirationDateSource
+              });
+            }
+          }
+          
+          // If OCR couldn't extract the date, require manual entry
+          if (!validoHasta) {
+            return res.status(400).json({ 
+              message: "No se pudo extraer la fecha de vencimiento automáticamente. Por favor ingrese la fecha manualmente.",
+              requiresManualDate: true,
+              code: 'MANUAL_DATE_REQUIRED'
+            });
+          }
+        } else {
+          // Verifik not configured, require manual date
+          return res.status(400).json({ 
+            message: "La fecha de vencimiento es requerida para este tipo de documento",
+            requiresManualDate: true,
+            code: 'MANUAL_DATE_REQUIRED'
+          });
+        }
+      } else if (fechaVencimiento && documentosConVencimiento.includes(tipoDocumento)) {
+        // Manual date provided
         const parsedDate = new Date(fechaVencimiento);
         if (!isNaN(parsedDate.getTime())) {
           // Validate that expiration date is in the future for all documents with expiration
@@ -6857,8 +6911,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(400).json({ message: "La fecha de vencimiento debe ser una fecha futura" });
           }
           validoHasta = parsedDate;
+          expirationDateSource = 'manual';
         }
+      } else if (documentosConVencimiento.includes(tipoDocumento) && tipoDocumento !== 'licencia' && !fechaVencimiento) {
+        // Non-license documents that require expiration date
+        return res.status(400).json({ 
+          message: "La fecha de vencimiento es requerida para este tipo de documento",
+          requiresManualDate: true
+        });
       }
+      
+      // Upload to object storage (after validation)
+      const uploadResult = await uploadDocument({
+        buffer: req.file.buffer,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        userId: conductor.id,
+        documentType: tipoDocumento,
+      });
 
       // Save document metadata to database
       const documento = await storage.createDocumento({

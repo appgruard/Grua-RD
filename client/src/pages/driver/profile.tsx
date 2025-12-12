@@ -216,8 +216,17 @@ export default function DriverProfile() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al subir el documento');
+        const errorData = await response.json();
+        // Create an error with additional context for manual date requirement
+        const error = new Error(errorData.message || 'Error al subir el documento') as Error & { 
+          requiresManualDate?: boolean; 
+          code?: string;
+          tipo?: string;
+        };
+        (error as any).requiresManualDate = errorData.requiresManualDate;
+        (error as any).code = errorData.code;
+        (error as any).tipo = tipo;
+        throw error;
       }
 
       return response.json();
@@ -241,7 +250,20 @@ export default function DriverProfile() {
         return newDates;
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error & { requiresManualDate?: boolean; code?: string; tipo?: string }) => {
+      // If manual date is required, keep the file in selectedFiles and show the date picker
+      if (error.requiresManualDate && error.tipo) {
+        toast({
+          title: 'Fecha de vencimiento requerida',
+          description: 'Por favor ingresa la fecha de vencimiento de tu licencia manualmente.',
+          variant: 'default',
+        });
+        // The file is already in selectedFiles, just need to show the date picker
+        // which happens automatically when there's a file in selectedFiles for documents with expiration
+        setUploadingDoc(null);
+        return;
+      }
+      
       toast({
         title: 'Error al subir documento',
         description: error.message,
@@ -292,7 +314,15 @@ export default function DriverProfile() {
   };
 
   const handleFileSelect = (file: File, tipo: string) => {
-    if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo)) {
+    // For license documents, try OCR first then fall back to manual date entry
+    if (tipo === 'licencia') {
+      // Store the file first in case OCR fails and we need manual date entry
+      setSelectedFiles(prev => ({ ...prev, [tipo]: file }));
+      setUploadingDoc(tipo);
+      // Try upload without date - server will attempt OCR extraction
+      uploadMutation.mutate({ file, tipo });
+    } else if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo)) {
+      // Other documents with expiration (like matricula) require manual date upfront
       setSelectedFiles(prev => ({ ...prev, [tipo]: file }));
     } else {
       setUploadingDoc(tipo);
