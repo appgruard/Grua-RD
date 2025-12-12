@@ -38,7 +38,7 @@ interface VerifikValidation {
 
 const REQUIRED_DOCUMENTS = [
   { tipo: 'foto_perfil', label: 'Foto de Perfil', requiereVencimiento: false, obligatorio: true, descripcion: 'Debe mostrar claramente tu rostro' },
-  { tipo: 'licencia', label: 'Licencia de Conducir (Frente)', requiereVencimiento: true, obligatorio: true },
+  { tipo: 'licencia', label: 'Licencia de Conducir (Frente)', requiereVencimiento: false, obligatorio: true },
   { tipo: 'licencia_trasera', label: 'Licencia de Conducir (Reverso)', requiereVencimiento: false, obligatorio: true, descripcion: 'Muestra el reverso de tu licencia para extraer categoría y restricciones' },
   { tipo: 'cedula_frontal', label: 'Cédula (Frente)', requiereVencimiento: false, obligatorio: true },
   { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false, obligatorio: true },
