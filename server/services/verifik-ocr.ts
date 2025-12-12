@@ -738,10 +738,10 @@ function isDocumentTypeDriverLicense(documentType: string): boolean {
 }
 
 /**
- * Parses expiration date from various formats.
+ * Parses a date string from various formats commonly found in Dominican documents.
  * Supports: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY
  */
-function parseExpirationDate(dateString: string): Date | null {
+function parseDateString(dateString: string): Date | null {
   if (!dateString) return null;
   
   const cleanDate = dateString.trim();
@@ -750,21 +750,24 @@ function parseExpirationDate(dateString: string): Date | null {
   const ddmmyyyySlash = cleanDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyySlash) {
     const [, day, month, year] = ddmmyyyySlash;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(parsed.getTime())) return parsed;
   }
   
   // Try YYYY-MM-DD format (ISO)
   const isoFormat = cleanDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoFormat) {
     const [, year, month, day] = isoFormat;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(parsed.getTime())) return parsed;
   }
   
   // Try DD-MM-YYYY format
   const ddmmyyyyDash = cleanDate.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (ddmmyyyyDash) {
     const [, day, month, year] = ddmmyyyyDash;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(parsed.getTime())) return parsed;
   }
   
   // Try native Date parsing as fallback
@@ -774,6 +777,24 @@ function parseExpirationDate(dateString: string): Date | null {
   }
   
   return null;
+}
+
+/**
+ * Calculates expiration date from issue date (Dominican licenses expire 4 years after issuance)
+ */
+function calculateExpirationFromIssueDate(issueDate: Date): Date {
+  const expiration = new Date(issueDate);
+  expiration.setFullYear(expiration.getFullYear() + 4);
+  return expiration;
+}
+
+/**
+ * Parses expiration date from various formats.
+ * Supports: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY
+ * @deprecated Use parseDateString instead
+ */
+function parseExpirationDate(dateString: string): Date | null {
+  return parseDateString(dateString);
 }
 
 interface LicenseOCRExtraction {
@@ -808,6 +829,8 @@ interface LicenseValidationResponse {
   message?: string;
 }
 
+export type ExpirationDateSource = 'ocr' | 'calculated_from_issue' | 'manual_required';
+
 export interface LicenseValidationResult {
   success: boolean;
   isValidLicense: boolean;
@@ -816,6 +839,8 @@ export interface LicenseValidationResult {
   licenseNumber?: string;
   licenseClass?: string;
   expirationDate?: string;
+  issueDate?: string;
+  expirationDateSource?: ExpirationDateSource;
   holderName?: string;
   details?: string;
   rawResponse?: any;
@@ -884,12 +909,14 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
     // Extract document type for validation
     const documentType = ocrData?.documentType || data.documentType || '';
     const licenseNumber = ocrData?.licenseNumber || ocrData?.documentNumber || data.documentNumber;
-    const expirationDate = ocrData?.expirationDate;
+    const rawExpirationDate = ocrData?.expirationDate;
+    const rawIssueDate = ocrData?.issueDate;
 
     logger.info("Verifik license validation response", { 
       documentType: documentType,
       documentNumber: licenseNumber,
-      expirationDate: expirationDate,
+      expirationDate: rawExpirationDate,
+      issueDate: rawIssueDate,
       ocrDataKeys: ocrData ? Object.keys(ocrData) : [],
       rawOcrData: ocrData
     });
@@ -931,26 +958,67 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
       };
     }
 
-    // Validate expiration date if extracted
-    let isExpired = false;
+    // Try to determine expiration date from multiple sources
+    let finalExpirationDate: string | undefined;
     let parsedExpirationDate: Date | null = null;
+    let expirationDateSource: ExpirationDateSource = 'manual_required';
+    let isExpired = false;
     
-    if (expirationDate) {
-      parsedExpirationDate = parseExpirationDate(expirationDate);
+    // First, try to parse the expiration date directly from OCR
+    if (rawExpirationDate) {
+      parsedExpirationDate = parseDateString(rawExpirationDate);
       if (parsedExpirationDate) {
-        isExpired = parsedExpirationDate < new Date();
-        if (isExpired) {
-          logger.warn("License is expired", { expirationDate, parsedDate: parsedExpirationDate });
-          return {
-            success: false,
-            isValidLicense: false,
-            score: 0,
-            licenseNumber: cleanLicenseNumber,
-            expirationDate: expirationDate,
-            error: `La licencia está vencida (${expirationDate}). Debe renovar su licencia antes de registrarse.`
-          };
-        }
+        finalExpirationDate = rawExpirationDate;
+        expirationDateSource = 'ocr';
+        logger.info("Expiration date extracted from OCR", { rawExpirationDate, parsed: parsedExpirationDate });
+      } else {
+        logger.warn("Could not parse expiration date from OCR", { rawExpirationDate });
       }
+    }
+    
+    // If expiration date not available, try to calculate from issue date (+4 years)
+    if (!parsedExpirationDate && rawIssueDate) {
+      const parsedIssueDate = parseDateString(rawIssueDate);
+      if (parsedIssueDate) {
+        parsedExpirationDate = calculateExpirationFromIssueDate(parsedIssueDate);
+        // Format as DD/MM/YYYY for consistency
+        const day = parsedExpirationDate.getDate().toString().padStart(2, '0');
+        const month = (parsedExpirationDate.getMonth() + 1).toString().padStart(2, '0');
+        const year = parsedExpirationDate.getFullYear();
+        finalExpirationDate = `${day}/${month}/${year}`;
+        expirationDateSource = 'calculated_from_issue';
+        logger.info("Expiration date calculated from issue date", { 
+          issueDate: rawIssueDate, 
+          calculatedExpiration: finalExpirationDate 
+        });
+      }
+    }
+    
+    // Check if license is expired (only if we have a valid expiration date)
+    if (parsedExpirationDate) {
+      isExpired = parsedExpirationDate < new Date();
+      if (isExpired) {
+        logger.warn("License is expired", { expirationDate: finalExpirationDate, parsedDate: parsedExpirationDate });
+        return {
+          success: false,
+          isValidLicense: false,
+          score: 0,
+          licenseNumber: cleanLicenseNumber,
+          expirationDate: finalExpirationDate,
+          issueDate: rawIssueDate,
+          expirationDateSource,
+          error: `La licencia está vencida (${finalExpirationDate}). Debe renovar su licencia antes de registrarse.`
+        };
+      }
+    }
+    
+    // Log if expiration date could not be determined
+    if (expirationDateSource === 'manual_required') {
+      logger.warn("Expiration date could not be determined - manual entry required", { 
+        rawExpirationDate,
+        rawIssueDate,
+        licenseNumber: cleanLicenseNumber
+      });
     }
 
     // Calculate confidence score - if we got valid license data, consider it successful
@@ -970,7 +1038,9 @@ export async function validateDriverLicense(imageBase64: string): Promise<Licens
       scanId: data._id,
       licenseNumber: cleanLicenseNumber,
       licenseClass: ocrData?.licenseClass || ocrData?.category,
-      expirationDate: expirationDate,
+      expirationDate: finalExpirationDate,
+      issueDate: rawIssueDate,
+      expirationDateSource,
       holderName: holderName,
       details: undefined,
       rawResponse: data,
@@ -996,6 +1066,8 @@ export interface ScanAndVerifyLicenseResult {
   nombre?: string;
   apellido?: string;
   expirationDate?: string;
+  issueDate?: string;
+  expirationDateSource?: ExpirationDateSource;
   licenseClass?: string;
   verified: boolean;
   confidenceScore?: number;
@@ -1116,6 +1188,8 @@ export async function scanAndVerifyLicense(
     nombre: extractedNombre || undefined,
     apellido: extractedApellido || undefined,
     expirationDate: scanResult.expirationDate,
+    issueDate: scanResult.issueDate,
+    expirationDateSource: scanResult.expirationDateSource,
     licenseClass: scanResult.licenseClass,
     verified: isVerified,
     confidenceScore: scanResult.score,

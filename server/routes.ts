@@ -2252,6 +2252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confidenceScore: result.confidenceScore,
         nameMatch: result.nameMatch,
         cedulaMatch: result.cedulaMatch,
+        expirationDateSource: result.expirationDateSource,
         userId: req.user?.id 
       });
 
@@ -2261,12 +2262,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombre: result.nombre,
         apellido: result.apellido,
         expirationDate: result.expirationDate,
+        issueDate: result.issueDate,
+        expirationDateSource: result.expirationDateSource,
         licenseClass: result.licenseClass,
         verified: isVerified,
         nameMatch: result.nameMatch,
         cedulaMatch: result.cedulaMatch,
         confidenceScore: result.confidenceScore,
-        message: "Licencia escaneada y verificada exitosamente"
+        message: result.expirationDateSource === 'manual_required' 
+          ? "Licencia verificada. Por favor, ingresa la fecha de vencimiento manualmente."
+          : "Licencia escaneada y verificada exitosamente"
       });
     } catch (error: any) {
       logSystem.error('Scan license error', error, { userId: req.user?.id });
