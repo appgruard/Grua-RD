@@ -81,6 +81,17 @@ interface OperatorWallet {
   recentTransactions?: WalletTransaction[];
 }
 
+interface OperatorBankAccount {
+  id: string;
+  banco: string;
+  tipoCuenta: string;
+  numeroCuenta: string;
+  nombreTitular: string;
+  cedula: string;
+  estado: string;
+  last4: string;
+}
+
 interface OperatorStatementSummary {
   operatorId: number;
   operatorName: string;
@@ -94,6 +105,7 @@ interface OperatorStatementSummary {
   transactions: StatementTransaction[];
   pendingDebts: WalletDebt[];
   manualPayouts: ManualPayout[];
+  bankAccount?: OperatorBankAccount | null;
 }
 
 interface StatementTransaction {
@@ -852,6 +864,51 @@ export default function AdminWallets() {
                           </p>
                         </Card>
                       </div>
+
+                      <Card className="p-4" data-testid="statement-card-bank-account">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <Banknote className="w-4 h-4" />
+                          Cuenta Bancaria
+                        </h4>
+                        {operatorStatement.bankAccount ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Banco:</span>
+                              <span className="font-medium" data-testid="text-bank-name">{operatorStatement.bankAccount.banco}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Tipo de Cuenta:</span>
+                              <span className="font-medium capitalize" data-testid="text-account-type">{operatorStatement.bankAccount.tipoCuenta}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Número de Cuenta:</span>
+                              <span className="font-medium font-mono" data-testid="text-account-number">****{operatorStatement.bankAccount.last4}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Titular:</span>
+                              <span className="font-medium" data-testid="text-account-holder">{operatorStatement.bankAccount.nombreTitular}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Cédula:</span>
+                              <span className="font-medium font-mono" data-testid="text-cedula">{operatorStatement.bankAccount.cedula}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Estado:</span>
+                              <Badge 
+                                variant={operatorStatement.bankAccount.estado === 'verified' || operatorStatement.bankAccount.estado === 'verificada' ? 'default' : 'secondary'} 
+                                data-testid="badge-bank-status"
+                              >
+                                {operatorStatement.bankAccount.estado === 'verified' || operatorStatement.bankAccount.estado === 'verificada' ? 'Verificada' : 
+                                 operatorStatement.bankAccount.estado === 'pendiente_verificacion' ? 'Pendiente de Verificación' : 'Pendiente'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground" data-testid="text-no-bank-account">
+                            El operador no ha registrado una cuenta bancaria.
+                          </p>
+                        )}
+                      </Card>
 
                       {operatorStatement.manualPayouts && operatorStatement.manualPayouts.length > 0 && (
                         <div data-testid="section-manual-payouts">

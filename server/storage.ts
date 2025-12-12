@@ -4566,10 +4566,24 @@ export class DatabaseStorage implements IStorage {
     // 9. Filter manual payouts from transactions
     const manualPayouts = transactions.filter(tx => tx.type === 'manual_payout');
 
-    // 10. Return OperatorStatementSummary
+    // 10. Get operator's bank account
+    const bankAccount = await this.getOperatorBankAccount(conductorId);
+    const bankAccountData = bankAccount ? {
+      id: bankAccount.id,
+      banco: bankAccount.banco,
+      tipoCuenta: bankAccount.tipoCuenta,
+      numeroCuenta: bankAccount.numeroCuenta,
+      nombreTitular: bankAccount.nombreTitular,
+      cedula: bankAccount.cedula,
+      estado: bankAccount.estado,
+      last4: bankAccount.numeroCuenta.slice(-4),
+    } : null;
+
+    // 11. Return OperatorStatementSummary
     return {
       operatorId: conductorId,
       operatorName: `${conductor.user.nombre} ${conductor.user.apellido}`,
+      operatorEmail: conductor.user.email,
       walletId: wallet.id,
       periodStart: effectivePeriodStart,
       periodEnd: effectivePeriodEnd,
@@ -4582,6 +4596,7 @@ export class DatabaseStorage implements IStorage {
       pendingDebts,
       completedServices,
       manualPayouts,
+      bankAccount: bankAccountData,
     };
   }
 

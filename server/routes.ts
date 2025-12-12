@@ -7868,7 +7868,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========================================
 
   // Get list of available banks in Dominican Republic
-  // TODO: Implementar con Azul API
   app.get("/api/drivers/banks", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -7878,15 +7877,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Only drivers can access this endpoint" });
     }
 
-    // TODO: Implementar lista de bancos con Azul API
-    return res.status(503).json({ 
-      message: "El servicio de cuentas bancarias está en proceso de migración.",
-      configured: false 
-    });
+    // Static list of major banks in Dominican Republic
+    const banks = [
+      { id: 'banreservas', name: 'Banco de Reservas (Banreservas)' },
+      { id: 'popular', name: 'Banco Popular Dominicano' },
+      { id: 'bhd_leon', name: 'Banco BHD León' },
+      { id: 'scotiabank', name: 'Scotiabank' },
+      { id: 'banesco', name: 'Banesco' },
+      { id: 'banco_santa_cruz', name: 'Banco Santa Cruz' },
+      { id: 'asociacion_popular', name: 'Asociación Popular de Ahorros y Préstamos' },
+      { id: 'banco_caribe', name: 'Banco Caribe' },
+      { id: 'banco_lopez', name: 'Banco López de Haro' },
+      { id: 'banco_vimenca', name: 'Banco Vimenca' },
+      { id: 'banco_promerica', name: 'Banco Promerica' },
+      { id: 'banco_ademi', name: 'Banco ADEMI' },
+      { id: 'banco_lafise', name: 'Banco LAFISE' },
+      { id: 'otro', name: 'Otro' },
+    ];
+
+    res.json({ banks });
   });
 
-  // Register conductor bank account for payouts
-  // TODO: Implementar con Azul API
+  // Register or update conductor bank account for payouts
   app.post("/api/drivers/bank-account", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -7896,11 +7908,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Only drivers can register bank accounts" });
     }
 
-    // TODO: Implementar registro de cuenta bancaria con Azul API
-    return res.status(503).json({ 
-      message: "El servicio de cuentas bancarias está en proceso de migración.",
-      configured: false 
-    });
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const { banco, tipoCuenta, numeroCuenta, nombreTitular, cedula } = req.body;
+
+      if (!banco || !tipoCuenta || !numeroCuenta || !nombreTitular || !cedula) {
+        return res.status(400).json({ message: "Todos los campos son requeridos" });
+      }
+
+      // Check if bank account already exists
+      const existingAccount = await storage.getOperatorBankAccountByCondutorId(conductor.id);
+
+      if (existingAccount) {
+        // Update existing account
+        const updated = await storage.updateOperatorBankAccount(existingAccount.id, {
+          banco,
+          tipoCuenta,
+          numeroCuenta,
+          nombreTitular,
+          cedula,
+          estado: 'pendiente_verificacion',
+        });
+        return res.json({ 
+          success: true, 
+          message: "Cuenta bancaria actualizada correctamente",
+          bankAccount: updated 
+        });
+      }
+
+      // Create new account
+      const newAccount = await storage.createOperatorBankAccount({
+        conductorId: conductor.id,
+        banco,
+        tipoCuenta,
+        numeroCuenta,
+        nombreTitular,
+        cedula,
+        estado: 'pendiente_verificacion',
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Cuenta bancaria registrada correctamente",
+        bankAccount: newAccount 
+      });
+    } catch (error: any) {
+      logSystem.error('Register bank account error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Error al registrar la cuenta bancaria" });
+    }
   });
 
   // Get conductor's bank account status
@@ -7919,11 +7978,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conductor profile not found" });
       }
 
-      // TODO: Actualizar cuando se integre Azul API
+      const bankAccount = await storage.getOperatorBankAccountByCondutorId(conductor.id);
+
       res.json({
-        hasBankAccount: false,
-        payoutEnabled: false,
-        bankAccount: null,
+        hasBankAccount: !!bankAccount,
+        payoutEnabled: bankAccount?.estado === 'activo',
+        bankAccount: bankAccount ? {
+          id: bankAccount.id,
+          banco: bankAccount.banco,
+          tipoCuenta: bankAccount.tipoCuenta,
+          numeroCuenta: bankAccount.numeroCuenta,
+          nombreTitular: bankAccount.nombreTitular,
+          cedula: bankAccount.cedula,
+          estado: bankAccount.estado,
+          last4: bankAccount.numeroCuenta?.slice(-4),
+        } : null,
         balance: {
           available: conductor.balanceDisponible || "0.00",
           pending: conductor.balancePendiente || "0.00",
@@ -7936,9 +8005,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Request withdrawal (payout) to bank account
-  // TODO: Implementar con Azul API
+  // TODO: Implementar con Azul API cuando esté disponible
   app.post("/api/drivers/request-withdrawal", async (req: Request, res: Response) => {
-    // Endpoint deshabilitado durante migración a Azul API
     return res.status(503).json({ 
       message: "El servicio de retiros está en proceso de migración. Por favor intente más tarde.",
       configured: false 
@@ -7946,13 +8014,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete conductor's bank account
-  // TODO: Implementar con Azul API
   app.delete("/api/drivers/bank-account", async (req: Request, res: Response) => {
-    // Endpoint deshabilitado durante migración a Azul API
-    return res.status(503).json({ 
-      message: "El servicio de cuentas bancarias está en proceso de migración.",
-      configured: false 
-    });
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can delete bank accounts" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const bankAccount = await storage.getOperatorBankAccountByCondutorId(conductor.id);
+      if (!bankAccount) {
+        return res.status(404).json({ message: "No bank account found" });
+      }
+
+      await storage.deleteOperatorBankAccount(bankAccount.id);
+      res.json({ success: true, message: "Cuenta bancaria eliminada correctamente" });
+    } catch (error: any) {
+      logSystem.error('Delete bank account error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Error al eliminar la cuenta bancaria" });
+    }
   });
 
   // Get conductor's withdrawal history

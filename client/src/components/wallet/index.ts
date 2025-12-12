@@ -4,3 +4,4 @@ export { DebtDetailModal } from './DebtDetailModal';
 export { PayDebtModal } from './PayDebtModal';
 export { WalletAlertBanner } from './WalletAlertBanner';
 export { CashServiceConfirmationModal, useWalletStatus } from './CashServiceConfirmationModal';
+export { BankAccountModal } from './BankAccountModal';
