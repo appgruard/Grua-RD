@@ -4268,7 +4268,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get conductor vehicles to check matricula and foto_vehiculo
         const conductorVehiculos = await storage.getConductorVehiculos(conductor.id);
         const hasActiveVehicle = conductorVehiculos.some(v => v.activo);
-        const hasVehicleWithPhoto = conductorVehiculos.some(v => v.activo && v.fotoUrl);
+        // If vehicle is registered with placa, consider both matricula and foto as complete
+        // (foto is optional when vehicle is registered in the system)
         
         // Required document types
         const requiredTypes = ['licencia', 'matricula', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
@@ -4306,8 +4307,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
           
-          // Skip foto_vehiculo if conductor has an active vehicle with photo
-          if (requiredType === 'foto_vehiculo' && hasVehicleWithPhoto) {
+          // Skip foto_vehiculo if conductor has an active vehicle registered
+          // (foto is optional - having a registered vehicle is sufficient)
+          if (requiredType === 'foto_vehiculo' && hasActiveVehicle) {
             continue;
           }
           
