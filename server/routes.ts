@@ -4265,6 +4265,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get user to check verification flags
         const userInfo = await storage.getUserById(req.user!.id);
         
+        // Get conductor vehicles to check matricula and foto_vehiculo
+        const conductorVehiculos = await storage.getConductorVehiculos(conductor.id);
+        const hasActiveVehicle = conductorVehiculos.some(v => v.activo);
+        const hasVehicleWithPhoto = conductorVehiculos.some(v => v.activo && v.fotoUrl);
+        
         // Required document types
         const requiredTypes = ['licencia', 'matricula', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
         
@@ -4288,6 +4293,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const requiredType of requiredTypes) {
           // Skip cedula documents if user has cedulaVerificada = true (verified via identity scan)
           if ((requiredType === 'cedula_frontal' || requiredType === 'cedula_trasera') && userInfo?.cedulaVerificada) {
+            continue;
+          }
+          
+          // Skip licencia document if conductor has licenciaVerificada = true (verified via Verifik)
+          if (requiredType === 'licencia' && conductor.licenciaVerificada) {
+            continue;
+          }
+          
+          // Skip matricula if conductor has an active vehicle registered (placa is required)
+          if (requiredType === 'matricula' && hasActiveVehicle) {
+            continue;
+          }
+          
+          // Skip foto_vehiculo if conductor has an active vehicle with photo
+          if (requiredType === 'foto_vehiculo' && hasVehicleWithPhoto) {
             continue;
           }
           
