@@ -6850,6 +6850,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             expirationDateSource: ocrResult.expirationDateSource
           });
           
+          // Check if OCR failed completely
+          if (!ocrResult.success) {
+            logSystem.warn('OCR failed for license', { error: ocrResult.error });
+            return res.status(400).json({ 
+              message: "No pudimos leer tu licencia automáticamente. Por favor, ingresa la fecha de vencimiento que aparece en tu licencia.",
+              requiresManualDate: true,
+              code: 'OCR_FAILED',
+              errorType: 'ocr_error'
+            });
+          }
+          
           if (ocrResult.success && ocrResult.expirationDate && ocrResult.expirationDateSource !== 'manual_required') {
             // Parse the OCR extracted date (formats: DD/MM/YYYY or YYYY-MM-DD)
             let parsedOcrDate: Date | undefined;
@@ -6870,8 +6881,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (parsedOcrDate <= today) {
                 return res.status(400).json({ 
-                  message: `La licencia está vencida (${ocrResult.expirationDate}). Debe renovar su licencia.`,
-                  requiresManualDate: false
+                  message: `Tu licencia venció el ${ocrResult.expirationDate}. Debes renovarla antes de poder registrarte como conductor.`,
+                  requiresManualDate: false,
+                  code: 'LICENSE_EXPIRED',
+                  errorType: 'expired'
                 });
               }
               
@@ -6887,37 +6900,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // If OCR couldn't extract the date, require manual entry
           if (!validoHasta) {
             return res.status(400).json({ 
-              message: "No se pudo extraer la fecha de vencimiento automáticamente. Por favor ingrese la fecha manualmente.",
+              message: "No pudimos detectar la fecha de vencimiento en tu licencia. Por favor, ingrésala manualmente mirando el documento.",
               requiresManualDate: true,
-              code: 'MANUAL_DATE_REQUIRED'
+              code: 'DATE_NOT_DETECTED',
+              errorType: 'manual_required'
             });
           }
         } else {
           // Verifik not configured, require manual date
           return res.status(400).json({ 
-            message: "La fecha de vencimiento es requerida para este tipo de documento",
+            message: "Por favor, ingresa la fecha de vencimiento de tu licencia.",
             requiresManualDate: true,
-            code: 'MANUAL_DATE_REQUIRED'
+            code: 'VERIFIK_NOT_CONFIGURED',
+            errorType: 'manual_required'
           });
         }
       } else if (fechaVencimiento && documentosConVencimiento.includes(tipoDocumento)) {
         // Manual date provided
         const parsedDate = new Date(fechaVencimiento);
-        if (!isNaN(parsedDate.getTime())) {
-          // Validate that expiration date is in the future for all documents with expiration
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          if (parsedDate <= today) {
-            return res.status(400).json({ message: "La fecha de vencimiento debe ser una fecha futura" });
-          }
-          validoHasta = parsedDate;
-          expirationDateSource = 'manual';
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ 
+            message: "La fecha ingresada no es válida. Por favor, usa el formato correcto (día/mes/año).",
+            code: 'INVALID_DATE_FORMAT',
+            errorType: 'validation'
+          });
         }
+        // Validate that expiration date is in the future for all documents with expiration
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (parsedDate <= today) {
+          return res.status(400).json({ 
+            message: "La fecha de vencimiento que ingresaste ya pasó. Por favor, ingresa una fecha futura.",
+            code: 'DATE_IN_PAST',
+            errorType: 'validation'
+          });
+        }
+        validoHasta = parsedDate;
+        expirationDateSource = 'manual';
       } else if (documentosConVencimiento.includes(tipoDocumento) && tipoDocumento !== 'licencia' && !fechaVencimiento) {
         // Non-license documents that require expiration date
+        const documentName = tipoDocumento === 'matricula' ? 'la matrícula' : 'este documento';
         return res.status(400).json({ 
-          message: "La fecha de vencimiento es requerida para este tipo de documento",
-          requiresManualDate: true
+          message: `Por favor, ingresa la fecha de vencimiento de ${documentName}.`,
+          requiresManualDate: true,
+          code: 'DATE_REQUIRED',
+          errorType: 'manual_required'
         });
       }
       
