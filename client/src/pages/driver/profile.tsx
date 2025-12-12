@@ -222,10 +222,12 @@ export default function DriverProfile() {
           requiresManualDate?: boolean; 
           code?: string;
           tipo?: string;
+          errorType?: string;
         };
         (error as any).requiresManualDate = errorData.requiresManualDate;
         (error as any).code = errorData.code;
         (error as any).tipo = tipo;
+        (error as any).errorType = errorData.errorType;
         throw error;
       }
 
@@ -250,26 +252,66 @@ export default function DriverProfile() {
         return newDates;
       });
     },
-    onError: (error: Error & { requiresManualDate?: boolean; code?: string; tipo?: string }) => {
-      // If manual date is required, keep the file in selectedFiles and show the date picker
-      if (error.requiresManualDate && error.tipo) {
+    onError: (error: Error & { requiresManualDate?: boolean; code?: string; tipo?: string; errorType?: string }) => {
+      setUploadingDoc(null);
+      
+      // Handle different error types with specific messages
+      const errorCode = (error as any).code;
+      const errorType = (error as any).errorType;
+      
+      // License expired - show destructive error, user needs to renew license
+      if (errorCode === 'LICENSE_EXPIRED') {
         toast({
-          title: 'Fecha de vencimiento requerida',
-          description: 'Por favor ingresa la fecha de vencimiento de tu licencia manualmente.',
-          variant: 'default',
+          title: 'Licencia vencida',
+          description: error.message,
+          variant: 'destructive',
         });
-        // The file is already in selectedFiles, just need to show the date picker
-        // which happens automatically when there's a file in selectedFiles for documents with expiration
-        setUploadingDoc(null);
+        // Clear the selected file since they can't proceed with an expired license
+        if (error.tipo) {
+          setSelectedFiles(prev => {
+            const newFiles = { ...prev };
+            delete newFiles[error.tipo!];
+            return newFiles;
+          });
+        }
         return;
       }
       
+      // OCR failed or date not detected - show informative message and date picker
+      if (error.requiresManualDate && error.tipo) {
+        let title = 'Ingresa la fecha manualmente';
+        
+        if (errorCode === 'OCR_FAILED') {
+          title = 'No pudimos leer la licencia';
+        } else if (errorCode === 'DATE_NOT_DETECTED') {
+          title = 'Fecha no detectada';
+        }
+        
+        toast({
+          title,
+          description: error.message,
+          variant: 'default',
+        });
+        // File is already in selectedFiles, date picker will show automatically
+        return;
+      }
+      
+      // Validation errors (date in past, invalid format)
+      if (errorType === 'validation') {
+        toast({
+          title: 'Fecha inválida',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Generic error
       toast({
         title: 'Error al subir documento',
         description: error.message,
         variant: 'destructive',
       });
-      setUploadingDoc(null);
     },
   });
 
