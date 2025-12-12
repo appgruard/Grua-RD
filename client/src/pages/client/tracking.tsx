@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign, Navigation, Clock, CreditCard, CheckCircle, XCircle, ShieldCheck, ShieldAlert, MoveRight } from 'lucide-react';
+import { Phone, MessageCircle, Loader2, Star, Truck, Car, AlertTriangle, DollarSign, Navigation, Clock, CheckCircle, XCircle, ShieldAlert, MoveRight } from 'lucide-react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useWebSocket } from '@/lib/websocket';
 import { useAuth } from '@/lib/auth';
@@ -52,14 +52,6 @@ interface DriverPublicProfile {
   }>;
 }
 
-const LICENSE_CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  'A': 'Motocicletas',
-  'B': 'Vehículos livianos',
-  'C': 'Vehículos pesados',
-  'D': 'Transporte de pasajeros',
-  'E': 'Vehículos articulados',
-  'F': 'Agrícolas/industriales',
-};
 
 export default function ClientTracking() {
   const [, params] = useRoute('/client/tracking/:id');
@@ -515,33 +507,6 @@ export default function ClientTracking() {
               </div>
             </div>
             
-            {driverPublicProfile?.licenciaCategoria && (
-              <div className="mt-3 pt-3 border-t border-border">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Licencia:</span>
-                    <Badge variant="outline" data-testid="badge-driver-license-category">
-                      Cat. {driverPublicProfile.licenciaCategoria}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {LICENSE_CATEGORY_DESCRIPTIONS[driverPublicProfile.licenciaCategoria] || ''}
-                    </span>
-                  </div>
-                  {driverPublicProfile.licenciaCategoriaVerificada && (
-                    <Badge variant="default" className="gap-1" data-testid="badge-driver-license-verified">
-                      <ShieldCheck className="w-3 h-3" />
-                      Verificada
-                    </Badge>
-                  )}
-                </div>
-                {driverPublicProfile.licenciaRestricciones && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" data-testid="text-driver-restrictions">
-                    Restricciones: {driverPublicProfile.licenciaRestricciones}
-                  </p>
-                )}
-              </div>
-            )}
 
             {service.vehiculo && (
               <div className="mt-3 pt-3 border-t border-border">
