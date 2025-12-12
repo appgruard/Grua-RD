@@ -52,13 +52,20 @@ interface DriverPublicProfile {
   }>;
 }
 
+// License category descriptions for Dominican Republic (INTRANT categories - numeric)
 const LICENSE_CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  'A': 'Motocicletas',
-  'B': 'Vehículos livianos',
-  'C': 'Vehículos pesados',
-  'D': 'Transporte de pasajeros',
-  'E': 'Vehículos articulados',
-  'F': 'Agrícolas/industriales',
+  '01': 'Motocicletas y Pasolas',
+  '02': 'Vehículos Livianos (hasta 5 ton)',
+  '03': 'Vehículos Pesados (camiones)',
+  '04': 'Transporte Público y Emergencias',
+  '05': 'Materiales Peligrosos',
+  '06': 'Licencia Profesional',
+  '1': 'Motocicletas y Pasolas',
+  '2': 'Vehículos Livianos (hasta 5 ton)',
+  '3': 'Vehículos Pesados (camiones)',
+  '4': 'Transporte Público y Emergencias',
+  '5': 'Materiales Peligrosos',
+  '6': 'Licencia Profesional',
 };
 
 export default function ClientTracking() {

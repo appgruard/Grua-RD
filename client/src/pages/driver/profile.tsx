@@ -20,8 +20,9 @@ import { DocumentExpirationAlerts } from '@/components/DocumentExpirationAlerts'
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection } from '@/components/ServiceCategoryMultiSelect';
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
-import { WalletSection } from '@/components/wallet';
+import { WalletSection, BankAccountModal } from '@/components/wallet';
 import { PrivacySection } from '@/components/PrivacySection';
+import { Building2 } from 'lucide-react';
 import type { Conductor, Documento, ConductorVehiculo } from '@shared/schema';
 
 interface VerifikValidation {
@@ -43,22 +44,47 @@ const REQUIRED_DOCUMENTS = [
   { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false, obligatorio: true },
 ];
 
-// License category descriptions for Dominican Republic
+// License category descriptions for Dominican Republic (INTRANT categories)
 const LICENSE_CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  'A': 'Motocicletas',
-  'B': 'Vehículos livianos (hasta 3,500 kg)',
-  'C': 'Vehículos pesados (camiones)',
-  'D': 'Transporte de pasajeros',
-  'E': 'Vehículos articulados/con remolque',
-  'F': 'Vehículos agrícolas/industriales',
+  '01': 'Motocicletas y Pasolas',
+  '02': 'Vehículos Livianos (hasta 5 ton)',
+  '03': 'Vehículos Pesados (camiones)',
+  '04': 'Transporte Público y Emergencias',
+  '05': 'Materiales Peligrosos',
+  '06': 'Licencia Profesional',
+  '1': 'Motocicletas y Pasolas',
+  '2': 'Vehículos Livianos (hasta 5 ton)',
+  '3': 'Vehículos Pesados (camiones)',
+  '4': 'Transporte Público y Emergencias',
+  '5': 'Materiales Peligrosos',
+  '6': 'Licencia Profesional',
 };
 
 const DOCUMENTOS_CON_VENCIMIENTO = ['licencia'];
 
 interface PayoutAccountStatus {
-  configured: boolean;
-  balanceDisponible: string;
-  balancePendiente: string;
+  configured?: boolean;
+  hasBankAccount: boolean;
+  payoutEnabled?: boolean;
+  balanceDisponible?: string;
+  balancePendiente?: string;
+  bankAccount?: {
+    id?: string;
+    banco?: string;
+    bankName?: string;
+    tipoCuenta?: string;
+    accountType?: string;
+    numeroCuenta?: string;
+    nombreTitular?: string;
+    accountHolder?: string;
+    cedula?: string;
+    estado?: string;
+    last4?: string;
+  };
+  balance?: {
+    available: string;
+    pending: string;
+  };
 }
 
 interface DriverFullProfile {
@@ -81,6 +107,7 @@ export default function DriverProfile() {
   const [editingVehicles, setEditingVehicles] = useState(false);
   const [vehicleData, setVehicleData] = useState<VehicleData[]>([]);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [bankAccountModalOpen, setBankAccountModalOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const documentsRef = useRef<HTMLDivElement>(null);
 
@@ -492,6 +519,44 @@ export default function DriverProfile() {
       {driverData && (
         <>
           <WalletSection />
+
+          <Card className="p-6 mb-4" data-testid="card-bank-account">
+            <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" />
+                <h3 className="text-lg font-semibold">Cuenta Bancaria</h3>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBankAccountModalOpen(true)}
+                data-testid="button-edit-bank-account"
+              >
+                <Edit3 className="w-4 h-4 mr-2" />
+                {payoutStatus?.hasBankAccount ? 'Editar' : 'Agregar'}
+              </Button>
+            </div>
+            {payoutStatus?.hasBankAccount && payoutStatus.bankAccount ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Banco:</span>
+                  <span className="font-medium" data-testid="text-bank-name">{payoutStatus.bankAccount.bankName || payoutStatus.bankAccount.banco}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Cuenta:</span>
+                  <span className="font-medium" data-testid="text-account-number">****{payoutStatus.bankAccount.last4}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Titular:</span>
+                  <span className="font-medium" data-testid="text-account-holder">{payoutStatus.bankAccount.accountHolder || payoutStatus.bankAccount.nombreTitular}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Agrega tu cuenta bancaria para recibir los pagos de tus servicios.
+              </p>
+            )}
+          </Card>
 
           <Card className="p-6 mb-4">
             <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
@@ -1130,6 +1195,11 @@ export default function DriverProfile() {
       <ChangePasswordModal
         open={changePasswordOpen}
         onOpenChange={setChangePasswordOpen}
+      />
+
+      <BankAccountModal
+        open={bankAccountModalOpen}
+        onOpenChange={setBankAccountModalOpen}
       />
     </div>
   );

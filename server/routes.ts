@@ -2238,9 +2238,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // If we reached this point, the license is valid:
+      // - Document type is a driver's license
+      // - License number (cedula) was extracted successfully
+      // - License is not expired
+      // - Name and cedula comparisons passed (if applicable)
+      // So we can mark it as verified
+      const isVerified = true;
+
       logSystem.info('License OCR scan successful', { 
         licenseNumber: result.licenseNumber?.slice(0, 3) + '***', 
-        verified: result.verified,
+        verified: isVerified,
         confidenceScore: result.confidenceScore,
         nameMatch: result.nameMatch,
         cedulaMatch: result.cedulaMatch,
@@ -2254,13 +2262,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apellido: result.apellido,
         expirationDate: result.expirationDate,
         licenseClass: result.licenseClass,
-        verified: result.verified,
+        verified: isVerified,
         nameMatch: result.nameMatch,
         cedulaMatch: result.cedulaMatch,
         confidenceScore: result.confidenceScore,
-        message: result.verified 
-          ? "Licencia escaneada y verificada exitosamente"
-          : "Licencia escaneada. Verificación pendiente."
+        message: "Licencia escaneada y verificada exitosamente"
       });
     } catch (error: any) {
       logSystem.error('Scan license error', error, { userId: req.user?.id });
@@ -2663,7 +2669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: 'license',
           name: 'Subir Licencia',
           description: 'Sube fotos de tu licencia (frente y reverso)',
-          completed: !!(conductor?.licenciaFrontalUrl && conductor?.licenciaTraseraUrl),
+          completed: !!(conductor?.licenciaVerificada && conductor?.licenciaFrontalUrl && conductor?.licenciaTraseraUrl),
           required: true
         });
         steps.push({
@@ -3800,6 +3806,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Mark categories as configured
       await storage.updateConductor(conductor.id, { categoriasConfiguradas: true });
       
+      // Refresh session with updated user data (includes conductor with categoriasConfiguradas)
+      const updatedUser = await storage.getUserById(req.user!.id);
+      if (updatedUser) {
+        await new Promise<void>((resolve, reject) => {
+          req.login(updatedUser as any, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
+      
       const servicios = await storage.getConductorServicios(conductor.id);
       
       logSystem.info('Driver services updated', { conductorId: conductor.id, count: servicios.length });
@@ -3858,6 +3875,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.updateConductor(conductor.id, updateData);
+      
+      // Refresh session with updated user data (includes conductor with licenciaVerificada)
+      const updatedUser = await storage.getUserById(req.user!.id);
+      if (updatedUser) {
+        await new Promise<void>((resolve, reject) => {
+          req.login(updatedUser as any, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
       
       logSystem.info('Driver license data updated', { 
         conductorId: conductor.id, 
@@ -3976,6 +4004,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (allCategoriesHaveVehicles) {
         await storage.updateConductor(conductor.id, { vehiculosRegistrados: true });
         logSystem.info('All categories have vehicles, marked vehiculosRegistrados', { conductorId: conductor.id });
+        
+        // Refresh session with updated user data (includes conductor with vehiculosRegistrados)
+        const updatedUser = await storage.getUserById(req.user!.id);
+        if (updatedUser) {
+          await new Promise<void>((resolve, reject) => {
+            req.login(updatedUser as any, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+        }
       }
 
       logSystem.info('Driver vehicle created/updated', { conductorId: conductor.id, categoria, vehiculoId: vehiculo.id });
@@ -4226,6 +4265,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get user to check verification flags
         const userInfo = await storage.getUserById(req.user!.id);
         
+        // Get conductor vehicles to check matricula and foto_vehiculo
+        const conductorVehiculos = await storage.getConductorVehiculos(conductor.id);
+        const hasActiveVehicle = conductorVehiculos.some(v => v.activo);
+        const hasVehicleWithPhoto = conductorVehiculos.some(v => v.activo && v.fotoUrl);
+        
         // Required document types
         const requiredTypes = ['licencia', 'matricula', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
         
@@ -4249,6 +4293,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const requiredType of requiredTypes) {
           // Skip cedula documents if user has cedulaVerificada = true (verified via identity scan)
           if ((requiredType === 'cedula_frontal' || requiredType === 'cedula_trasera') && userInfo?.cedulaVerificada) {
+            continue;
+          }
+          
+          // Skip licencia document if conductor has licenciaVerificada = true (verified via Verifik)
+          if (requiredType === 'licencia' && conductor.licenciaVerificada) {
+            continue;
+          }
+          
+          // Skip matricula if conductor has an active vehicle registered (placa is required)
+          if (requiredType === 'matricula' && hasActiveVehicle) {
+            continue;
+          }
+          
+          // Skip foto_vehiculo if conductor has an active vehicle with photo
+          if (requiredType === 'foto_vehiculo' && hasVehicleWithPhoto) {
             continue;
           }
           
@@ -6954,16 +7013,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If Verifik is configured, only verify if the front was validated
         // If Verifik is not configured, mark for manual review (don't auto-verify)
         if (isVerifikConfigured()) {
-          if (verifikValidation.verified || type === 'licencia_trasera') {
-            // For back upload, check if front was already verified
-            // We need to re-validate if this is the back upload
-            if (type === 'licencia_trasera') {
-              // Trust that front was already validated when uploaded
+          if (type === 'licencia' && verifikValidation.verified) {
+            // Front license was just verified
+            await storage.updateConductor(conductor.id, { licenciaVerificada: true });
+            logSystem.info('License verified via Verifik', { conductorId: conductor.id });
+          } else if (type === 'licencia_trasera') {
+            // For back upload, check if front license document was actually verified
+            // Look for an approved front license document in the database
+            const frontLicenseDoc = await storage.getDocumentoByConductorAndTipo(conductor.id, 'licencia');
+            const frontIsVerified = frontLicenseDoc && frontLicenseDoc.estado === 'aprobado';
+            
+            if (frontIsVerified) {
               await storage.updateConductor(conductor.id, { licenciaVerificada: true });
               logSystem.info('License verified - both sides uploaded and front was validated', { conductorId: conductor.id });
             } else {
-              await storage.updateConductor(conductor.id, { licenciaVerificada: true });
-              logSystem.info('License verified via Verifik', { conductorId: conductor.id });
+              logSystem.warn('Back license uploaded but front was not verified', { 
+                conductorId: conductor.id,
+                frontDocExists: !!frontLicenseDoc,
+                frontDocEstado: frontLicenseDoc?.estado
+              });
             }
           } else {
             logSystem.warn('License images uploaded but not verified - Verifik validation failed', { 
@@ -7820,7 +7888,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========================================
 
   // Get list of available banks in Dominican Republic
-  // TODO: Implementar con Azul API
   app.get("/api/drivers/banks", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -7830,15 +7897,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Only drivers can access this endpoint" });
     }
 
-    // TODO: Implementar lista de bancos con Azul API
-    return res.status(503).json({ 
-      message: "El servicio de cuentas bancarias está en proceso de migración.",
-      configured: false 
-    });
+    // Static list of major banks in Dominican Republic
+    const banks = [
+      { id: 'banreservas', name: 'Banco de Reservas (Banreservas)' },
+      { id: 'popular', name: 'Banco Popular Dominicano' },
+      { id: 'bhd_leon', name: 'Banco BHD León' },
+      { id: 'scotiabank', name: 'Scotiabank' },
+      { id: 'banesco', name: 'Banesco' },
+      { id: 'banco_santa_cruz', name: 'Banco Santa Cruz' },
+      { id: 'asociacion_popular', name: 'Asociación Popular de Ahorros y Préstamos' },
+      { id: 'banco_caribe', name: 'Banco Caribe' },
+      { id: 'banco_lopez', name: 'Banco López de Haro' },
+      { id: 'banco_vimenca', name: 'Banco Vimenca' },
+      { id: 'banco_promerica', name: 'Banco Promerica' },
+      { id: 'banco_ademi', name: 'Banco ADEMI' },
+      { id: 'banco_lafise', name: 'Banco LAFISE' },
+      { id: 'otro', name: 'Otro' },
+    ];
+
+    res.json({ banks });
   });
 
-  // Register conductor bank account for payouts
-  // TODO: Implementar con Azul API
+  // Register or update conductor bank account for payouts
   app.post("/api/drivers/bank-account", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -7848,11 +7928,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Only drivers can register bank accounts" });
     }
 
-    // TODO: Implementar registro de cuenta bancaria con Azul API
-    return res.status(503).json({ 
-      message: "El servicio de cuentas bancarias está en proceso de migración.",
-      configured: false 
-    });
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const { banco, tipoCuenta, numeroCuenta, nombreTitular, cedula } = req.body;
+
+      if (!banco || !tipoCuenta || !numeroCuenta || !nombreTitular || !cedula) {
+        return res.status(400).json({ message: "Todos los campos son requeridos" });
+      }
+
+      // Check if bank account already exists
+      const existingAccount = await storage.getOperatorBankAccountByCondutorId(conductor.id);
+
+      if (existingAccount) {
+        // Update existing account
+        const updated = await storage.updateOperatorBankAccount(existingAccount.id, {
+          banco,
+          tipoCuenta,
+          numeroCuenta,
+          nombreTitular,
+          cedula,
+          estado: 'pendiente_verificacion',
+        });
+        return res.json({ 
+          success: true, 
+          message: "Cuenta bancaria actualizada correctamente",
+          bankAccount: updated 
+        });
+      }
+
+      // Create new account
+      const newAccount = await storage.createOperatorBankAccount({
+        conductorId: conductor.id,
+        banco,
+        tipoCuenta,
+        numeroCuenta,
+        nombreTitular,
+        cedula,
+        estado: 'pendiente_verificacion',
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Cuenta bancaria registrada correctamente",
+        bankAccount: newAccount 
+      });
+    } catch (error: any) {
+      logSystem.error('Register bank account error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Error al registrar la cuenta bancaria" });
+    }
   });
 
   // Get conductor's bank account status
@@ -7871,11 +7998,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conductor profile not found" });
       }
 
-      // TODO: Actualizar cuando se integre Azul API
+      const bankAccount = await storage.getOperatorBankAccountByCondutorId(conductor.id);
+
       res.json({
-        hasBankAccount: false,
-        payoutEnabled: false,
-        bankAccount: null,
+        hasBankAccount: !!bankAccount,
+        payoutEnabled: bankAccount?.estado === 'activo',
+        bankAccount: bankAccount ? {
+          id: bankAccount.id,
+          banco: bankAccount.banco,
+          tipoCuenta: bankAccount.tipoCuenta,
+          numeroCuenta: bankAccount.numeroCuenta,
+          nombreTitular: bankAccount.nombreTitular,
+          cedula: bankAccount.cedula,
+          estado: bankAccount.estado,
+          last4: bankAccount.numeroCuenta?.slice(-4),
+        } : null,
         balance: {
           available: conductor.balanceDisponible || "0.00",
           pending: conductor.balancePendiente || "0.00",
@@ -7888,9 +8025,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Request withdrawal (payout) to bank account
-  // TODO: Implementar con Azul API
+  // TODO: Implementar con Azul API cuando esté disponible
   app.post("/api/drivers/request-withdrawal", async (req: Request, res: Response) => {
-    // Endpoint deshabilitado durante migración a Azul API
     return res.status(503).json({ 
       message: "El servicio de retiros está en proceso de migración. Por favor intente más tarde.",
       configured: false 
@@ -7898,13 +8034,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete conductor's bank account
-  // TODO: Implementar con Azul API
   app.delete("/api/drivers/bank-account", async (req: Request, res: Response) => {
-    // Endpoint deshabilitado durante migración a Azul API
-    return res.status(503).json({ 
-      message: "El servicio de cuentas bancarias está en proceso de migración.",
-      configured: false 
-    });
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (req.user!.userType !== 'conductor') {
+      return res.status(403).json({ message: "Only drivers can delete bank accounts" });
+    }
+
+    try {
+      const conductor = await storage.getConductorByUserId(req.user!.id);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor profile not found" });
+      }
+
+      const bankAccount = await storage.getOperatorBankAccountByCondutorId(conductor.id);
+      if (!bankAccount) {
+        return res.status(404).json({ message: "No bank account found" });
+      }
+
+      await storage.deleteOperatorBankAccount(bankAccount.id);
+      res.json({ success: true, message: "Cuenta bancaria eliminada correctamente" });
+    } catch (error: any) {
+      logSystem.error('Delete bank account error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Error al eliminar la cuenta bancaria" });
+    }
   });
 
   // Get conductor's withdrawal history

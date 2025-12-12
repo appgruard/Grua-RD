@@ -548,7 +548,13 @@ export default function DriverDashboard() {
     let missingCount = 0;
     
     for (const requiredType of requiredTypes) {
+      // Skip cedula documents if already verified via Verifik
       if ((requiredType === 'cedula_frontal' || requiredType === 'cedula_trasera') && user?.cedulaVerificada) {
+        continue;
+      }
+      
+      // Skip licencia document if already verified on conductor record
+      if (requiredType === 'licencia' && driverData?.licenciaVerificada) {
         continue;
       }
       

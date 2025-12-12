@@ -2390,6 +2390,7 @@ export type WalletTransactionWithDetails = WalletTransaction & {
 export type OperatorStatementSummary = {
   operatorId: string;
   operatorName: string;
+  operatorEmail?: string;
   walletId: string;
   periodStart: Date;
   periodEnd: Date;
@@ -2402,6 +2403,16 @@ export type OperatorStatementSummary = {
   pendingDebts: OperatorDebtWithDaysRemaining[];
   completedServices: number;
   manualPayouts: WalletTransactionWithDetails[];
+  bankAccount?: {
+    id: string;
+    banco: string;
+    tipoCuenta: string;
+    numeroCuenta: string;
+    nombreTitular: string;
+    cedula: string;
+    estado: string;
+    last4: string;
+  } | null;
 };
 
 // ==================== END OPERATOR WALLET TYPES ====================

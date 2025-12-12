@@ -335,6 +335,7 @@ export interface IStorage {
   createDocumento(documento: InsertDocumento): Promise<Documento>;
   getDocumentoById(id: string): Promise<Documento | undefined>;
   getDocumentosByConductor(conductorId: string): Promise<Documento[]>;
+  getDocumentoByConductorAndTipo(conductorId: string, tipo: string): Promise<Documento | undefined>;
   deleteDocumento(id: string): Promise<void>;
   updateDocumentoStatus(id: string, estado: 'pendiente' | 'aprobado' | 'rechazado', revisadoPor: string, motivoRechazo?: string): Promise<Documento | undefined>;
   getPendingDocuments(): Promise<DocumentoWithDetails[]>;
@@ -1918,6 +1919,19 @@ export class DatabaseStorage implements IStorage {
       .from(documentos)
       .where(eq(documentos.conductorId, conductorId))
       .orderBy(desc(documentos.createdAt));
+  }
+
+  async getDocumentoByConductorAndTipo(conductorId: string, tipo: string): Promise<Documento | undefined> {
+    const result = await db
+      .select()
+      .from(documentos)
+      .where(and(
+        eq(documentos.conductorId, conductorId),
+        eq(documentos.tipo, tipo as any)
+      ))
+      .orderBy(desc(documentos.createdAt))
+      .limit(1);
+    return result[0];
   }
 
   async aprobarDocumento(id: string, adminId: string): Promise<Documento> {
@@ -4552,10 +4566,24 @@ export class DatabaseStorage implements IStorage {
     // 9. Filter manual payouts from transactions
     const manualPayouts = transactions.filter(tx => tx.type === 'manual_payout');
 
-    // 10. Return OperatorStatementSummary
+    // 10. Get operator's bank account
+    const bankAccount = await this.getOperatorBankAccount(conductorId);
+    const bankAccountData = bankAccount ? {
+      id: bankAccount.id,
+      banco: bankAccount.banco,
+      tipoCuenta: bankAccount.tipoCuenta,
+      numeroCuenta: bankAccount.numeroCuenta,
+      nombreTitular: bankAccount.nombreTitular,
+      cedula: bankAccount.cedula,
+      estado: bankAccount.estado,
+      last4: bankAccount.numeroCuenta.slice(-4),
+    } : null;
+
+    // 11. Return OperatorStatementSummary
     return {
       operatorId: conductorId,
       operatorName: `${conductor.user.nombre} ${conductor.user.apellido}`,
+      operatorEmail: conductor.user.email,
       walletId: wallet.id,
       periodStart: effectivePeriodStart,
       periodEnd: effectivePeriodEnd,
@@ -4568,6 +4596,7 @@ export class DatabaseStorage implements IStorage {
       pendingDebts,
       completedServices,
       manualPayouts,
+      bankAccount: bankAccountData,
     };
   }
 
