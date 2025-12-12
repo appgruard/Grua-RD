@@ -63,6 +63,18 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 12, 2025 - Operator Bank Account Management
+- **Feature**: Added bank account management for operators.
+- **Driver Profile**: Operators can now add/edit their bank account information (bank name, account type, account number, account holder name, cédula) in their profile page via a new BankAccountModal component.
+- **Admin Panel**: The admin wallets page now displays operator bank account information in the statement tab, allowing admins to see bank details when processing payouts.
+- **Security**: Account numbers are masked in the UI (only last 4 digits shown) for both operator and admin views.
+- **Files Changed**: 
+  - `client/src/pages/driver/profile.tsx` - Added bank account card and modal integration
+  - `client/src/pages/admin/wallets.tsx` - Added bank account display in statement tab
+  - `shared/schema.ts` - Updated OperatorStatementSummary type to include bankAccount
+  - `server/storage.ts` - Updated getOperatorStatement to fetch and return bank account data
+- **Database**: Uses `operatorBankAccounts` table with fields: banco, tipoCuenta, numeroCuenta, nombreTitular, cedula, estado
+
 ### December 11, 2025 - License Category Storage Fix
 - **Issue**: License category was not being saved after OCR scan of the back of the driver's license. This caused drivers to remain with pending validation and unable to activate services.
 - **Root Cause**: The `/api/identity/scan-license-back` endpoint was only performing OCR scan and returning results, but not persisting the extracted category to the database.
