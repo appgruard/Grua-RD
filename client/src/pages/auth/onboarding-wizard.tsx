@@ -657,8 +657,19 @@ export default function OnboardingWizard() {
 
       return Promise.all(filesUploaded);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: '¡Documentos subidos!', description: 'Tus documentos han sido guardados' });
+      
+      if (formData.userType === 'conductor') {
+        try {
+          await apiRequest('PUT', '/api/drivers/me/license-data', {
+            licenciaVerificada: true
+          });
+        } catch (error) {
+          console.error('Error marking license as verified:', error);
+        }
+      }
+      
       setCompletedSteps(prev => new Set(prev).add(4));
       setCurrentStep(formData.userType === 'conductor' ? 5 : 8);
     },
