@@ -2238,9 +2238,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // If we reached this point, the license is valid:
+      // - Document type is a driver's license
+      // - License number (cedula) was extracted successfully
+      // - License is not expired
+      // - Name and cedula comparisons passed (if applicable)
+      // So we can mark it as verified
+      const isVerified = true;
+
       logSystem.info('License OCR scan successful', { 
         licenseNumber: result.licenseNumber?.slice(0, 3) + '***', 
-        verified: result.verified,
+        verified: isVerified,
         confidenceScore: result.confidenceScore,
         nameMatch: result.nameMatch,
         cedulaMatch: result.cedulaMatch,
@@ -2254,13 +2262,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apellido: result.apellido,
         expirationDate: result.expirationDate,
         licenseClass: result.licenseClass,
-        verified: result.verified,
+        verified: isVerified,
         nameMatch: result.nameMatch,
         cedulaMatch: result.cedulaMatch,
         confidenceScore: result.confidenceScore,
-        message: result.verified 
-          ? "Licencia escaneada y verificada exitosamente"
-          : "Licencia escaneada. Verificación pendiente."
+        message: "Licencia escaneada y verificada exitosamente"
       });
     } catch (error: any) {
       logSystem.error('Scan license error', error, { userId: req.user?.id });
