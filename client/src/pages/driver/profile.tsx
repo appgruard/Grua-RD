@@ -43,14 +43,20 @@ const REQUIRED_DOCUMENTS = [
   { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false, obligatorio: true },
 ];
 
-// License category descriptions for Dominican Republic
+// License category descriptions for Dominican Republic (INTRANT categories)
 const LICENSE_CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  'A': 'Motocicletas',
-  'B': 'Vehículos livianos (hasta 3,500 kg)',
-  'C': 'Vehículos pesados (camiones)',
-  'D': 'Transporte de pasajeros',
-  'E': 'Vehículos articulados/con remolque',
-  'F': 'Vehículos agrícolas/industriales',
+  '01': 'Motocicletas y Pasolas',
+  '02': 'Vehículos Livianos (hasta 5 ton)',
+  '03': 'Vehículos Pesados (camiones)',
+  '04': 'Transporte Público y Emergencias',
+  '05': 'Materiales Peligrosos',
+  '06': 'Licencia Profesional',
+  '1': 'Motocicletas y Pasolas',
+  '2': 'Vehículos Livianos (hasta 5 ton)',
+  '3': 'Vehículos Pesados (camiones)',
+  '4': 'Transporte Público y Emergencias',
+  '5': 'Materiales Peligrosos',
+  '6': 'Licencia Profesional',
 };
 
 const DOCUMENTOS_CON_VENCIMIENTO = ['licencia'];
