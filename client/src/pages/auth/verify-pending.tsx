@@ -826,26 +826,38 @@ export default function VerifyPending() {
           });
         }
       } else {
-        // Back side - check success and isValid status from backend
+        // Back side - category extraction is optional, always accept the upload
         // Backend returns: { success, isValid, category, restrictions, confidenceScore, ... }
-        if (!data.success || !data.isValid) {
-          throw new Error(data.message || 'No se pudo leer la parte trasera. Intenta con otra foto más clara.');
-        }
-        
+        // Even if OCR fails to read category, we accept the license back as valid
         setLicenseBackUrl(base64);
         setLicenseBackVerified(true);
-        setLicenseOcrDetails(prev => ({
-          ...prev,
-          licenseClass: data.category,
-        }));
+        
+        if (data.category) {
+          setLicenseOcrDetails(prev => ({
+            ...prev,
+            licenseClass: data.category,
+          }));
+        }
         
         const scorePercent = Math.round((data.confidenceScore || 0) * 100);
-        toast({ 
-          title: 'Licencia trasera verificada', 
-          description: data.category 
-            ? `Categoría: ${data.category} - Confianza: ${scorePercent}%`
-            : `Verificación exitosa - Confianza: ${scorePercent}%`
-        });
+        
+        if (data.success && data.isValid && data.category) {
+          toast({ 
+            title: 'Licencia trasera verificada', 
+            description: `Categoría: ${data.category} - Confianza: ${scorePercent}%`
+          });
+        } else if (data.success && data.isValid) {
+          toast({ 
+            title: 'Licencia trasera aceptada', 
+            description: 'La imagen fue aceptada. La categoría será verificada manualmente si es necesario.'
+          });
+        } else {
+          // OCR couldn't read it, but we still accept the upload
+          toast({ 
+            title: 'Licencia trasera subida', 
+            description: 'La imagen fue guardada. Un administrador la revisará manualmente.'
+          });
+        }
       }
 
       // Also upload to document storage for record keeping with retries
