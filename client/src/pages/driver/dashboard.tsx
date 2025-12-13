@@ -245,8 +245,66 @@ export default function DriverDashboard() {
     calculateRoute();
   }, [activeService?.id, activeService?.estado, activeService?.destinoExtendidoLat, activeService?.destinoExtendidoLng, currentLocation, locationReady]);
 
+  const requestLocationPermission = async (): Promise<boolean> => {
+    if (!('geolocation' in navigator)) {
+      toast({
+        title: 'Ubicación no disponible',
+        description: 'Tu navegador no soporta geolocalización',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          // Permission granted, update location immediately
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setCurrentLocation(location);
+          currentLocationRef.current = location;
+          setLocationReady(true);
+          locationReadyRef.current = true;
+          // Send location to server
+          if (driverData?.id) {
+            apiRequest('PUT', '/api/drivers/location', location);
+          }
+          resolve(true);
+        },
+        (error) => {
+          console.error('Location permission error:', error);
+          if (error.code === error.PERMISSION_DENIED) {
+            toast({
+              title: 'Permiso de ubicación requerido',
+              description: 'Debes permitir el acceso a tu ubicación para activar tu disponibilidad',
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: 'Error de ubicación',
+              description: 'No se pudo obtener tu ubicación. Verifica que el GPS esté activo.',
+              variant: 'destructive',
+            });
+          }
+          resolve(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+  };
+
   const toggleAvailability = useMutation({
     mutationFn: async (disponible: boolean) => {
+      // If activating, request location permission first
+      if (disponible) {
+        const hasPermission = await requestLocationPermission();
+        if (!hasPermission) {
+          throw new Error('LOCATION_PERMISSION_DENIED');
+        }
+      }
+
       const res = await apiRequest('PUT', '/api/drivers/availability', { disponible });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -266,6 +324,11 @@ export default function DriverDashboard() {
       });
     },
     onError: (error: any) => {
+      // Location permission denied is already handled in requestLocationPermission
+      if (error?.message === 'LOCATION_PERMISSION_DENIED') {
+        return;
+      }
+      
       const errorResponse = error?.response;
       
       if (errorResponse?.missingDocuments && errorResponse.missingDocuments.length > 0) {
