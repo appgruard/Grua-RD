@@ -1433,10 +1433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
         
-        // Only check cliente and conductor accounts for disambiguation
-        if (account.userType !== 'cliente' && account.userType !== 'conductor') {
-          continue;
-        }
+        // Check all account types for disambiguation (cliente, conductor, admin, aseguradora, socio, empresa)
         
         try {
           const isValid = await bcrypt.compare(password, account.passwordHash);
