@@ -339,3 +339,8 @@ Este software es propiedad exclusiva de Grúa RD. Queda prohibido su uso, copia,
   <img src="https://img.shields.io/badge/Made%20with-❤️-white?style=flat-square" alt="Made with love" />
   <img src="https://img.shields.io/badge/Dominican%20Republic-🇩🇴-blue?style=flat-square" alt="Dominican Republic" />
 </p>
+
+<p align="center">
+  <img
+src="https://img.shields.io/badge/by%20Fourone%20Solutions-gray?style=flat-square" alt="Hecho por Four One Solutions" />
+</p>
