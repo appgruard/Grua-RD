@@ -39,7 +39,6 @@ interface OnboardingData {
   otpCode: string;
   nombre: string;
   apellido: string;
-  licencia: string;
   placaGrua: string;
   marcaGrua: string;
   modeloGrua: string;
@@ -66,7 +65,7 @@ export default function OnboardingWizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<OnboardingData>({
     email: '', password: '', userType: preselectedType || 'cliente', cedula: '', phone: '',
-    otpCode: '', nombre: '', apellido: '', licencia: '',
+    otpCode: '', nombre: '', apellido: '',
     placaGrua: '', marcaGrua: '', modeloGrua: '',
   });
   const [errors, setErrors] = useState<StepErrors>({});
@@ -839,7 +838,6 @@ export default function OnboardingWizard() {
           nombre: formData.nombre,
           apellido: formData.apellido,
           conductorData: {
-            licencia: formData.licencia,
             placaGrua: firstVehicle?.placa || formData.placaGrua || '',
             marcaGrua: firstVehicle?.marca || formData.marcaGrua || '',
             modeloGrua: firstVehicle?.modelo || formData.modeloGrua || '',
@@ -855,7 +853,6 @@ export default function OnboardingWizard() {
       if (formData.userType === 'conductor') {
         const firstVehicle = vehicleData[0];
         updateData.conductorData = {
-          licencia: formData.licencia,
           placaGrua: firstVehicle?.placa || formData.placaGrua || '',
           marcaGrua: firstVehicle?.marca || formData.marcaGrua || '',
           modeloGrua: firstVehicle?.modelo || formData.modeloGrua || '',
@@ -963,8 +960,6 @@ export default function OnboardingWizard() {
         newErrors[`vehicle_${categoria}`] = 'Formato de placa inválido. Ej: A123456';
       }
     }
-    
-    if (!formData.licencia.trim()) newErrors.licencia = 'Número de licencia requerido';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -1210,19 +1205,6 @@ export default function OnboardingWizard() {
         </Alert>
       )}
       
-      <div className="space-y-2">
-        <Label htmlFor="licencia">Número de Licencia *</Label>
-        <Input 
-          id="licencia" 
-          placeholder="Licencia de conducir" 
-          value={formData.licencia} 
-          onChange={(e) => updateField('licencia', e.target.value)} 
-          disabled={saveVehiclesMutation.isPending} 
-          data-testid="input-licencia" 
-        />
-        {errors.licencia && <p className="text-sm text-destructive">{errors.licencia}</p>}
-      </div>
-
       <div className="max-h-[350px] overflow-y-auto pr-1">
         <VehicleCategoryForm
           selectedCategories={selectedServices.map(s => s.categoria)}
