@@ -9438,7 +9438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       doc.pipe(res);
 
-      doc.fontSize(20).text('GruaRD', { align: 'center' });
+      doc.fontSize(20).text('Grúa RD', { align: 'center' });
       doc.fontSize(16).text('Recibo de Servicio', { align: 'center' });
       doc.moveDown();
 
@@ -9466,7 +9466,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       doc.fontSize(10).text('Información Fiscal', { underline: true });
       doc.text('GruaRD - República Dominicana');
-      doc.text('RNC: XXXXXXXXX');
       doc.text('Este documento es válido como comprobante de pago');
 
       doc.end();
