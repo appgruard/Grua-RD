@@ -994,69 +994,8 @@ export default function OnboardingWizard() {
       <div className="space-y-2">
         <Label htmlFor="apellido">Apellido</Label>
         <Input id="apellido" placeholder="Tu apellido" value={formData.apellido} onChange={(e) => updateField('apellido', e.target.value)} disabled={registerMutation.isPending} data-testid="input-apellido-step1" />
-        {errors.apellido && <p className="text-sm text-destructive">          
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="clientInsuranceName">Nombre de Aseguradora</Label>
-              <Input 
-                id="clientInsuranceName" 
-                placeholder="Ej: Seguros Reservas, Mapfre, etc." 
-                value={clientInsuranceName} 
-                onChange={(e) => setClientInsuranceName(e.target.value)} 
-                disabled={uploadClientInsuranceMutation.isPending}
-                data-testid="input-client-insurance-name" 
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="clientPolicyNumber">Número de Póliza</Label>
-              <Input 
-                id="clientPolicyNumber" 
-                placeholder="Número de tu póliza de seguro" 
-                value={clientPolicyNumber} 
-                onChange={(e) => setClientPolicyNumber(e.target.value)} 
-                disabled={uploadClientInsuranceMutation.isPending}
-                data-testid="input-client-policy-number" 
-              />
-            </div>
-            
-            <FileUpload 
-              label="Documento de Seguro" 
-              onFileSelect={setInsuranceFile} 
-              fileName={insuranceFile?.name} 
-              testId="input-client-insurance-file" 
-            />
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            <Button 
-              type="button" 
-              className="w-full" 
-              onClick={() => uploadClientInsuranceMutation.mutate()} 
-              disabled={uploadClientInsuranceMutation.isPending || !insuranceFile || !clientInsuranceName.trim() || !clientPolicyNumber.trim()} 
-              data-testid="button-upload-client-insurance"
-            >
-              {uploadClientInsuranceMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
-              ) : (
-                <><Upload className="w-4 h-4 mr-2" />Subir Seguro</>
-              )}
-            </Button>
-            
-            <Button 
-              type="button" 
-              variant="ghost" 
-              className="w-full" 
-              onClick={handleSkipStep4ForClient} 
-              disabled={uploadClientInsuranceMutation.isPending}
-              data-testid="button-skip-documents"
-            >
-              Omitir y continuar
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-        </div>
-      )}
+        {errors.apellido && <p className="text-sm text-destructive">{errors.apellido}</p>}
+      </div>
     </div>
   );
 
