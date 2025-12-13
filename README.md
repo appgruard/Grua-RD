@@ -342,5 +342,5 @@ Este software es propiedad exclusiva de Grúa RD. Queda prohibido su uso, copia,
 
 <p align="center">
   <img
-src="https://img.shields.io/badge/by%20Fourone%20Solutions-gray?style=flat-square" alt="Hecho por Four One Solutions" />
+src="https://img.shields.io/badge/by%20Four%20One%20Solutions-gray?style=flat-square" alt="Hecho por Four One Solutions" />
 </p>
