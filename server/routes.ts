@@ -2314,13 +2314,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await validateDriverLicenseBack(image);
 
+      // License back category extraction is optional - don't fail the request
+      // Even if OCR fails, we still accept the upload for manual review
       if (!result.success) {
-        logSystem.warn('License back OCR scan failed', { 
+        logSystem.warn('License back OCR scan failed - accepting for manual review', { 
           error: result.error, 
           userId: req.user?.id 
         });
-        return res.status(400).json({ 
-          message: result.error || "No se pudo escanear la parte trasera de la licencia"
+        // Return success with isValid: true but no category - manual review will handle it
+        return res.json({
+          success: true,
+          isValid: true,
+          category: null,
+          restrictions: null,
+          expirationDate: null,
+          confidenceScore: 0,
+          manualReviewRequired: true,
+          message: "La licencia fue aceptada. La categoría será verificada manualmente."
         });
       }
 
