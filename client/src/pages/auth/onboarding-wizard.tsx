@@ -986,15 +986,55 @@ export default function OnboardingWizard() {
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="nombre">Nombre</Label>
-        <Input id="nombre" placeholder="Tu nombre" value={formData.nombre} onChange={(e) => updateField('nombre', e.target.value)} disabled={registerMutation.isPending} data-testid="input-nombre-step1" />
-        {errors.nombre && <p className="text-sm text-destructive">{errors.nombre}</p>}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="nombre">Nombre</Label>
+          <Input id="nombre" placeholder="Tu nombre" value={formData.nombre} onChange={(e) => updateField('nombre', e.target.value)} disabled={registerMutation.isPending} data-testid="input-nombre-step1" />
+          {errors.nombre && <p className="text-sm text-destructive">{errors.nombre}</p>}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="apellido">Apellido</Label>
+          <Input id="apellido" placeholder="Tu apellido" value={formData.apellido} onChange={(e) => updateField('apellido', e.target.value)} disabled={registerMutation.isPending} data-testid="input-apellido-step1" />
+          {errors.apellido && <p className="text-sm text-destructive">{errors.apellido}</p>}
+        </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="apellido">Apellido</Label>
-        <Input id="apellido" placeholder="Tu apellido" value={formData.apellido} onChange={(e) => updateField('apellido', e.target.value)} disabled={registerMutation.isPending} data-testid="input-apellido-step1" />
-        {errors.apellido && <p className="text-sm text-destructive">{errors.apellido}</p>}
+        <Label htmlFor="email">Correo Electrónico</Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input id="email" type="email" placeholder="tu@correo.com" value={formData.email} onChange={(e) => updateField('email', e.target.value)} disabled={registerMutation.isPending} className="pl-10" data-testid="input-email-step1" />
+        </div>
+        {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="phone">Teléfono</Label>
+        <div className="relative">
+          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input id="phone" type="tel" placeholder="8091234567" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} disabled={registerMutation.isPending} className="pl-10" data-testid="input-phone-step1" />
+        </div>
+        {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="password">Contraseña</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input id="password" type={showPassword ? "text" : "password"} placeholder="Mínimo 6 caracteres" value={formData.password} onChange={(e) => updateField('password', e.target.value)} disabled={registerMutation.isPending} className="pl-10 pr-10" data-testid="input-password-step1" />
+          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" data-testid="button-toggle-password">
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Repite tu contraseña" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={registerMutation.isPending} className="pl-10 pr-10" data-testid="input-confirm-password-step1" />
+          <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" data-testid="button-toggle-confirm-password">
+            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
       </div>
     </div>
   );
