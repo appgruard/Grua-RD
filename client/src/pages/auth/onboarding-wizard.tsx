@@ -182,9 +182,12 @@ export default function OnboardingWizard() {
       if (userDataSync.emailVerificado === true) {
         // Mark step 3 as completed if email is verified
         setCompletedSteps(prev => new Set(prev).add(3));
-        // If currently on step 3 (email verification), advance to step 4
+        // If currently on step 3 (email verification), advance to next visible step
         if (currentStep === 3) {
-          setCurrentStep(4);
+          // For clients, next visible step is 8 (Confirmar) since steps 4-7 are only for conductors
+          // For conductors, next visible step is 4 (Documentos)
+          const nextStep = syncedUserType === 'conductor' ? 4 : 8;
+          setCurrentStep(nextStep);
         }
       }
     }
@@ -212,7 +215,7 @@ export default function OnboardingWizard() {
     { id: 1, name: 'Cuenta', show: !isClientAddingDriverAccount },
     { id: 2, name: 'Cédula', show: !isClientAddingDriverAccount || !userData?.cedulaVerificada },
     { id: 3, name: 'Email', show: !isClientAddingDriverAccount || !userData?.emailVerificado },
-    { id: 4, name: 'Documentos', show: true },
+    { id: 4, name: 'Documentos', show: formData.userType === 'conductor' },
     { id: 5, name: 'Foto', show: formData.userType === 'conductor' },
     { id: 6, name: 'Servicios', show: formData.userType === 'conductor' },
     { id: 7, name: 'Vehículos', show: formData.userType === 'conductor' },
@@ -562,7 +565,7 @@ export default function OnboardingWizard() {
     onSuccess: () => {
       toast({ title: '¡Correo verificado!', description: 'Tu correo electrónico ha sido verificado' });
       setCompletedSteps(prev => new Set(prev).add(3));
-      setCurrentStep(4);
+      setCurrentStep(getNextVisibleStep(3));
       queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       queryClient.invalidateQueries({ queryKey: ['/api/identity/verification-status'] });
     },
@@ -613,64 +616,47 @@ export default function OnboardingWizard() {
 
   const uploadDocsMutation = useMutation({
     mutationFn: async () => {
-      if (!licenseFile && !insuranceFile && !licenseBackFile) {
-        throw new Error('Debe cargar al menos un documento');
+      if (!licenseFile || !licenseBackFile) {
+        throw new Error('Debe cargar la licencia de conducir (frente y reverso)');
       }
 
       const filesUploaded = [];
-      if (licenseFile) {
-        const formDataLicense = new FormData();
-        formDataLicense.append('document', licenseFile);
-        formDataLicense.append('tipoDocumento', formData.userType === 'conductor' ? 'licencia' : 'seguro_cliente');
-        const licRes = await fetch('/api/documents/upload', {
-          method: 'POST',
-          body: formDataLicense,
-        });
-        if (!licRes.ok) throw new Error('Error al subir licencia (frente)');
-        filesUploaded.push(licRes.json());
-      }
+      
+      const formDataLicense = new FormData();
+      formDataLicense.append('document', licenseFile);
+      formDataLicense.append('tipoDocumento', 'licencia');
+      const licRes = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formDataLicense,
+      });
+      if (!licRes.ok) throw new Error('Error al subir licencia (frente)');
+      filesUploaded.push(licRes.json());
 
-      if (licenseBackFile && formData.userType === 'conductor') {
-        const formDataLicenseBack = new FormData();
-        formDataLicenseBack.append('document', licenseBackFile);
-        formDataLicenseBack.append('tipoDocumento', 'licencia_trasera');
-        const licBackRes = await fetch('/api/documents/upload', {
-          method: 'POST',
-          body: formDataLicenseBack,
-        });
-        if (!licBackRes.ok) throw new Error('Error al subir licencia (reverso)');
-        filesUploaded.push(licBackRes.json());
-      }
-
-      if (insuranceFile) {
-        const formDataIns = new FormData();
-        formDataIns.append('document', insuranceFile);
-        formDataIns.append('tipoDocumento', formData.userType === 'conductor' ? 'poliza' : 'seguro_cliente');
-        const insRes = await fetch('/api/documents/upload', {
-          method: 'POST',
-          body: formDataIns,
-        });
-        if (!insRes.ok) throw new Error('Error al subir documento de seguro');
-        filesUploaded.push(insRes.json());
-      }
+      const formDataLicenseBack = new FormData();
+      formDataLicenseBack.append('document', licenseBackFile);
+      formDataLicenseBack.append('tipoDocumento', 'licencia_trasera');
+      const licBackRes = await fetch('/api/documents/upload', {
+        method: 'POST',
+        body: formDataLicenseBack,
+      });
+      if (!licBackRes.ok) throw new Error('Error al subir licencia (reverso)');
+      filesUploaded.push(licBackRes.json());
 
       return Promise.all(filesUploaded);
     },
     onSuccess: async () => {
-      toast({ title: '¡Documentos subidos!', description: 'Tus documentos han sido guardados' });
+      toast({ title: '¡Documentos subidos!', description: 'Tu licencia ha sido guardada' });
       
-      if (formData.userType === 'conductor') {
-        try {
-          await apiRequest('PUT', '/api/drivers/me/license-data', {
-            licenciaVerificada: true
-          });
-        } catch (error) {
-          console.error('Error marking license as verified:', error);
-        }
+      try {
+        await apiRequest('PUT', '/api/drivers/me/license-data', {
+          licenciaVerificada: true
+        });
+      } catch (error) {
+        console.error('Error marking license as verified:', error);
       }
       
       setCompletedSteps(prev => new Set(prev).add(4));
-      setCurrentStep(formData.userType === 'conductor' ? 5 : 8);
+      setCurrentStep(5);
     },
     onError: (error: any) => {
       setErrors({ documents: error?.message });
@@ -1247,21 +1233,14 @@ export default function OnboardingWizard() {
       <div className="text-center mb-4">
         <FileText className="w-12 h-12 mx-auto text-primary mb-2" />
         <p className="text-sm text-muted-foreground">
-          {formData.userType === 'conductor' ? 'Sube tu licencia de conducir' : 'Sube tus documentos de seguro (opcional)'}
+          Sube tu licencia de conducir
         </p>
       </div>
 
-      {formData.userType === 'conductor' ? (
-        <div className="space-y-4">
-          <FileUpload label="Licencia de Conducir (Frente) *" onFileSelect={setLicenseFile} accept="image/*,application/pdf" required error={errors.licenseFile} fileName={licenseFile?.name} testId="upload-license-front" />
-          <FileUpload label="Licencia de Conducir (Reverso) *" onFileSelect={setLicenseBackFile} accept="image/*,application/pdf" required error={errors.licenseBackFile} fileName={licenseBackFile?.name} testId="upload-license-back" />
-          <FileUpload label="Póliza de Seguro (Opcional)" onFileSelect={setInsuranceFile} accept="image/*,application/pdf" fileName={insuranceFile?.name} testId="upload-insurance" />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <FileUpload label="Documento de Seguro (Opcional)" onFileSelect={setInsuranceFile} accept="image/*,application/pdf" fileName={insuranceFile?.name} testId="upload-client-insurance" />
-        </div>
-      )}
+      <div className="space-y-4">
+        <FileUpload label="Licencia de Conducir (Frente) *" onFileSelect={setLicenseFile} accept="image/*,application/pdf" required error={errors.licenseFile} fileName={licenseFile?.name} testId="upload-license-front" />
+        <FileUpload label="Licencia de Conducir (Reverso) *" onFileSelect={setLicenseBackFile} accept="image/*,application/pdf" required error={errors.licenseBackFile} fileName={licenseBackFile?.name} testId="upload-license-back" />
+      </div>
 
       <div className="flex gap-2">
         <Button variant="outline" onClick={goBack} data-testid="button-back-step4">
