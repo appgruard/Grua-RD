@@ -38,7 +38,7 @@ interface VerifikValidation {
 
 const REQUIRED_DOCUMENTS = [
   { tipo: 'foto_perfil', label: 'Foto de Perfil', requiereVencimiento: false, obligatorio: true, descripcion: 'Debe mostrar claramente tu rostro' },
-  { tipo: 'licencia', label: 'Licencia de Conducir (Frente)', requiereVencimiento: true, obligatorio: true },
+  { tipo: 'licencia', label: 'Licencia de Conducir (Frente)', requiereVencimiento: false, obligatorio: true },
   { tipo: 'licencia_trasera', label: 'Licencia de Conducir (Reverso)', requiereVencimiento: false, obligatorio: true, descripcion: 'Muestra el reverso de tu licencia para extraer categoría y restricciones' },
   { tipo: 'cedula_frontal', label: 'Cédula (Frente)', requiereVencimiento: false, obligatorio: true },
   { tipo: 'cedula_trasera', label: 'Cédula (Reverso)', requiereVencimiento: false, obligatorio: true },
@@ -216,8 +216,19 @@ export default function DriverProfile() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al subir el documento');
+        const errorData = await response.json();
+        // Create an error with additional context for manual date requirement
+        const error = new Error(errorData.message || 'Error al subir el documento') as Error & { 
+          requiresManualDate?: boolean; 
+          code?: string;
+          tipo?: string;
+          errorType?: string;
+        };
+        (error as any).requiresManualDate = errorData.requiresManualDate;
+        (error as any).code = errorData.code;
+        (error as any).tipo = tipo;
+        (error as any).errorType = errorData.errorType;
+        throw error;
       }
 
       return response.json();
@@ -241,13 +252,66 @@ export default function DriverProfile() {
         return newDates;
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error & { requiresManualDate?: boolean; code?: string; tipo?: string; errorType?: string }) => {
+      setUploadingDoc(null);
+      
+      // Handle different error types with specific messages
+      const errorCode = (error as any).code;
+      const errorType = (error as any).errorType;
+      
+      // License expired - show destructive error, user needs to renew license
+      if (errorCode === 'LICENSE_EXPIRED') {
+        toast({
+          title: 'Licencia vencida',
+          description: error.message,
+          variant: 'destructive',
+        });
+        // Clear the selected file since they can't proceed with an expired license
+        if (error.tipo) {
+          setSelectedFiles(prev => {
+            const newFiles = { ...prev };
+            delete newFiles[error.tipo!];
+            return newFiles;
+          });
+        }
+        return;
+      }
+      
+      // OCR failed or date not detected - show informative message and date picker
+      if (error.requiresManualDate && error.tipo) {
+        let title = 'Ingresa la fecha manualmente';
+        
+        if (errorCode === 'OCR_FAILED') {
+          title = 'No pudimos leer la licencia';
+        } else if (errorCode === 'DATE_NOT_DETECTED') {
+          title = 'Fecha no detectada';
+        }
+        
+        toast({
+          title,
+          description: error.message,
+          variant: 'default',
+        });
+        // File is already in selectedFiles, date picker will show automatically
+        return;
+      }
+      
+      // Validation errors (date in past, invalid format)
+      if (errorType === 'validation') {
+        toast({
+          title: 'Fecha inválida',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Generic error
       toast({
         title: 'Error al subir documento',
         description: error.message,
         variant: 'destructive',
       });
-      setUploadingDoc(null);
     },
   });
 
@@ -292,7 +356,15 @@ export default function DriverProfile() {
   };
 
   const handleFileSelect = (file: File, tipo: string) => {
-    if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo)) {
+    // For license documents, try OCR first then fall back to manual date entry
+    if (tipo === 'licencia') {
+      // Store the file first in case OCR fails and we need manual date entry
+      setSelectedFiles(prev => ({ ...prev, [tipo]: file }));
+      setUploadingDoc(tipo);
+      // Try upload without date - server will attempt OCR extraction
+      uploadMutation.mutate({ file, tipo });
+    } else if (DOCUMENTOS_CON_VENCIMIENTO.includes(tipo)) {
+      // Other documents with expiration (like matricula) require manual date upfront
       setSelectedFiles(prev => ({ ...prev, [tipo]: file }));
     } else {
       setUploadingDoc(tipo);

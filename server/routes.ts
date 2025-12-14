@@ -1433,10 +1433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
         
-        // Only check cliente and conductor accounts for disambiguation
-        if (account.userType !== 'cliente' && account.userType !== 'conductor') {
-          continue;
-        }
+        // Check all account types for disambiguation (cliente, conductor, admin, aseguradora, socio, empresa)
         
         try {
           const isValid = await bcrypt.compare(password, account.passwordHash);
@@ -2252,6 +2249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confidenceScore: result.confidenceScore,
         nameMatch: result.nameMatch,
         cedulaMatch: result.cedulaMatch,
+        expirationDateSource: result.expirationDateSource,
         userId: req.user?.id 
       });
 
@@ -2261,12 +2259,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nombre: result.nombre,
         apellido: result.apellido,
         expirationDate: result.expirationDate,
+        issueDate: result.issueDate,
+        expirationDateSource: result.expirationDateSource,
         licenseClass: result.licenseClass,
         verified: isVerified,
         nameMatch: result.nameMatch,
         cedulaMatch: result.cedulaMatch,
         confidenceScore: result.confidenceScore,
-        message: "Licencia escaneada y verificada exitosamente"
+        message: result.expirationDateSource === 'manual_required' 
+          ? "Licencia verificada. Por favor, ingresa la fecha de vencimiento manualmente."
+          : "Licencia escaneada y verificada exitosamente"
       });
     } catch (error: any) {
       logSystem.error('Scan license error', error, { userId: req.user?.id });
@@ -2309,13 +2311,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await validateDriverLicenseBack(image);
 
+      // License back category extraction is optional - don't fail the request
+      // Even if OCR fails, we still accept the upload for manual review
       if (!result.success) {
-        logSystem.warn('License back OCR scan failed', { 
+        logSystem.warn('License back OCR scan failed - accepting for manual review', { 
           error: result.error, 
           userId: req.user?.id 
         });
-        return res.status(400).json({ 
-          message: result.error || "No se pudo escanear la parte trasera de la licencia"
+        // Return success with isValid: true but no category - manual review will handle it
+        return res.json({
+          success: true,
+          isValid: true,
+          category: null,
+          restrictions: null,
+          expirationDate: null,
+          confidenceScore: 0,
+          manualReviewRequired: true,
+          message: "La licencia fue aceptada. La categoría será verificada manualmente."
         });
       }
 
@@ -4268,7 +4280,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get conductor vehicles to check matricula and foto_vehiculo
         const conductorVehiculos = await storage.getConductorVehiculos(conductor.id);
         const hasActiveVehicle = conductorVehiculos.some(v => v.activo);
-        const hasVehicleWithPhoto = conductorVehiculos.some(v => v.activo && v.fotoUrl);
+        // If vehicle is registered with placa, consider both matricula and foto as complete
+        // (foto is optional when vehicle is registered in the system)
         
         // Required document types
         const requiredTypes = ['licencia', 'matricula', 'foto_vehiculo', 'cedula_frontal', 'cedula_trasera'];
@@ -4306,8 +4319,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
           
-          // Skip foto_vehiculo if conductor has an active vehicle with photo
-          if (requiredType === 'foto_vehiculo' && hasVehicleWithPhoto) {
+          // Skip foto_vehiculo if conductor has an active vehicle registered
+          // (foto is optional - having a registered vehicle is sufficient)
+          if (requiredType === 'foto_vehiculo' && hasActiveVehicle) {
             continue;
           }
           
@@ -6821,7 +6835,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Upload to object storage
+      // Document types that require expiration date
+      const documentosConVencimiento = ['licencia', 'matricula'];
+      
+      // Parse expiration date if provided and document type supports it
+      let validoHasta: Date | undefined = undefined;
+      let expirationDateSource: 'manual' | 'ocr' | 'calculated' = 'manual';
+      
+      // For license documents, try OCR if no expiration date provided
+      if (tipoDocumento === 'licencia' && !fechaVencimiento) {
+        const { validateDriverLicense, isVerifikConfigured } = await import("./services/verifik-ocr");
+        
+        if (isVerifikConfigured()) {
+          // Try to extract expiration date via OCR
+          const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+          const ocrResult = await validateDriverLicense(imageBase64);
+          
+          logSystem.info('License OCR for expiration date extraction', {
+            success: ocrResult.success,
+            expirationDate: ocrResult.expirationDate,
+            expirationDateSource: ocrResult.expirationDateSource
+          });
+          
+          // Check if OCR failed completely
+          if (!ocrResult.success) {
+            logSystem.warn('OCR failed for license', { error: ocrResult.error });
+            return res.status(400).json({ 
+              message: "No pudimos leer tu licencia automáticamente. Por favor, ingresa la fecha de vencimiento que aparece en tu licencia.",
+              requiresManualDate: true,
+              code: 'OCR_FAILED',
+              errorType: 'ocr_error'
+            });
+          }
+          
+          if (ocrResult.success && ocrResult.expirationDate && ocrResult.expirationDateSource !== 'manual_required') {
+            // Parse the OCR extracted date (formats: DD/MM/YYYY or YYYY-MM-DD)
+            let parsedOcrDate: Date | undefined;
+            const dateStr = ocrResult.expirationDate;
+            
+            // Try DD/MM/YYYY format first
+            const dmyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (dmyMatch) {
+              parsedOcrDate = new Date(parseInt(dmyMatch[3]), parseInt(dmyMatch[2]) - 1, parseInt(dmyMatch[1]));
+            } else {
+              // Try ISO format
+              parsedOcrDate = new Date(dateStr);
+            }
+            
+            if (parsedOcrDate && !isNaN(parsedOcrDate.getTime())) {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              
+              if (parsedOcrDate <= today) {
+                return res.status(400).json({ 
+                  message: `Tu licencia venció el ${ocrResult.expirationDate}. Debes renovarla antes de poder registrarte como conductor.`,
+                  requiresManualDate: false,
+                  code: 'LICENSE_EXPIRED',
+                  errorType: 'expired'
+                });
+              }
+              
+              validoHasta = parsedOcrDate;
+              expirationDateSource = ocrResult.expirationDateSource === 'calculated_from_issue' ? 'calculated' : 'ocr';
+              logSystem.info('Using OCR extracted expiration date', {
+                expirationDate: ocrResult.expirationDate,
+                source: expirationDateSource
+              });
+            }
+          }
+          
+          // If OCR couldn't extract the date, require manual entry
+          if (!validoHasta) {
+            return res.status(400).json({ 
+              message: "No pudimos detectar la fecha de vencimiento en tu licencia. Por favor, ingrésala manualmente mirando el documento.",
+              requiresManualDate: true,
+              code: 'DATE_NOT_DETECTED',
+              errorType: 'manual_required'
+            });
+          }
+        } else {
+          // Verifik not configured, require manual date
+          return res.status(400).json({ 
+            message: "Por favor, ingresa la fecha de vencimiento de tu licencia.",
+            requiresManualDate: true,
+            code: 'VERIFIK_NOT_CONFIGURED',
+            errorType: 'manual_required'
+          });
+        }
+      } else if (fechaVencimiento && documentosConVencimiento.includes(tipoDocumento)) {
+        // Manual date provided
+        const parsedDate = new Date(fechaVencimiento);
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ 
+            message: "La fecha ingresada no es válida. Por favor, usa el formato correcto (día/mes/año).",
+            code: 'INVALID_DATE_FORMAT',
+            errorType: 'validation'
+          });
+        }
+        // Validate that expiration date is in the future for all documents with expiration
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (parsedDate <= today) {
+          return res.status(400).json({ 
+            message: "La fecha de vencimiento que ingresaste ya pasó. Por favor, ingresa una fecha futura.",
+            code: 'DATE_IN_PAST',
+            errorType: 'validation'
+          });
+        }
+        validoHasta = parsedDate;
+        expirationDateSource = 'manual';
+      } else if (documentosConVencimiento.includes(tipoDocumento) && tipoDocumento !== 'licencia' && !fechaVencimiento) {
+        // Non-license documents that require expiration date
+        const documentName = tipoDocumento === 'matricula' ? 'la matrícula' : 'este documento';
+        return res.status(400).json({ 
+          message: `Por favor, ingresa la fecha de vencimiento de ${documentName}.`,
+          requiresManualDate: true,
+          code: 'DATE_REQUIRED',
+          errorType: 'manual_required'
+        });
+      }
+      
+      // Upload to object storage (after validation)
       const uploadResult = await uploadDocument({
         buffer: req.file.buffer,
         originalName: req.file.originalname,
@@ -6829,29 +6963,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: conductor.id,
         documentType: tipoDocumento,
       });
-
-      // Document types that require expiration date
-      const documentosConVencimiento = ['licencia', 'matricula'];
-      
-      // Validate expiration date is required for all documents with expiration
-      if (documentosConVencimiento.includes(tipoDocumento) && !fechaVencimiento) {
-        return res.status(400).json({ message: "La fecha de vencimiento es requerida para este tipo de documento" });
-      }
-      
-      // Parse expiration date if provided and document type supports it
-      let validoHasta: Date | undefined = undefined;
-      if (fechaVencimiento && documentosConVencimiento.includes(tipoDocumento)) {
-        const parsedDate = new Date(fechaVencimiento);
-        if (!isNaN(parsedDate.getTime())) {
-          // Validate that expiration date is in the future for all documents with expiration
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          if (parsedDate <= today) {
-            return res.status(400).json({ message: "La fecha de vencimiento debe ser una fecha futura" });
-          }
-          validoHasta = parsedDate;
-        }
-      }
 
       // Save document metadata to database
       const documento = await storage.createDocumento({
@@ -9324,7 +9435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       doc.pipe(res);
 
-      doc.fontSize(20).text('GruaRD', { align: 'center' });
+      doc.fontSize(20).text('Grúa RD', { align: 'center' });
       doc.fontSize(16).text('Recibo de Servicio', { align: 'center' });
       doc.moveDown();
 
@@ -9352,7 +9463,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       doc.fontSize(10).text('Información Fiscal', { underline: true });
       doc.text('GruaRD - República Dominicana');
-      doc.text('RNC: XXXXXXXXX');
       doc.text('Este documento es válido como comprobante de pago');
 
       doc.end();

@@ -744,8 +744,11 @@ export default function VerifyPending() {
     licenseNumber?: string;
     licenseClass?: string;
     expirationDate?: string;
+    issueDate?: string;
+    expirationDateSource?: 'ocr' | 'calculated_from_issue' | 'manual_required';
     confidenceScore?: number;
   }>({});
+  const [manualExpirationDate, setManualExpirationDate] = useState('');
 
   const handleLicenseUpload = async (file: File, type: 'licencia' | 'licencia_trasera') => {
     setIsUploadingLicense(true);
@@ -796,37 +799,65 @@ export default function VerifyPending() {
           ...prev,
           licenseNumber: data.licenseNumber,
           expirationDate: data.expirationDate,
+          issueDate: data.issueDate,
+          expirationDateSource: data.expirationDateSource,
           confidenceScore: data.confidenceScore
         }));
         
         const scorePercent = Math.round((data.confidenceScore || 0) * 100);
-        toast({ 
-          title: 'Licencia frontal verificada', 
-          description: data.licenseNumber 
-            ? `Número: ${data.licenseNumber.slice(0, 3)}*** - Confianza: ${scorePercent}%`
-            : `Verificación exitosa - Confianza: ${scorePercent}%`
-        });
-      } else {
-        // Back side - check success and isValid status from backend
-        // Backend returns: { success, isValid, category, restrictions, confidenceScore, ... }
-        if (!data.success || !data.isValid) {
-          throw new Error(data.message || 'No se pudo leer la parte trasera. Intenta con otra foto más clara.');
-        }
         
+        // Show different message based on expiration date source
+        if (data.expirationDateSource === 'manual_required') {
+          toast({ 
+            title: 'Licencia verificada - Fecha requerida', 
+            description: 'Por favor ingresa la fecha de vencimiento de tu licencia manualmente.'
+          });
+        } else if (data.expirationDateSource === 'calculated_from_issue') {
+          toast({ 
+            title: 'Licencia frontal verificada', 
+            description: `Fecha de vencimiento calculada desde emisión: ${data.expirationDate}`
+          });
+        } else {
+          toast({ 
+            title: 'Licencia frontal verificada', 
+            description: data.licenseNumber 
+              ? `Número: ${data.licenseNumber.slice(0, 3)}*** - Confianza: ${scorePercent}%`
+              : `Verificación exitosa - Confianza: ${scorePercent}%`
+          });
+        }
+      } else {
+        // Back side - category extraction is optional, always accept the upload
+        // Backend returns: { success, isValid, category, restrictions, confidenceScore, ... }
+        // Even if OCR fails to read category, we accept the license back as valid
         setLicenseBackUrl(base64);
         setLicenseBackVerified(true);
-        setLicenseOcrDetails(prev => ({
-          ...prev,
-          licenseClass: data.category,
-        }));
+        
+        if (data.category) {
+          setLicenseOcrDetails(prev => ({
+            ...prev,
+            licenseClass: data.category,
+          }));
+        }
         
         const scorePercent = Math.round((data.confidenceScore || 0) * 100);
-        toast({ 
-          title: 'Licencia trasera verificada', 
-          description: data.category 
-            ? `Categoría: ${data.category} - Confianza: ${scorePercent}%`
-            : `Verificación exitosa - Confianza: ${scorePercent}%`
-        });
+        
+        if (data.success && data.isValid && data.category) {
+          toast({ 
+            title: 'Licencia trasera verificada', 
+            description: `Categoría: ${data.category} - Confianza: ${scorePercent}%`
+          });
+        } else if (data.success && data.isValid) {
+          toast({ 
+            title: 'Licencia trasera aceptada', 
+            description: 'La imagen fue aceptada. La categoría será verificada manualmente si es necesario.'
+          });
+        } else {
+          // OCR couldn't read it, but we still accept the upload
+          toast({ 
+            title: 'Licencia trasera subida', 
+            description: 'La imagen fue guardada. Un administrador la revisará manualmente.'
+          });
+        }
       }
 
       // Also upload to document storage for record keeping with retries
@@ -898,6 +929,35 @@ export default function VerifyPending() {
       return;
     }
 
+    // Check if manual expiration date is required
+    const needsManualDate = licenseOcrDetails.expirationDateSource === 'manual_required';
+    const finalExpirationDate = needsManualDate ? manualExpirationDate : licenseOcrDetails.expirationDate;
+    
+    if (needsManualDate && !manualExpirationDate) {
+      setErrors({ manualExpirationDate: 'Por favor ingresa la fecha de vencimiento de tu licencia' });
+      return;
+    }
+    
+    // Validate manual date format and check if not expired
+    if (needsManualDate && manualExpirationDate) {
+      const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+      const match = manualExpirationDate.match(dateRegex);
+      if (!match) {
+        setErrors({ manualExpirationDate: 'Formato inválido. Usa DD/MM/YYYY (ej: 21/03/2026)' });
+        return;
+      }
+      const [, day, month, year] = match;
+      const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      if (isNaN(parsedDate.getTime())) {
+        setErrors({ manualExpirationDate: 'Fecha inválida' });
+        return;
+      }
+      if (parsedDate < new Date()) {
+        setErrors({ manualExpirationDate: 'La licencia está vencida. Debe renovar su licencia antes de registrarse.' });
+        return;
+      }
+    }
+
     // Update conductor record to mark license as verified
     try {
       setIsUploadingLicense(true);
@@ -911,7 +971,7 @@ export default function VerifyPending() {
           licenciaVerificada: true,
           licenciaNumero: licenseOcrDetails.licenseNumber,
           licenciaClase: licenseOcrDetails.licenseClass,
-          licenciaVencimiento: licenseOcrDetails.expirationDate
+          licenciaVencimiento: finalExpirationDate
         }),
       });
       
@@ -2190,16 +2250,71 @@ export default function VerifyPending() {
                         </div>
                       </div>
 
+                      {/* Manual expiration date input - shown when OCR cannot extract the date */}
+                      {licenseFrontVerified && licenseOcrDetails.expirationDateSource === 'manual_required' && (
+                        <div className="space-y-2 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                Fecha de vencimiento no detectada
+                              </p>
+                              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                No pudimos leer automáticamente la fecha de vencimiento de tu licencia. 
+                                Por favor, ingrésala manualmente como aparece en tu documento.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <Label htmlFor="manualExpirationDate" className="text-sm font-medium">
+                              Fecha de Vencimiento (DD/MM/YYYY) *
+                            </Label>
+                            <Input
+                              id="manualExpirationDate"
+                              type="text"
+                              placeholder="Ej: 21/03/2026"
+                              value={manualExpirationDate}
+                              onChange={(e) => {
+                                setManualExpirationDate(e.target.value);
+                                setErrors(prev => ({ ...prev, manualExpirationDate: '' }));
+                              }}
+                              className="mt-1"
+                              data-testid="input-manual-expiration-date"
+                            />
+                            {errors.manualExpirationDate && (
+                              <p className="text-sm text-destructive mt-1">{errors.manualExpirationDate}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Show detected or calculated expiration date */}
+                      {licenseFrontVerified && licenseOcrDetails.expirationDate && licenseOcrDetails.expirationDateSource !== 'manual_required' && (
+                        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <p className="text-sm text-green-800 dark:text-green-200">
+                              Fecha de vencimiento: <span className="font-medium">{licenseOcrDetails.expirationDate}</span>
+                              {licenseOcrDetails.expirationDateSource === 'calculated_from_issue' && (
+                                <span className="text-xs ml-2 text-green-600 dark:text-green-400">(calculada desde emisión)</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       <Button 
                         onClick={handleLicenseContinue} 
                         className="w-full"
-                        disabled={!licenseFrontVerified || !licenseBackVerified || isUploadingLicense}
+                        disabled={!licenseFrontVerified || !licenseBackVerified || isUploadingLicense || (licenseOcrDetails.expirationDateSource === 'manual_required' && !manualExpirationDate)}
                         data-testid="button-continue-license"
                       >
                         {isUploadingLicense ? (
                           <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando OCR...</>
                         ) : !licenseFrontVerified || !licenseBackVerified ? (
                           <>Verificar ambos lados de la licencia</>
+                        ) : licenseOcrDetails.expirationDateSource === 'manual_required' && !manualExpirationDate ? (
+                          <>Ingresa la fecha de vencimiento</>
                         ) : (
                           <>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>
                         )}

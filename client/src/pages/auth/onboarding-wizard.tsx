@@ -39,7 +39,6 @@ interface OnboardingData {
   otpCode: string;
   nombre: string;
   apellido: string;
-  licencia: string;
   placaGrua: string;
   marcaGrua: string;
   modeloGrua: string;
@@ -66,7 +65,7 @@ export default function OnboardingWizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<OnboardingData>({
     email: '', password: '', userType: preselectedType || 'cliente', cedula: '', phone: '',
-    otpCode: '', nombre: '', apellido: '', licencia: '',
+    otpCode: '', nombre: '', apellido: '',
     placaGrua: '', marcaGrua: '', modeloGrua: '',
   });
   const [errors, setErrors] = useState<StepErrors>({});
@@ -657,8 +656,19 @@ export default function OnboardingWizard() {
 
       return Promise.all(filesUploaded);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: '¡Documentos subidos!', description: 'Tus documentos han sido guardados' });
+      
+      if (formData.userType === 'conductor') {
+        try {
+          await apiRequest('PUT', '/api/drivers/me/license-data', {
+            licenciaVerificada: true
+          });
+        } catch (error) {
+          console.error('Error marking license as verified:', error);
+        }
+      }
+      
       setCompletedSteps(prev => new Set(prev).add(4));
       setCurrentStep(formData.userType === 'conductor' ? 5 : 8);
     },
@@ -828,7 +838,6 @@ export default function OnboardingWizard() {
           nombre: formData.nombre,
           apellido: formData.apellido,
           conductorData: {
-            licencia: formData.licencia,
             placaGrua: firstVehicle?.placa || formData.placaGrua || '',
             marcaGrua: firstVehicle?.marca || formData.marcaGrua || '',
             modeloGrua: firstVehicle?.modelo || formData.modeloGrua || '',
@@ -844,7 +853,6 @@ export default function OnboardingWizard() {
       if (formData.userType === 'conductor') {
         const firstVehicle = vehicleData[0];
         updateData.conductorData = {
-          licencia: formData.licencia,
           placaGrua: firstVehicle?.placa || formData.placaGrua || '',
           marcaGrua: firstVehicle?.marca || formData.marcaGrua || '',
           modeloGrua: firstVehicle?.modelo || formData.modeloGrua || '',
@@ -953,8 +961,6 @@ export default function OnboardingWizard() {
       }
     }
     
-    if (!formData.licencia.trim()) newErrors.licencia = 'Número de licencia requerido';
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -990,415 +996,6 @@ export default function OnboardingWizard() {
         <Input id="apellido" placeholder="Tu apellido" value={formData.apellido} onChange={(e) => updateField('apellido', e.target.value)} disabled={registerMutation.isPending} data-testid="input-apellido-step1" />
         {errors.apellido && <p className="text-sm text-destructive">{errors.apellido}</p>}
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="email">Correo Electrónico</Label>
-        <Input id="email" type="email" placeholder="tu@email.com" value={formData.email} onChange={(e) => updateField('email', e.target.value)} disabled={registerMutation.isPending} data-testid="input-email" />
-        {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Contraseña</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" className="pl-10 pr-10" value={formData.password} onChange={(e) => updateField('password', e.target.value)} disabled={registerMutation.isPending} data-testid="input-password" />
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => setShowPassword(!showPassword)}
-            data-testid="button-toggle-password"
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-        {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            id="confirmPassword" 
-            type={showConfirmPassword ? 'text' : 'password'} 
-            placeholder="Repite tu contraseña" 
-            className="pl-10 pr-10" 
-            value={confirmPassword} 
-            onChange={(e) => {
-              setConfirmPassword(e.target.value);
-              setErrors(prev => ({ ...prev, confirmPassword: '' }));
-            }} 
-            disabled={registerMutation.isPending} 
-            data-testid="input-confirm-password" 
-          />
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            data-testid="button-toggle-confirm-password"
-          >
-            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-        {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="phone">Teléfono</Label>
-        <Input id="phone" type="tel" placeholder="+1 809 555 0100" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} disabled={registerMutation.isPending} data-testid="input-phone-step1" />
-        {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
-      </div>
-      <Button type="button" className="w-full" onClick={() => validateStep1() && registerMutation.mutate()} disabled={registerMutation.isPending} data-testid="button-continue-step1">
-        {registerMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando...</>) : (<>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>)}
-      </Button>
-    </div>
-  );
-
-  const renderStep2 = () => {
-    // For operators, use OCR scanning with name verification
-    if (formData.userType === 'conductor') {
-      return (
-        <div className="space-y-4">
-          {errors.cedula && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{errors.cedula}</AlertDescription>
-            </Alert>
-          )}
-
-          {cedulaVerified ? (
-            <div className="flex flex-col items-center text-center space-y-4 py-4">
-              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-green-600 dark:text-green-400">Cédula Verificada</h3>
-                <p className="text-sm text-muted-foreground mt-1">Cédula: {formData.cedula}</p>
-                {ocrScore && <p className="text-sm text-muted-foreground">Confianza: {Math.round(ocrScore * 100)}%</p>}
-              </div>
-              <Button variant="outline" size="sm" onClick={resetOCRScan} data-testid="button-rescan-cedula">
-                <RefreshCcw className="w-4 h-4 mr-2" />
-                Escanear otra
-              </Button>
-            </div>
-          ) : showCamera ? (
-            <div className="space-y-4">
-              <div className="relative aspect-[4/3] bg-black rounded-lg overflow-hidden">
-                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="border-2 border-dashed border-white/50 rounded-lg w-[90%] h-[70%] flex items-center justify-center">
-                    <ScanLine className="w-12 h-12 text-white/70 animate-pulse" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={captureOCRPhoto} className="flex-1" disabled={isScanning} data-testid="button-capture-cedula">
-                  {isScanning ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</>) : (<><Camera className="w-4 h-4 mr-2" />Capturar</>)}
-                </Button>
-                <Button variant="outline" onClick={stopOCRCamera} data-testid="button-cancel-camera">Cancelar</Button>
-              </div>
-            </div>
-          ) : capturedImage ? (
-            <div className="space-y-4">
-              <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-muted">
-                <img src={capturedImage} alt="Cédula capturada" className="w-full h-full object-contain" />
-                {isScanning && (
-                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                      <p className="text-sm">Escaneando documento...</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <Button variant="outline" onClick={resetOCRScan} className="w-full" data-testid="button-reset-scan">
-                <RefreshCcw className="w-4 h-4 mr-2" />
-                Tomar otra foto
-              </Button>
-            </div>
-          ) : isEditingName ? (
-            <div className="space-y-4">
-              <div className="text-center py-2">
-                <Edit3 className="w-12 h-12 mx-auto text-primary mb-2" />
-                <p className="text-sm font-medium">Corregir nombre</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Corrige tu nombre antes de escanear tu cédula
-                </p>
-              </div>
-              {errors.nombre && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{errors.nombre}</AlertDescription>
-                </Alert>
-              )}
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="tempNombre">Nombre</Label>
-                  <Input 
-                    id="tempNombre" 
-                    placeholder="Tu nombre" 
-                    value={tempNombre} 
-                    onChange={(e) => setTempNombre(e.target.value)} 
-                    disabled={updateNameMutation.isPending} 
-                    data-testid="input-edit-nombre" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tempApellido">Apellido</Label>
-                  <Input 
-                    id="tempApellido" 
-                    placeholder="Tu apellido" 
-                    value={tempApellido} 
-                    onChange={(e) => setTempApellido(e.target.value)} 
-                    disabled={updateNameMutation.isPending} 
-                    data-testid="input-edit-apellido" 
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  className="flex-1" 
-                  onClick={cancelEditingName} 
-                  disabled={updateNameMutation.isPending}
-                  data-testid="button-cancel-edit-name"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  type="button" 
-                  className="flex-1" 
-                  onClick={() => updateNameMutation.mutate()} 
-                  disabled={updateNameMutation.isPending || !tempNombre.trim() || !tempApellido.trim()}
-                  data-testid="button-save-name"
-                >
-                  {updateNameMutation.isPending ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
-                  ) : (
-                    <>Guardar<CheckCircle2 className="w-4 h-4 ml-2" /></>
-                  )}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-center py-2">
-                <IdCard className="w-12 h-12 mx-auto text-primary mb-2" />
-                <p className="text-sm font-medium">Escanea tu cédula de identidad</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Tu nombre debe coincidir con el registrado: <strong>{formData.nombre} {formData.apellido}</strong>
-                </p>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="mt-2 text-primary" 
-                  onClick={startEditingName}
-                  data-testid="button-edit-name"
-                >
-                  <Edit3 className="w-3 h-3 mr-1" />
-                  ¿Nombre incorrecto? Editar
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" onClick={startOCRCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-use-camera">
-                  <Camera className="w-8 h-8" />
-                  <span className="text-sm">Usar cámara</span>
-                </Button>
-                <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-cedula">
-                  <Upload className="w-8 h-8" />
-                  <span className="text-sm">Subir imagen</span>
-                </Button>
-              </div>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleOCRFileSelect} className="hidden" data-testid="input-file-cedula" />
-              <p className="text-xs text-muted-foreground text-center">Coloca tu cédula sobre una superficie plana y bien iluminada. Se requiere un score de confianza mínimo de 60%.</p>
-            </div>
-          )}
-          <canvas ref={canvasRef} className="hidden" />
-        </div>
-      );
-    }
-
-    // For clients, keep the simple text input
-    return (
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="cedula">Cédula de Identidad</Label>
-          <Input id="cedula" placeholder="000-0000000-0" maxLength={13} value={formData.cedula} onChange={(e) => updateField('cedula', e.target.value.replace(/\D/g, ''))} disabled={verifyCedulaMutation.isPending} data-testid="input-cedula" />
-          {errors.cedula && <p className="text-sm text-destructive">{errors.cedula}</p>}
-          <p className="text-sm text-muted-foreground">Cédula dominicana (11 dígitos)</p>
-        </div>
-        <Button type="button" className="w-full" onClick={() => validateStep2() && verifyCedulaMutation.mutate()} disabled={verifyCedulaMutation.isPending} data-testid="button-verify-cedula">
-          {verifyCedulaMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar Cédula<ArrowRight className="w-4 h-4 ml-2" /></>)}
-        </Button>
-      </div>
-    );
-  };
-
-  const renderStep3 = () => (
-    <div className="space-y-4">
-      <div className="text-center py-2">
-        <Mail className="w-12 h-12 mx-auto text-primary mb-2" />
-        <p className="text-sm font-medium">Verificación de Correo Electrónico</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Enviaremos un código de verificación a: <strong>{formData.email}</strong>
-        </p>
-      </div>
-      {otpTimer === 0 ? (
-        <Button type="button" variant="outline" className="w-full" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
-          {sendOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>) : 'Enviar Código de Verificación'}
-        </Button>
-      ) : (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="otpCode">Código de Verificación</Label>
-            <Input id="otpCode" placeholder="000000" maxLength={6} className="text-center text-2xl tracking-widest" value={formData.otpCode} onChange={(e) => updateField('otpCode', e.target.value.replace(/\D/g, ''))} disabled={verifyOtpMutation.isPending} data-testid="input-otp-code" />
-            {errors.otpCode && <p className="text-sm text-destructive">{errors.otpCode}</p>}
-          </div>
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>Expira en: {formatTime(otpTimer)}</span>
-          </div>
-          <Button type="button" className="w-full" onClick={() => verifyOtpMutation.mutate()} disabled={verifyOtpMutation.isPending || !formData.otpCode} data-testid="button-verify-otp">
-            {verifyOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar<ArrowRight className="w-4 h-4 ml-2" /></>)}
-          </Button>
-          <Button type="button" variant="ghost" className="w-full" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending || otpTimer > 60} data-testid="button-resend-otp">
-            {otpTimer > 60 ? (<><Clock className="w-4 h-4 mr-2" />Reenviar en {formatTime(otpTimer - 60)}</>) : 'Reenviar Código'}
-          </Button>
-        </>
-      )}
-    </div>
-  );
-
-  const handleSkipStep4ForClient = () => {
-    setCompletedSteps(prev => new Set(prev).add(4));
-    setCurrentStep(8);
-    toast({ title: 'Paso omitido', description: 'Puedes subir tu seguro más tarde desde tu perfil' });
-  };
-
-  const uploadClientInsuranceMutation = useMutation({
-    mutationFn: async () => {
-      if (!insuranceFile) {
-        throw new Error('Debe seleccionar un documento de seguro');
-      }
-      if (!clientInsuranceName.trim()) {
-        throw new Error('Nombre de aseguradora es requerido');
-      }
-      if (!clientPolicyNumber.trim()) {
-        throw new Error('Número de póliza es requerido');
-      }
-
-      const formDataIns = new FormData();
-      formDataIns.append('document', insuranceFile);
-      formDataIns.append('aseguradoraNombre', clientInsuranceName.trim());
-      formDataIns.append('numeroPoliza', clientPolicyNumber.trim());
-
-      const insRes = await fetch('/api/client/insurance', {
-        method: 'POST',
-        credentials: 'include',
-        body: formDataIns,
-      });
-      
-      if (!insRes.ok) {
-        const errorData = await insRes.json();
-        throw new Error(errorData.message || 'Error al subir documento de seguro');
-      }
-      
-      return insRes.json();
-    },
-    onSuccess: () => {
-      toast({ title: '¡Seguro subido!', description: 'Tu documento de seguro ha sido guardado' });
-      setInsuranceFile(null);
-      setClientInsuranceName('');
-      setClientPolicyNumber('');
-      setCompletedSteps(prev => new Set(prev).add(4));
-      setCurrentStep(8);
-    },
-    onError: (error: any) => {
-      setErrors({ documents: error?.message });
-      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
-    },
-  });
-
-  const renderStep4 = () => (
-    <div className="space-y-4">
-      {errors.documents && (<Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{errors.documents}</AlertDescription></Alert>)}
-      {formData.userType === 'conductor' ? (
-        <>
-          <FileUpload label="Licencia de Conducir (Frente)" required onFileSelect={setLicenseFile} fileName={licenseFile?.name} error={errors.licenseFile} testId="input-license-file" />
-          <FileUpload label="Licencia de Conducir (Reverso)" required onFileSelect={setLicenseBackFile} fileName={licenseBackFile?.name} error={errors.licenseBackFile} testId="input-license-back-file" />
-          <Button type="button" className="w-full" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadingDocs || uploadDocsMutation.isPending} data-testid="button-upload-docs">
-            {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Subir Documentos<Upload className="w-4 h-4 ml-2" /></>)}
-          </Button>
-        </>
-      ) : (
-        <div className="space-y-4">
-          <div className="text-center py-2">
-            <FileText className="w-12 h-12 mx-auto text-primary mb-2" />
-            <p className="text-sm font-medium">Documento de Seguro (Opcional)</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Si tienes un seguro de vehículo, puedes subirlo ahora o hacerlo después desde tu perfil.
-            </p>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label htmlFor="clientInsuranceName">Nombre de Aseguradora</Label>
-              <Input 
-                id="clientInsuranceName" 
-                placeholder="Ej: Seguros Reservas, Mapfre, etc." 
-                value={clientInsuranceName} 
-                onChange={(e) => setClientInsuranceName(e.target.value)} 
-                disabled={uploadClientInsuranceMutation.isPending}
-                data-testid="input-client-insurance-name" 
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="clientPolicyNumber">Número de Póliza</Label>
-              <Input 
-                id="clientPolicyNumber" 
-                placeholder="Número de tu póliza de seguro" 
-                value={clientPolicyNumber} 
-                onChange={(e) => setClientPolicyNumber(e.target.value)} 
-                disabled={uploadClientInsuranceMutation.isPending}
-                data-testid="input-client-policy-number" 
-              />
-            </div>
-            
-            <FileUpload 
-              label="Documento de Seguro" 
-              onFileSelect={setInsuranceFile} 
-              fileName={insuranceFile?.name} 
-              testId="input-client-insurance-file" 
-            />
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            <Button 
-              type="button" 
-              className="w-full" 
-              onClick={() => uploadClientInsuranceMutation.mutate()} 
-              disabled={uploadClientInsuranceMutation.isPending || !insuranceFile || !clientInsuranceName.trim() || !clientPolicyNumber.trim()} 
-              data-testid="button-upload-client-insurance"
-            >
-              {uploadClientInsuranceMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>
-              ) : (
-                <><Upload className="w-4 h-4 mr-2" />Subir Seguro</>
-              )}
-            </Button>
-            
-            <Button 
-              type="button" 
-              variant="ghost" 
-              className="w-full" 
-              onClick={handleSkipStep4ForClient} 
-              disabled={uploadClientInsuranceMutation.isPending}
-              data-testid="button-skip-documents"
-            >
-              Omitir y continuar
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -1440,7 +1037,7 @@ export default function OnboardingWizard() {
         </div>
       ) : showProfileCamera ? (
         <div className="space-y-4">
-          <div className="relative aspect-square max-w-[280px] mx-auto bg-black rounded-full overflow-hidden">
+          <div className="relative className max-w-[280px] mx-auto bg-black rounded-full overflow-hidden">
             <video ref={profileVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="border-2 border-dashed border-white/50 rounded-full w-[80%] h-[80%]" />
@@ -1547,19 +1144,6 @@ export default function OnboardingWizard() {
         </Alert>
       )}
       
-      <div className="space-y-2">
-        <Label htmlFor="licencia">Número de Licencia *</Label>
-        <Input 
-          id="licencia" 
-          placeholder="Licencia de conducir" 
-          value={formData.licencia} 
-          onChange={(e) => updateField('licencia', e.target.value)} 
-          disabled={saveVehiclesMutation.isPending} 
-          data-testid="input-licencia" 
-        />
-        {errors.licencia && <p className="text-sm text-destructive">{errors.licencia}</p>}
-      </div>
-
       <div className="max-h-[350px] overflow-y-auto pr-1">
         <VehicleCategoryForm
           selectedCategories={selectedServices.map(s => s.categoria)}

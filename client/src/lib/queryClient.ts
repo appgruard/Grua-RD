@@ -1,23 +1,66 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { CapacitorHttp, HttpResponse } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 
-// Get API base URL from environment or use relative path for same-origin requests
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://app.gruard.com';
 
-// Helper to construct full URL for API requests
-function getApiUrl(path: string): string {
-  if (API_BASE_URL) {
-    // For mobile apps connecting to remote server
-    return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
-  }
-  // For web app on same origin
-  return path;
+function isNativePlatform(): boolean {
+  return Capacitor.isNativePlatform();
 }
 
-async function throwIfResNotOk(res: Response) {
-  if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+function getApiUrl(path: string): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (isNativePlatform()) {
+    return `${API_BASE_URL}${cleanPath}`;
   }
+  if (API_BASE_URL && !API_BASE_URL.includes('localhost')) {
+    return `${API_BASE_URL}${cleanPath}`;
+  }
+  return cleanPath;
+}
+
+async function throwIfResNotOk(res: Response | HttpResponse) {
+  const status = 'status' in res ? res.status : 500;
+  const ok = status >= 200 && status < 300;
+  
+  if (!ok) {
+    let text = '';
+    if ('text' in res && typeof res.text === 'function') {
+      text = await (res as Response).text();
+    } else if ('data' in res) {
+      text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+    }
+    throw new Error(`${status}: ${text || 'Request failed'}`);
+  }
+}
+
+async function nativeFetch(
+  url: string,
+  options: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  } = {}
+): Promise<{ status: number; data: any; headers: Record<string, string> }> {
+  const response = await CapacitorHttp.request({
+    url,
+    method: options.method || 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    data: options.body ? JSON.parse(options.body) : undefined,
+    webFetchExtra: {
+      credentials: 'include',
+    },
+  });
+  
+  return {
+    status: response.status,
+    data: response.data,
+    headers: response.headers,
+  };
 }
 
 export async function apiRequest(
@@ -26,11 +69,35 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const fullUrl = getApiUrl(url);
+  
+  if (isNativePlatform()) {
+    const response = await nativeFetch(fullUrl, {
+      method,
+      body: data ? JSON.stringify(data) : undefined,
+    });
+    
+    if (response.status < 200 || response.status >= 300) {
+      const errorText = typeof response.data === 'string' 
+        ? response.data 
+        : JSON.stringify(response.data);
+      throw new Error(`${response.status}: ${errorText}`);
+    }
+    
+    const responseBody = typeof response.data === 'string' 
+      ? response.data 
+      : JSON.stringify(response.data);
+    
+    return new Response(responseBody, {
+      status: response.status,
+      headers: response.headers,
+    });
+  }
+  
   const res = await fetch(fullUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: API_BASE_URL ? "include" : "include",
+    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -80,6 +147,24 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const path = buildUrlFromQueryKey(queryKey);
     const fullUrl = getApiUrl(path);
+    
+    if (isNativePlatform()) {
+      const response = await nativeFetch(fullUrl);
+      
+      if (unauthorizedBehavior === "returnNull" && response.status === 401) {
+        return null;
+      }
+      
+      if (response.status < 200 || response.status >= 300) {
+        const errorText = typeof response.data === 'string' 
+          ? response.data 
+          : JSON.stringify(response.data);
+        throw new Error(`${response.status}: ${errorText}`);
+      }
+      
+      return response.data;
+    }
+    
     const res = await fetch(fullUrl, {
       credentials: "include",
     });
@@ -96,12 +181,12 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
-      staleTime: 1000 * 60 * 5, // 5 minutes - data considered fresh
-      gcTime: 1000 * 60 * 10, // 10 minutes - keep unused data in cache (previously cacheTime)
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 10,
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      refetchOnMount: false, // Don't refetch if data exists and not stale
-      refetchOnReconnect: 'always', // Always refetch when connection restored
+      refetchOnMount: false,
+      refetchOnReconnect: 'always',
       retry: false,
     },
     mutations: {
