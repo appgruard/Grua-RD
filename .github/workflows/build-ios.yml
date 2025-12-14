@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    name: Build iOS
+    name: Build iOS (Unsigned)
     runs-on: macos-latest
     
     steps:
@@ -69,46 +69,70 @@ jobs:
   build-signed:
     name: Build Signed iOS (App Store)
     runs-on: macos-latest
-    if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check for iOS signing secrets
+        id: check-secrets
+        run: |
+          if [ -n "$IOS_CERT" ]; then
+            echo "has_secrets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_secrets=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+
+      - name: Skip if no signing secrets
+        if: steps.check-secrets.outputs.has_secrets != 'true'
+        run: |
+          echo "No iOS signing secrets configured. Skipping signed build."
+          exit 0
+
       - name: Setup Node.js
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: npm ci
 
       - name: Build web app
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: npm run build
         env:
           VITE_API_URL: https://app.gruard.com
 
       - name: Sync Capacitor iOS
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: npx cap sync ios
 
       - name: Install CocoaPods
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: |
           cd ios/App
           pod install
 
       - name: Install Apple Certificate
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         uses: apple-actions/import-codesign-certs@v2
         with:
           p12-file-base64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
 
       - name: Install Provisioning Profile
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         uses: akashiyamoto/install-provisioning-profile@v1
         with:
           profile-base64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
 
       - name: Build and Archive
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: |
           cd ios/App
           xcodebuild -workspace App.xcworkspace \
@@ -119,6 +143,7 @@ jobs:
             archive
 
       - name: Export IPA
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         run: |
           cd ios/App
           xcodebuild -exportArchive \
@@ -127,6 +152,7 @@ jobs:
             -exportOptionsPlist ExportOptions.plist
 
       - name: Upload Signed IPA
+        if: steps.check-secrets.outputs.has_secrets == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ios-signed
