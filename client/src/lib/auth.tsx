@@ -2,7 +2,25 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, getQueryFn } from './queryClient';
 import { preloadByUserType, preloadDriverResourcesOnLogin } from './preload';
+import { CapacitorHttp } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import type { User, UserWithConductor } from '@shared/schema';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://app.gruard.com';
+
+function isNativePlatform(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+function getFullUrl(path: string): string {
+  if (isNativePlatform()) {
+    return `${API_BASE_URL}${path}`;
+  }
+  if (API_BASE_URL && !API_BASE_URL.includes('localhost')) {
+    return `${API_BASE_URL}${path}`;
+  }
+  return path;
+}
 
 interface VerificationStatus {
   cedulaVerificada: boolean;
@@ -93,25 +111,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; userType?: string }) => {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-      const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/login` : '/api/auth/login';
-      
-      const res = await fetch(fullUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: 'include',
-      });
+      const fullUrl = getFullUrl('/api/auth/login');
       
       let responseData;
-      try {
-        responseData = await res.json();
-      } catch {
-        if (!res.ok) throw new Error('Login failed');
-        return { user: null };
+      let status: number;
+      
+      if (isNativePlatform()) {
+        const response = await CapacitorHttp.request({
+          url: fullUrl,
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          data: data,
+          webFetchExtra: {
+            credentials: 'include',
+          },
+        });
+        status = response.status;
+        responseData = response.data;
+      } else {
+        const res = await fetch(fullUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          credentials: 'include',
+        });
+        status = res.status;
+        try {
+          responseData = await res.json();
+        } catch {
+          if (!res.ok) throw new Error('Login failed');
+          return { user: null };
+        }
       }
       
-      if (res.status === 403 && responseData?.requiresVerification) {
+      if (status === 403 && responseData?.requiresVerification) {
         const verificationError = new Error(responseData.message) as VerificationError;
         verificationError.requiresVerification = true;
         verificationError.verificationStatus = responseData.verificationStatus;
@@ -120,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw verificationError;
       }
       
-      if (!res.ok) throw new Error(responseData?.message || 'Login failed');
+      if (status < 200 || status >= 300) throw new Error(responseData?.message || 'Login failed');
       return responseData;
     },
     onSuccess: async (data) => {
@@ -182,23 +218,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const checkAccounts = async (email: string, password: string): Promise<CheckAccountsResult> => {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-    const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/check-accounts` : '/api/auth/check-accounts';
+    const fullUrl = getFullUrl('/api/auth/check-accounts');
     
-    const res = await fetch(fullUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include',
-    });
+    let responseData;
+    let status: number;
     
-    const data = await res.json();
-    
-    if (!res.ok) {
-      throw new Error(data?.message || 'Error verificando cuentas');
+    if (isNativePlatform()) {
+      const response = await CapacitorHttp.request({
+        url: fullUrl,
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        data: { email, password },
+        webFetchExtra: {
+          credentials: 'include',
+        },
+      });
+      status = response.status;
+      responseData = response.data;
+    } else {
+      const res = await fetch(fullUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
+      });
+      status = res.status;
+      responseData = await res.json();
     }
     
-    return data;
+    if (status < 200 || status >= 300) {
+      throw new Error(responseData?.message || 'Error verificando cuentas');
+    }
+    
+    return responseData;
   };
 
   const login = async (email: string, password: string, options?: LoginOptions) => {
