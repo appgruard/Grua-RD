@@ -16,7 +16,7 @@ import { ServiceCategoryMultiSelect } from '@/components/ServiceCategoryMultiSel
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import { 
   Loader2, Mail, Lock, User, Phone, AlertCircle, FileText, Car, IdCard,
-  CheckCircle2, ArrowRight, Clock, Upload, Truck, Camera, ScanLine, RefreshCcw,
+  CheckCircle2, ArrowRight, ArrowLeft, Clock, Upload, Truck, Camera, ScanLine, RefreshCcw,
   UserCircle, XCircle, Edit3, Eye, EyeOff
 } from 'lucide-react';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
@@ -897,7 +897,8 @@ export default function OnboardingWizard() {
     else if (formData.password !== confirmPassword) newErrors.confirmPassword = 'Las contraseñas no coinciden';
     if (!formData.nombre.trim()) newErrors.nombre = 'Nombre requerido';
     if (!formData.apellido.trim()) newErrors.apellido = 'Apellido requerido';
-    if (formData.phone.trim() && !/^\+?1?8\d{9}$/.test(formData.phone.replace(/[\s-]/g, ''))) newErrors.phone = 'Teléfono inválido';
+    if (!formData.phone.trim()) newErrors.phone = 'Teléfono requerido';
+    else if (!/^\+?1?8\d{9}$/.test(formData.phone.replace(/[\s-]/g, ''))) newErrors.phone = 'Teléfono inválido';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -1006,7 +1007,7 @@ export default function OnboardingWizard() {
         {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="phone">Teléfono <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+        <Label htmlFor="phone">Teléfono</Label>
         <div className="relative">
           <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input id="phone" type="tel" placeholder="8091234567" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} disabled={registerMutation.isPending} className="pl-10" data-testid="input-phone-step1" />
@@ -1034,6 +1035,242 @@ export default function OnboardingWizard() {
           </button>
         </div>
         {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword}</p>}
+      </div>
+      <Button type="button" className="w-full" onClick={() => validateStep1() && registerMutation.mutate()} disabled={registerMutation.isPending} data-testid="button-register-step1">
+        {registerMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando cuenta...</>) : (<>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>)}
+      </Button>
+    </div>
+  );
+
+  // Helper to go to previous visible step
+  const getPreviousVisibleStep = (fromStep: number): number => {
+    for (let i = fromStep - 1; i >= 1; i--) {
+      const stepItem = stepConfig.find(s => s.id === i);
+      if (stepItem?.show) return i;
+    }
+    return fromStep;
+  };
+
+  const goBack = () => {
+    const prevStep = getPreviousVisibleStep(currentStep);
+    if (prevStep !== currentStep) {
+      setCurrentStep(prevStep);
+    }
+  };
+
+  const renderStep2 = () => (
+    <div className="space-y-4">
+      {errors.cedula && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errors.cedula}</AlertDescription>
+        </Alert>
+      )}
+
+      {formData.userType === 'conductor' ? (
+        // Operator flow: OCR cedula scan
+        <>
+          {cedulaVerified ? (
+            <div className="flex flex-col items-center text-center space-y-4 py-4">
+              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-green-600 dark:text-green-400">Cédula Verificada</h3>
+                <p className="text-sm text-muted-foreground">{formData.cedula}</p>
+                {ocrScore && <p className="text-xs text-muted-foreground">Confianza: {Math.round(ocrScore * 100)}%</p>}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={resetOCRScan} data-testid="button-rescan-cedula">
+                  <RefreshCcw className="w-4 h-4 mr-2" />
+                  Escanear otra
+                </Button>
+                <Button size="sm" onClick={() => { setCompletedSteps(prev => new Set(prev).add(2)); setCurrentStep(3); }} data-testid="button-continue-step2">
+                  Continuar
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          ) : showCamera ? (
+            <div className="space-y-4">
+              <div className="relative aspect-[4/3] max-w-full bg-black rounded-lg overflow-hidden">
+                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="border-2 border-dashed border-white/50 rounded-lg w-[85%] h-[60%]" />
+                </div>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">Centra tu cédula en el recuadro</p>
+              <div className="flex gap-2">
+                <Button onClick={captureOCRPhoto} className="flex-1" disabled={isScanning} data-testid="button-capture-cedula">
+                  {isScanning ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Procesando...</>) : (<><Camera className="w-4 h-4 mr-2" />Capturar</>)}
+                </Button>
+                <Button variant="outline" onClick={stopOCRCamera} data-testid="button-cancel-camera">Cancelar</Button>
+              </div>
+            </div>
+          ) : capturedImage ? (
+            <div className="space-y-4">
+              <div className="relative aspect-[4/3] max-w-full rounded-lg overflow-hidden bg-muted">
+                <img src={capturedImage} alt="Cédula capturada" className="w-full h-full object-contain" />
+                {isScanning && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                    <div className="text-center">
+                      <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                      <p className="text-sm">Procesando cédula...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {!isScanning && !cedulaVerified && (
+                <Button variant="outline" onClick={resetOCRScan} className="w-full" data-testid="button-reset-scan">
+                  <RefreshCcw className="w-4 h-4 mr-2" />
+                  Tomar otra foto
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-center mb-4">
+                <IdCard className="w-12 h-12 mx-auto text-primary mb-2" />
+                <p className="text-sm text-muted-foreground">Escanea tu cédula para verificar tu identidad</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Button variant="outline" onClick={startOCRCamera} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-start-camera">
+                  <Camera className="w-8 h-8" />
+                  <span className="text-sm">Usar cámara</span>
+                </Button>
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="h-auto py-6 flex flex-col items-center gap-2" data-testid="button-upload-cedula">
+                  <Upload className="w-8 h-8" />
+                  <span className="text-sm">Subir imagen</span>
+                </Button>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleOCRFileSelect} className="hidden" data-testid="input-file-cedula" />
+            </div>
+          )}
+          <canvas ref={canvasRef} className="hidden" />
+        </>
+      ) : (
+        // Client flow: simple cedula input
+        <div className="space-y-4">
+          <div className="text-center mb-4">
+            <IdCard className="w-12 h-12 mx-auto text-primary mb-2" />
+            <p className="text-sm text-muted-foreground">Ingresa tu número de cédula</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cedula">Número de Cédula</Label>
+            <Input id="cedula" placeholder="00000000000" value={formData.cedula} onChange={(e) => updateField('cedula', e.target.value.replace(/\D/g, '').slice(0, 11))} disabled={verifyCedulaMutation.isPending} maxLength={11} data-testid="input-cedula" />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={goBack} data-testid="button-back-step2">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Atrás
+            </Button>
+            <Button className="flex-1" onClick={() => validateStep2() && verifyCedulaMutation.mutate()} disabled={verifyCedulaMutation.isPending} data-testid="button-verify-cedula">
+              {verifyCedulaMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar<ArrowRight className="w-4 h-4 ml-2" /></>)}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {formData.userType === 'conductor' && !cedulaVerified && !showCamera && !capturedImage && (
+        <Button variant="outline" onClick={goBack} className="w-full" data-testid="button-back-step2-conductor">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Atrás
+        </Button>
+      )}
+    </div>
+  );
+
+  const renderStep3 = () => (
+    <div className="space-y-4">
+      {errors.otpCode && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errors.otpCode}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="text-center mb-4">
+        <Mail className="w-12 h-12 mx-auto text-primary mb-2" />
+        <p className="text-sm text-muted-foreground">Verifica tu correo electrónico</p>
+        <p className="text-xs text-muted-foreground mt-1">{formData.email}</p>
+      </div>
+
+      {otpTimer > 0 ? (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="otpCode">Código de Verificación</Label>
+            <Input id="otpCode" placeholder="000000" value={formData.otpCode} onChange={(e) => updateField('otpCode', e.target.value.replace(/\D/g, '').slice(0, 6))} disabled={verifyOtpMutation.isPending} maxLength={6} className="text-center text-2xl tracking-widest" data-testid="input-otp-code" />
+          </div>
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Clock className="w-4 h-4" />
+            <span>Expira en {formatTime(otpTimer)}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={goBack} data-testid="button-back-step3">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Atrás
+            </Button>
+            <Button className="flex-1" onClick={() => verifyOtpMutation.mutate()} disabled={verifyOtpMutation.isPending || formData.otpCode.length !== 6} data-testid="button-verify-otp">
+              {verifyOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar<ArrowRight className="w-4 h-4 ml-2" /></>)}
+            </Button>
+          </div>
+          <Button variant="ghost" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} className="w-full" data-testid="button-resend-otp">
+            Reenviar código
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-center text-sm text-muted-foreground">Enviaremos un código de verificación a tu correo</p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={goBack} data-testid="button-back-step3-send">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Atrás
+            </Button>
+            <Button className="flex-1" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
+              {sendOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>) : (<><Mail className="w-4 h-4 mr-2" />Enviar Código</>)}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderStep4 = () => (
+    <div className="space-y-4">
+      {errors.documents && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errors.documents}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="text-center mb-4">
+        <FileText className="w-12 h-12 mx-auto text-primary mb-2" />
+        <p className="text-sm text-muted-foreground">
+          {formData.userType === 'conductor' ? 'Sube tu licencia de conducir' : 'Sube tus documentos de seguro (opcional)'}
+        </p>
+      </div>
+
+      {formData.userType === 'conductor' ? (
+        <div className="space-y-4">
+          <FileUpload label="Licencia de Conducir (Frente) *" onFileSelect={setLicenseFile} accept="image/*,application/pdf" required error={errors.licenseFile} fileName={licenseFile?.name} testId="upload-license-front" />
+          <FileUpload label="Licencia de Conducir (Reverso) *" onFileSelect={setLicenseBackFile} accept="image/*,application/pdf" required error={errors.licenseBackFile} fileName={licenseBackFile?.name} testId="upload-license-back" />
+          <FileUpload label="Póliza de Seguro (Opcional)" onFileSelect={setInsuranceFile} accept="image/*,application/pdf" fileName={insuranceFile?.name} testId="upload-insurance" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <FileUpload label="Documento de Seguro (Opcional)" onFileSelect={setInsuranceFile} accept="image/*,application/pdf" fileName={insuranceFile?.name} testId="upload-client-insurance" />
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={goBack} data-testid="button-back-step4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Atrás
+        </Button>
+        <Button className="flex-1" onClick={() => validateStep4() && uploadDocsMutation.mutate()} disabled={uploadDocsMutation.isPending} data-testid="button-upload-docs">
+          {uploadDocsMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Subiendo...</>) : (<>Continuar<ArrowRight className="w-4 h-4 ml-2" /></>)}
+        </Button>
       </div>
     </div>
   );
