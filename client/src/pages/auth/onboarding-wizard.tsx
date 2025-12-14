@@ -897,8 +897,7 @@ export default function OnboardingWizard() {
     else if (formData.password !== confirmPassword) newErrors.confirmPassword = 'Las contraseñas no coinciden';
     if (!formData.nombre.trim()) newErrors.nombre = 'Nombre requerido';
     if (!formData.apellido.trim()) newErrors.apellido = 'Apellido requerido';
-    if (!formData.phone.trim()) newErrors.phone = 'Teléfono requerido';
-    else if (!/^\+?1?8\d{9}$/.test(formData.phone.replace(/[\s-]/g, ''))) newErrors.phone = 'Teléfono inválido';
+    if (formData.phone.trim() && !/^\+?1?8\d{9}$/.test(formData.phone.replace(/[\s-]/g, ''))) newErrors.phone = 'Teléfono inválido';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -1007,7 +1006,7 @@ export default function OnboardingWizard() {
         {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="phone">Teléfono</Label>
+        <Label htmlFor="phone">Teléfono <span className="text-muted-foreground text-xs">(opcional)</span></Label>
         <div className="relative">
           <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input id="phone" type="tel" placeholder="8091234567" value={formData.phone} onChange={(e) => updateField('phone', e.target.value)} disabled={registerMutation.isPending} className="pl-10" data-testid="input-phone-step1" />
