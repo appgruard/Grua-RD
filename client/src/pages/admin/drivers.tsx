@@ -1,12 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Truck, ShieldCheck, ShieldAlert, Wrench, ChevronDown, ChevronUp, CreditCard, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Search, Truck, ShieldCheck, ShieldAlert, Wrench, ChevronDown, ChevronUp, CreditCard, AlertTriangle, Pencil, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { SERVICE_CATEGORIES } from '@/components/ServiceCategoryMultiSelect';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import type { Conductor, User } from '@shared/schema';
 
 interface ServiceSelection {
@@ -29,10 +34,62 @@ type ConductorWithUser = Conductor & {
 export default function AdminDrivers() {
   const [search, setSearch] = useState('');
   const [expandedDrivers, setExpandedDrivers] = useState<Set<string>>(new Set());
+  const [editDialog, setEditDialog] = useState<{
+    open: boolean;
+    driverId: string | null;
+    nombre: string;
+    apellido: string;
+  }>({ open: false, driverId: null, nombre: '', apellido: '' });
+  const { toast } = useToast();
   
   const { data: drivers, isLoading } = useQuery<ConductorWithUser[]>({
     queryKey: ['/api/admin/drivers'],
   });
+
+  const updateDriverInfo = useMutation({
+    mutationFn: async ({ driverId, nombre, apellido }: { driverId: string; nombre: string; apellido: string }) => {
+      const res = await apiRequest('PUT', `/api/admin/drivers/${driverId}/user-info`, { nombre, apellido });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Error al actualizar');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/drivers'] });
+      setEditDialog({ open: false, driverId: null, nombre: '', apellido: '' });
+      toast({
+        title: 'Datos actualizados',
+        description: 'El nombre del operador ha sido actualizado correctamente',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo actualizar los datos',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const openEditDialog = (driver: ConductorWithUser) => {
+    setEditDialog({
+      open: true,
+      driverId: driver.id,
+      nombre: driver.user.nombre,
+      apellido: driver.user.apellido,
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (editDialog.driverId && editDialog.nombre.trim() && editDialog.apellido.trim()) {
+      updateDriverInfo.mutate({
+        driverId: editDialog.driverId,
+        nombre: editDialog.nombre.trim(),
+        apellido: editDialog.apellido.trim(),
+      });
+    }
+  };
 
   const toggleExpanded = (driverId: string) => {
     setExpandedDrivers(prev => {
@@ -167,9 +224,19 @@ export default function AdminDrivers() {
                 return (
                   <TableRow key={driver.id} data-testid={`driver-row-${driver.id}`}>
                     <TableCell className="font-medium">
-                      <div>
-                        <p>{driver.user.nombre} {driver.user.apellido}</p>
-                        <p className="text-sm text-muted-foreground">{driver.user.email}</p>
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <p>{driver.user.nombre} {driver.user.apellido}</p>
+                          <p className="text-sm text-muted-foreground">{driver.user.email}</p>
+                        </div>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => openEditDialog(driver)}
+                          data-testid={`button-edit-driver-${driver.id}`}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
                       </div>
                     </TableCell>
                     <TableCell>{driver.licencia}</TableCell>
@@ -296,6 +363,59 @@ export default function AdminDrivers() {
           </TableBody>
         </Table>
       </Card>
+
+      <Dialog open={editDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setEditDialog({ open: false, driverId: null, nombre: '', apellido: '' });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar datos del operador</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-nombre">Nombre</Label>
+              <Input
+                id="edit-nombre"
+                value={editDialog.nombre}
+                onChange={(e) => setEditDialog(prev => ({ ...prev, nombre: e.target.value }))}
+                placeholder="Nombre"
+                data-testid="input-edit-nombre"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-apellido">Apellido</Label>
+              <Input
+                id="edit-apellido"
+                value={editDialog.apellido}
+                onChange={(e) => setEditDialog(prev => ({ ...prev, apellido: e.target.value }))}
+                placeholder="Apellido"
+                data-testid="input-edit-apellido"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setEditDialog({ open: false, driverId: null, nombre: '', apellido: '' })}
+              data-testid="button-cancel-edit"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveEdit}
+              disabled={updateDriverInfo.isPending || !editDialog.nombre.trim() || !editDialog.apellido.trim()}
+              data-testid="button-save-edit"
+            >
+              {updateDriverInfo.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

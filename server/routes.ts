@@ -5713,6 +5713,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update driver's user info (name, surname) - admin only
+  app.put("/api/admin/drivers/:driverId/user-info", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { driverId } = req.params;
+      const { nombre, apellido } = req.body;
+      
+      if (!nombre || !apellido) {
+        return res.status(400).json({ message: "Nombre y apellido son requeridos" });
+      }
+
+      // Get driver to find user ID
+      const driver = await storage.getConductor(driverId);
+      if (!driver) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      // Update user info
+      const updatedUser = await storage.updateUser(driver.userId, { nombre, apellido });
+      
+      logSystem.info('Driver user info updated by admin', { 
+        adminId: req.user!.id, 
+        driverId, 
+        userId: driver.userId,
+        nombre, 
+        apellido 
+      });
+      
+      res.json({ success: true, user: { nombre: updatedUser.nombre, apellido: updatedUser.apellido } });
+    } catch (error: any) {
+      logSystem.error('Update driver user info (admin) error', error);
+      res.status(500).json({ message: "Failed to update driver user info" });
+    }
+  });
+
   // Get driver's service categories (admin)
   app.get("/api/admin/drivers/:driverId/servicios", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
