@@ -11247,7 +11247,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apellido: parsed.data.apellido || '',
         userType: 'admin',
         emailVerificado: true,
-      });
+        estadoCuenta: 'activo',
+      } as any);
 
       const admin = await storage.createAdministrador({
         userId: newUser.id,
