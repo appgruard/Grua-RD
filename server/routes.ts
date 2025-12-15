@@ -3438,6 +3438,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const contextPhotoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    }
+  });
+
+  app.post("/api/services/upload-context-photo", contextPhotoUpload.single('photo'), async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No photo uploaded" });
+      }
+
+      const timestamp = Date.now();
+      const index = req.body.index || '0';
+      const filename = `context-photo-${req.user!.id}-${timestamp}-${index}.jpg`;
+
+      const uploadResult = await uploadDocument({
+        fileName: filename,
+        buffer: req.file.buffer,
+        mimeType: req.file.mimetype,
+        folder: 'context-photos',
+        userId: req.user!.id
+      });
+
+      res.json({ url: uploadResult.url });
+    } catch (error: any) {
+      logSystem.error('Upload context photo error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to upload photo" });
+    }
+  });
+
   app.get("/api/services/my-services", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Not authenticated" });

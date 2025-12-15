@@ -1205,6 +1205,33 @@ export default function DriverDashboard() {
                     </div>
                   )}
 
+                  {(request.fotoContexto1Url || request.fotoContexto2Url || request.fotoContexto3Url || request.notaCliente) && (
+                    <div className="p-1.5 sm:p-2 bg-blue-500/10 rounded-lg border border-blue-500/30 space-y-2">
+                      {(request.fotoContexto1Url || request.fotoContexto2Url || request.fotoContexto3Url) && (
+                        <div>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">Fotos del cliente:</p>
+                          <div className="flex gap-2">
+                            {request.fotoContexto1Url && (
+                              <img src={request.fotoContexto1Url} alt="Foto 1" className="w-16 h-16 rounded object-cover" data-testid={`img-context-photo-1-${request.id}`} />
+                            )}
+                            {request.fotoContexto2Url && (
+                              <img src={request.fotoContexto2Url} alt="Foto 2" className="w-16 h-16 rounded object-cover" data-testid={`img-context-photo-2-${request.id}`} />
+                            )}
+                            {request.fotoContexto3Url && (
+                              <img src={request.fotoContexto3Url} alt="Foto 3" className="w-16 h-16 rounded object-cover" data-testid={`img-context-photo-3-${request.id}`} />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {request.notaCliente && (
+                        <div>
+                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-0.5">Nota del cliente:</p>
+                          <p className="text-xs text-muted-foreground line-clamp-3" data-testid={`text-nota-cliente-${request.id}`}>{request.notaCliente}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between py-1.5 sm:py-2 border-t border-border">
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />

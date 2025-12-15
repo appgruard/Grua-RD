@@ -2,7 +2,7 @@ import { createContext, useContext, useState, ReactNode, useCallback, useEffect,
 import type { Coordinates, RouteGeometry } from '@/lib/maps';
 import { useAuth } from '@/lib/auth';
 
-type Step = 'serviceCategory' | 'serviceSubtype' | 'extractionDescription' | 'location' | 'vehicleType' | 'payment' | 'confirm';
+type Step = 'serviceCategory' | 'serviceSubtype' | 'extractionDescription' | 'location' | 'vehicleType' | 'payment' | 'additionalInfo' | 'confirm';
 
 const LOCATION_STORAGE_KEY = 'gruard_client_location';
 
@@ -56,6 +56,8 @@ interface ServiceRequestState {
   duration: number | null;
   cost: number | null;
   routeGeometry: RouteGeometry | null;
+  fotosContexto: File[];
+  notaCliente: string;
 }
 
 interface ServiceRequestContextType extends ServiceRequestState {
@@ -77,6 +79,8 @@ interface ServiceRequestContextType extends ServiceRequestState {
   setDuration: (duration: number | null) => void;
   setCost: (cost: number | null) => void;
   setRouteGeometry: (geometry: RouteGeometry | null) => void;
+  setFotosContexto: (fotos: File[]) => void;
+  setNotaCliente: (nota: string) => void;
   resetServiceRequest: () => void;
   hasActiveRequest: boolean;
 }
@@ -100,6 +104,8 @@ const initialState: ServiceRequestState = {
   duration: null,
   cost: null,
   routeGeometry: null,
+  fotosContexto: [],
+  notaCliente: '',
 };
 
 const ServiceRequestContext = createContext<ServiceRequestContextType | null>(null);
@@ -215,6 +221,14 @@ export function ServiceRequestProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, routeGeometry }));
   }, []);
 
+  const setFotosContexto = useCallback((fotosContexto: File[]) => {
+    setState(prev => ({ ...prev, fotosContexto }));
+  }, []);
+
+  const setNotaCliente = useCallback((notaCliente: string) => {
+    setState(prev => ({ ...prev, notaCliente }));
+  }, []);
+
   const resetServiceRequest = useCallback(() => {
     setState(initialState);
   }, []);
@@ -243,6 +257,8 @@ export function ServiceRequestProvider({ children }: { children: ReactNode }) {
         setDuration,
         setCost,
         setRouteGeometry,
+        setFotosContexto,
+        setNotaCliente,
         resetServiceRequest,
         hasActiveRequest,
       }}
