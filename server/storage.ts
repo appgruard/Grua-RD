@@ -1639,32 +1639,29 @@ export class DatabaseStorage implements IStorage {
 
   // Advanced Analytics (Module 2.3)
   async getServiceLocationsForHeatmap(startDate?: string, endDate?: string, precision: number = 3): Promise<Array<{ lat: number; lng: number; count: number; weight: number }>> {
-    const roundFactor = Math.pow(10, precision);
-    
-    let query = db
-      .select({
-        lat: sql<number>`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision})`.as('lat'),
-        lng: sql<number>`ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`.as('lng'),
-        count: sql<number>`COUNT(*)::int`.as('count'),
-      })
-      .from(servicios);
-
+    // Use raw SQL to avoid Drizzle's expression issues with GROUP BY
+    let dateFilter = '';
     if (startDate && endDate) {
-      query = query.where(
-        and(
-          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
-          sql`${servicios.createdAt} <= ${endDate}::timestamp`
-        )
-      ) as any;
+      dateFilter = `AND created_at >= '${startDate}'::timestamp AND created_at <= '${endDate}'::timestamp`;
     }
 
-    const results = await query
-      .groupBy(sql`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision}), ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`)
-      .orderBy(desc(sql`COUNT(*)`));
+    const results = await db.execute(sql`
+      SELECT 
+        ROUND(CAST(origen_lat AS NUMERIC), ${precision}) as lat,
+        ROUND(CAST(origen_lng AS NUMERIC), ${precision}) as lng,
+        COUNT(*)::int as count
+      FROM servicios
+      WHERE origen_lat IS NOT NULL AND origen_lng IS NOT NULL ${sql.raw(dateFilter)}
+      GROUP BY 
+        ROUND(CAST(origen_lat AS NUMERIC), ${precision}),
+        ROUND(CAST(origen_lng AS NUMERIC), ${precision})
+      ORDER BY count DESC
+    `);
 
-    const maxCount = Math.max(...results.map(r => r.count), 1);
+    const rows = results.rows as Array<{ lat: string; lng: string; count: number }>;
+    const maxCount = Math.max(...rows.map(r => r.count), 1);
     
-    return results.map(r => ({
+    return rows.map(r => ({
       lat: Number(r.lat),
       lng: Number(r.lng),
       count: r.count,
