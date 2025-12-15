@@ -1335,7 +1335,7 @@ export default function VerifyPending() {
   // Show loading state while initializing or waiting for auth
   if (isInitializing || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 safe-area-inset-top">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
@@ -1350,7 +1350,7 @@ export default function VerifyPending() {
   // Show error state if initialization failed
   if (initError && !currentUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 safe-area-inset-top">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
@@ -1367,7 +1367,7 @@ export default function VerifyPending() {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 safe-area-inset-top">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
@@ -1383,7 +1383,7 @@ export default function VerifyPending() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col safe-area-inset-top">
       <header className="flex items-center justify-between p-4 border-b bg-card">
         <div className="flex items-center gap-3">
           <img src={logoUrl} alt="Grúa RD" className="h-10 w-auto" />

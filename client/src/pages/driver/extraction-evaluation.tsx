@@ -133,7 +133,7 @@ export default function ExtractionEvaluation() {
 
   if (authLoading || serviceLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen safe-area-inset-top">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -141,7 +141,7 @@ export default function ExtractionEvaluation() {
 
   if (!service) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 safe-area-inset-top">
         <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Servicio no encontrado</h2>
         <p className="text-muted-foreground mb-4">El servicio que buscas no existe o ya no esta disponible</p>
@@ -154,7 +154,7 @@ export default function ExtractionEvaluation() {
 
   if (!service.requiereNegociacion) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 safe-area-inset-top">
         <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Este servicio no requiere negociacion</h2>
         <p className="text-muted-foreground mb-4">Puedes aceptar este servicio directamente desde el dashboard</p>
@@ -169,7 +169,7 @@ export default function ExtractionEvaluation() {
   const originLng = typeof service.origenLng === 'string' ? parseFloat(service.origenLng) : service.origenLng;
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-background safe-area-inset-top">
       <header className="flex items-center gap-3 p-4 border-b bg-background/95 backdrop-blur-sm">
         <Button 
           size="icon" 

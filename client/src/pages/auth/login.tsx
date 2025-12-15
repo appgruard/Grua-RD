@@ -12,7 +12,7 @@ import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
 interface AccountOption {
   id: string;
-  userType: 'cliente' | 'conductor';
+  userType: 'cliente' | 'conductor' | 'admin' | 'aseguradora' | 'socio' | 'empresa';
   nombre: string;
   apellido: string | null;
   fotoUrl: string | null;
@@ -163,7 +163,7 @@ export default function Login() {
     }
   };
 
-  const handleAccountSelect = async (userType: 'cliente' | 'conductor') => {
+  const handleAccountSelect = async (userType: string) => {
     await performLogin(userType);
   };
 
@@ -173,19 +173,31 @@ export default function Login() {
     setErrors({});
   };
 
-  const getAccountTypeLabel = (userType: 'cliente' | 'conductor') => {
-    return userType === 'conductor' ? 'Operador' : 'Cliente';
+  const getAccountTypeLabel = (userType: string) => {
+    switch (userType) {
+      case 'conductor': return 'Operador';
+      case 'admin': return 'Administrador';
+      case 'aseguradora': return 'Aseguradora';
+      case 'socio': return 'Socio';
+      case 'empresa': return 'Empresa';
+      default: return 'Cliente';
+    }
   };
 
-  const getAccountTypeDescription = (userType: 'cliente' | 'conductor') => {
-    return userType === 'conductor' 
-      ? 'Gestiona y acepta servicios de grúa' 
-      : 'Solicita servicios de grúa';
+  const getAccountTypeDescription = (userType: string) => {
+    switch (userType) {
+      case 'conductor': return 'Gestiona y acepta servicios de grúa';
+      case 'admin': return 'Panel de administración del sistema';
+      case 'aseguradora': return 'Gestión de pólizas y servicios';
+      case 'socio': return 'Panel de socio inversor';
+      case 'empresa': return 'Gestión empresarial';
+      default: return 'Solicita servicios de grúa';
+    }
   };
 
   if (step === 'select-account') {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
+      <div className="min-h-screen flex flex-col bg-background safe-area-inset-top">
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="w-full max-w-sm">
             <div className="text-center mb-8">
@@ -260,7 +272,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background safe-area-inset-top">
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
