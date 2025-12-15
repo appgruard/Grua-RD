@@ -4600,7 +4600,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // Record a manual payout to operator
+  // Record a manual payout to operator - this pays off debts
   async recordManualPayout(walletId: string, amount: string, adminId: string, notes?: string, evidenceUrl?: string): Promise<WalletTransaction> {
     // Get the wallet to update its balance
     const [wallet] = await db.select().from(operatorWallets)
@@ -4610,29 +4610,69 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Wallet not found');
     }
 
-    // Manual payout amount should be negative (money going out to operator)
-    // The amount is passed as a positive number, so we negate it
-    const payoutAmount = `-${Math.abs(parseFloat(amount)).toFixed(2)}`;
+    const paymentAmount = Math.abs(parseFloat(amount));
+    const currentDebt = parseFloat(wallet.totalDebt) || 0;
 
-    // Calculate new balance before transaction
-    const newBalance = (parseFloat(wallet.balance) + parseFloat(payoutAmount)).toFixed(2);
-
-    // Use a database transaction to ensure both insert and update succeed or fail together
+    // Use a database transaction to ensure all operations succeed or fail together
     return await db.transaction(async (tx) => {
-      // 1. Create wallet transaction
+      // 1. Get pending debts sorted by due date (oldest first)
+      const debts = await tx.select().from(operatorDebts)
+        .where(and(
+          eq(operatorDebts.walletId, walletId),
+          ne(operatorDebts.status, 'paid')
+        ))
+        .orderBy(operatorDebts.dueDate);
+
+      // 2. Apply payment to debts (oldest first)
+      let remainingPayment = paymentAmount;
+      let totalDebtPaid = 0;
+
+      for (const debt of debts) {
+        if (remainingPayment <= 0) break;
+
+        const debtRemaining = parseFloat(debt.remainingAmount);
+        if (debtRemaining <= 0) continue;
+
+        const paymentForThisDebt = Math.min(remainingPayment, debtRemaining);
+        const newRemaining = Math.max(0, debtRemaining - paymentForThisDebt);
+        const newStatus = newRemaining <= 0.01 ? 'paid' : 'partial';
+
+        await tx.update(operatorDebts)
+          .set({
+            remainingAmount: newRemaining.toFixed(2),
+            status: newStatus,
+            paidAt: newStatus === 'paid' ? new Date() : null
+          })
+          .where(eq(operatorDebts.id, debt.id));
+
+        remainingPayment -= paymentForThisDebt;
+        totalDebtPaid += paymentForThisDebt;
+      }
+
+      // 3. Create wallet transaction (amount is positive since this is a payment received)
       const [transaction] = await tx.insert(walletTransactions).values({
         walletId,
         type: 'manual_payout',
-        amount: payoutAmount,
+        amount: paymentAmount.toFixed(2),
         recordedByAdminId: adminId,
         evidenceUrl: evidenceUrl || null,
         notes: notes || null,
-        description: 'Pago manual a operador',
+        description: `Pago manual registrado - Deuda pagada: RD$${totalDebtPaid.toFixed(2)}`,
       }).returning();
 
-      // 2. Update wallet balance (reduce by the amount since this is payment to operator)
+      // 4. Update wallet totalDebt and potentially unblock cash services
+      const newDebt = Math.max(0, currentDebt - totalDebtPaid);
+      const updateData: Partial<OperatorWallet> = {
+        totalDebt: newDebt.toFixed(2)
+      };
+
+      // Unblock cash services if debt is fully paid
+      if (newDebt <= 0.01 && wallet.cashServicesBlocked) {
+        updateData.cashServicesBlocked = false;
+      }
+
       await tx.update(operatorWallets)
-        .set({ balance: newBalance })
+        .set(updateData)
         .where(eq(operatorWallets.id, walletId));
 
       return transaction;
