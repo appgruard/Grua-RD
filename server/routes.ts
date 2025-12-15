@@ -6262,6 +6262,345 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== MANUAL VERIFICATION ROUTES (Admin Only) ====================
+
+  // Get users with pending email verification
+  app.get("/api/admin/pending-email-verifications", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allUsers = await storage.getAllUsers();
+      const usersWithPendingEmail = allUsers.filter(user => 
+        (user.userType === 'conductor' || user.userType === 'cliente') && 
+        !user.emailVerificado
+      );
+
+      const pendingEmails = usersWithPendingEmail.map(user => ({
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        phone: user.phone,
+        userType: user.userType,
+        emailVerificado: user.emailVerificado,
+        cedulaVerificada: user.cedulaVerificada,
+        createdAt: user.createdAt,
+      }));
+
+      const stats = {
+        totalPending: pendingEmails.length,
+        totalDrivers: allUsers.filter(u => u.userType === 'conductor' && !u.emailVerificado).length,
+        totalClients: allUsers.filter(u => u.userType === 'cliente' && !u.emailVerificado).length,
+        totalVerified: allUsers.filter(u => u.emailVerificado).length,
+      };
+
+      res.json({
+        pendingEmails,
+        stats,
+      });
+    } catch (error: any) {
+      logSystem.error('Get pending email verifications error', error);
+      res.status(500).json({ message: "Failed to get pending email verifications" });
+    }
+  });
+
+  // Manually verify email for a user
+  app.post("/api/admin/users/:userId/verify-email", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.params.userId;
+
+      if (!userId) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.updateUser(userId, {
+        emailVerificado: true,
+      });
+
+      logSystem.info('Admin manually verified email', { 
+        adminId: req.user!.id, 
+        userId, 
+        adminEmail: req.user!.email,
+        userEmail: user.email
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Email verified successfully",
+        userId,
+      });
+    } catch (error: any) {
+      logSystem.error('Verify email error', error);
+      res.status(500).json({ message: "Failed to verify email" });
+    }
+  });
+
+  // Revoke email verification for a user
+  app.post("/api/admin/users/:userId/revoke-email", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.params.userId;
+
+      if (!userId) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.updateUser(userId, {
+        emailVerificado: false,
+      });
+
+      logSystem.info('Admin revoked email verification', { 
+        adminId: req.user!.id, 
+        userId, 
+        adminEmail: req.user!.email,
+        userEmail: user.email
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Email verification revoked",
+        userId,
+      });
+    } catch (error: any) {
+      logSystem.error('Revoke email verification error', error);
+      res.status(500).json({ message: "Failed to revoke email verification" });
+    }
+  });
+
+  // Get drivers with pending license verification
+  app.get("/api/admin/pending-license-verifications", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allDrivers = await storage.getAllDrivers();
+      const driversWithPendingLicense = allDrivers.filter(driver => 
+        !driver.licenciaVerificada
+      );
+
+      const pendingLicenses = driversWithPendingLicense.map(driver => ({
+        id: driver.id,
+        conductorId: driver.id,
+        userId: driver.userId,
+        nombre: driver.user?.nombre || '',
+        apellido: driver.user?.apellido || '',
+        email: driver.user?.email || '',
+        phone: driver.user?.phone || '',
+        licencia: driver.licencia,
+        licenciaCategoria: driver.licenciaCategoria,
+        licenciaRestricciones: driver.licenciaRestricciones,
+        licenciaFechaVencimiento: driver.licenciaFechaVencimiento,
+        licenciaFrontalUrl: driver.licenciaFrontalUrl,
+        licenciaTraseraUrl: driver.licenciaTraseraUrl,
+        licenciaVerificada: driver.licenciaVerificada,
+        licenciaCategoriaVerificada: driver.licenciaCategoriaVerificada,
+        createdAt: driver.user?.createdAt,
+      }));
+
+      const stats = {
+        totalPending: pendingLicenses.length,
+        totalDrivers: allDrivers.length,
+        totalVerified: allDrivers.filter(d => d.licenciaVerificada).length,
+      };
+
+      res.json({
+        pendingLicenses,
+        stats,
+      });
+    } catch (error: any) {
+      logSystem.error('Get pending license verifications error', error);
+      res.status(500).json({ message: "Failed to get pending license verifications" });
+    }
+  });
+
+  // Manually verify license for a driver
+  app.post("/api/admin/conductores/:conductorId/verify-license", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductorId = req.params.conductorId;
+      const { licencia, licenciaCategoria, licenciaRestricciones, licenciaFechaVencimiento } = req.body;
+
+      if (!conductorId) {
+        return res.status(400).json({ message: "Invalid conductor ID" });
+      }
+
+      const conductor = await storage.getConductorById(conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor not found" });
+      }
+
+      const updateData: any = {
+        licenciaVerificada: true,
+        licenciaCategoriaVerificada: true,
+      };
+
+      if (licencia && typeof licencia === 'string') {
+        updateData.licencia = licencia;
+      }
+      if (licenciaCategoria && typeof licenciaCategoria === 'string') {
+        updateData.licenciaCategoria = licenciaCategoria;
+      }
+      if (licenciaRestricciones && typeof licenciaRestricciones === 'string') {
+        updateData.licenciaRestricciones = licenciaRestricciones;
+      }
+      if (licenciaFechaVencimiento) {
+        updateData.licenciaFechaVencimiento = new Date(licenciaFechaVencimiento);
+      }
+
+      await storage.updateConductor(conductorId, updateData);
+
+      logSystem.info('Admin manually verified license', { 
+        adminId: req.user!.id, 
+        conductorId, 
+        adminEmail: req.user!.email,
+        licencia: updateData.licencia || conductor.licencia,
+        licenciaCategoria: updateData.licenciaCategoria || conductor.licenciaCategoria,
+      });
+
+      res.json({ 
+        success: true, 
+        message: "License verified successfully",
+        conductorId,
+      });
+    } catch (error: any) {
+      logSystem.error('Verify license error', error);
+      res.status(500).json({ message: "Failed to verify license" });
+    }
+  });
+
+  // Reject license for a driver
+  app.post("/api/admin/conductores/:conductorId/reject-license", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductorId = req.params.conductorId;
+      const { reason } = req.body;
+
+      if (!conductorId) {
+        return res.status(400).json({ message: "Invalid conductor ID" });
+      }
+
+      const conductor = await storage.getConductorById(conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor not found" });
+      }
+
+      await storage.updateConductor(conductorId, {
+        licenciaVerificada: false,
+        licenciaCategoriaVerificada: false,
+      });
+
+      logSystem.info('Admin rejected license', { 
+        adminId: req.user!.id, 
+        conductorId, 
+        adminEmail: req.user!.email,
+        reason: reason || 'No reason provided'
+      });
+
+      res.json({ 
+        success: true, 
+        message: "License rejected. Driver will need to re-verify.",
+        conductorId,
+      });
+    } catch (error: any) {
+      logSystem.error('Reject license error', error);
+      res.status(500).json({ message: "Failed to reject license" });
+    }
+  });
+
+  // Serve license front image from object storage (admin only)
+  app.get("/api/admin/license-image/:conductorId/front", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { conductorId } = req.params;
+      
+      if (!conductorId) {
+        return res.status(400).json({ message: "Conductor ID is required" });
+      }
+
+      const conductor = await storage.getConductorById(conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor not found" });
+      }
+
+      if (!conductor.licenciaFrontalUrl) {
+        return res.status(404).json({ message: "No license front image available" });
+      }
+
+      const imageBuffer = await storageService.downloadFile(conductor.licenciaFrontalUrl);
+      const contentType = conductor.licenciaFrontalUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.send(imageBuffer);
+    } catch (error: any) {
+      logSystem.error('Get license front image error', error);
+      res.status(500).json({ message: "Failed to retrieve license image" });
+    }
+  });
+
+  // Serve license back image from object storage (admin only)
+  app.get("/api/admin/license-image/:conductorId/back", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { conductorId } = req.params;
+      
+      if (!conductorId) {
+        return res.status(400).json({ message: "Conductor ID is required" });
+      }
+
+      const conductor = await storage.getConductorById(conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor not found" });
+      }
+
+      if (!conductor.licenciaTraseraUrl) {
+        return res.status(404).json({ message: "No license back image available" });
+      }
+
+      const imageBuffer = await storageService.downloadFile(conductor.licenciaTraseraUrl);
+      const contentType = conductor.licenciaTraseraUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.send(imageBuffer);
+    } catch (error: any) {
+      logSystem.error('Get license back image error', error);
+      res.status(500).json({ message: "Failed to retrieve license image" });
+    }
+  });
+
   app.post("/api/pricing/calculate", pricingLimiter, async (req: Request, res: Response) => {
     try {
       const { distanceKm, servicioCategoria, servicioSubtipo } = req.body;
