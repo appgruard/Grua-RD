@@ -12715,9 +12715,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const adminAdjustmentSchema = z.object({
-    adjustmentType: z.enum(["balance", "debt"]),
+    adjustmentType: z.enum(["add_balance", "subtract_balance", "add_debt", "subtract_debt"]),
     amount: z.number()
-      .min(-100000, "El ajuste mínimo es -100,000")
+      .positive("El monto debe ser mayor a cero")
       .max(100000, "El ajuste máximo es 100,000"),
     reason: z.string().min(5, "La razón debe tener al menos 5 caracteres").max(500, "La razón es muy larga"),
   });
@@ -13072,10 +13072,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { adjustmentType, amount, reason } = validation.data;
 
+      // Convert frontend adjustment types to wallet service format
+      let walletType: 'balance' | 'debt';
+      let adjustedAmount: number;
+
+      switch (adjustmentType) {
+        case 'add_balance':
+          walletType = 'balance';
+          adjustedAmount = amount;
+          break;
+        case 'subtract_balance':
+          walletType = 'balance';
+          adjustedAmount = -amount;
+          break;
+        case 'add_debt':
+          walletType = 'debt';
+          adjustedAmount = amount;
+          break;
+        case 'subtract_debt':
+          walletType = 'debt';
+          adjustedAmount = -amount;
+          break;
+        default:
+          return res.status(400).json({ message: "Tipo de ajuste no válido" });
+      }
+
       const updatedWallet = await WalletService.adminAdjustment(
         req.params.walletId,
-        adjustmentType,
-        amount,
+        walletType,
+        adjustedAmount,
         reason,
         req.user!.id
       );
