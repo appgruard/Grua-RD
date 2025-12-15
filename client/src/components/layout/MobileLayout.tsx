@@ -77,6 +77,7 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
+      <div className="safe-area-inset-top bg-background" />
       <main className="flex-1 min-h-0 overflow-hidden pb-16">
         {children}
       </main>
