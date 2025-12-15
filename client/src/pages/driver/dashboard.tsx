@@ -29,6 +29,7 @@ import type { Coordinates, RouteGeometry } from '@/lib/maps';
 import { generateWazeNavigationUrl, generateGoogleMapsNavigationUrl } from '@/lib/maps';
 import { getDirections } from '@/lib/mapbox-directions';
 import { cn } from '@/lib/utils';
+import { LocationService } from '@/lib/capacitor';
 
 interface DriverInitData {
   conductor: Conductor | null;
@@ -246,7 +247,126 @@ export default function DriverDashboard() {
   }, [activeService?.id, activeService?.estado, activeService?.destinoExtendidoLat, activeService?.destinoExtendidoLng, currentLocation, locationReady]);
 
   const requestLocationPermission = async (): Promise<boolean> => {
-    if (!('geolocation' in navigator)) {
+    try {
+      // First check if we already have permission
+      const hasPermission = await LocationService.checkPermissions();
+      
+      if (!hasPermission) {
+        // Explicitly request permission - this will show the browser/native permission dialog
+        const granted = await LocationService.requestPermissions();
+        
+        if (!granted) {
+          toast({
+            title: 'Permiso de ubicación requerido',
+            description: 'Debes permitir el acceso a tu ubicación para activar tu disponibilidad. Revisa la configuración de tu navegador o dispositivo.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+      }
+      
+      // Now try to get the current position
+      try {
+        const locationData = await LocationService.getCurrentPosition();
+        const location = {
+          lat: locationData.latitude,
+          lng: locationData.longitude,
+        };
+        setCurrentLocation(location);
+        currentLocationRef.current = location;
+        setLocationReady(true);
+        locationReadyRef.current = true;
+        
+        // Send location to server
+        if (driverData?.id) {
+          apiRequest('PUT', '/api/drivers/location', location);
+        }
+        return true;
+      } catch (posError) {
+        console.error('Error getting position:', posError);
+        
+        // Fallback to browser geolocation if Capacitor fails
+        if ('geolocation' in navigator) {
+          return new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                const location = {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                };
+                setCurrentLocation(location);
+                currentLocationRef.current = location;
+                setLocationReady(true);
+                locationReadyRef.current = true;
+                if (driverData?.id) {
+                  apiRequest('PUT', '/api/drivers/location', location);
+                }
+                resolve(true);
+              },
+              (error) => {
+                console.error('Browser geolocation error:', error);
+                toast({
+                  title: 'Error de ubicación',
+                  description: 'No se pudo obtener tu ubicación. Verifica que el GPS esté activo.',
+                  variant: 'destructive',
+                });
+                resolve(false);
+              },
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+          });
+        }
+        
+        toast({
+          title: 'Error de ubicación',
+          description: 'No se pudo obtener tu ubicación. Verifica que el GPS esté activo.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('Location permission error:', error);
+      
+      // Fallback: try browser geolocation which will prompt for permission
+      if ('geolocation' in navigator) {
+        return new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const location = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              };
+              setCurrentLocation(location);
+              currentLocationRef.current = location;
+              setLocationReady(true);
+              locationReadyRef.current = true;
+              if (driverData?.id) {
+                apiRequest('PUT', '/api/drivers/location', location);
+              }
+              resolve(true);
+            },
+            (geoError) => {
+              console.error('Browser geolocation error:', geoError);
+              if (geoError.code === geoError.PERMISSION_DENIED) {
+                toast({
+                  title: 'Permiso de ubicación requerido',
+                  description: 'Debes permitir el acceso a tu ubicación para activar tu disponibilidad. Revisa la configuración de tu navegador.',
+                  variant: 'destructive',
+                });
+              } else {
+                toast({
+                  title: 'Error de ubicación',
+                  description: 'No se pudo obtener tu ubicación. Verifica que el GPS esté activo.',
+                  variant: 'destructive',
+                });
+              }
+              resolve(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        });
+      }
+      
       toast({
         title: 'Ubicación no disponible',
         description: 'Tu navegador no soporta geolocalización',
@@ -254,45 +374,6 @@ export default function DriverDashboard() {
       });
       return false;
     }
-
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          // Permission granted, update location immediately
-          const location = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setCurrentLocation(location);
-          currentLocationRef.current = location;
-          setLocationReady(true);
-          locationReadyRef.current = true;
-          // Send location to server
-          if (driverData?.id) {
-            apiRequest('PUT', '/api/drivers/location', location);
-          }
-          resolve(true);
-        },
-        (error) => {
-          console.error('Location permission error:', error);
-          if (error.code === error.PERMISSION_DENIED) {
-            toast({
-              title: 'Permiso de ubicación requerido',
-              description: 'Debes permitir el acceso a tu ubicación para activar tu disponibilidad',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: 'Error de ubicación',
-              description: 'No se pudo obtener tu ubicación. Verifica que el GPS esté activo.',
-              variant: 'destructive',
-            });
-          }
-          resolve(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    });
   };
 
   const toggleAvailability = useMutation({
