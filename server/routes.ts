@@ -2161,6 +2161,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
       }
 
+      // IMPORTANT: Require cédula to be verified (or pending review) before license verification
+      if (req.isAuthenticated()) {
+        const currentUser = await storage.getUserById(req.user!.id);
+        if (currentUser && !currentUser.cedulaVerificada && !currentUser.cedulaImageUrl) {
+          logSystem.warn('License verification attempted without cedula verification', {
+            userId: req.user!.id,
+            cedulaVerificada: currentUser.cedulaVerificada,
+            hasCedulaImage: !!currentUser.cedulaImageUrl
+          });
+          return res.status(400).json({ 
+            message: "Debes verificar tu cédula antes de verificar tu licencia de conducir",
+            requiresCedulaFirst: true
+          });
+        }
+      }
+
       const { scanAndVerifyLicense, isVerifikConfigured } = await import("./services/verifik-ocr");
       
       if (!isVerifikConfigured()) {
@@ -2299,6 +2315,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (image.length > 10 * 1024 * 1024) {
         return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
+      }
+
+      // IMPORTANT: Require cédula to be verified (or pending review) before license verification
+      if (req.isAuthenticated()) {
+        const currentUser = await storage.getUserById(req.user!.id);
+        if (currentUser && !currentUser.cedulaVerificada && !currentUser.cedulaImageUrl) {
+          logSystem.warn('License back verification attempted without cedula verification', {
+            userId: req.user!.id,
+            cedulaVerificada: currentUser.cedulaVerificada,
+            hasCedulaImage: !!currentUser.cedulaImageUrl
+          });
+          return res.status(400).json({ 
+            message: "Debes verificar tu cédula antes de verificar tu licencia de conducir",
+            requiresCedulaFirst: true
+          });
+        }
       }
 
       const { validateDriverLicenseBack, isVerifikConfigured } = await import("./services/verifik-ocr");
@@ -5713,7 +5745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update driver's user info (name, surname) - admin only
+  // Update driver's user info (name, surname, email) - admin only
   app.put("/api/admin/drivers/:driverId/user-info", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
       return res.status(401).json({ message: "Not authorized" });
@@ -5721,7 +5753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const { driverId } = req.params;
-      const { nombre, apellido } = req.body;
+      const { nombre, apellido, email } = req.body;
       
       if (!nombre || !apellido) {
         return res.status(400).json({ message: "Nombre y apellido son requeridos" });
@@ -5733,18 +5765,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conductor no encontrado" });
       }
 
+      // Prepare update data
+      const updateData: { nombre: string; apellido: string; email?: string } = { nombre, apellido };
+      
+      // If email is provided and different from current, validate and update
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return res.status(400).json({ message: "Formato de correo electrónico inválido" });
+        }
+        
+        // Check if email is already in use by another user
+        const existingUsers = await storage.getUsersByEmail(email);
+        const otherUser = existingUsers.find(u => u.id !== driver.userId);
+        if (otherUser) {
+          return res.status(409).json({ 
+            message: "Este correo electrónico ya está en uso por otra cuenta" 
+          });
+        }
+        
+        updateData.email = email;
+      }
+
       // Update user info
-      const updatedUser = await storage.updateUser(driver.userId, { nombre, apellido });
+      const updatedUser = await storage.updateUser(driver.userId, updateData);
       
       logSystem.info('Driver user info updated by admin', { 
         adminId: req.user!.id, 
         driverId, 
         userId: driver.userId,
         nombre, 
-        apellido 
+        apellido,
+        emailChanged: !!email
       });
       
-      res.json({ success: true, user: { nombre: updatedUser.nombre, apellido: updatedUser.apellido } });
+      res.json({ 
+        success: true, 
+        user: { 
+          nombre: updatedUser.nombre, 
+          apellido: updatedUser.apellido,
+          email: updatedUser.email
+        } 
+      });
     } catch (error: any) {
       logSystem.error('Update driver user info (admin) error', error);
       res.status(500).json({ message: "Failed to update driver user info" });

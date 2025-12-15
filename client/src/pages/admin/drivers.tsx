@@ -39,7 +39,8 @@ export default function AdminDrivers() {
     driverId: string | null;
     nombre: string;
     apellido: string;
-  }>({ open: false, driverId: null, nombre: '', apellido: '' });
+    email: string;
+  }>({ open: false, driverId: null, nombre: '', apellido: '', email: '' });
   const { toast } = useToast();
   
   const { data: drivers, isLoading } = useQuery<ConductorWithUser[]>({
@@ -47,8 +48,8 @@ export default function AdminDrivers() {
   });
 
   const updateDriverInfo = useMutation({
-    mutationFn: async ({ driverId, nombre, apellido }: { driverId: string; nombre: string; apellido: string }) => {
-      const res = await apiRequest('PUT', `/api/admin/drivers/${driverId}/user-info`, { nombre, apellido });
+    mutationFn: async ({ driverId, nombre, apellido, email }: { driverId: string; nombre: string; apellido: string; email: string }) => {
+      const res = await apiRequest('PUT', `/api/admin/drivers/${driverId}/user-info`, { nombre, apellido, email });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || 'Error al actualizar');
@@ -57,10 +58,10 @@ export default function AdminDrivers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/drivers'] });
-      setEditDialog({ open: false, driverId: null, nombre: '', apellido: '' });
+      setEditDialog({ open: false, driverId: null, nombre: '', apellido: '', email: '' });
       toast({
         title: 'Datos actualizados',
-        description: 'El nombre del operador ha sido actualizado correctamente',
+        description: 'Los datos del operador han sido actualizados correctamente',
       });
     },
     onError: (error: any) => {
@@ -78,15 +79,17 @@ export default function AdminDrivers() {
       driverId: driver.id,
       nombre: driver.user.nombre,
       apellido: driver.user.apellido,
+      email: driver.user.email,
     });
   };
 
   const handleSaveEdit = () => {
-    if (editDialog.driverId && editDialog.nombre.trim() && editDialog.apellido.trim()) {
+    if (editDialog.driverId && editDialog.nombre.trim() && editDialog.apellido.trim() && editDialog.email.trim()) {
       updateDriverInfo.mutate({
         driverId: editDialog.driverId,
         nombre: editDialog.nombre.trim(),
         apellido: editDialog.apellido.trim(),
+        email: editDialog.email.trim(),
       });
     }
   };
@@ -366,7 +369,7 @@ export default function AdminDrivers() {
 
       <Dialog open={editDialog.open} onOpenChange={(open) => {
         if (!open) {
-          setEditDialog({ open: false, driverId: null, nombre: '', apellido: '' });
+          setEditDialog({ open: false, driverId: null, nombre: '', apellido: '', email: '' });
         }
       }}>
         <DialogContent>
@@ -394,18 +397,29 @@ export default function AdminDrivers() {
                 data-testid="input-edit-apellido"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Correo electrónico</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editDialog.email}
+                onChange={(e) => setEditDialog(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="correo@ejemplo.com"
+                data-testid="input-edit-email"
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button 
               variant="outline" 
-              onClick={() => setEditDialog({ open: false, driverId: null, nombre: '', apellido: '' })}
+              onClick={() => setEditDialog({ open: false, driverId: null, nombre: '', apellido: '', email: '' })}
               data-testid="button-cancel-edit"
             >
               Cancelar
             </Button>
             <Button 
               onClick={handleSaveEdit}
-              disabled={updateDriverInfo.isPending || !editDialog.nombre.trim() || !editDialog.apellido.trim()}
+              disabled={updateDriverInfo.isPending || !editDialog.nombre.trim() || !editDialog.apellido.trim() || !editDialog.email.trim()}
               data-testid="button-save-edit"
             >
               {updateDriverInfo.isPending ? (
