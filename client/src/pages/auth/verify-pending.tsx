@@ -110,6 +110,7 @@ export default function VerifyPending() {
   const [initError, setInitError] = useState(false);
   const initFetchedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const redirectingRef = useRef(false);
   
   // Use user from context, or pendingVerificationUser, or initializedUser from API
   const currentUser = contextUser || initializedUser;
@@ -130,6 +131,11 @@ export default function VerifyPending() {
   // Reusable function to fetch verification status from the server
   // When skipRedirects is true, only update local state without triggering redirects
   const fetchVerificationStatusFromServer = useCallback(async (signal?: AbortSignal, options?: { skipRedirects?: boolean }) => {
+    // Skip if redirect is already in progress to prevent polling loops
+    if (redirectingRef.current) {
+      return { success: true, redirecting: true };
+    }
+    
     try {
       const res = await fetch('/api/identity/verification-status', {
         credentials: 'include',
@@ -207,10 +213,12 @@ export default function VerifyPending() {
 
           if (allDriverStepsComplete) {
             if (!options?.skipRedirects) {
+              redirectingRef.current = true;
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/driver');
               });
+              return { success: true, redirecting: true };
             }
           } else if (!cedulaStepComplete) {
             setCurrentStep('cedula');
@@ -254,10 +262,12 @@ export default function VerifyPending() {
           if (cedulaVerificada && emailVerificado) {
             // Fully verified - redirect if skipRedirects is not true
             if (!options?.skipRedirects) {
+              redirectingRef.current = true;
               clearPendingVerification();
               refreshUser().then(() => {
                 setLocation('/client');
               });
+              return { success: true, redirecting: true };
             }
           } else if (cedulaStepComplete && !emailVerificado) {
             // Cedula done, needs email verification
@@ -270,6 +280,7 @@ export default function VerifyPending() {
         return { success: true };
       } else if (res.status === 401) {
         if (!options?.skipRedirects) {
+          redirectingRef.current = true;
           setLocation('/login');
         }
         return { success: false, unauthorized: true };
