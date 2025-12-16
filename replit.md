@@ -92,6 +92,28 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
   - `shared/schema.ts` - Schema updates for Jira fields
   - `migrations/0014_jira_integration.sql` - Database migration
 
+### December 16, 2025 - Intelligent Error Tracking and Priority Assignment
+- **Feature**: Enhanced error tracking with intelligent priority calculation and noise filtering.
+- **Priority Calculator** (`server/services/priority-calculator.ts`):
+  - Weighted scoring system (0-100 scale) considers:
+    - Module criticality (payment=100, database=90, auth=85, etc.)
+    - Error severity and type multipliers
+    - Frequency analysis (more occurrences = higher priority)
+    - Cascade indicators (stack trace depth, related errors)
+    - Critical metadata patterns (userId, serviceId, paymentId)
+  - Returns `calculatedPriority` (urgente/alta/media/baja) with reasoning
+- **Noise Filter** (`server/services/noise-filter.ts`):
+  - Detects transient errors (ECONNRESET, ETIMEDOUT, rate limits)
+  - Ignores non-critical patterns (favicon, healthcheck, bots)
+  - Groups related errors by `groupKey`
+  - Timed suppression windows prevent ticket spam
+- **Database Changes** (migration 0015):
+  - `calculatedPriority`: AI-assigned priority level
+  - `priorityScore`: Numeric score (0-100)
+  - `groupKey`: Error grouping identifier
+  - `isTransient`: Flag for transient/ignorable errors
+- **Integration**: Auto-created tickets now sync to Jira automatically with priority reasoning in description
+
 ### December 16, 2025 - System Error Tracking and Auto-Ticketing
 - **Feature**: Comprehensive error handling system with automatic ticket creation and classification.
 - **Error Classification**: 
