@@ -9,19 +9,16 @@ async function testJira() {
 
   if (!baseUrl || !email || !apiToken || !projectKey) {
     console.error('❌ Variables de entorno de Jira no configuradas');
-    console.log('   JIRA_BASE_URL:', baseUrl ? '✓' : '✗');
-    console.log('   JIRA_EMAIL:', email ? '✓' : '✗');
-    console.log('   JIRA_API_TOKEN:', apiToken ? '✓' : '✗');
-    console.log('   JIRA_PROJECT_KEY:', projectKey ? '✓' : '✗');
     process.exit(1);
   }
 
   const authHeader = 'Basic ' + Buffer.from(`${email}:${apiToken}`).toString('base64');
 
-  // Test connection
-  console.log('1. Probando conexión con Jira...');
+  // Delete previous ticket GR-1
+  console.log('1. Eliminando ticket anterior (GR-1)...');
   try {
-    const projectResponse = await fetch(`${baseUrl}/rest/api/3/project/${projectKey}`, {
+    const deleteResponse = await fetch(`${baseUrl}/rest/api/3/issue/GR-1`, {
+      method: 'DELETE',
       headers: {
         'Authorization': authHeader,
         'Content-Type': 'application/json',
@@ -29,27 +26,24 @@ async function testJira() {
       },
     });
 
-    if (!projectResponse.ok) {
-      const errorText = await projectResponse.text();
-      console.error('❌ Error de conexión:', projectResponse.status, errorText);
-      process.exit(1);
+    if (deleteResponse.ok || deleteResponse.status === 204) {
+      console.log('✅ Ticket GR-1 eliminado exitosamente');
+    } else {
+      const errorText = await deleteResponse.text();
+      console.log('⚠️ No se pudo eliminar GR-1:', deleteResponse.status, errorText);
     }
-
-    const project = await projectResponse.json();
-    console.log('✅ Conexión exitosa al proyecto:', project.name);
   } catch (error) {
-    console.error('❌ Error de conexión:', error);
-    process.exit(1);
+    console.log('⚠️ Error al eliminar:', error);
   }
 
-  // Create test ticket
-  console.log('\n2. Creando ticket de prueba...');
+  // Create new ticket with highest priority
+  console.log('\n2. Creando nuevo ticket con prioridad URGENTE...');
   const ticketId = 'TEST-' + Date.now();
   
   const payload = {
     fields: {
       project: { key: projectKey },
-      summary: 'Ticket de Prueba - Eliminar después de verificar',
+      summary: 'Ticket de Prueba URGENTE - Eliminar después de verificar',
       description: {
         type: 'doc',
         version: 1,
@@ -59,14 +53,14 @@ async function testJira() {
             content: [
               {
                 type: 'text',
-                text: `Este es un ticket de prueba creado automáticamente para verificar la integración con Jira.
+                text: `Este es un ticket de prueba con PRIORIDAD MÁXIMA creado automáticamente para verificar la integración con Jira.
 
 ---
 **Detalles del Ticket**
 - ID Local: ${ticketId}
 - Usuario: Sistema de Prueba (test@grua-rd.com)
-- Categoría: otro
-- Prioridad: baja
+- Categoría: problema_tecnico
+- Prioridad: URGENTE (Highest)
 
 Por favor eliminar después de confirmar que funciona.`,
               },
@@ -75,8 +69,8 @@ Por favor eliminar después de confirmar que funciona.`,
         ],
       },
       issuetype: { name: 'Task' },
-      priority: { name: 'Low' },
-      labels: ['other', 'grua-rd', 'support-ticket', 'test'],
+      priority: { name: 'Highest' },
+      labels: ['technical-issue', 'grua-rd', 'support-ticket', 'test', 'urgent'],
     },
   };
 
@@ -98,10 +92,11 @@ Por favor eliminar después de confirmar que funciona.`,
     }
 
     const result = await createResponse.json();
-    console.log('✅ Ticket creado exitosamente!');
+    console.log('✅ Ticket URGENTE creado exitosamente!');
     console.log('   - Issue ID:', result.id);
     console.log('   - Issue Key:', result.key);
-    console.log('\n🎉 Prueba completada. El ticket fue creado en Jira.');
+    console.log('   - Prioridad: Highest (Urgente)');
+    console.log('\n🎉 Prueba completada.');
     console.log('   Guarda este Issue Key para eliminarlo después:', result.key);
   } catch (error) {
     console.error('❌ Error al crear ticket:', error);
