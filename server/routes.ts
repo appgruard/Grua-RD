@@ -11133,6 +11133,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       logSystem.info('Admin created manual ticket', { ticketId: ticket.id, adminId: req.user!.id });
       res.json(updatedTicket);
+
+      // Handle Jira and email asynchronously (fire-and-forget)
+      const ticketSnapshot = {
+        id: updatedTicket.id,
+        titulo: updatedTicket.titulo,
+        descripcion: updatedTicket.descripcion || '',
+        categoria: updatedTicket.categoria,
+        prioridad: updatedTicket.prioridad,
+        estado: updatedTicket.estado
+      };
+      const ticketUserId = validationResult.data.usuarioId;
+
+      void (async () => {
+        try {
+          // 1. Create Jira issue if configured
+          const { jiraService } = await import('./services/jira-service');
+          if (jiraService.isConfigured()) {
+            try {
+              const usuario = await storage.getUserById(ticketUserId);
+              const jiraResult = await jiraService.createIssue({
+                id: updatedTicket.id,
+                titulo: updatedTicket.titulo,
+                descripcion: updatedTicket.descripcion || '',
+                categoria: updatedTicket.categoria as any,
+                prioridad: updatedTicket.prioridad as any,
+                usuarioNombre: usuario?.nombre,
+                usuarioEmail: usuario?.email,
+              });
+              
+              await storage.updateTicket(updatedTicket.id, {
+                jiraIssueId: jiraResult.issueId,
+                jiraIssueKey: jiraResult.issueKey,
+                jiraSyncedAt: new Date(),
+              });
+              logSystem.info('Manual ticket synced to Jira', { ticketId: updatedTicket.id, jiraKey: jiraResult.issueKey });
+            } catch (jiraErr) {
+              logSystem.error('Failed to sync manual ticket to Jira', jiraErr);
+            }
+          }
+
+          // 2. Send email notification to ticket owner
+          const emailService = await getEmailService();
+          if (emailService) {
+            const ticketOwner = await storage.getUserById(ticketUserId);
+            if (ticketOwner?.email) {
+              await emailService.sendTicketCreatedEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', ticketSnapshot);
+              logSystem.info('Manual ticket email sent', { ticketId: updatedTicket.id, email: ticketOwner.email });
+            }
+          }
+        } catch (err) {
+          logSystem.error('Failed to process manual ticket notifications', err);
+        }
+      })();
     } catch (error: any) {
       logSystem.error('Create manual ticket error', error);
       res.status(500).json({ 
