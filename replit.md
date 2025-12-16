@@ -60,8 +60,37 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Capacitor**: For native mobile app functionalities and plugins.
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
+- **Jira REST API**: For ticket synchronization with Jira Cloud (requires manual configuration of secrets).
 
 ## Recent Changes
+
+### December 16, 2025 - Jira REST API Integration
+- **Feature**: Full integration with Jira REST API for synchronizing support tickets.
+- **Configuration Required**: The following environment variables must be set as secrets:
+  - `JIRA_BASE_URL`: Your Jira Cloud instance URL (e.g., `https://your-domain.atlassian.net`)
+  - `JIRA_EMAIL`: The email associated with your Atlassian account
+  - `JIRA_API_TOKEN`: API token generated from https://id.atlassian.com/manage-profile/security/api-tokens
+  - `JIRA_PROJECT_KEY`: The project key where tickets will be created (e.g., `GRUA` or `SUPPORT`)
+- **API Endpoints**:
+  - `GET /api/admin/jira/status` - Check Jira connection status
+  - `POST /api/admin/tickets/:id/sync-jira` - Create Jira issue from local ticket
+  - `POST /api/admin/tickets/:id/sync-jira-status` - Pull status from Jira to local
+  - `POST /api/admin/tickets/:id/push-jira-status` - Push local status to Jira
+  - `POST /api/admin/tickets/:id/jira-comment` - Add comment to Jira issue
+  - `POST /api/admin/jira/bulk-sync` - Bulk sync multiple tickets to Jira
+- **Features**:
+  - Bidirectional status synchronization
+  - Priority mapping (baja→Low, media→Medium, alta→High, urgente→Highest)
+  - Category labels for issue classification
+  - Comment syncing with author attribution
+  - Bulk operations support
+- **Database Changes**: 
+  - New columns on `tickets` table: `jira_issue_id`, `jira_issue_key`, `jira_synced_at`
+- **Files Added/Modified**:
+  - `server/services/jira-service.ts` - Jira REST API service
+  - `server/routes.ts` - Jira integration API routes
+  - `shared/schema.ts` - Schema updates for Jira fields
+  - `migrations/0014_jira_integration.sql` - Database migration
 
 ### December 16, 2025 - System Error Tracking and Auto-Ticketing
 - **Feature**: Comprehensive error handling system with automatic ticket creation and classification.

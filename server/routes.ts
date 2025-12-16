@@ -11233,6 +11233,320 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== END ADMIN SYSTEM ERRORS ====================
 
+  // ==================== JIRA INTEGRATION ====================
+
+  // Test Jira connection (admin only)
+  app.get("/api/admin/jira/status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      
+      if (!jiraService.isConfigured()) {
+        return res.json({ 
+          configured: false, 
+          message: 'Jira no está configurado. Configure las variables de entorno JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN y JIRA_PROJECT_KEY.' 
+        });
+      }
+
+      const result = await jiraService.testConnection();
+      res.json({ 
+        configured: true, 
+        connected: result.success, 
+        projectKey: jiraService.getProjectKey(),
+        projectName: result.projectName,
+        error: result.error 
+      });
+    } catch (error: any) {
+      logSystem.error('Jira status check error', error);
+      res.status(500).json({ message: "Error al verificar conexión con Jira" });
+    }
+  });
+
+  // Sync ticket to Jira (admin only)
+  app.post("/api/admin/tickets/:id/sync-jira", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (ticket.jiraIssueKey) {
+        return res.status(400).json({ 
+          message: "Este ticket ya está sincronizado con Jira",
+          jiraIssueKey: ticket.jiraIssueKey 
+        });
+      }
+
+      const usuario = await storage.getUserById(ticket.usuarioId);
+      
+      const result = await jiraService.createIssue({
+        id: ticket.id,
+        titulo: ticket.titulo,
+        descripcion: ticket.descripcion,
+        categoria: ticket.categoria as any,
+        prioridad: ticket.prioridad as any,
+        usuarioNombre: usuario?.nombre,
+        usuarioEmail: usuario?.email,
+      });
+
+      const updatedTicket = await storage.updateTicket(ticket.id, {
+        jiraIssueId: result.issueId,
+        jiraIssueKey: result.issueKey,
+        jiraSyncedAt: new Date(),
+      });
+
+      logSystem.info('Ticket synced to Jira', { 
+        ticketId: ticket.id, 
+        jiraIssueKey: result.issueKey,
+        adminId: req.user!.id 
+      });
+
+      res.json({
+        message: 'Ticket sincronizado con Jira exitosamente',
+        ticket: updatedTicket,
+        jiraIssueKey: result.issueKey,
+      });
+    } catch (error: any) {
+      logSystem.error('Jira sync error', error);
+      res.status(500).json({ message: "Error al sincronizar con Jira: " + error.message });
+    }
+  });
+
+  // Sync ticket status from Jira (admin only)
+  app.post("/api/admin/tickets/:id/sync-jira-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (!ticket.jiraIssueKey) {
+        return res.status(400).json({ message: "Este ticket no está sincronizado con Jira" });
+      }
+
+      const jiraStatus = await jiraService.getIssueStatus(ticket.jiraIssueKey);
+      
+      const updatedTicket = await storage.updateTicket(ticket.id, {
+        estado: jiraStatus.status,
+        prioridad: jiraStatus.priority,
+        jiraSyncedAt: new Date(),
+      });
+
+      logSystem.info('Ticket status synced from Jira', { 
+        ticketId: ticket.id, 
+        jiraIssueKey: ticket.jiraIssueKey,
+        newStatus: jiraStatus.status,
+        adminId: req.user!.id 
+      });
+
+      res.json({
+        message: 'Estado sincronizado desde Jira',
+        ticket: updatedTicket,
+        jiraStatus: jiraStatus.jiraStatus,
+        jiraPriority: jiraStatus.jiraPriority,
+      });
+    } catch (error: any) {
+      logSystem.error('Jira status sync error', error);
+      res.status(500).json({ message: "Error al sincronizar estado desde Jira: " + error.message });
+    }
+  });
+
+  // Push ticket status to Jira (admin only)
+  app.post("/api/admin/tickets/:id/push-jira-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (!ticket.jiraIssueKey) {
+        return res.status(400).json({ message: "Este ticket no está sincronizado con Jira" });
+      }
+
+      const success = await jiraService.transitionIssue(
+        ticket.jiraIssueKey, 
+        ticket.estado as any
+      );
+
+      if (!success) {
+        return res.status(400).json({ 
+          message: "No se encontró una transición válida en Jira para el estado actual" 
+        });
+      }
+
+      await storage.updateTicket(ticket.id, { jiraSyncedAt: new Date() });
+
+      logSystem.info('Ticket status pushed to Jira', { 
+        ticketId: ticket.id, 
+        jiraIssueKey: ticket.jiraIssueKey,
+        status: ticket.estado,
+        adminId: req.user!.id 
+      });
+
+      res.json({ message: 'Estado enviado a Jira exitosamente' });
+    } catch (error: any) {
+      logSystem.error('Jira status push error', error);
+      res.status(500).json({ message: "Error al enviar estado a Jira: " + error.message });
+    }
+  });
+
+  // Add comment to Jira issue (admin only)
+  app.post("/api/admin/tickets/:id/jira-comment", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      const { comment } = req.body;
+
+      if (!comment || typeof comment !== 'string') {
+        return res.status(400).json({ message: "El comentario es requerido" });
+      }
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (!ticket.jiraIssueKey) {
+        return res.status(400).json({ message: "Este ticket no está sincronizado con Jira" });
+      }
+
+      await jiraService.addComment(ticket.jiraIssueKey, comment, req.user!.nombre);
+      await storage.updateTicket(ticket.id, { jiraSyncedAt: new Date() });
+
+      logSystem.info('Comment added to Jira', { 
+        ticketId: ticket.id, 
+        jiraIssueKey: ticket.jiraIssueKey,
+        adminId: req.user!.id 
+      });
+
+      res.json({ message: 'Comentario agregado a Jira exitosamente' });
+    } catch (error: any) {
+      logSystem.error('Jira comment error', error);
+      res.status(500).json({ message: "Error al agregar comentario en Jira: " + error.message });
+    }
+  });
+
+  // Bulk sync tickets to Jira (admin only)
+  app.post("/api/admin/jira/bulk-sync", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      const { ticketIds } = req.body;
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      if (!Array.isArray(ticketIds) || ticketIds.length === 0) {
+        return res.status(400).json({ message: "Se requiere un array de IDs de tickets" });
+      }
+
+      const results: Array<{ ticketId: string; success: boolean; jiraKey?: string; error?: string }> = [];
+
+      for (const ticketId of ticketIds) {
+        try {
+          const ticket = await storage.getTicketById(ticketId);
+          if (!ticket) {
+            results.push({ ticketId, success: false, error: 'Ticket no encontrado' });
+            continue;
+          }
+
+          if (ticket.jiraIssueKey) {
+            results.push({ ticketId, success: true, jiraKey: ticket.jiraIssueKey, error: 'Ya sincronizado' });
+            continue;
+          }
+
+          const usuario = await storage.getUserById(ticket.usuarioId);
+          
+          const result = await jiraService.createIssue({
+            id: ticket.id,
+            titulo: ticket.titulo,
+            descripcion: ticket.descripcion,
+            categoria: ticket.categoria as any,
+            prioridad: ticket.prioridad as any,
+            usuarioNombre: usuario?.nombre,
+            usuarioEmail: usuario?.email,
+          });
+
+          await storage.updateTicket(ticket.id, {
+            jiraIssueId: result.issueId,
+            jiraIssueKey: result.issueKey,
+            jiraSyncedAt: new Date(),
+          });
+
+          results.push({ ticketId, success: true, jiraKey: result.issueKey });
+        } catch (error: any) {
+          results.push({ ticketId, success: false, error: error.message });
+        }
+      }
+
+      logSystem.info('Bulk Jira sync completed', { 
+        totalTickets: ticketIds.length,
+        successful: results.filter(r => r.success).length,
+        adminId: req.user!.id 
+      });
+
+      res.json({
+        message: 'Sincronización masiva completada',
+        results,
+        summary: {
+          total: results.length,
+          successful: results.filter(r => r.success && !r.error?.includes('Ya sincronizado')).length,
+          alreadySynced: results.filter(r => r.error?.includes('Ya sincronizado')).length,
+          failed: results.filter(r => !r.success).length,
+        }
+      });
+    } catch (error: any) {
+      logSystem.error('Bulk Jira sync error', error);
+      res.status(500).json({ message: "Error en sincronización masiva: " + error.message });
+    }
+  });
+
+  // ==================== END JIRA INTEGRATION ====================
+
   // ==================== SOCIOS/PARTNERS PORTAL (Module 2.5) ====================
 
   // Get current partner's profile and dashboard data

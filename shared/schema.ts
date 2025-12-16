@@ -2212,6 +2212,9 @@ export const tickets = pgTable("tickets", {
   autoCreated: boolean("auto_created").default(false).notNull(),
   errorFingerprint: text("error_fingerprint"),
   sourceComponent: text("source_component"),
+  jiraIssueId: text("jira_issue_id"),
+  jiraIssueKey: text("jira_issue_key"),
+  jiraSyncedAt: timestamp("jira_synced_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
