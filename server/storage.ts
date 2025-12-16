@@ -149,6 +149,10 @@ import {
   type Administrador,
   type InsertAdministrador,
   type AdministradorWithDetails,
+  systemErrors,
+  type SystemError,
+  type InsertSystemError,
+  type SystemErrorWithDetails,
 } from '@shared/schema';
 import {
   serviceReceipts,
@@ -424,6 +428,15 @@ export interface IStorage {
     urgentes: number;
     sinAsignar: number;
   }>;
+
+  // System Errors
+  createSystemError(data: InsertSystemError): Promise<SystemError>;
+  getSystemErrorById(id: string): Promise<SystemError | undefined>;
+  getSystemErrorByFingerprint(fingerprint: string): Promise<SystemError | undefined>;
+  updateSystemError(id: string, data: Partial<SystemError>): Promise<SystemError>;
+  getUnresolvedSystemErrors(limit?: number): Promise<SystemError[]>;
+  getAllSystemErrors(limit?: number): Promise<SystemError[]>;
+  getSystemErrorsByTicketId(ticketId: string): Promise<SystemError[]>;
 
   // Socios (Partners/Investors) - Module 2.5
   createSocio(socio: InsertSocio): Promise<Socio>;
@@ -3027,6 +3040,70 @@ export class DatabaseStorage implements IStorage {
       .from(tickets);
     
     return stats;
+  }
+
+  // ==================== SYSTEM ERRORS ====================
+
+  async createSystemError(data: InsertSystemError): Promise<SystemError> {
+    const [error] = await db
+      .insert(systemErrors)
+      .values(data)
+      .returning();
+    return error;
+  }
+
+  async getSystemErrorById(id: string): Promise<SystemError | undefined> {
+    const [error] = await db
+      .select()
+      .from(systemErrors)
+      .where(eq(systemErrors.id, id))
+      .limit(1);
+    return error;
+  }
+
+  async getSystemErrorByFingerprint(fingerprint: string): Promise<SystemError | undefined> {
+    const [error] = await db
+      .select()
+      .from(systemErrors)
+      .where(and(
+        eq(systemErrors.fingerprint, fingerprint),
+        eq(systemErrors.resolved, false)
+      ))
+      .limit(1);
+    return error;
+  }
+
+  async updateSystemError(id: string, data: Partial<SystemError>): Promise<SystemError> {
+    const [updated] = await db
+      .update(systemErrors)
+      .set(data)
+      .where(eq(systemErrors.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getUnresolvedSystemErrors(limit: number = 50): Promise<SystemError[]> {
+    return await db
+      .select()
+      .from(systemErrors)
+      .where(eq(systemErrors.resolved, false))
+      .orderBy(desc(systemErrors.lastOccurrence))
+      .limit(limit);
+  }
+
+  async getAllSystemErrors(limit: number = 100): Promise<SystemError[]> {
+    return await db
+      .select()
+      .from(systemErrors)
+      .orderBy(desc(systemErrors.lastOccurrence))
+      .limit(limit);
+  }
+
+  async getSystemErrorsByTicketId(ticketId: string): Promise<SystemError[]> {
+    return await db
+      .select()
+      .from(systemErrors)
+      .where(eq(systemErrors.ticketId, ticketId));
   }
 
   // ==================== SOCIOS (PARTNERS/INVESTORS) - Module 2.5 ====================

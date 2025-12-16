@@ -11076,6 +11076,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ADMIN SYSTEM ERRORS ====================
+
+  // Admin manual ticket creation
+  app.post("/api/admin/tickets/manual", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const { titulo, descripcion, categoria, prioridad, usuarioId, servicioRelacionadoId, sourceComponent } = req.body;
+
+    // Use Zod schema for validation
+    const validationResult = insertTicketSchema.safeParse({
+      usuarioId: usuarioId || req.user!.id,
+      titulo,
+      descripcion,
+      categoria,
+      prioridad: prioridad || 'media',
+      servicioRelacionadoId: servicioRelacionadoId || null,
+    });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de ticket inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      // Create ticket via storage interface
+      const ticket = await storage.createTicket(validationResult.data);
+
+      // Update admin-specific fields via storage interface
+      const updatedTicket = await storage.updateTicket(ticket.id, {
+        autoCreated: false,
+        sourceComponent: sourceComponent || 'admin_manual',
+        asignadoA: req.user!.id,
+      });
+
+      logSystem.info('Admin created manual ticket', { ticketId: ticket.id, adminId: req.user!.id });
+      res.json(updatedTicket);
+    } catch (error: any) {
+      logSystem.error('Create manual ticket error', error);
+      res.status(500).json({ message: "Error al crear ticket manual" });
+    }
+  });
+
+  // Get all system errors (admin only)
+  app.get("/api/admin/system-errors", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { resolved, severity, source, limit } = req.query;
+      const maxLimit = parseInt(limit as string) || 100;
+      
+      // Use storage abstraction for all queries
+      let errors = resolved === 'true' 
+        ? await storage.getAllSystemErrors(maxLimit)
+        : await storage.getUnresolvedSystemErrors(maxLimit);
+
+      if (severity && typeof severity === 'string') {
+        errors = errors.filter(e => e.severity === severity);
+      }
+
+      if (source && typeof source === 'string') {
+        errors = errors.filter(e => e.errorSource === source);
+      }
+
+      res.json(errors);
+    } catch (error: any) {
+      logSystem.error('Get system errors error', error);
+      res.status(500).json({ message: "Error al obtener errores del sistema" });
+    }
+  });
+
+  // Get system error statistics (admin only)
+  app.get("/api/admin/system-errors/stats", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { systemErrorService } = await import('./services/system-error-service');
+      const stats = await systemErrorService.getErrorStats();
+      res.json(stats);
+    } catch (error: any) {
+      logSystem.error('Get system error stats error', error);
+      res.status(500).json({ message: "Error al obtener estadísticas de errores" });
+    }
+  });
+
+  // Get single system error (admin only)
+  app.get("/api/admin/system-errors/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const error = await storage.getSystemErrorById(req.params.id);
+      if (!error) {
+        return res.status(404).json({ message: "Error no encontrado" });
+      }
+      res.json(error);
+    } catch (error: any) {
+      logSystem.error('Get system error error', error);
+      res.status(500).json({ message: "Error al obtener error del sistema" });
+    }
+  });
+
+  // Resolve system error (admin only)
+  app.put("/api/admin/system-errors/:id/resolve", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const existingError = await storage.getSystemErrorById(req.params.id);
+      if (!existingError) {
+        return res.status(404).json({ message: "Error no encontrado" });
+      }
+
+      const { systemErrorService } = await import('./services/system-error-service');
+      await systemErrorService.resolveError(req.params.id, req.user!.id);
+
+      const updated = await storage.getSystemErrorById(req.params.id);
+      logSystem.info('System error resolved', { errorId: req.params.id, resolvedBy: req.user!.id });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Resolve system error error', error);
+      res.status(500).json({ message: "Error al resolver error del sistema" });
+    }
+  });
+
+  // Get system errors linked to a ticket (admin only)
+  app.get("/api/admin/tickets/:id/system-errors", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      const errors = await storage.getSystemErrorsByTicketId(req.params.id);
+      res.json(errors);
+    } catch (error: any) {
+      logSystem.error('Get ticket system errors error', error);
+      res.status(500).json({ message: "Error al obtener errores del sistema" });
+    }
+  });
+
+  // ==================== END ADMIN SYSTEM ERRORS ====================
+
   // ==================== SOCIOS/PARTNERS PORTAL (Module 2.5) ====================
 
   // Get current partner's profile and dashboard data

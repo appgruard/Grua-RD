@@ -2209,6 +2209,9 @@ export const tickets = pgTable("tickets", {
   asignadoA: varchar("asignado_a").references(() => users.id, { onDelete: "set null" }),
   resueltoAt: timestamp("resuelto_at"),
   cerradoAt: timestamp("cerrado_at"),
+  autoCreated: boolean("auto_created").default(false).notNull(),
+  errorFingerprint: text("error_fingerprint"),
+  sourceComponent: text("source_component"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -2302,6 +2305,115 @@ export type MensajeTicketWithUsuario = MensajeTicket & {
 };
 
 // ==================== END TICKET SYSTEM ====================
+
+// ==================== SYSTEM ERROR TRACKING ====================
+
+// Error severity enum
+export const errorSeverityEnum = pgEnum("error_severity", [
+  "low",
+  "medium", 
+  "high",
+  "critical"
+]);
+
+// Error source enum - where the error originated
+export const errorSourceEnum = pgEnum("error_source", [
+  "database",
+  "external_api",
+  "internal_service",
+  "authentication",
+  "payment",
+  "file_storage",
+  "websocket",
+  "email",
+  "sms",
+  "unknown"
+]);
+
+// Error type enum - classification of error
+export const errorTypeEnum = pgEnum("error_type", [
+  "connection_error",
+  "timeout_error",
+  "validation_error",
+  "permission_error",
+  "not_found_error",
+  "rate_limit_error",
+  "configuration_error",
+  "integration_error",
+  "system_error",
+  "unknown_error"
+]);
+
+// System Errors Table (for tracking and deduplication)
+export const systemErrors = pgTable("system_errors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fingerprint: text("fingerprint").notNull(),
+  errorType: errorTypeEnum("error_type").notNull(),
+  errorSource: errorSourceEnum("error_source").notNull(),
+  severity: errorSeverityEnum("severity").notNull(),
+  message: text("message").notNull(),
+  stackTrace: text("stack_trace"),
+  route: text("route"),
+  method: text("method"),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  metadata: text("metadata"),
+  occurrenceCount: integer("occurrence_count").default(1).notNull(),
+  firstOccurrence: timestamp("first_occurrence").defaultNow().notNull(),
+  lastOccurrence: timestamp("last_occurrence").defaultNow().notNull(),
+  ticketId: varchar("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
+  resolved: boolean("resolved").default(false).notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+});
+
+// System Errors Relations
+export const systemErrorsRelations = relations(systemErrors, ({ one }) => ({
+  user: one(users, {
+    fields: [systemErrors.userId],
+    references: [users.id],
+  }),
+  ticket: one(tickets, {
+    fields: [systemErrors.ticketId],
+    references: [tickets.id],
+  }),
+  resolvedByUser: one(users, {
+    fields: [systemErrors.resolvedBy],
+    references: [users.id],
+  }),
+}));
+
+// System Error Insert Schema
+export const insertSystemErrorSchema = createInsertSchema(systemErrors, {
+  fingerprint: z.string().min(1),
+  message: z.string().min(1),
+  errorType: z.enum(["connection_error", "timeout_error", "validation_error", "permission_error", "not_found_error", "rate_limit_error", "configuration_error", "integration_error", "system_error", "unknown_error"]),
+  errorSource: z.enum(["database", "external_api", "internal_service", "authentication", "payment", "file_storage", "websocket", "email", "sms", "unknown"]),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+}).omit({
+  id: true,
+  occurrenceCount: true,
+  firstOccurrence: true,
+  lastOccurrence: true,
+  resolved: true,
+  resolvedAt: true,
+  resolvedBy: true,
+});
+
+// System Error Select Schema
+export const selectSystemErrorSchema = createSelectSchema(systemErrors);
+
+// System Error Types
+export type InsertSystemError = z.infer<typeof insertSystemErrorSchema>;
+export type SystemError = typeof systemErrors.$inferSelect;
+
+// System Error Helper Types
+export type SystemErrorWithDetails = SystemError & {
+  user?: User;
+  ticket?: Ticket;
+  resolvedByUser?: User;
+};
+
+// ==================== END SYSTEM ERROR TRACKING ====================
 
 // ==================== OPERATOR WALLET INSERT SCHEMAS & TYPES ====================
 
