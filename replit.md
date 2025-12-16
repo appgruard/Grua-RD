@@ -63,6 +63,32 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 16, 2025 - System Error Tracking and Auto-Ticketing
+- **Feature**: Comprehensive error handling system with automatic ticket creation and classification.
+- **Error Classification**: 
+  - User errors (ValidationError, AuthenticationError, NotFoundError, etc.) - No tickets created
+  - System errors (DatabaseError, ExternalApiError, PaymentError, etc.) - Automatic ticket creation
+- **Deduplication**: SHA256 fingerprinting with 1-hour window prevents duplicate tickets for same error
+- **Severity Escalation**: Uses `Math.max()` to ensure severity never downgrades (critical stays critical)
+- **Email Notifications**: High and critical errors send email notifications to admin@fourone.com.do via Resend
+- **Admin Routes**: 
+  - `POST /api/admin/tickets/manual` - Create tickets manually
+  - `GET /api/admin/system-errors` - List all system errors
+  - `GET /api/admin/system-errors/unresolved` - List unresolved errors
+  - `GET/PUT /api/admin/system-errors/:id` - View/update specific error
+- **Database Tables**: 
+  - `systemErrors` table with fingerprint, severity, source, type, occurrenceCount, status
+  - Enums: error_severity (low/medium/high/critical), error_source, error_type
+  - New columns on tickets: autoCreated, errorFingerprint, sourceComponent
+- **Files Added/Modified**:
+  - `server/errors/app-errors.ts` - Error classification hierarchy
+  - `server/services/system-error-service.ts` - Deduplication and ticket creation logic
+  - `server/middleware/error-handler.ts` - Express error handling middleware
+  - `shared/schema.ts` - Database schema for system errors
+  - `server/storage.ts` - Storage methods for system errors
+  - `server/routes.ts` - Admin API routes
+  - `server/index.ts` - Middleware integration
+
 ### December 12, 2025 - Operator Bank Account Management
 - **Feature**: Added bank account management for operators.
 - **Driver Profile**: Operators can now add/edit their bank account information (bank name, account type, account number, account holder name, cédula) in their profile page via a new BankAccountModal component.
