@@ -127,21 +127,24 @@ class SystemErrorService {
         descripcion: `
 **Error Automático Detectado**
 
+---
+**LOG EXACTO DEL ERROR:**
+\`\`\`
+${errorRecord.message}
+\`\`\`
+---
+
 **Tipo:** ${errorRecord.errorType}
 **Origen:** ${errorRecord.errorSource}
 **Severidad:** ${errorRecord.severity}
 **Ruta:** ${errorRecord.route || 'N/A'}
 **Método:** ${errorRecord.method || 'N/A'}
-
-**Mensaje:**
-${errorRecord.message}
-
 **Primera Ocurrencia:** ${errorRecord.firstOccurrence instanceof Date ? errorRecord.firstOccurrence.toISOString() : errorRecord.firstOccurrence}
 **Fingerprint:** ${errorRecord.fingerprint}
 
-${errorRecord.stackTrace ? `**Stack Trace:**\n\`\`\`\n${errorRecord.stackTrace.substring(0, 1000)}\n\`\`\`` : ''}
+${errorRecord.stackTrace ? `**Stack Trace Completo:**\n\`\`\`\n${errorRecord.stackTrace}\n\`\`\`` : ''}
 
-${errorRecord.metadata ? `**Metadata:**\n\`\`\`json\n${errorRecord.metadata}\n\`\`\`` : ''}
+${errorRecord.metadata ? `**Metadata (contexto adicional):**\n\`\`\`json\n${errorRecord.metadata}\n\`\`\`` : ''}
         `.trim(),
       });
 
