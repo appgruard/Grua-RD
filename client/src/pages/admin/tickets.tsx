@@ -11,8 +11,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -35,7 +37,8 @@ import {
   Filter,
   Inbox,
   AlertTriangle,
-  UserCheck
+  UserCheck,
+  Plus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -46,6 +49,15 @@ const messageFormSchema = z.object({
 });
 
 type MessageFormValues = z.infer<typeof messageFormSchema>;
+
+const createTicketSchema = z.object({
+  titulo: z.string().min(5, 'El titulo debe tener al menos 5 caracteres').max(200, 'El titulo no puede exceder 200 caracteres'),
+  descripcion: z.string().min(10, 'La descripcion debe tener al menos 10 caracteres').max(2000, 'La descripcion no puede exceder 2000 caracteres'),
+  categoria: z.enum(['problema_tecnico', 'consulta_servicio', 'queja', 'sugerencia', 'problema_pago', 'otro']),
+  prioridad: z.enum(['baja', 'media', 'alta', 'urgente']),
+});
+
+type CreateTicketFormValues = z.infer<typeof createTicketSchema>;
 
 const categoriaLabels: Record<string, { label: string; icon: typeof HelpCircle }> = {
   problema_tecnico: { label: 'Problema Tecnico', icon: AlertCircle },
@@ -86,10 +98,54 @@ export default function AdminTickets() {
   const [estadoFilter, setEstadoFilter] = useState<string>('all');
   const [prioridadFilter, setPrioridadFilter] = useState<string>('all');
   const [categoriaFilter, setCategoriaFilter] = useState<string>('all');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const { data: currentUser } = useQuery<UserType>({
     queryKey: ['/api/auth/me'],
   });
+
+  const createTicketForm = useForm<CreateTicketFormValues>({
+    resolver: zodResolver(createTicketSchema),
+    defaultValues: {
+      titulo: '',
+      descripcion: '',
+      categoria: 'otro',
+      prioridad: 'media',
+    },
+  });
+
+  const createTicketMutation = useMutation({
+    mutationFn: async (data: CreateTicketFormValues) => {
+      const res = await apiRequest('POST', '/api/admin/tickets/manual', data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Error al crear ticket');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/tickets/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/tickets/mis-asignados'] });
+      setIsCreateDialogOpen(false);
+      createTicketForm.reset();
+      toast({
+        title: 'Ticket creado',
+        description: 'El ticket ha sido creado exitosamente',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleCreateTicket = (data: CreateTicketFormValues) => {
+    createTicketMutation.mutate(data);
+  };
 
   const { data: stats, isLoading: statsLoading } = useQuery<TicketStats>({
     queryKey: ['/api/admin/tickets/stats'],
@@ -297,9 +353,137 @@ export default function AdminTickets() {
 
   return (
     <div className="container mx-auto p-4 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" data-testid="text-admin-tickets-title">Gestion de Tickets</h1>
-        <p className="text-muted-foreground">Administra las solicitudes de soporte</p>
+      <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-admin-tickets-title">Gestion de Tickets</h1>
+          <p className="text-muted-foreground">Administra las solicitudes de soporte</p>
+        </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-create-ticket">
+              <Plus className="mr-2 h-4 w-4" />
+              Crear Ticket
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Crear Nuevo Ticket</DialogTitle>
+              <DialogDescription>
+                Crea un ticket de soporte manualmente. Este sera asignado automaticamente a ti.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...createTicketForm}>
+              <form onSubmit={createTicketForm.handleSubmit(handleCreateTicket)} className="space-y-4">
+                <FormField
+                  control={createTicketForm.control}
+                  name="titulo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Titulo</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Describe brevemente el problema" 
+                          {...field} 
+                          data-testid="input-ticket-titulo"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createTicketForm.control}
+                  name="descripcion"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descripcion</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Describe el problema en detalle..." 
+                          rows={4}
+                          {...field} 
+                          data-testid="input-ticket-descripcion"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={createTicketForm.control}
+                    name="categoria"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Categoria</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-ticket-categoria">
+                              <SelectValue placeholder="Selecciona categoria" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {Object.entries(categoriaLabels).map(([key, { label }]) => (
+                              <SelectItem key={key} value={key}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createTicketForm.control}
+                    name="prioridad"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Prioridad</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-ticket-prioridad">
+                              <SelectValue placeholder="Selecciona prioridad" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="baja">Baja</SelectItem>
+                            <SelectItem value="media">Media</SelectItem>
+                            <SelectItem value="alta">Alta</SelectItem>
+                            <SelectItem value="urgente">Urgente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    data-testid="button-cancel-ticket"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createTicketMutation.isPending}
+                    data-testid="button-submit-ticket"
+                  >
+                    {createTicketMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creando...
+                      </>
+                    ) : (
+                      'Crear Ticket'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {statsLoading ? (
