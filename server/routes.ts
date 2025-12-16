@@ -10723,6 +10723,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUserById(userId);
           if (user?.email) {
             await emailService.sendTicketCreatedEmail(user.email, user.nombre || 'Usuario', ticketSnapshot);
+            
+            // Send notification to admin for high priority tickets (alta or urgente)
+            if (ticketSnapshot.prioridad === 'alta' || ticketSnapshot.prioridad === 'urgente') {
+              const adminEmail = 'admin@fourone.com.do';
+              await emailService.sendHighPriorityTicketNotification(
+                adminEmail,
+                ticketSnapshot,
+                user.nombre || 'Usuario',
+                user.email
+              );
+              logSystem.info('High priority ticket notification sent to admin', { 
+                ticketId: ticketSnapshot.id, 
+                prioridad: ticketSnapshot.prioridad,
+                adminEmail 
+              });
+            }
           }
         } catch (err) {
           logSystem.error('Failed to send ticket created email', err);
