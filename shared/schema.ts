@@ -2367,6 +2367,10 @@ export const systemErrors = pgTable("system_errors", {
   resolved: boolean("resolved").default(false).notNull(),
   resolvedAt: timestamp("resolved_at"),
   resolvedBy: varchar("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  calculatedPriority: text("calculated_priority"),
+  priorityScore: integer("priority_score"),
+  groupKey: text("group_key"),
+  isTransient: boolean("is_transient").default(false),
 });
 
 // System Errors Relations
@@ -2392,6 +2396,10 @@ export const insertSystemErrorSchema = createInsertSchema(systemErrors, {
   errorType: z.enum(["connection_error", "timeout_error", "validation_error", "permission_error", "not_found_error", "rate_limit_error", "configuration_error", "integration_error", "system_error", "unknown_error"]),
   errorSource: z.enum(["database", "external_api", "internal_service", "authentication", "payment", "file_storage", "websocket", "email", "sms", "unknown"]),
   severity: z.enum(["low", "medium", "high", "critical"]),
+  calculatedPriority: z.enum(["baja", "media", "alta", "urgente"]).optional(),
+  priorityScore: z.number().optional(),
+  groupKey: z.string().optional(),
+  isTransient: z.boolean().optional(),
 }).omit({
   id: true,
   occurrenceCount: true,
