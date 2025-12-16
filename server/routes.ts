@@ -11135,7 +11135,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedTicket);
     } catch (error: any) {
       logSystem.error('Create manual ticket error', error);
-      res.status(500).json({ message: "Error al crear ticket manual" });
+      res.status(500).json({ 
+        message: "Error al crear ticket manual",
+        detail: error?.message || String(error)
+      });
     }
   });
 
