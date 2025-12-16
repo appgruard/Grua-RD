@@ -1,4 +1,4 @@
-import { logSystem } from '../utils/logger';
+import { logSystem } from '../logger';
 
 interface JiraConfig {
   baseUrl: string;
