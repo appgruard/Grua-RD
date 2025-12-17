@@ -5760,7 +5760,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get driver to find user ID
-      const driver = await storage.getConductor(driverId);
+      const driver = await storage.getConductorById(driverId);
       if (!driver) {
         return res.status(404).json({ message: "Conductor no encontrado" });
       }
