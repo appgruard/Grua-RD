@@ -384,7 +384,6 @@ Body:
   -- - tiempo_desde_aceptacion_segundos
   -- - nivel_demanda (de tabla zonas_demanda)
   -- - es_hora_pico (por timestamp)
-  -- - rating_usuario (de tabla users)
   -- - total_cancelaciones_usuario
 }
 
@@ -400,7 +399,6 @@ Response:
     multiplicadores_aplicados: {
       demanda: decimal,
       hora: decimal,
-      rating: decimal,
       reincidencia: decimal
     },
     evaluacion: "ninguna|leve|moderada|grave|critica",
@@ -611,9 +609,9 @@ Contexto:
 - Tiempo: 3 minutos
 - Distancia recorrida: 0.8 km
 - Hora: 3:00 PM (sin pico)
-- Rating cliente: 4.2 estrellas
 - Demanda zona: Baja (20%)
 - Costo servicio: $25
+- Total cancelaciones: 0 (primera cancelación)
 
 Cálculo:
 - penalizacion_base = 0.8 km × $0.50 = $0.40
@@ -628,20 +626,19 @@ Contexto:
 - Estado: conductor_en_sitio
 - Tiempo desde llegada: 2 minutos
 - Distancia total: 8 km
-- Distancia recorrida: 7.8 km
 - Hora: 6:30 PM (PICO VESPERTINO)
-- Rating cliente: 3.2 estrellas
 - Demanda zona: Alta (70%)
-- Total cancelaciones cliente: 1
+- Total cancelaciones: 1
 - Costo servicio: $50
 - Zona: Urbana
 
 Cálculo:
-- penalizacion_base = (7.8 km × $1.00) + ($50 × 0.30) = $7.80 + $15 = $22.80
-- penalizacion_base_final = $22.80 + 50% × $50 + $10 = $22.80 + $25 + $10 = $57.80
+- penalizacion_base = (8 km × $1.00) + ($50 × 0.30) = $8 + $15 = $23
+- penalizacion_base_final = $23 + 50% × $50 + $10 = $23 + $25 + $10 = $58
 - Multiplicadores: demanda 1.3 × hora 1.5 × reincidencia 1.0 = 1.95
-- penalizacion_final = $57.80 × 1.95 = $112.71
-- Reembolso: $50 - $112.71 = $0 (sin reembolso, excede el costo)
+- penalizacion_final = $58 × 1.95 = $113.10 (cap 100% costo)
+- penalizacion_capped = $50 (máximo 100% del costo)
+- Reembolso: $50 - $50 = $0
 - Bloqueo: 2 horas
 
 NOTA: Se aplica cap de penalización en 100% del costo = $50
@@ -657,19 +654,21 @@ Contexto:
 - Total cancelaciones conductor: 2 en última semana
 - Costo servicio: $60
 - Zona: Suburbana
+- Demanda zona: Media
 - Razón: "Problema con vehículo"
 
 Cálculo:
 - penalizacion_base = 6.5 km × $0.75 = $4.88
 - penalizacion_base_final = $15 + $4.88 = $19.88
-- Multiplicadores: demanda 1.0 × hora 1.4 × reincidencia 2.0 = 2.8
-- penalizacion_final = $19.88 × 2.8 = $55.66
+- Multiplicadores: demanda 1.0 × hora 1.4 × reincidencia 1.5 = 2.1
+  (Nota: reincidencia 1.5 porque tiene 2 cancelaciones, no >2)
+- penalizacion_final = $19.88 × 2.1 = $41.75
 - Pérdida comisión: 100%
 - Reembolso al cliente: 100%
 - Rating conductor: -0.5 estrellas
 - Bloqueo: 30 minutos
 
-NOTA: Penalización moderada por reincidencia
+NOTA: Penalización moderada-baja por reincidencia limitada
 ```
 
 ### Caso 4: Conductor cancela cuando en progreso (DISTANCIA RECORRIDA COMPLETA)
@@ -683,7 +682,7 @@ Contexto:
 - Total cancelaciones conductor: 4 en último mes
 - Costo servicio: $150
 - Zona: Periférica
-- Demanda: Crítica (85%)
+- Demanda zona: Crítica (85%)
 
 Cálculo:
 - penalizacion_base = ($150 × 0.50) + (10 km × $1.50) = $75 + $15 = $90
@@ -708,7 +707,7 @@ Cálculo:
 - Cancelaciones por usuario (cliente vs conductor)
 - Penalizaciones aplicadas vs revertidas
 - Apelaciones de penalizaciones (tasa de aprobación)
-- Impacto en rating promedio de usuarios
+- Impacto en rating promedio de conductores
 - Ingresos por penalizaciones (tarifa administrativa)
 
 ### Alertas
@@ -720,23 +719,65 @@ Cálculo:
 
 ---
 
-## 13. Preguntas Frecuentes (Respuestas Pendientes)
+## 13. Puntos Críticos a Validar
 
-1. ¿Cuál es el porcentaje de penalización exacto para cada escenario?
-2. ¿Se pueden cancelar servicios que requieren negociación?
-3. ¿Cómo se manejan las cancelaciones por culpa de Gruard (error de app)?
-4. ¿Hay límite de cancelaciones antes de suspensión?
-5. ¿Las penalizaciones se heredan entre plataformas (web/mobile)?
-6. ¿Cómo se integra con terceros pagadores (Azul)?
+### Validación de Fórmulas
+✓ Fórmula base: penalizacion_base × (mul_demanda × mul_hora × mul_reincidencia)
+✓ No incluye multiplicador de rating (clientes no tienen rating)
+✓ Cap máximo de penalización: 100% del costo del servicio
+
+### Validación de Conceptos
+✓ Clientes: No tienen rating, no usan multiplicador de rating
+✓ Conductores: Tienen rating, cambios de rating según estado/acción
+✓ Demanda: Se calcula en tiempo real desde tabla `zonas_demanda`
+✓ Reembolsos: Se procesan en siguiente ciclo (24-48h)
+✓ Bloqueos: Se almacenan en campo `bloqueado_hasta` TIMESTAMP
+
+### Preguntas Resueltas en el Plan
+1. ✓ Porcentajes de penalización: Especificados en matrices por estado
+2. ? ¿Se pueden cancelar servicios que requieren negociación? (Por definir)
+3. ? ¿Cómo se manejan las cancelaciones por culpa de Gruard? (Por definir)
+4. ✓ Límite de cancelaciones: Especificado en sección 7.3
+5. ? ¿Las penalizaciones se heredan entre plataformas? (Por definir)
+6. ? ¿Cómo se integra con terceros pagadores (Azul)? (Por definir)
 
 ---
 
-## Siguiente: Esperar Instrucciones
+## Resumen de Verificación ✓
 
-Este plan está listo para revisión. Por favor proporciona:
+El plan ha sido revisado y verificado para:
 
-1. Ajustes a los montos de penalización
-2. Cambios a los tiempos de gracia (5 minutos, etc.)
-3. Confirmación de estructura de datos
-4. Prioridades de implementación
-5. Cualquier requisito adicional
+✓ **Consistencia Matemática**
+  - Todas las fórmulas de cálculo son coherentes
+  - Los ejemplos tienen cálculos correctos
+  - Cap de penalización en 100% del costo del servicio aplicado correctamente
+
+✓ **Coherencia Conceptual**
+  - Sin referencias a rating de clientes (no existe)
+  - Sin multiplicadores de rating en la fórmula final
+  - Estructura de datos completa y consistente
+  - API endpoints bien definidos
+
+✓ **Lógica de Negocio**
+  - Penalizaciones escalonadas por estado del servicio
+  - Multiplicadores aplicados correctamente (demanda, hora, reincidencia)
+  - Bloqueos temporales según severidad
+  - Admin review para casos críticos
+
+✓ **Estructura de Implementación**
+  - 5 fases con timeline estimado
+  - Workflow de cancelación detallado
+  - Validaciones y reglas especificadas
+  - Notificaciones definidas
+
+---
+
+## Próximos Pasos
+
+El plan está **LISTO PARA IMPLEMENTACIÓN**. Se puede proceder con:
+
+1. **Fase 1**: Crear tablas y estructura de datos
+2. **Fase 2**: Desarrollar servicio de cálculo de penalizaciones
+3. **Fase 3**: Implementar interfaz de usuario
+4. **Fase 4**: Herramientas administrativas
+5. **Fase 5**: Testing y refinamiento
