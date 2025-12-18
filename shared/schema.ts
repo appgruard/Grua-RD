@@ -164,6 +164,34 @@ export const tipoMensajeChatEnum = pgEnum("tipo_mensaje_chat", [
   "sistema"
 ]);
 
+// Cancelaciones Enums
+export const nivelDemandaEnum = pgEnum("nivel_demanda", [
+  "bajo",
+  "medio",
+  "alto",
+  "critico"
+]);
+
+export const zonaTipoEnum = pgEnum("zona_tipo", [
+  "urbana",
+  "suburbana",
+  "periferica",
+  "rural"
+]);
+
+export const tipoCanceladorEnum = pgEnum("tipo_cancelador", [
+  "cliente",
+  "conductor"
+]);
+
+export const evaluacionPenalizacionEnum = pgEnum("evaluacion_penalizacion", [
+  "ninguna",
+  "leve",
+  "moderada",
+  "grave",
+  "critica"
+]);
+
 // Users Table
 // Note: email is not globally unique - users can have multiple accounts with different userTypes
 // A composite unique constraint on (email, userType) prevents duplicate accounts of the same type
@@ -186,6 +214,13 @@ export const users = pgTable("users", {
   fotoVerificada: boolean("foto_verificada").default(false).notNull(),
   fotoVerificadaScore: decimal("foto_verificada_score", { precision: 5, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Cancelaciones fields (for clientes only)
+  bloqueadoHasta: timestamp("bloqueado_hasta"),
+  cancelacionesTotales: integer("cancelaciones_totales").default(0),
+  cancelacionesUltimos7dias: integer("cancelaciones_ultimos_7_dias").default(0),
+  cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
+  penalizacionesTotales: decimal("penalizaciones_totales", { precision: 12, scale: 2 }).default("0.00"),
+  ultimaCancelacionTimestamp: timestamp("ultima_cancelacion_timestamp"),
 }, (table) => ({
   emailUserTypeUnique: uniqueIndex("users_email_user_type_unique").on(table.email, table.userType),
 }));
@@ -213,6 +248,14 @@ export const conductores = pgTable("conductores", {
   licenciaVerificada: boolean("licencia_verificada").default(false),
   categoriasConfiguradas: boolean("categorias_configuradas").default(false),
   vehiculosRegistrados: boolean("vehiculos_registrados").default(false),
+  // Cancelaciones fields
+  bloqueadoHasta: timestamp("bloqueado_hasta"),
+  cancelacionesTotales: integer("cancelaciones_totales").default(0),
+  cancelacionesUltimos7dias: integer("cancelaciones_ultimos_7_dias").default(0),
+  cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
+  penalizacionesTotales: decimal("penalizaciones_totales", { precision: 12, scale: 2 }).default("0.00"),
+  penalizacionesUltimas24h: decimal("penalizaciones_ultimas_24h", { precision: 12, scale: 2 }).default("0.00"),
+  ultimaCancelacionTimestamp: timestamp("ultima_cancelacion_timestamp"),
 });
 
 // Conductor Service Categories Table (driver can offer multiple service categories)
@@ -301,6 +344,10 @@ export const servicios = pgTable("servicios", {
   iniciadoAt: timestamp("iniciado_at"),
   completadoAt: timestamp("completado_at"),
   canceladoAt: timestamp("cancelado_at"),
+  // Cancelaciones fields
+  zonaTipo: varchar("zona_tipo"),
+  nivelDemandaEnCreacion: varchar("nivel_demanda_en_creacion"),
+  horaCreacionEsPico: boolean("hora_creacion_es_pico").default(false),
 });
 
 // Dismissed Services Table (services rejected by drivers)
@@ -2571,6 +2618,163 @@ export type DocumentoWithReminderStatus = Documento & {
   diasRestantes?: number;
   recordatoriosEnviados?: DocumentoRecordatorio[];
   conductor?: Conductor;
+};
+
+// ==================== CANCELACIONES (SERVICE CANCELLATION SYSTEM) ====================
+
+// Razones de Cancelación Table
+export const razonesCancelacion = pgTable("razones_cancelacion", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  codigo: varchar("codigo").notNull().unique(),
+  descripcion: text("descripcion").notNull(),
+  aplicaA: tipoCanceladorEnum("aplica_a").default("ambos"),
+  penalizacionPredeterminada: boolean("penalizacion_predeterminada").default(true),
+  activa: boolean("activa").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Zonas de Demanda Table (for real-time demand calculation)
+export const zonasDemanada = pgTable("zonas_demanda", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  codigoZona: varchar("codigo_zona").notNull().unique(),
+  nombreZona: varchar("nombre_zona"),
+  tipoZona: zonaTipoEnum("tipo_zona"),
+  latCentro: decimal("lat_centro", { precision: 10, scale: 7 }),
+  lngCentro: decimal("lng_centro", { precision: 10, scale: 7 }),
+  radioKm: decimal("radio_km", { precision: 6, scale: 2 }),
+  // Real-time demand metrics
+  serviciosActivosSinConductor: integer("servicios_activos_sin_conductor").default(0),
+  serviciosActivosTotales: integer("servicios_activos_totales").default(0),
+  conductoresDisponibles: integer("conductores_disponibles").default(0),
+  nivelDemandaActual: nivelDemandaEnum("nivel_demanda_actual").default("bajo"),
+  porcentajeDemanda: decimal("porcentaje_demanda", { precision: 5, scale: 2 }).default("0.00"),
+  ultimoUpdateAt: timestamp("ultimo_update_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Cancelaciones Servicios Table (main cancellation record)
+export const cancelacionesServicios = pgTable("cancelaciones_servicios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  servicioId: varchar("servicio_id").notNull().references(() => servicios.id, { onDelete: "cascade" }),
+  canceladoPorId: varchar("cancelado_por_id").notNull().references(() => users.id),
+  tipoCancelador: tipoCanceladorEnum("tipo_cancelador").notNull(),
+  estadoAnterior: varchar("estado_anterior").notNull(),
+  
+  // Cancelation info
+  motivoCancelacion: text("motivo_cancelacion"),
+  razonCodigo: varchar("razon_codigo").references(() => razonesCancelacion.codigo),
+  notasUsuario: text("notas_usuario"),
+  
+  // Calculation data
+  distanciaRecorridaKm: decimal("distancia_recorrida_km", { precision: 6, scale: 2 }),
+  distanciaTotalServicioKm: decimal("distancia_total_servicio_km", { precision: 6, scale: 2 }),
+  tiempoDesdeAceptacionSegundos: integer("tiempo_desde_aceptacion_segundos"),
+  tiempoDesdellegadaSegundos: integer("tiempo_desde_llegada_segundos"),
+  
+  // Context factors
+  nivelDemanda: nivelDemandaEnum("nivel_demanda"),
+  esHoraPico: boolean("es_hora_pico").default(false),
+  zonaTipo: zonaTipoEnum("zona_tipo"),
+  totalCancelacionesUsuario: integer("total_cancelaciones_usuario").default(0),
+  tipoServicioEspecializado: boolean("tipo_servicio_especializado").default(false),
+  
+  // Multipliers applied
+  multiplicadorDemanda: decimal("multiplicador_demanda", { precision: 3, scale: 2 }).default("1.00"),
+  multiplicadorHora: decimal("multiplicador_hora", { precision: 3, scale: 2 }).default("1.00"),
+  multiplicadorReincidencia: decimal("multiplicador_reincidencia", { precision: 3, scale: 2 }).default("1.00"),
+  
+  // Penalty and refund
+  penalizacionBase: decimal("penalizacion_base", { precision: 10, scale: 2 }),
+  penalizacionAplicada: decimal("penalizacion_aplicada", { precision: 10, scale: 2 }).default("0.00"),
+  reembolsoMonto: decimal("reembolso_monto", { precision: 10, scale: 2 }).default("0.00"),
+  cambioRating: decimal("cambio_rating", { precision: 3, scale: 2 }),
+  
+  // Processing status
+  reembolsoProcesado: boolean("reembolso_procesado").default(false),
+  penalizacionProcesada: boolean("penalizacion_procesada").default(false),
+  bloqueadoHasta: timestamp("bloqueado_hasta"),
+  
+  // Admin review
+  evaluacionPenalizacion: evaluacionPenalizacionEnum("evaluacion_penalizacion"),
+  notasAdmin: text("notas_admin"),
+  revisadoPor: varchar("revisado_por").references(() => users.id),
+  fechaRevision: timestamp("fecha_revision"),
+  penalizacionAjustadaPorAdmin: decimal("penalizacion_ajustada_por_admin", { precision: 10, scale: 2 }),
+  razonAjuste: text("razon_ajuste"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Razones Cancelación Relations
+export const razonesCancelacionRelations = relations(razonesCancelacion, ({ many }) => ({
+  cancelaciones: many(cancelacionesServicios),
+}));
+
+// Zonas Demanda Relations
+export const zonasDemanadaRelations = relations(zonasDemanada, ({ many }) => ({
+  cancelaciones: many(cancelacionesServicios),
+}));
+
+// Cancelaciones Servicios Relations
+export const cancelacionesServiciosRelations = relations(cancelacionesServicios, ({ one }) => ({
+  servicio: one(servicios, {
+    fields: [cancelacionesServicios.servicioId],
+    references: [servicios.id],
+  }),
+  canceladoPor: one(users, {
+    fields: [cancelacionesServicios.canceladoPorId],
+    references: [users.id],
+  }),
+  razonCancelacion: one(razonesCancelacion, {
+    fields: [cancelacionesServicios.razonCodigo],
+    references: [razonesCancelacion.codigo],
+  }),
+  revisadoPorUsuario: one(users, {
+    fields: [cancelacionesServicios.revisadoPor],
+    references: [users.id],
+  }),
+}));
+
+// Schemas for Razones Cancelación
+export const insertRazonCancelacionSchema = createInsertSchema(razonesCancelacion).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectRazonCancelacionSchema = createSelectSchema(razonesCancelacion);
+export type InsertRazonCancelacion = z.infer<typeof insertRazonCancelacionSchema>;
+export type RazonCancelacion = typeof razonesCancelacion.$inferSelect;
+
+// Schemas for Zonas Demanda
+export const insertZonaDemandaSchema = createInsertSchema(zonasDemanada).omit({
+  id: true,
+  ultimoUpdateAt: true,
+  updatedAt: true,
+});
+export const selectZonaDemandaSchema = createSelectSchema(zonasDemanada);
+export type InsertZonaDemanda = z.infer<typeof insertZonaDemandaSchema>;
+export type ZonaDemanda = typeof zonasDemanada.$inferSelect;
+
+// Schemas for Cancelaciones Servicios
+export const insertCancelacionServicioSchema = createInsertSchema(cancelacionesServicios, {
+  penalizacionBase: z.number().positive().optional(),
+  penalizacionAplicada: z.number().nonnegative().default(0),
+  reembolsoMonto: z.number().nonnegative().default(0),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectCancelacionServicioSchema = createSelectSchema(cancelacionesServicios);
+export type InsertCancelacionServicio = z.infer<typeof insertCancelacionServicioSchema>;
+export type CancelacionServicio = typeof cancelacionesServicios.$inferSelect;
+
+// Helper types
+export type CancelacionServicioWithDetails = CancelacionServicio & {
+  servicio?: Servicio;
+  canceladoPor?: User;
+  razonCancelacion?: RazonCancelacion;
+  revisadoPorUsuario?: User;
 };
 
 // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
