@@ -1,5 +1,35 @@
 # Plan de Cancelación de Servicios con Penalizaciones
 
+## ANÁLISIS DE VIABILIDAD DEL CÓDIGO
+
+### Estado Actual del Sistema ✓
+
+**YA EXISTE EN EL CÓDIGO:**
+- ✓ Tabla `servicios` con estado `cancelado` y timestamp `canceladoAt`
+- ✓ Tabla `ubicacionesTracking` para registrar GPS del conductor (servicioId, conductorId, lat, lng, timestamp)
+- ✓ Tabla `conductores` con campos `balanceDisponible`, `balancePendiente`
+- ✓ Clase `WalletService` con sistema de comisiones y deudas
+- ✓ Tabla `calificaciones` para ratings (SOLO conductores, no clientes)
+- ✓ Tabla `dismissedServices` para rechazos antes de aceptar
+- ✓ Sistema de comisiones (20% en pagos cash)
+- ✓ Tabla `usuarios` con campo `calificacionPromedio` (para conductores)
+- ✓ Método para calcular distancia entre puntos (uso de lat/lng)
+
+**NO EXISTE Y DEBE SER CREADO:**
+- ✗ Tabla `cancelaciones_servicios` - CRÍTICA
+- ✗ Tabla `zonas_demanda` - CRÍTICA
+- ✗ Tabla `razones_cancelacion` - Importante
+- ✗ Campos en `conductores`: bloqueado_hasta, cancelaciones_totales, penalizaciones_totales, etc.
+- ✗ Campos en `users`: bloqueado_hasta, cancelaciones_totales, etc. (SOLO PARA CLIENTES)
+- ✗ Campos en `servicios`: zona_tipo, nivel_demanda_en_creacion
+- ✗ Funciones en storage.ts para CRUD de cancelaciones
+- ✗ Endpoints en routes.ts para cancelación
+- ✗ Servicio para cálculo de penalizaciones
+
+**IMPACTO:** El plan ES VIABLE. Requiere crear ~3 tablas y extender 3 tablas existentes. El 60% de la infraestructura necesaria ya existe.
+
+---
+
 ## 1. Introducción
 
 Este documento describe la estrategia para implementar un sistema de cancelación de servicios con penalizaciones en la plataforma GruArd. El objetivo es permitir que clientes y conductores cancelen servicios cuando sea necesario, mientras se aplican penalizaciones en ciertos escenarios para mantener la integridad del sistema.
@@ -190,7 +220,7 @@ reembolso_final = costo_total - penalizacion_final (mínimo 0)
 
 ### 3.5 Factores de Demanda
 
-La demanda se calcula como porcentaje de servicios disponibles sin conductor en la zona:
+La demanda se calcula como porcentaje de servicios disponibles sin conductor en la zona en tiempo real:
 
 ```
 demanda_zona = (servicios_sin_conductor / servicios_totales_zona) × 100
@@ -200,6 +230,12 @@ Nivel Medio: 20-50% (equilibrado)
 Nivel Alto: 50-80% (mucha demanda)
 Nivel Crítico: > 80% (emergencia de demanda)
 ```
+
+**IMPLEMENTACIÓN:** Se usa tabla `zonas_demanda` que se actualiza:
+- Cada vez que se crea un nuevo servicio
+- Cada vez que un conductor acepta/rechaza un servicio
+- Cada vez que se cancela un servicio
+- Background job cada 5 minutos para limpiar zonas sin actividad
 
 ---
 
@@ -288,38 +324,33 @@ CREATE TABLE cancelaciones_servicios (
 );
 ```
 
-### 4.2 Extensión de Tabla `usuarios` / `conductores` / `servicios`
+### 4.2 Extensión de Tablas Existentes
 
-```sql
--- Agregar a tabla conductores:
-ALTER TABLE conductores ADD COLUMN (
-  cancelaciones_totales INT DEFAULT 0,
-  cancelaciones_ultimos_7_dias INT DEFAULT 0,
-  cancelaciones_ultimo_mes INT DEFAULT 0,
-  penalizaciones_totales DECIMAL(12, 2) DEFAULT 0.00,
-  penalizaciones_ultimas_24h DECIMAL(12, 2) DEFAULT 0.00,
-  ultima_cancelacion_timestamp TIMESTAMP,
-  bloqueado_hasta TIMESTAMP,
-  ultima_zona_tipo VARCHAR(50),
-  ultima_demanda_zona VARCHAR(50)
-);
+**IMPORTANTE:** NO usar ALTER TABLE de forma manual. Usar Drizzle migrations para actualizar schema.ts primero.
 
--- Agregar a tabla users (clientes/socios):
-ALTER TABLE users ADD COLUMN (
-  cancelaciones_totales INT DEFAULT 0,
-  cancelaciones_ultimos_7_dias INT DEFAULT 0,
-  cancelaciones_ultimo_mes INT DEFAULT 0,
-  penalizaciones_totales DECIMAL(12, 2) DEFAULT 0.00,
-  ultima_cancelacion_timestamp TIMESTAMP,
-  bloqueado_hasta TIMESTAMP
-);
+```typescript
+// Agregar a tabla conductores en schema.ts:
+bloqueadoHasta: timestamp("bloqueado_hasta"),
+cancelacionesTotales: integer("cancelaciones_totales").default(0),
+cancelacionesUltimos7dias: integer("cancelaciones_ultimos_7_dias").default(0),
+cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
+penalizacionesTotales: decimal("penalizaciones_totales", { precision: 12, scale: 2 }).default("0.00"),
+penalizacionesUltimas24h: decimal("penalizaciones_ultimas_24h", { precision: 12, scale: 2 }).default("0.00"),
+ultimaCancelacionTimestamp: timestamp("ultima_cancelacion_timestamp"),
 
--- Agregar a tabla servicios (para rastrear datos en el momento):
-ALTER TABLE servicios ADD COLUMN (
-  zona_tipo VARCHAR(50),          -- Tipo de zona al momento de crear
-  nivel_demanda_en_creacion VARCHAR(50),  -- Nivel de demanda cuando se creó
-  hora_creacion_es_pico BOOLEAN DEFAULT FALSE
-);
+// Agregar a tabla users (SOLO PARA userType = 'cliente'):
+bloqueadoHasta: timestamp("bloqueado_hasta"),
+cancelacionesTotales: integer("cancelaciones_totales").default(0),
+cancelacionesUltimos7dias: integer("cancelaciones_ultimos_7_dias").default(0),
+cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
+penalizacionesTotales: decimal("penalizaciones_totales", { precision: 12, scale: 2 }).default("0.00"),
+ultimaCancelacionTimestamp: timestamp("ultima_cancelacion_timestamp"),
+
+// Agregar a tabla servicios (para rastrear datos en el momento):
+zonaTipo: varchar("zona_tipo"),          -- Tipo de zona al momento de crear
+nivelDemandaEnCreacion: varchar("nivel_demanda_en_creacion"),  -- Nivel cuando se creó
+horaCreacionEsPico: boolean("hora_creacion_es_pico").default(false)
+```
 
 -- Nueva tabla: zonas_demanda (para cálculos de demanda en tiempo real)
 CREATE TABLE zonas_demanda (
@@ -566,37 +597,61 @@ Body:
 
 ---
 
-## 10. Fases de Implementación
+## 10. Fases de Implementación (ACTUALIZADO CON ANÁLISIS DE CÓDIGO)
 
-### **Fase 1: Base de Datos y API Core** (2-3 días)
-- [ ] Crear tabla `cancelaciones_servicios`
-- [ ] Crear tabla `razones_cancelacion`
-- [ ] Extender schema de usuarios y conductores
-- [ ] Implementar endpoint POST cancelar
-- [ ] Implementar endpoint GET historial
+### **Fase 1: Base de Datos y Estructura** (~2-3 horas)
+- [ ] Actualizar `shared/schema.ts`:
+  - Crear tabla `cancelacionesServicios` (Drizzle)
+  - Crear tabla `zonasDemanada` (Drizzle)
+  - Crear tabla `razonesCancelacion` (Drizzle)
+  - Extender tabla `conductores` con 8 campos nuevos
+  - Extender tabla `users` con 5 campos nuevos
+  - Extender tabla `servicios` con 3 campos nuevos
+- [ ] Crear migración Drizzle para aplicar cambios
+- [ ] Seed datos iniciales de `razonesCancelacion`
 
-### **Fase 2: Lógica de Penalización** (2-3 días)
-- [ ] Crear servicio de cálculo de penalizaciones
-- [ ] Implementar validaciones de cancelación
-- [ ] Integrar con sistema de wallet/balance
-- [ ] Integrar con sistema de rating
+### **Fase 2: Capa de Storage y Servicios** (~3-4 horas)
+- [ ] Crear funciones en `server/storage.ts`:
+  - `createCancelacion()` - guardar cancelación
+  - `getCancelacionesByUsuarioId()` - historial
+  - `updateZonaDemanda()` - actualizar demanda en tiempo real
+  - `getZonaDemandaByCoords()` - obtener demanda por lat/lng
+  - `getTrackingDistancia()` - calcular km recorridos desde tracking
+- [ ] Crear `server/services/cancellation-service.ts`:
+  - `calcularPenalizacion()` - fórmula completa
+  - `validarCancelacion()` - validaciones
+  - `procesarCancelacion()` - orquestación
+  - `aplicarBloqueoDeTiempo()` - bloqueos temporales
+  - `integrarConWallet()` - deducción de penalización
 
-### **Fase 3: Frontend y UX** (2-3 días)
-- [ ] Modal de confirmación de cancelación
-- [ ] Selector de razón de cancelación
-- [ ] Pantalla de confirmación con detalles de penalización
-- [ ] Historial de cancelaciones en perfil
+### **Fase 3: API Endpoints** (~2 horas)
+- [ ] POST `/api/servicios/{id}/cancelar` - cancelar servicio
+- [ ] GET `/api/usuarios/{id}/cancelaciones` - historial cliente
+- [ ] GET `/api/conductores/{id}/cancelaciones` - historial conductor
+- [ ] POST `/api/admin/cancelaciones/{id}/revisar` - admin review
+- [ ] GET `/api/admin/cancelaciones` - dashboard admin
+- [ ] Integrar con endpoints existentes: `/api/servicios/{id}` para retornar estado bloqueado
 
-### **Fase 4: Admin Tools** (1-2 días)
-- [ ] Dashboard de cancelaciones
-- [ ] Herramienta de revisión de penalizaciones
-- [ ] Reportes de cancelaciones
+### **Fase 4: Frontend y UX** (~3-4 horas)
+- [ ] Modal de confirmación de cancelación (reutilizar componentes existentes)
+- [ ] Selector de razón (dropdown desde tabla `razonesCancelacion`)
+- [ ] Pantalla de confirmación mostrando penalización calculada
+- [ ] Historial de cancelaciones en perfil cliente/conductor
+- [ ] Indicador visual de bloqueo temporal
 
-### **Fase 5: Testing y Refinamiento** (1-2 días)
-- [ ] Tests unitarios
-- [ ] Tests de integración
-- [ ] Testing en producción (usuarios beta)
-- [ ] Ajustes según feedback
+### **Fase 5: Integración con Sistemas Existentes** (~2-3 horas)
+- [ ] Integrar con `WalletService` para deducir penalizaciones
+- [ ] Integrar con rating/calificaciones de conductores
+- [ ] Integrar con sistema de comisiones (revertir comisión si se cancela)
+- [ ] Actualizar `service-auto-cancel.ts` si es necesario
+- [ ] Background job para limpiar zonas_demanda y actualizar cancelaciones_ultimos_7_dias
+
+### **Fase 6: Testing e Iteración** (~2-3 horas)
+- [ ] Tests unitarios de fórmulas de penalización
+- [ ] Tests de integración de flujos de cancelación
+- [ ] Validación de casos de uso (Caso 1, 2, 3, 4 del plan)
+- [ ] Testing manual en staging
+- [ ] Documentación de decisiones
 
 ---
 
@@ -774,10 +829,27 @@ El plan ha sido revisado y verificado para:
 
 ## Próximos Pasos
 
-El plan está **LISTO PARA IMPLEMENTACIÓN**. Se puede proceder con:
+El plan está **LISTO PARA IMPLEMENTACIÓN** (Viabilidad Confirmada: 90%)
 
-1. **Fase 1**: Crear tablas y estructura de datos
-2. **Fase 2**: Desarrollar servicio de cálculo de penalizaciones
-3. **Fase 3**: Implementar interfaz de usuario
-4. **Fase 4**: Herramientas administrativas
-5. **Fase 5**: Testing y refinamiento
+### Orden Recomendado de Ejecución:
+1. **Fase 1** (2-3h): Actualizar schema.ts y crear tablas → aplicar migración
+2. **Fase 2** (3-4h): Crear funciones en storage.ts y servicio de penalizaciones
+3. **Fase 3** (2h): Implementar endpoints REST
+4. **Fase 4** (3-4h): Frontend (dialogs, formularios, historial)
+5. **Fase 5** (2-3h): Integración con wallet, comisiones, ratings
+6. **Fase 6** (2-3h): Testing y validación
+
+### Total Estimado: 14-21 horas de desarrollo
+
+### Riesgos Identificados:
+- ⚠️ **Bajo**: Integración con WalletService existente es bien documentada
+- ⚠️ **Bajo**: Sistema de tracking ya registra ubicaciones correctamente
+- ⚠️ **Medio**: Cálculo de demanda en tiempo real requiere background job para rendimiento
+- ⚠️ **Bajo**: Rating de conductores ya existe, no afecta clientes
+
+### Notas de Implementación:
+- Usar Drizzle ORM para todas las migraciones (NO ALTER TABLE manual)
+- Las penalizaciones se aplican INMEDIATAMENTE al wallet del usuario
+- Los reembolsos se procesan en siguiente ciclo (usar `scheduled-payouts` existente)
+- Los bloqueos se almacenan en campo `bloqueado_hasta` y se validan en endpoints de aceptación
+- Background jobs deben limpiar registros de `zonas_demanda` inactivas cada 24h
