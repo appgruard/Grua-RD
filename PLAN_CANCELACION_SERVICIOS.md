@@ -55,11 +55,10 @@ Las penalizaciones se calculan considerando múltiples factores:
 6. **Zona geográfica** - Urbana, suburbana, rural
 
 #### **Factores Secundarios:**
-7. **Rating del usuario** - Usuarios con rating bajo tienen penalizaciones mayores
-8. **Historial de cancelaciones** - Reincidencia aumenta penalizaciones
-9. **Tipo de servicio** - Servicios especializados tienen penalizaciones mayores
-10. **Razón de cancelación** - Emergencias tienen penalizaciones reducidas
-11. **Razonabilidad del viaje** - Si el servicio requería viajar >15 km
+7. **Historial de cancelaciones** - Reincidencia aumenta penalizaciones
+8. **Tipo de servicio** - Servicios especializados tienen penalizaciones mayores
+9. **Razón de cancelación** - Emergencias tienen penalizaciones reducidas
+10. **Razonabilidad del viaje** - Si el servicio requería viajar >15 km
 
 ---
 
@@ -85,7 +84,6 @@ Cálculo base: `penalizacion_base = distancia_recorrida_km × 0.50`
 **Multiplicadores aplicables:**
 - **Hora pico** (6-10 AM, 12-2 PM, 5-8 PM): ×1.5
 - **Zona rural/lejana** (>15 km): ×1.3
-- **Rating bajo** (<3.5 estrellas): ×1.2
 - **Reincidencia** (>3 cancelaciones/mes): ×1.5
 - **Demanda alta** (>80% servicios en zona): ×1.3
 - **Emergencia** (razón válida): ×0.3
@@ -102,7 +100,6 @@ Cálculo base: `penalizacion_base = distancia_total_km × 1.00 + costo_total × 
 **Multiplicadores aplicables:**
 - **Hora pico**: ×1.5
 - **Servicio especializado**: ×1.4
-- **Rating bajo**: ×1.3
 - **Reincidencia**: ×2.0
 
 #### **Estado: CARGANDO o EN PROGRESO (Servicio iniciado)**
@@ -117,7 +114,6 @@ Cálculo base: `penalizacion_base = costo_total + (distancia_recorrida_km × 1.5
 
 **Multiplicadores aplicables:**
 - **Hora pico**: ×2.0
-- **Rating bajo**: ×1.5
 - **Reincidencia**: ×3.0
 
 ---
@@ -142,10 +138,8 @@ Cálculo base: `penalizacion_base = distancia_km × 0.75`
 
 **Multiplicadores aplicables:**
 - **Hora pico**: ×1.4
-- **Rating bajo** (<3.0): ×1.5
 - **Reincidencia** (>2 cancelaciones/semana): ×2.0
 - **Zona de alta demanda**: ×1.3
-- **Cliente VIP** (rating > 4.5): ×2.0
 - **Emergencia del conductor** (razón válida): ×0.2
 
 #### **Estado: CONDUCTOR EN SITIO (Conductor llegó)**
@@ -160,7 +154,6 @@ Cálculo base: `penalizacion_base = costo_total × 0.40 + distancia_total_km × 
 
 **Multiplicadores aplicables:**
 - **Hora pico**: ×2.0
-- **Rating bajo**: ×2.0
 - **Reincidencia**: ×3.0
 
 #### **Estado: CARGANDO o EN PROGRESO (Servicio iniciado)**
@@ -176,7 +169,6 @@ Cálculo base: `penalizacion_base = costo_total × 0.50 + distancia_recorrida_km
 
 **Multiplicadores aplicables:**
 - **Hora pico**: ×2.5
-- **Rating bajo**: ×3.0
 - **Reincidencia**: ×4.0
 
 ---
@@ -184,12 +176,11 @@ Cálculo base: `penalizacion_base = costo_total × 0.50 + distancia_recorrida_km
 ### 3.4 Fórmula Completa de Cálculo
 
 ```
-penalizacion_final = penalizacion_base × (multiplicador_demanda × multiplicador_hora × multiplicador_rating × multiplicador_reincidencia)
+penalizacion_final = penalizacion_base × (multiplicador_demanda × multiplicador_hora × multiplicador_reincidencia)
 
 Donde:
   multiplicador_demanda = 0.8 (baja) | 1.0 (media) | 1.3 (alta) | 1.5 (crítica)
   multiplicador_hora = 1.0 (normal) | 1.5 (pico) | 2.0 (pico máximo)
-  multiplicador_rating = 1.0 (>4.0) | 1.2 (3.5-4.0) | 1.5 (3.0-3.5) | 2.0 (<3.0)
   multiplicador_reincidencia = 1.0 (primera) | 1.5 (2-3 veces) | 2.0 (4-5 veces) | 3.0+ (>5 veces)
 
 reembolso_final = costo_total - penalizacion_final (mínimo 0)
@@ -265,14 +256,12 @@ CREATE TABLE cancelaciones_servicios (
   nivel_demanda ENUM('bajo', 'medio', 'alto', 'critico'),  -- Demanda en la zona
   es_hora_pico BOOLEAN DEFAULT FALSE,
   zona_tipo ENUM('urbana', 'suburbana', 'periferica', 'rural'),
-  rating_usuario DECIMAL(3, 2),
   total_cancelaciones_usuario INT,  -- Historial de cancelaciones
   tipo_servicio_especializado BOOLEAN DEFAULT FALSE,
   
   -- Multiplicadores aplicados
   multiplicador_demanda DECIMAL(3, 2) DEFAULT 1.0,
   multiplicador_hora DECIMAL(3, 2) DEFAULT 1.0,
-  multiplicador_rating DECIMAL(3, 2) DEFAULT 1.0,
   multiplicador_reincidencia DECIMAL(3, 2) DEFAULT 1.0,
   
   -- Penalización y reembolso
@@ -628,10 +617,9 @@ Contexto:
 
 Cálculo:
 - penalizacion_base = 0.8 km × $0.50 = $0.40
-- Multiplicadores: demanda 0.8 × hora 1.0 × rating 1.0 × reincidencia 1.0 = 0.8
+- Multiplicadores: demanda 0.8 × hora 1.0 × reincidencia 1.0 = 0.8
 - penalizacion_final = $0.40 × 0.8 = $0.32 ≈ $0
 - Reembolso: 100%
-- Rating: Sin cambio
 ```
 
 ### Caso 2: Cliente cancela cuando conductor está en sitio (DISTANCIA MEDIA)
@@ -651,10 +639,9 @@ Contexto:
 Cálculo:
 - penalizacion_base = (7.8 km × $1.00) + ($50 × 0.30) = $7.80 + $15 = $22.80
 - penalizacion_base_final = $22.80 + 50% × $50 + $10 = $22.80 + $25 + $10 = $57.80
-- Multiplicadores: demanda 1.3 × hora 1.5 × rating 1.5 × reincidencia 1.0 = 2.925
-- penalizacion_final = $57.80 × 2.925 = $169.21
-- Reembolso: $50 - $169.21 = $0 (sin reembolso, excede el costo)
-- Rating: -0.75 estrellas
+- Multiplicadores: demanda 1.3 × hora 1.5 × reincidencia 1.0 = 1.95
+- penalizacion_final = $57.80 × 1.95 = $112.71
+- Reembolso: $50 - $112.71 = $0 (sin reembolso, excede el costo)
 - Bloqueo: 2 horas
 
 NOTA: Se aplica cap de penalización en 100% del costo = $50
@@ -667,25 +654,22 @@ Contexto:
 - Tiempo desde aceptación: 20 minutos
 - Distancia recorrida: 6.5 km (de 12 km totales)
 - Hora: 8:15 AM (PICO MATINAL)
-- Rating conductor: 3.8 estrellas
 - Total cancelaciones conductor: 2 en última semana
 - Costo servicio: $60
-- Cliente rating: 4.8 estrellas (VIP)
 - Zona: Suburbana
 - Razón: "Problema con vehículo"
 
 Cálculo:
 - penalizacion_base = 6.5 km × $0.75 = $4.88
 - penalizacion_base_final = $15 + $4.88 = $19.88
-- Multiplicadores: demanda 1.0 × hora 1.4 × rating 1.2 × reincidencia 2.0 = 3.36
-- Cliente VIP aplicable: ×2.0
-- penalizacion_final = $19.88 × 3.36 × 2.0 = $133.60
+- Multiplicadores: demanda 1.0 × hora 1.4 × reincidencia 2.0 = 2.8
+- penalizacion_final = $19.88 × 2.8 = $55.66
 - Pérdida comisión: 100%
 - Reembolso al cliente: 100%
 - Rating conductor: -0.5 estrellas
 - Bloqueo: 30 minutos
 
-NOTA: Penalización elevada por reincidencia + cliente VIP
+NOTA: Penalización moderada por reincidencia
 ```
 
 ### Caso 4: Conductor cancela cuando en progreso (DISTANCIA RECORRIDA COMPLETA)
@@ -696,7 +680,6 @@ Contexto:
 - Distancia recorrida: 10 km
 - Distancia faltante: 30 km
 - Hora: 7:45 PM (PICO VESPERTINO)
-- Rating conductor: 2.8 estrellas
 - Total cancelaciones conductor: 4 en último mes
 - Costo servicio: $150
 - Zona: Periférica
@@ -705,8 +688,8 @@ Contexto:
 Cálculo:
 - penalizacion_base = ($150 × 0.50) + (10 km × $1.50) = $75 + $15 = $90
 - penalizacion_base_final = $25 + $90 = $115
-- Multiplicadores: demanda 1.5 × hora 2.5 × rating 2.0 × reincidencia 3.0 = 22.5
-- penalizacion_final = $115 × 22.5 = $2,587.50 (excede límite)
+- Multiplicadores: demanda 1.5 × hora 2.5 × reincidencia 3.0 = 11.25
+- penalizacion_final = $115 × 11.25 = $1,293.75 (excede límite)
 - penalizacion_capped = $150 (100% costo)
 - Reembolso al cliente: $0
 - Rating conductor: -1.5 estrellas
