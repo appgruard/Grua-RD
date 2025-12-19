@@ -5079,15 +5079,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/services/:id/cancel", async (req: Request, res: Response) => {
+  // ==================== FASE 3: API ENDPOINTS FOR CANCELLATIONS ====================
+  
+  app.post("/api/servicios/:id/cancelar", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "No autenticado" });
     }
 
     try {
       const servicioId = req.params.id;
+      const { razonCodigo, notasUsuario } = req.body;
+
+      if (!razonCodigo) {
+        return res.status(400).json({ message: "Razón de cancelación es requerida" });
+      }
+
       const servicio = await storage.getServicioById(servicioId);
-      
       if (!servicio) {
         return res.status(404).json({ message: "Servicio no encontrado" });
       }
@@ -5097,7 +5104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAdmin = req.user!.userType === 'admin';
 
       if (!isClient && !isDriver && !isAdmin) {
-        return res.status(403).json({ message: "No autorizado para cancelar este servicio" });
+        return res.status(403).json({ message: "No autorizado para cancelar" });
       }
 
       if (servicio.estado === 'cancelado') {
@@ -5108,19 +5115,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No se puede cancelar un servicio completado" });
       }
 
-      // TODO: Implementar reembolso con Azul API si el servicio fue pagado con tarjeta
+      // Create cancellation record
+      const cancelacion = await storage.createCancelacionServicio({
+        servicioId,
+        canceladoPorId: req.user!.id,
+        tipoCancelador: isClient ? 'cliente' : 'conductor',
+        estadoAnterior: servicio.estado,
+        razonCodigo,
+        notasUsuario: notasUsuario || null,
+        nivelDemanda: 'medio',
+        esHoraPico: false,
+        zonaTipo: servicio.zonaTipo || 'urbana',
+        totalCancelacionesUsuario: isClient ? (servicio.clienteId === req.user!.id ? 0 : 0) : 0,
+        penalizacionAplicada: 0,
+        reembolsoMonto: 0,
+      });
 
-      const cancelledService = await storage.updateServicio(servicioId, {
+      // Update service to canceled
+      await storage.updateServicio(servicioId, {
         estado: 'cancelado',
         canceladoAt: new Date(),
       });
 
-      logService.cancelled(servicioId, `Cancelled by ${req.user!.userType}`);
+      logService.cancelled(servicioId, `Cancelled by ${isClient ? 'cliente' : isDriver ? 'conductor' : 'admin'}`);
 
+      // Send notifications
       if (isDriver && servicio.clienteId) {
         await pushService.sendToUser(servicio.clienteId, {
           title: 'Servicio cancelado',
-          body: 'El operador ha cancelado el servicio. Puedes solicitar uno nuevo.',
+          body: 'El operador ha cancelado el servicio.',
           data: { type: 'service_cancelled', servicioId }
         });
       } else if (isClient && servicio.conductorId) {
@@ -5131,10 +5154,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      res.json(cancelledService);
+      res.json({
+        success: true,
+        cancelacionId: cancelacion.id,
+        mensaje: 'Servicio cancelado exitosamente',
+      });
     } catch (error: any) {
-      logSystem.error('Cancel service error', error, { servicioId: req.params.id });
+      logSystem.error('Cancel service error', error);
       res.status(500).json({ message: "Error al cancelar el servicio" });
+    }
+  });
+
+  app.get("/api/usuarios/:id/cancelaciones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    try {
+      const usuarioId = req.params.id;
+      
+      if (req.user!.id !== usuarioId && req.user!.userType !== 'admin') {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      const cancelaciones = await storage.getCancelacionesByUsuarioId(usuarioId, 'cliente');
+
+      res.json({
+        totalCancelaciones: cancelaciones.length,
+        cancelaciones,
+      });
+    } catch (error: any) {
+      logSystem.error('Get cancellations error', error);
+      res.status(500).json({ message: "Error al obtener cancelaciones" });
+    }
+  });
+
+  app.get("/api/conductores/:id/cancelaciones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    try {
+      const conductorId = req.params.id;
+      
+      if (req.user!.id !== conductorId && req.user!.userType !== 'admin') {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      const cancelaciones = await storage.getCancelacionesByUsuarioId(conductorId, 'conductor');
+
+      res.json({
+        totalCancelaciones: cancelaciones.length,
+        cancelaciones,
+      });
+    } catch (error: any) {
+      logSystem.error('Get driver cancellations error', error);
+      res.status(500).json({ message: "Error al obtener cancelaciones" });
+    }
+  });
+
+  app.get("/api/admin/cancelaciones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const cancelaciones = await storage.getAllCancelaciones(500);
+
+      res.json({
+        total: cancelaciones.length,
+        cancelaciones,
+      });
+    } catch (error: any) {
+      logSystem.error('Get all cancellations error', error);
+      res.status(500).json({ message: "Error al obtener cancelaciones" });
+    }
+  });
+
+  app.post("/api/admin/cancelaciones/:id/revisar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const cancelacionId = req.params.id;
+      const { accion, nuevaPenalizacion, notas } = req.body;
+
+      if (!accion) {
+        return res.status(400).json({ message: "Acción es requerida" });
+      }
+
+      const updated = await storage.updateCancelacion(cancelacionId, {
+        evaluacionPenalizacion: accion,
+        notasAdmin: notas || null,
+        revisadoPor: req.user!.id,
+        fechaRevision: new Date(),
+        ...(nuevaPenalizacion && { penalizacionAjustadaPorAdmin: nuevaPenalizacion }),
+      });
+
+      res.json({
+        success: true,
+        mensaje: 'Cancelación revisada exitosamente',
+        cancelacion: updated,
+      });
+    } catch (error: any) {
+      logSystem.error('Review cancellation error', error);
+      res.status(500).json({ message: "Error al revisar cancelación" });
+    }
+  });
+
+  app.get("/api/razones-cancelacion", async (req: Request, res: Response) => {
+    try {
+      const razones = await storage.getAllRazonesCancelacion();
+      res.json(razones);
+    } catch (error: any) {
+      logSystem.error('Get cancellation reasons error', error);
+      res.status(500).json({ message: "Error al obtener razones" });
     }
   });
 

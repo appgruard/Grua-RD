@@ -45,6 +45,7 @@ import {
   razonesCancelacion,
   zonasDemanada,
   cancelacionesServicios,
+  asc,
   type User,
   type InsertUser,
   type Conductor,
@@ -156,6 +157,11 @@ import {
   type SystemError,
   type InsertSystemError,
   type SystemErrorWithDetails,
+  type RazonCancelacion,
+  type ZonaDemanda,
+  type CancelacionServicio,
+  type InsertCancelacionServicio,
+  type CancelacionServicioWithDetails,
 } from '@shared/schema';
 import {
   serviceReceipts,
@@ -643,6 +649,23 @@ export interface IStorage {
   // Operator Statement for Manual Payouts
   getOperatorStatement(conductorId: string, periodStart?: Date, periodEnd?: Date): Promise<OperatorStatementSummary | null>;
   recordManualPayout(walletId: string, amount: string, adminId: string, notes?: string, evidenceUrl?: string): Promise<WalletTransaction>;
+
+  // ==================== SYSTEM FOR CANCELLATIONS (Phase 3) ====================
+  
+  // Cancelaciones Servicios
+  createCancelacionServicio(cancelacion: InsertCancelacionServicio): Promise<CancelacionServicio>;
+  getCancelacionesByUsuarioId(usuarioId: string, tipo: 'cliente' | 'conductor'): Promise<CancelacionServicioWithDetails[]>;
+  getCancelacionesByServicioId(servicioId: string): Promise<CancelacionServicioWithDetails | undefined>;
+  getAllCancelaciones(limit?: number): Promise<CancelacionServicioWithDetails[]>;
+  updateCancelacion(id: string, data: Partial<CancelacionServicio>): Promise<CancelacionServicio>;
+  
+  // Razones Cancelacion
+  getAllRazonesCancelacion(): Promise<RazonCancelacion[]>;
+  getRazonCancelacionByCodigo(codigo: string): Promise<RazonCancelacion | undefined>;
+  
+  // Zonas Demanda
+  getZonaDemandaByCoords(lat: number, lng: number): Promise<ZonaDemanda | undefined>;
+  updateZonaDemanda(id: string, data: Partial<ZonaDemanda>): Promise<ZonaDemanda>;
 
   // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
   
@@ -4754,6 +4777,84 @@ export class DatabaseStorage implements IStorage {
 
       return transaction;
     });
+  }
+
+  // ==================== SYSTEM FOR CANCELLATIONS (Phase 3) ====================
+
+  async createCancelacionServicio(cancelacion: InsertCancelacionServicio): Promise<CancelacionServicio> {
+    const [result] = await db.insert(cancelacionesServicios).values(cancelacion).returning();
+    return result;
+  }
+
+  async getCancelacionesByUsuarioId(usuarioId: string, tipo: 'cliente' | 'conductor'): Promise<CancelacionServicioWithDetails[]> {
+    return await db.query.cancelacionesServicios.findMany({
+      where: and(
+        eq(cancelacionesServicios.canceladoPorId, usuarioId),
+        eq(cancelacionesServicios.tipoCancelador, tipo)
+      ),
+      with: {
+        servicio: true,
+        canceladoPor: true,
+        razonCancelacion: true,
+      },
+      orderBy: desc(cancelacionesServicios.createdAt),
+    }) as Promise<CancelacionServicioWithDetails[]>;
+  }
+
+  async getCancelacionesByServicioId(servicioId: string): Promise<CancelacionServicioWithDetails | undefined> {
+    return await db.query.cancelacionesServicios.findFirst({
+      where: eq(cancelacionesServicios.servicioId, servicioId),
+      with: {
+        servicio: true,
+        canceladoPor: true,
+        razonCancelacion: true,
+      },
+    }) as Promise<CancelacionServicioWithDetails | undefined>;
+  }
+
+  async getAllCancelaciones(limit: number = 100): Promise<CancelacionServicioWithDetails[]> {
+    return await db.query.cancelacionesServicios.findMany({
+      with: {
+        servicio: true,
+        canceladoPor: true,
+        razonCancelacion: true,
+      },
+      orderBy: desc(cancelacionesServicios.createdAt),
+      limit,
+    }) as Promise<CancelacionServicioWithDetails[]>;
+  }
+
+  async updateCancelacion(id: string, data: Partial<CancelacionServicio>): Promise<CancelacionServicio> {
+    const [result] = await db.update(cancelacionesServicios)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(cancelacionesServicios.id, id))
+      .returning();
+    return result;
+  }
+
+  async getAllRazonesCancelacion(): Promise<RazonCancelacion[]> {
+    return await db.query.razonesCancelacion.findMany({
+      where: eq(razonesCancelacion.activa, true),
+      orderBy: asc(razonesCancelacion.codigo),
+    }) as Promise<RazonCancelacion[]>;
+  }
+
+  async getRazonCancelacionByCodigo(codigo: string): Promise<RazonCancelacion | undefined> {
+    return await db.query.razonesCancelacion.findFirst({
+      where: eq(razonesCancelacion.codigo, codigo),
+    }) as Promise<RazonCancelacion | undefined>;
+  }
+
+  async getZonaDemandaByCoords(lat: number, lng: number): Promise<ZonaDemanda | undefined> {
+    return await db.query.zonasDemanada.findFirst() as Promise<ZonaDemanda | undefined>;
+  }
+
+  async updateZonaDemanda(id: string, data: Partial<ZonaDemanda>): Promise<ZonaDemanda> {
+    const [result] = await db.update(zonasDemanada)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(zonasDemanada.id, id))
+      .returning();
+    return result;
   }
 
   // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================

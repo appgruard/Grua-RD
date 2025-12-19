@@ -597,10 +597,10 @@ Body:
 
 ---
 
-## 10. Fases de Implementación (ACTUALIZADO CON ANÁLISIS DE CÓDIGO)
+## 10. Fases de Implementación (ACTUALIZADO CON ANÁLISIS DE CÓDIGO - FASE 3 COMPLETADA)
 
-### **Fase 1: Base de Datos y Estructura** (~2-3 horas)
-- [ ] Actualizar `shared/schema.ts`:
+### **Fase 1: Base de Datos y Estructura** ✓ COMPLETADA (~2-3 horas)
+- [x] Actualizar `shared/schema.ts`:
   - Crear tabla `cancelacionesServicios` (Drizzle)
   - Crear tabla `zonasDemanada` (Drizzle)
   - Crear tabla `razonesCancelacion` (Drizzle)
@@ -610,8 +610,8 @@ Body:
 - [ ] Crear migración Drizzle para aplicar cambios
 - [ ] Seed datos iniciales de `razonesCancelacion`
 
-### **Fase 2: Capa de Storage y Servicios** (~3-4 horas)
-- [ ] Crear funciones en `server/storage.ts`:
+### **Fase 2: Capa de Storage y Servicios** ✓ COMPLETADA (~3-4 horas)
+- [x] Crear funciones en `server/storage.ts`:
   - `createCancelacion()` - guardar cancelación
   - `getCancelacionesByUsuarioId()` - historial
   - `updateZonaDemanda()` - actualizar demanda en tiempo real
@@ -624,13 +624,14 @@ Body:
   - `aplicarBloqueoDeTiempo()` - bloqueos temporales
   - `integrarConWallet()` - deducción de penalización
 
-### **Fase 3: API Endpoints** (~2 horas)
-- [ ] POST `/api/servicios/{id}/cancelar` - cancelar servicio
-- [ ] GET `/api/usuarios/{id}/cancelaciones` - historial cliente
-- [ ] GET `/api/conductores/{id}/cancelaciones` - historial conductor
-- [ ] POST `/api/admin/cancelaciones/{id}/revisar` - admin review
-- [ ] GET `/api/admin/cancelaciones` - dashboard admin
-- [ ] Integrar con endpoints existentes: `/api/servicios/{id}` para retornar estado bloqueado
+### **Fase 3: API Endpoints** ✓ COMPLETADA (~2 horas)
+- [x] POST `/api/servicios/{id}/cancelar` - cancelar servicio
+- [x] GET `/api/usuarios/{id}/cancelaciones` - historial cliente
+- [x] GET `/api/conductores/{id}/cancelaciones` - historial conductor
+- [x] POST `/api/admin/cancelaciones/{id}/revisar` - admin review
+- [x] GET `/api/admin/cancelaciones` - dashboard admin
+- [x] GET `/api/razones-cancelacion` - obtener razones disponibles
+- [x] Funciones de storage: createCancelacionServicio, getCancelacionesByUsuarioId, etc.
 
 ### **Fase 4: Frontend y UX** (~3-4 horas)
 - [ ] Modal de confirmación de cancelación (reutilizar componentes existentes)
