@@ -64,6 +64,22 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 20, 2025 - Fase 4: Frontend y UX para Sistema de Cancelación de Servicios
+- **Feature**: Completada la Fase 4 del plan de cancelación de servicios con mejoras visuales y UX.
+- **Mejoras Implementadas**:
+  - CancelServiceModal: Mejorado con diferentes colores según si la razón aplica penalización o no
+  - CancellationHistory: Agregada alerta cuando hay >5 cancelaciones
+  - CancellationCard: Mejorada con información de distancia, evaluación de penalización, y bloqueos temporales
+  - Perfil del Cliente: Agregado indicador visual de bloqueo temporal con mensaje claro
+  - Perfil del Conductor: Agregado indicador visual de bloqueo temporal cuando está activo
+- **Componentes Modificados**:
+  - `client/src/components/CancelServiceModal.tsx` - Mejorada información de penalización
+  - `client/src/components/cancellation/CancellationHistory.tsx` - Agregada alerta de cancelaciones frecuentes
+  - `client/src/components/cancellation/CancellationCard.tsx` - Extendida información mostrada
+  - `client/src/pages/client/profile.tsx` - Agregado bloqueo temporal visual
+  - `client/src/pages/driver/profile.tsx` - Agregado bloqueo temporal visual
+- **Plan**: Actualizado PLAN_CANCELACION_SERVICIOS.md marcando Fase 4 como completada
+
 ### December 16, 2025 - Jira REST API Integration
 - **Feature**: Full integration with Jira REST API for synchronizing support tickets.
 - **Configuration Required**: The following environment variables must be set as secrets:

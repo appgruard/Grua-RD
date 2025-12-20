@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { CancellationCard } from './CancellationCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CancellationHistoryProps {
   userId: string;
@@ -73,6 +74,15 @@ export function CancellationHistory({ userId, userType }: CancellationHistoryPro
           </div>
         </CardContent>
       </Card>
+
+      {totalCancelaciones > 5 && (
+        <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950" data-testid="alert-high-cancellations">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-amber-700 dark:text-amber-200">
+            Tienes una cantidad significativa de cancelaciones. Considera mantener un historial más limpio para mejorar tu reputación.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="space-y-2" data-testid="cancellations-cards">
         {cancelaciones.map((cancel: any, index: number) => (

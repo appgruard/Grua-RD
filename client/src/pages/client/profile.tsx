@@ -139,6 +139,14 @@ export default function ClientProfile() {
             Editar
           </Button>
         </div>
+        {user.bloqueadoHasta && new Date(user.bloqueadoHasta) > new Date() && (
+          <Alert className="mb-4 border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950" data-testid="alert-user-blocked">
+            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-700 dark:text-red-200">
+              Tu cuenta está bloqueada hasta {new Date(user.bloqueadoHasta).toLocaleString()} por cancelaciones previas. No puedes solicitar nuevos servicios durante este período.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex flex-col items-center text-center">
           <div className="relative">
             <Avatar className="w-24 h-24 border-4 border-background shadow-lg">

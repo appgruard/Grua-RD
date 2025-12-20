@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, DollarSign, Calendar } from 'lucide-react';
+import { AlertCircle, DollarSign, Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -11,6 +11,9 @@ interface CancellationCardProps {
     penalizacion: number;
     razon: string;
     estado: string;
+    bloqueadoHasta?: string | null;
+    distanciaRecorrida?: number;
+    evaluacion?: string;
   };
 }
 
@@ -39,6 +42,9 @@ export function CancellationCard({ cancellation }: CancellationCardProps) {
     "d 'de' MMMM 'de' yyyy 'a las' HH:mm",
     { locale: es }
   );
+
+  const isBlocked = cancellation.bloqueadoHasta && new Date(cancellation.bloqueadoHasta) > new Date();
+  const evaluationLevel = cancellation.evaluacion || 'ninguna';
 
   return (
     <Card className="hover-elevate" data-testid={`card-cancellation-${cancellation.servicio_id}`}>
@@ -79,6 +85,33 @@ export function CancellationCard({ cancellation }: CancellationCardProps) {
             </Badge>
           </div>
         </div>
+
+        {cancellation.distanciaRecorrida !== undefined && (
+          <div className="mt-3 grid grid-cols-2 gap-4" data-testid="additional-details">
+            <div className="text-xs">
+              <p className="text-muted-foreground">Distancia Recorrida</p>
+              <p className="font-medium" data-testid="distance-value">{cancellation.distanciaRecorrida.toFixed(1)} km</p>
+            </div>
+            <div className="text-xs">
+              <p className="text-muted-foreground">Nivel de Penalización</p>
+              <Badge variant="secondary" className="text-xs capitalize" data-testid="evaluation-badge">
+                {evaluationLevel}
+              </Badge>
+            </div>
+          </div>
+        )}
+
+        {isBlocked && (
+          <div
+            className="mt-4 flex gap-2 rounded-md bg-red-50 p-2 dark:bg-red-950"
+            data-testid="blocked-warning"
+          >
+            <Clock className="h-4 w-4 flex-shrink-0 text-red-600 dark:text-red-400" />
+            <p className="text-xs text-red-700 dark:text-red-200" data-testid="blocked-text">
+              Estuviste bloqueado por esta cancelación hasta {format(new Date(cancellation.bloqueadoHasta!), "HH:mm", { locale: es })}.
+            </p>
+          </div>
+        )}
 
         {cancellation.penalizacion > 20 && (
           <div

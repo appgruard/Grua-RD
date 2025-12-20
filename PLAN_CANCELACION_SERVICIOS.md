@@ -633,12 +633,14 @@ Body:
 - [x] GET `/api/razones-cancelacion` - obtener razones disponibles
 - [x] Funciones de storage: createCancelacionServicio, getCancelacionesByUsuarioId, etc.
 
-### **Fase 4: Frontend y UX** (~3-4 horas)
-- [ ] Modal de confirmación de cancelación (reutilizar componentes existentes)
-- [ ] Selector de razón (dropdown desde tabla `razonesCancelacion`)
-- [ ] Pantalla de confirmación mostrando penalización calculada
-- [ ] Historial de cancelaciones en perfil cliente/conductor
-- [ ] Indicador visual de bloqueo temporal
+### **Fase 4: Frontend y UX** ✓ COMPLETADA (~3 horas)
+- [x] Modal de confirmación de cancelación (reutilizar componentes existentes)
+- [x] Selector de razón (dropdown desde tabla `razonesCancelacion`)
+- [x] Pantalla de confirmación mostrando penalización calculada con detalles
+- [x] Historial de cancelaciones en perfil cliente/conductor
+- [x] Indicador visual de bloqueo temporal
+- [x] Mejoras visuales: alerta cuando >5 cancelaciones
+- [x] Información adicional de distancia y evaluación en historial
 
 ### **Fase 5: Integración con Sistemas Existentes** (~2-3 horas)
 - [ ] Integrar con `WalletService` para deducir penalizaciones

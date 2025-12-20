@@ -490,6 +490,15 @@ export default function DriverProfile() {
           </Button>
         </div>
 
+        {user.bloqueadoHasta && new Date(user.bloqueadoHasta) > new Date() && (
+          <Alert variant="destructive" data-testid="alert-driver-blocked">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Cuenta bloqueada:</strong> Estás bloqueado hasta {new Date(user.bloqueadoHasta).toLocaleString()} por cancelaciones previas. No puedes aceptar nuevos servicios.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <DocumentExpirationAlerts onNavigateToDocuments={scrollToDocuments} />
 
         {!hasProfilePhoto && (

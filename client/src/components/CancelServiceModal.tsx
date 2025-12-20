@@ -156,23 +156,31 @@ export function CancelServiceModal({
 
           {selectedReason && (
             <Card
-              className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950"
+              className={`${selectedReasonData?.penalizacionPredeterminada 
+                ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950' 
+                : 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950'}`}
               data-testid="penalty-warning-card"
             >
               <CardHeader className="pb-3" data-testid="penalty-header">
                 <CardTitle className="flex gap-2 text-sm" data-testid="penalty-title">
-                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  Información de Penalización
+                  <AlertCircle className={`h-4 w-4 ${selectedReasonData?.penalizacionPredeterminada 
+                    ? 'text-amber-600 dark:text-amber-400' 
+                    : 'text-green-600 dark:text-green-400'}`} />
+                  {selectedReasonData?.penalizacionPredeterminada 
+                    ? 'Información de Penalización' 
+                    : 'Información de Cancelación'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm" data-testid="penalty-content">
                 <p data-testid="penalty-description">
                   {selectedReasonData?.penalizacionPredeterminada
-                    ? 'Se aplicará una penalización por esta cancelación.'
-                    : 'No hay penalización predeterminada por esta razón.'}
+                    ? 'Se aplicará una penalización por esta cancelación según el estado del servicio y otros factores.'
+                    : 'Esta razón puede ser exonerada de penalización o tener reducción de cargos.'}
                 </p>
-                <p className="font-medium" data-testid="penalty-amount">
-                  La penalización será calculada basada en el estado del servicio.
+                <p className="font-medium text-xs text-muted-foreground" data-testid="penalty-calculation-note">
+                  {selectedReasonData?.penalizacionPredeterminada
+                    ? 'La penalización final dependerá de: estado del servicio, distancia recorrida, hora, demanda y reincidencia.'
+                    : 'Se requiere revisión administrativa para confirmar.'}
                 </p>
               </CardContent>
             </Card>
