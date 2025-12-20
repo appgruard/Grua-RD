@@ -22,6 +22,7 @@ import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection }
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import { WalletSection, BankAccountModal } from '@/components/wallet';
 import { PrivacySection } from '@/components/PrivacySection';
+import { CancellationHistory } from '@/components/cancellation/CancellationHistory';
 import { Building2 } from 'lucide-react';
 import type { Conductor, Documento, ConductorVehiculo } from '@shared/schema';
 
@@ -1238,6 +1239,17 @@ export default function DriverProfile() {
           </Card>
 
           <PrivacySection userType="conductor" />
+
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Historial de Cancelaciones
+              </h3>
+            </div>
+            <div className="p-4">
+              <CancellationHistory userId={user.id} userType="conductor" />
+            </div>
+          </Card>
 
           <Button
             variant="destructive"

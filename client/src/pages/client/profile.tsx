@@ -17,6 +17,7 @@ import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { CedulaScanner } from '@/components/CedulaScanner';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { PrivacySection } from '@/components/PrivacySection';
+import { CancellationHistory } from '@/components/cancellation/CancellationHistory';
 import {
   Dialog,
   DialogContent,
@@ -323,6 +324,17 @@ export default function ClientProfile() {
         </Card>
 
         <PrivacySection userType="cliente" />
+
+        <Card className="overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Historial de Cancelaciones
+            </h3>
+          </div>
+          <div className="p-4">
+            <CancellationHistory userId={user.id} userType="cliente" />
+          </div>
+        </Card>
 
         <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-driver">
           <div className="p-4">
