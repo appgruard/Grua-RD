@@ -60,8 +60,85 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Capacitor**: For native mobile app functionalities and plugins.
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
+- **Jira REST API**: For ticket synchronization with Jira Cloud (requires manual configuration of secrets).
 
 ## Recent Changes
+
+### December 16, 2025 - Jira REST API Integration
+- **Feature**: Full integration with Jira REST API for synchronizing support tickets.
+- **Configuration Required**: The following environment variables must be set as secrets:
+  - `JIRA_BASE_URL`: Your Jira Cloud instance URL (e.g., `https://your-domain.atlassian.net`)
+  - `JIRA_EMAIL`: The email associated with your Atlassian account
+  - `JIRA_API_TOKEN`: API token generated from https://id.atlassian.com/manage-profile/security/api-tokens
+  - `JIRA_PROJECT_KEY`: The project key where tickets will be created (e.g., `GRUA` or `SUPPORT`)
+- **API Endpoints**:
+  - `GET /api/admin/jira/status` - Check Jira connection status
+  - `POST /api/admin/tickets/:id/sync-jira` - Create Jira issue from local ticket
+  - `POST /api/admin/tickets/:id/sync-jira-status` - Pull status from Jira to local
+  - `POST /api/admin/tickets/:id/push-jira-status` - Push local status to Jira
+  - `POST /api/admin/tickets/:id/jira-comment` - Add comment to Jira issue
+  - `POST /api/admin/jira/bulk-sync` - Bulk sync multiple tickets to Jira
+- **Features**:
+  - Bidirectional status synchronization
+  - Priority mapping (baja→Low, media→Medium, alta→High, urgente→Highest)
+  - Category labels for issue classification
+  - Comment syncing with author attribution
+  - Bulk operations support
+- **Database Changes**: 
+  - New columns on `tickets` table: `jira_issue_id`, `jira_issue_key`, `jira_synced_at`
+- **Files Added/Modified**:
+  - `server/services/jira-service.ts` - Jira REST API service
+  - `server/routes.ts` - Jira integration API routes
+  - `shared/schema.ts` - Schema updates for Jira fields
+  - `migrations/0014_jira_integration.sql` - Database migration
+
+### December 16, 2025 - Intelligent Error Tracking and Priority Assignment
+- **Feature**: Enhanced error tracking with intelligent priority calculation and noise filtering.
+- **Priority Calculator** (`server/services/priority-calculator.ts`):
+  - Weighted scoring system (0-100 scale) considers:
+    - Module criticality (payment=100, database=90, auth=85, etc.)
+    - Error severity and type multipliers
+    - Frequency analysis (more occurrences = higher priority)
+    - Cascade indicators (stack trace depth, related errors)
+    - Critical metadata patterns (userId, serviceId, paymentId)
+  - Returns `calculatedPriority` (urgente/alta/media/baja) with reasoning
+- **Noise Filter** (`server/services/noise-filter.ts`):
+  - Detects transient errors (ECONNRESET, ETIMEDOUT, rate limits)
+  - Ignores non-critical patterns (favicon, healthcheck, bots)
+  - Groups related errors by `groupKey`
+  - Timed suppression windows prevent ticket spam
+- **Database Changes** (migration 0015):
+  - `calculatedPriority`: AI-assigned priority level
+  - `priorityScore`: Numeric score (0-100)
+  - `groupKey`: Error grouping identifier
+  - `isTransient`: Flag for transient/ignorable errors
+- **Integration**: Auto-created tickets now sync to Jira automatically with priority reasoning in description
+
+### December 16, 2025 - System Error Tracking and Auto-Ticketing
+- **Feature**: Comprehensive error handling system with automatic ticket creation and classification.
+- **Error Classification**: 
+  - User errors (ValidationError, AuthenticationError, NotFoundError, etc.) - No tickets created
+  - System errors (DatabaseError, ExternalApiError, PaymentError, etc.) - Automatic ticket creation
+- **Deduplication**: SHA256 fingerprinting with 1-hour window prevents duplicate tickets for same error
+- **Severity Escalation**: Uses `Math.max()` to ensure severity never downgrades (critical stays critical)
+- **Email Notifications**: High and critical errors send email notifications to admin@fourone.com.do via Resend
+- **Admin Routes**: 
+  - `POST /api/admin/tickets/manual` - Create tickets manually
+  - `GET /api/admin/system-errors` - List all system errors
+  - `GET /api/admin/system-errors/unresolved` - List unresolved errors
+  - `GET/PUT /api/admin/system-errors/:id` - View/update specific error
+- **Database Tables**: 
+  - `systemErrors` table with fingerprint, severity, source, type, occurrenceCount, status
+  - Enums: error_severity (low/medium/high/critical), error_source, error_type
+  - New columns on tickets: autoCreated, errorFingerprint, sourceComponent
+- **Files Added/Modified**:
+  - `server/errors/app-errors.ts` - Error classification hierarchy
+  - `server/services/system-error-service.ts` - Deduplication and ticket creation logic
+  - `server/middleware/error-handler.ts` - Express error handling middleware
+  - `shared/schema.ts` - Database schema for system errors
+  - `server/storage.ts` - Storage methods for system errors
+  - `server/routes.ts` - Admin API routes
+  - `server/index.ts` - Middleware integration
 
 ### December 12, 2025 - Operator Bank Account Management
 - **Feature**: Added bank account management for operators.

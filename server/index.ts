@@ -7,6 +7,7 @@ import { serveStatic, log } from "./static";
 import { logger } from "./logger";
 import { pool, initializeTicketTables } from "./db";
 import { checkStorageHealth } from "./services/object-storage";
+import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 
 const app = express();
 
@@ -386,13 +387,11 @@ app.use((req, res, next) => {
   
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
+  // 404 handler for unmatched API routes (must be after all routes, before error handler)
+  app.use('/api/*', notFoundHandler);
+  
+  // Global error handler - catches all errors and creates tickets for system errors
+  app.use(errorHandler);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route

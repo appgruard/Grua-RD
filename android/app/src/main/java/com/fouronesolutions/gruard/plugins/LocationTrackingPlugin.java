@@ -10,6 +10,7 @@ import android.os.IBinder;
 import android.util.Log;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -98,7 +99,7 @@ public class LocationTrackingPlugin extends Plugin {
     
     @PluginMethod
     public void startTracking(PluginCall call) {
-        if (!hasRequiredPermissions()) {
+        if (!hasLocationPermission()) {
             requestAllPermissions(call, "locationPermissionCallback");
             return;
         }
@@ -203,7 +204,7 @@ public class LocationTrackingPlugin extends Plugin {
     
     @PermissionCallback
     private void locationPermissionCallback(PluginCall call) {
-        if (hasRequiredPermissions()) {
+        if (hasLocationPermission()) {
             if (!isServiceBound) {
                 pendingStartCall = call;
                 bindToService();
@@ -215,7 +216,7 @@ public class LocationTrackingPlugin extends Plugin {
         }
     }
     
-    private boolean hasRequiredPermissions() {
+    private boolean hasLocationPermission() {
         return getPermissionState("location") == PermissionState.GRANTED;
     }
     

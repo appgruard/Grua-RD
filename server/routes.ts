@@ -2161,6 +2161,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
       }
 
+      // IMPORTANT: Require cédula to be verified (or pending review) before license verification
+      if (req.isAuthenticated()) {
+        const currentUser = await storage.getUserById(req.user!.id);
+        if (currentUser && !currentUser.cedulaVerificada && !currentUser.cedulaImageUrl) {
+          logSystem.warn('License verification attempted without cedula verification', {
+            userId: req.user!.id,
+            cedulaVerificada: currentUser.cedulaVerificada,
+            hasCedulaImage: !!currentUser.cedulaImageUrl
+          });
+          return res.status(400).json({ 
+            message: "Debes verificar tu cédula antes de verificar tu licencia de conducir",
+            requiresCedulaFirst: true
+          });
+        }
+      }
+
       const { scanAndVerifyLicense, isVerifikConfigured } = await import("./services/verifik-ocr");
       
       if (!isVerifikConfigured()) {
@@ -2299,6 +2315,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (image.length > 10 * 1024 * 1024) {
         return res.status(400).json({ message: "La imagen es demasiado grande. Máximo 10MB." });
+      }
+
+      // IMPORTANT: Require cédula to be verified (or pending review) before license verification
+      if (req.isAuthenticated()) {
+        const currentUser = await storage.getUserById(req.user!.id);
+        if (currentUser && !currentUser.cedulaVerificada && !currentUser.cedulaImageUrl) {
+          logSystem.warn('License back verification attempted without cedula verification', {
+            userId: req.user!.id,
+            cedulaVerificada: currentUser.cedulaVerificada,
+            hasCedulaImage: !!currentUser.cedulaImageUrl
+          });
+          return res.status(400).json({ 
+            message: "Debes verificar tu cédula antes de verificar tu licencia de conducir",
+            requiresCedulaFirst: true
+          });
+        }
       }
 
       const { validateDriverLicenseBack, isVerifikConfigured } = await import("./services/verifik-ocr");
@@ -3435,6 +3467,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       logSystem.error('Create service error', error, { clienteId: req.user!.id });
       res.status(500).json({ message: "Failed to create service" });
+    }
+  });
+
+  const contextPhotoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    }
+  });
+
+  app.post("/api/services/upload-context-photo", contextPhotoUpload.single('photo'), async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No photo uploaded" });
+      }
+
+      const timestamp = Date.now();
+      const index = req.body.index || '0';
+      const filename = `context-photo-${req.user!.id}-${timestamp}-${index}.jpg`;
+
+      const uploadResult = await uploadDocument({
+        fileName: filename,
+        buffer: req.file.buffer,
+        mimeType: req.file.mimetype,
+        folder: 'context-photos',
+        userId: req.user!.id
+      });
+
+      res.json({ url: uploadResult.url });
+    } catch (error: any) {
+      logSystem.error('Upload context photo error', error, { userId: req.user!.id });
+      res.status(500).json({ message: "Failed to upload photo" });
     }
   });
 
@@ -5672,6 +5745,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update driver's user info (name, surname, email) - admin only
+  app.put("/api/admin/drivers/:driverId/user-info", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { driverId } = req.params;
+      const { nombre, apellido, email } = req.body;
+      
+      if (!nombre || !apellido) {
+        return res.status(400).json({ message: "Nombre y apellido son requeridos" });
+      }
+
+      // Get driver to find user ID
+      const driver = await storage.getConductorById(driverId);
+      if (!driver) {
+        return res.status(404).json({ message: "Conductor no encontrado" });
+      }
+
+      // Prepare update data
+      const updateData: { nombre: string; apellido: string; email?: string } = { nombre, apellido };
+      
+      // If email is provided and different from current, validate and update
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return res.status(400).json({ message: "Formato de correo electrónico inválido" });
+        }
+        
+        // Check if email is already in use by another user
+        const existingUsers = await storage.getUsersByEmail(email);
+        const otherUser = existingUsers.find(u => u.id !== driver.userId);
+        if (otherUser) {
+          return res.status(409).json({ 
+            message: "Este correo electrónico ya está en uso por otra cuenta" 
+          });
+        }
+        
+        updateData.email = email;
+      }
+
+      // Update user info
+      const updatedUser = await storage.updateUser(driver.userId, updateData);
+      
+      logSystem.info('Driver user info updated by admin', { 
+        adminId: req.user!.id, 
+        driverId, 
+        userId: driver.userId,
+        nombre, 
+        apellido,
+        emailChanged: !!email
+      });
+      
+      res.json({ 
+        success: true, 
+        user: { 
+          nombre: updatedUser.nombre, 
+          apellido: updatedUser.apellido,
+          email: updatedUser.email
+        } 
+      });
+    } catch (error: any) {
+      logSystem.error('Update driver user info (admin) error', error);
+      res.status(500).json({ message: "Failed to update driver user info" });
+    }
+  });
+
   // Get driver's service categories (admin)
   app.get("/api/admin/drivers/:driverId/servicios", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
@@ -6218,6 +6359,345 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       logSystem.error('Get cedula image error', error);
       res.status(500).json({ message: "Failed to retrieve cedula image" });
+    }
+  });
+
+  // ==================== MANUAL VERIFICATION ROUTES (Admin Only) ====================
+
+  // Get users with pending email verification
+  app.get("/api/admin/pending-email-verifications", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allUsers = await storage.getAllUsers();
+      const usersWithPendingEmail = allUsers.filter(user => 
+        (user.userType === 'conductor' || user.userType === 'cliente') && 
+        !user.emailVerificado
+      );
+
+      const pendingEmails = usersWithPendingEmail.map(user => ({
+        id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
+        email: user.email,
+        phone: user.phone,
+        userType: user.userType,
+        emailVerificado: user.emailVerificado,
+        cedulaVerificada: user.cedulaVerificada,
+        createdAt: user.createdAt,
+      }));
+
+      const stats = {
+        totalPending: pendingEmails.length,
+        totalDrivers: allUsers.filter(u => u.userType === 'conductor' && !u.emailVerificado).length,
+        totalClients: allUsers.filter(u => u.userType === 'cliente' && !u.emailVerificado).length,
+        totalVerified: allUsers.filter(u => u.emailVerificado).length,
+      };
+
+      res.json({
+        pendingEmails,
+        stats,
+      });
+    } catch (error: any) {
+      logSystem.error('Get pending email verifications error', error);
+      res.status(500).json({ message: "Failed to get pending email verifications" });
+    }
+  });
+
+  // Manually verify email for a user
+  app.post("/api/admin/users/:userId/verify-email", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.params.userId;
+
+      if (!userId) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.updateUser(userId, {
+        emailVerificado: true,
+      });
+
+      logSystem.info('Admin manually verified email', { 
+        adminId: req.user!.id, 
+        userId, 
+        adminEmail: req.user!.email,
+        userEmail: user.email
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Email verified successfully",
+        userId,
+      });
+    } catch (error: any) {
+      logSystem.error('Verify email error', error);
+      res.status(500).json({ message: "Failed to verify email" });
+    }
+  });
+
+  // Revoke email verification for a user
+  app.post("/api/admin/users/:userId/revoke-email", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const userId = req.params.userId;
+
+      if (!userId) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.updateUser(userId, {
+        emailVerificado: false,
+      });
+
+      logSystem.info('Admin revoked email verification', { 
+        adminId: req.user!.id, 
+        userId, 
+        adminEmail: req.user!.email,
+        userEmail: user.email
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Email verification revoked",
+        userId,
+      });
+    } catch (error: any) {
+      logSystem.error('Revoke email verification error', error);
+      res.status(500).json({ message: "Failed to revoke email verification" });
+    }
+  });
+
+  // Get drivers with pending license verification
+  app.get("/api/admin/pending-license-verifications", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const allDrivers = await storage.getAllDrivers();
+      const driversWithPendingLicense = allDrivers.filter(driver => 
+        !driver.licenciaVerificada
+      );
+
+      const pendingLicenses = driversWithPendingLicense.map(driver => ({
+        id: driver.id,
+        conductorId: driver.id,
+        userId: driver.userId,
+        nombre: driver.user?.nombre || '',
+        apellido: driver.user?.apellido || '',
+        email: driver.user?.email || '',
+        phone: driver.user?.phone || '',
+        licencia: driver.licencia,
+        licenciaCategoria: driver.licenciaCategoria,
+        licenciaRestricciones: driver.licenciaRestricciones,
+        licenciaFechaVencimiento: driver.licenciaFechaVencimiento,
+        licenciaFrontalUrl: driver.licenciaFrontalUrl,
+        licenciaTraseraUrl: driver.licenciaTraseraUrl,
+        licenciaVerificada: driver.licenciaVerificada,
+        licenciaCategoriaVerificada: driver.licenciaCategoriaVerificada,
+        createdAt: driver.user?.createdAt,
+      }));
+
+      const stats = {
+        totalPending: pendingLicenses.length,
+        totalDrivers: allDrivers.length,
+        totalVerified: allDrivers.filter(d => d.licenciaVerificada).length,
+      };
+
+      res.json({
+        pendingLicenses,
+        stats,
+      });
+    } catch (error: any) {
+      logSystem.error('Get pending license verifications error', error);
+      res.status(500).json({ message: "Failed to get pending license verifications" });
+    }
+  });
+
+  // Manually verify license for a driver
+  app.post("/api/admin/conductores/:conductorId/verify-license", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductorId = req.params.conductorId;
+      const { licencia, licenciaCategoria, licenciaRestricciones, licenciaFechaVencimiento } = req.body;
+
+      if (!conductorId) {
+        return res.status(400).json({ message: "Invalid conductor ID" });
+      }
+
+      const conductor = await storage.getConductorById(conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor not found" });
+      }
+
+      const updateData: any = {
+        licenciaVerificada: true,
+        licenciaCategoriaVerificada: true,
+      };
+
+      if (licencia && typeof licencia === 'string') {
+        updateData.licencia = licencia;
+      }
+      if (licenciaCategoria && typeof licenciaCategoria === 'string') {
+        updateData.licenciaCategoria = licenciaCategoria;
+      }
+      if (licenciaRestricciones && typeof licenciaRestricciones === 'string') {
+        updateData.licenciaRestricciones = licenciaRestricciones;
+      }
+      if (licenciaFechaVencimiento) {
+        updateData.licenciaFechaVencimiento = new Date(licenciaFechaVencimiento);
+      }
+
+      await storage.updateConductor(conductorId, updateData);
+
+      logSystem.info('Admin manually verified license', { 
+        adminId: req.user!.id, 
+        conductorId, 
+        adminEmail: req.user!.email,
+        licencia: updateData.licencia || conductor.licencia,
+        licenciaCategoria: updateData.licenciaCategoria || conductor.licenciaCategoria,
+      });
+
+      res.json({ 
+        success: true, 
+        message: "License verified successfully",
+        conductorId,
+      });
+    } catch (error: any) {
+      logSystem.error('Verify license error', error);
+      res.status(500).json({ message: "Failed to verify license" });
+    }
+  });
+
+  // Reject license for a driver
+  app.post("/api/admin/conductores/:conductorId/reject-license", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const conductorId = req.params.conductorId;
+      const { reason } = req.body;
+
+      if (!conductorId) {
+        return res.status(400).json({ message: "Invalid conductor ID" });
+      }
+
+      const conductor = await storage.getConductorById(conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor not found" });
+      }
+
+      await storage.updateConductor(conductorId, {
+        licenciaVerificada: false,
+        licenciaCategoriaVerificada: false,
+      });
+
+      logSystem.info('Admin rejected license', { 
+        adminId: req.user!.id, 
+        conductorId, 
+        adminEmail: req.user!.email,
+        reason: reason || 'No reason provided'
+      });
+
+      res.json({ 
+        success: true, 
+        message: "License rejected. Driver will need to re-verify.",
+        conductorId,
+      });
+    } catch (error: any) {
+      logSystem.error('Reject license error', error);
+      res.status(500).json({ message: "Failed to reject license" });
+    }
+  });
+
+  // Serve license front image from object storage (admin only)
+  app.get("/api/admin/license-image/:conductorId/front", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { conductorId } = req.params;
+      
+      if (!conductorId) {
+        return res.status(400).json({ message: "Conductor ID is required" });
+      }
+
+      const conductor = await storage.getConductorById(conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor not found" });
+      }
+
+      if (!conductor.licenciaFrontalUrl) {
+        return res.status(404).json({ message: "No license front image available" });
+      }
+
+      const imageBuffer = await storageService.downloadFile(conductor.licenciaFrontalUrl);
+      const contentType = conductor.licenciaFrontalUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.send(imageBuffer);
+    } catch (error: any) {
+      logSystem.error('Get license front image error', error);
+      res.status(500).json({ message: "Failed to retrieve license image" });
+    }
+  });
+
+  // Serve license back image from object storage (admin only)
+  app.get("/api/admin/license-image/:conductorId/back", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { conductorId } = req.params;
+      
+      if (!conductorId) {
+        return res.status(400).json({ message: "Conductor ID is required" });
+      }
+
+      const conductor = await storage.getConductorById(conductorId);
+      if (!conductor) {
+        return res.status(404).json({ message: "Conductor not found" });
+      }
+
+      if (!conductor.licenciaTraseraUrl) {
+        return res.status(404).json({ message: "No license back image available" });
+      }
+
+      const imageBuffer = await storageService.downloadFile(conductor.licenciaTraseraUrl);
+      const contentType = conductor.licenciaTraseraUrl.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.send(imageBuffer);
+    } catch (error: any) {
+      logSystem.error('Get license back image error', error);
+      res.status(500).json({ message: "Failed to retrieve license image" });
     }
   });
 
@@ -10243,6 +10723,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUserById(userId);
           if (user?.email) {
             await emailService.sendTicketCreatedEmail(user.email, user.nombre || 'Usuario', ticketSnapshot);
+            
+            // Send notification to admin for high priority tickets (alta or urgente)
+            if (ticketSnapshot.prioridad === 'alta' || ticketSnapshot.prioridad === 'urgente') {
+              const adminEmail = 'admin@fourone.com.do';
+              await emailService.sendHighPriorityTicketNotification(
+                adminEmail,
+                ticketSnapshot,
+                user.nombre || 'Usuario',
+                user.email
+              );
+              logSystem.info('High priority ticket notification sent to admin', { 
+                ticketId: ticketSnapshot.id, 
+                prioridad: ticketSnapshot.prioridad,
+                adminEmail 
+              });
+            }
           }
         } catch (err) {
           logSystem.error('Failed to send ticket created email', err);
@@ -10595,6 +11091,533 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error al obtener tickets asignados" });
     }
   });
+
+  // ==================== ADMIN SYSTEM ERRORS ====================
+
+  // Admin manual ticket creation
+  app.post("/api/admin/tickets/manual", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    const { titulo, descripcion, categoria, prioridad, usuarioId, servicioRelacionadoId, sourceComponent } = req.body;
+
+    // Use Zod schema for validation
+    const validationResult = insertTicketSchema.safeParse({
+      usuarioId: usuarioId || req.user!.id,
+      titulo,
+      descripcion,
+      categoria,
+      prioridad: prioridad || 'media',
+      servicioRelacionadoId: servicioRelacionadoId || null,
+    });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return res.status(400).json({
+        message: firstError.message || "Datos de ticket inválidos",
+        errors: validationResult.error.errors
+      });
+    }
+
+    try {
+      // Create ticket via storage interface
+      const ticket = await storage.createTicket(validationResult.data);
+
+      // Update admin-specific fields via storage interface
+      const updatedTicket = await storage.updateTicket(ticket.id, {
+        autoCreated: false,
+        sourceComponent: sourceComponent || 'admin_manual',
+        asignadoA: req.user!.id,
+      });
+
+      logSystem.info('Admin created manual ticket', { ticketId: ticket.id, adminId: req.user!.id });
+      res.json(updatedTicket);
+
+      // Handle Jira and email asynchronously (fire-and-forget)
+      const ticketSnapshot = {
+        id: updatedTicket.id,
+        titulo: updatedTicket.titulo,
+        descripcion: updatedTicket.descripcion || '',
+        categoria: updatedTicket.categoria,
+        prioridad: updatedTicket.prioridad,
+        estado: updatedTicket.estado
+      };
+      const ticketUserId = validationResult.data.usuarioId;
+
+      void (async () => {
+        try {
+          // 1. Create Jira issue if configured
+          const { jiraService } = await import('./services/jira-service');
+          if (jiraService.isConfigured()) {
+            try {
+              const usuario = await storage.getUserById(ticketUserId);
+              const jiraResult = await jiraService.createIssue({
+                id: updatedTicket.id,
+                titulo: updatedTicket.titulo,
+                descripcion: updatedTicket.descripcion || '',
+                categoria: updatedTicket.categoria as any,
+                prioridad: updatedTicket.prioridad as any,
+                usuarioNombre: usuario?.nombre,
+                usuarioEmail: usuario?.email,
+              });
+              
+              await storage.updateTicket(updatedTicket.id, {
+                jiraIssueId: jiraResult.issueId,
+                jiraIssueKey: jiraResult.issueKey,
+                jiraSyncedAt: new Date(),
+              });
+              logSystem.info('Manual ticket synced to Jira', { ticketId: updatedTicket.id, jiraKey: jiraResult.issueKey });
+            } catch (jiraErr) {
+              logSystem.error('Failed to sync manual ticket to Jira', jiraErr);
+            }
+          }
+
+          // 2. Send email notification to ticket owner
+          const emailService = await getEmailService();
+          if (emailService) {
+            const ticketOwner = await storage.getUserById(ticketUserId);
+            if (ticketOwner?.email) {
+              await emailService.sendTicketCreatedEmail(ticketOwner.email, ticketOwner.nombre || 'Usuario', ticketSnapshot);
+              logSystem.info('Manual ticket email sent', { ticketId: updatedTicket.id, email: ticketOwner.email });
+            }
+          }
+        } catch (err) {
+          logSystem.error('Failed to process manual ticket notifications', err);
+        }
+      })();
+    } catch (error: any) {
+      logSystem.error('Create manual ticket error', error);
+      res.status(500).json({ 
+        message: "Error al crear ticket manual",
+        detail: error?.message || String(error)
+      });
+    }
+  });
+
+  // Get all system errors (admin only)
+  app.get("/api/admin/system-errors", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { resolved, severity, source, limit } = req.query;
+      const maxLimit = parseInt(limit as string) || 100;
+      
+      // Use storage abstraction for all queries
+      let errors = resolved === 'true' 
+        ? await storage.getAllSystemErrors(maxLimit)
+        : await storage.getUnresolvedSystemErrors(maxLimit);
+
+      if (severity && typeof severity === 'string') {
+        errors = errors.filter(e => e.severity === severity);
+      }
+
+      if (source && typeof source === 'string') {
+        errors = errors.filter(e => e.errorSource === source);
+      }
+
+      res.json(errors);
+    } catch (error: any) {
+      logSystem.error('Get system errors error', error);
+      res.status(500).json({ message: "Error al obtener errores del sistema" });
+    }
+  });
+
+  // Get system error statistics (admin only)
+  app.get("/api/admin/system-errors/stats", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { systemErrorService } = await import('./services/system-error-service');
+      const stats = await systemErrorService.getErrorStats();
+      res.json(stats);
+    } catch (error: any) {
+      logSystem.error('Get system error stats error', error);
+      res.status(500).json({ message: "Error al obtener estadísticas de errores" });
+    }
+  });
+
+  // Get single system error (admin only)
+  app.get("/api/admin/system-errors/:id", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const error = await storage.getSystemErrorById(req.params.id);
+      if (!error) {
+        return res.status(404).json({ message: "Error no encontrado" });
+      }
+      res.json(error);
+    } catch (error: any) {
+      logSystem.error('Get system error error', error);
+      res.status(500).json({ message: "Error al obtener error del sistema" });
+    }
+  });
+
+  // Resolve system error (admin only)
+  app.put("/api/admin/system-errors/:id/resolve", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const existingError = await storage.getSystemErrorById(req.params.id);
+      if (!existingError) {
+        return res.status(404).json({ message: "Error no encontrado" });
+      }
+
+      const { systemErrorService } = await import('./services/system-error-service');
+      await systemErrorService.resolveError(req.params.id, req.user!.id);
+
+      const updated = await storage.getSystemErrorById(req.params.id);
+      logSystem.info('System error resolved', { errorId: req.params.id, resolvedBy: req.user!.id });
+      res.json(updated);
+    } catch (error: any) {
+      logSystem.error('Resolve system error error', error);
+      res.status(500).json({ message: "Error al resolver error del sistema" });
+    }
+  });
+
+  // Get system errors linked to a ticket (admin only)
+  app.get("/api/admin/tickets/:id/system-errors", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      const errors = await storage.getSystemErrorsByTicketId(req.params.id);
+      res.json(errors);
+    } catch (error: any) {
+      logSystem.error('Get ticket system errors error', error);
+      res.status(500).json({ message: "Error al obtener errores del sistema" });
+    }
+  });
+
+  // ==================== END ADMIN SYSTEM ERRORS ====================
+
+  // ==================== JIRA INTEGRATION ====================
+
+  // Test Jira connection (admin only)
+  app.get("/api/admin/jira/status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      
+      if (!jiraService.isConfigured()) {
+        return res.json({ 
+          configured: false, 
+          message: 'Jira no está configurado. Configure las variables de entorno JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN y JIRA_PROJECT_KEY.' 
+        });
+      }
+
+      const result = await jiraService.testConnection();
+      res.json({ 
+        configured: true, 
+        connected: result.success, 
+        projectKey: jiraService.getProjectKey(),
+        projectName: result.projectName,
+        error: result.error 
+      });
+    } catch (error: any) {
+      logSystem.error('Jira status check error', error);
+      res.status(500).json({ message: "Error al verificar conexión con Jira" });
+    }
+  });
+
+  // Sync ticket to Jira (admin only)
+  app.post("/api/admin/tickets/:id/sync-jira", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (ticket.jiraIssueKey) {
+        return res.status(400).json({ 
+          message: "Este ticket ya está sincronizado con Jira",
+          jiraIssueKey: ticket.jiraIssueKey 
+        });
+      }
+
+      const usuario = await storage.getUserById(ticket.usuarioId);
+      
+      const result = await jiraService.createIssue({
+        id: ticket.id,
+        titulo: ticket.titulo,
+        descripcion: ticket.descripcion,
+        categoria: ticket.categoria as any,
+        prioridad: ticket.prioridad as any,
+        usuarioNombre: usuario?.nombre,
+        usuarioEmail: usuario?.email,
+      });
+
+      const updatedTicket = await storage.updateTicket(ticket.id, {
+        jiraIssueId: result.issueId,
+        jiraIssueKey: result.issueKey,
+        jiraSyncedAt: new Date(),
+      });
+
+      logSystem.info('Ticket synced to Jira', { 
+        ticketId: ticket.id, 
+        jiraIssueKey: result.issueKey,
+        adminId: req.user!.id 
+      });
+
+      res.json({
+        message: 'Ticket sincronizado con Jira exitosamente',
+        ticket: updatedTicket,
+        jiraIssueKey: result.issueKey,
+      });
+    } catch (error: any) {
+      logSystem.error('Jira sync error', error);
+      res.status(500).json({ message: "Error al sincronizar con Jira: " + error.message });
+    }
+  });
+
+  // Sync ticket status from Jira (admin only)
+  app.post("/api/admin/tickets/:id/sync-jira-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (!ticket.jiraIssueKey) {
+        return res.status(400).json({ message: "Este ticket no está sincronizado con Jira" });
+      }
+
+      const jiraStatus = await jiraService.getIssueStatus(ticket.jiraIssueKey);
+      
+      const updatedTicket = await storage.updateTicket(ticket.id, {
+        estado: jiraStatus.status,
+        prioridad: jiraStatus.priority,
+        jiraSyncedAt: new Date(),
+      });
+
+      logSystem.info('Ticket status synced from Jira', { 
+        ticketId: ticket.id, 
+        jiraIssueKey: ticket.jiraIssueKey,
+        newStatus: jiraStatus.status,
+        adminId: req.user!.id 
+      });
+
+      res.json({
+        message: 'Estado sincronizado desde Jira',
+        ticket: updatedTicket,
+        jiraStatus: jiraStatus.jiraStatus,
+        jiraPriority: jiraStatus.jiraPriority,
+      });
+    } catch (error: any) {
+      logSystem.error('Jira status sync error', error);
+      res.status(500).json({ message: "Error al sincronizar estado desde Jira: " + error.message });
+    }
+  });
+
+  // Push ticket status to Jira (admin only)
+  app.post("/api/admin/tickets/:id/push-jira-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (!ticket.jiraIssueKey) {
+        return res.status(400).json({ message: "Este ticket no está sincronizado con Jira" });
+      }
+
+      const success = await jiraService.transitionIssue(
+        ticket.jiraIssueKey, 
+        ticket.estado as any
+      );
+
+      if (!success) {
+        return res.status(400).json({ 
+          message: "No se encontró una transición válida en Jira para el estado actual" 
+        });
+      }
+
+      await storage.updateTicket(ticket.id, { jiraSyncedAt: new Date() });
+
+      logSystem.info('Ticket status pushed to Jira', { 
+        ticketId: ticket.id, 
+        jiraIssueKey: ticket.jiraIssueKey,
+        status: ticket.estado,
+        adminId: req.user!.id 
+      });
+
+      res.json({ message: 'Estado enviado a Jira exitosamente' });
+    } catch (error: any) {
+      logSystem.error('Jira status push error', error);
+      res.status(500).json({ message: "Error al enviar estado a Jira: " + error.message });
+    }
+  });
+
+  // Add comment to Jira issue (admin only)
+  app.post("/api/admin/tickets/:id/jira-comment", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      const { comment } = req.body;
+
+      if (!comment || typeof comment !== 'string') {
+        return res.status(400).json({ message: "El comentario es requerido" });
+      }
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      const ticket = await storage.getTicketById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket no encontrado" });
+      }
+
+      if (!ticket.jiraIssueKey) {
+        return res.status(400).json({ message: "Este ticket no está sincronizado con Jira" });
+      }
+
+      await jiraService.addComment(ticket.jiraIssueKey, comment, req.user!.nombre);
+      await storage.updateTicket(ticket.id, { jiraSyncedAt: new Date() });
+
+      logSystem.info('Comment added to Jira', { 
+        ticketId: ticket.id, 
+        jiraIssueKey: ticket.jiraIssueKey,
+        adminId: req.user!.id 
+      });
+
+      res.json({ message: 'Comentario agregado a Jira exitosamente' });
+    } catch (error: any) {
+      logSystem.error('Jira comment error', error);
+      res.status(500).json({ message: "Error al agregar comentario en Jira: " + error.message });
+    }
+  });
+
+  // Bulk sync tickets to Jira (admin only)
+  app.post("/api/admin/jira/bulk-sync", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const { jiraService } = await import('./services/jira-service');
+      const { ticketIds } = req.body;
+      
+      if (!jiraService.isConfigured()) {
+        return res.status(400).json({ message: 'Jira no está configurado' });
+      }
+
+      if (!Array.isArray(ticketIds) || ticketIds.length === 0) {
+        return res.status(400).json({ message: "Se requiere un array de IDs de tickets" });
+      }
+
+      const results: Array<{ ticketId: string; success: boolean; jiraKey?: string; error?: string }> = [];
+
+      for (const ticketId of ticketIds) {
+        try {
+          const ticket = await storage.getTicketById(ticketId);
+          if (!ticket) {
+            results.push({ ticketId, success: false, error: 'Ticket no encontrado' });
+            continue;
+          }
+
+          if (ticket.jiraIssueKey) {
+            results.push({ ticketId, success: true, jiraKey: ticket.jiraIssueKey, error: 'Ya sincronizado' });
+            continue;
+          }
+
+          const usuario = await storage.getUserById(ticket.usuarioId);
+          
+          const result = await jiraService.createIssue({
+            id: ticket.id,
+            titulo: ticket.titulo,
+            descripcion: ticket.descripcion,
+            categoria: ticket.categoria as any,
+            prioridad: ticket.prioridad as any,
+            usuarioNombre: usuario?.nombre,
+            usuarioEmail: usuario?.email,
+          });
+
+          await storage.updateTicket(ticket.id, {
+            jiraIssueId: result.issueId,
+            jiraIssueKey: result.issueKey,
+            jiraSyncedAt: new Date(),
+          });
+
+          results.push({ ticketId, success: true, jiraKey: result.issueKey });
+        } catch (error: any) {
+          results.push({ ticketId, success: false, error: error.message });
+        }
+      }
+
+      logSystem.info('Bulk Jira sync completed', { 
+        totalTickets: ticketIds.length,
+        successful: results.filter(r => r.success).length,
+        adminId: req.user!.id 
+      });
+
+      res.json({
+        message: 'Sincronización masiva completada',
+        results,
+        summary: {
+          total: results.length,
+          successful: results.filter(r => r.success && !r.error?.includes('Ya sincronizado')).length,
+          alreadySynced: results.filter(r => r.error?.includes('Ya sincronizado')).length,
+          failed: results.filter(r => !r.success).length,
+        }
+      });
+    } catch (error: any) {
+      logSystem.error('Bulk Jira sync error', error);
+      res.status(500).json({ message: "Error en sincronización masiva: " + error.message });
+    }
+  });
+
+  // ==================== END JIRA INTEGRATION ====================
 
   // ==================== SOCIOS/PARTNERS PORTAL (Module 2.5) ====================
 
@@ -11206,7 +12229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         apellido: parsed.data.apellido || '',
         userType: 'admin',
         emailVerificado: true,
-      });
+        estadoCuenta: 'activo',
+      } as any);
 
       const admin = await storage.createAdministrador({
         userId: newUser.id,
@@ -12234,9 +13258,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const adminAdjustmentSchema = z.object({
-    adjustmentType: z.enum(["balance", "debt"]),
+    adjustmentType: z.enum(["add_balance", "subtract_balance", "add_debt", "subtract_debt"]),
     amount: z.number()
-      .min(-100000, "El ajuste mínimo es -100,000")
+      .positive("El monto debe ser mayor a cero")
       .max(100000, "El ajuste máximo es 100,000"),
     reason: z.string().min(5, "La razón debe tener al menos 5 caracteres").max(500, "La razón es muy larga"),
   });
@@ -12591,10 +13615,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { adjustmentType, amount, reason } = validation.data;
 
+      // Convert frontend adjustment types to wallet service format
+      let walletType: 'balance' | 'debt';
+      let adjustedAmount: number;
+
+      switch (adjustmentType) {
+        case 'add_balance':
+          walletType = 'balance';
+          adjustedAmount = amount;
+          break;
+        case 'subtract_balance':
+          walletType = 'balance';
+          adjustedAmount = -amount;
+          break;
+        case 'add_debt':
+          walletType = 'debt';
+          adjustedAmount = amount;
+          break;
+        case 'subtract_debt':
+          walletType = 'debt';
+          adjustedAmount = -amount;
+          break;
+        default:
+          return res.status(400).json({ message: "Tipo de ajuste no válido" });
+      }
+
       const updatedWallet = await WalletService.adminAdjustment(
         req.params.walletId,
-        adjustmentType,
-        amount,
+        walletType,
+        adjustedAmount,
         reason,
         req.user!.id
       );

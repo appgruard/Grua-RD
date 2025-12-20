@@ -137,6 +137,7 @@ export interface EmailService {
   sendTicketCreatedEmail(email: string, userName: string, ticket: TicketEmailData): Promise<boolean>;
   sendTicketStatusChangedEmail(email: string, userName: string, ticket: TicketEmailData, oldStatus: string, newStatus: string): Promise<boolean>;
   sendTicketSupportResponseEmail(email: string, userName: string, ticket: TicketEmailData, mensaje: string): Promise<boolean>;
+  sendHighPriorityTicketNotification(adminEmail: string, ticket: TicketEmailData, userName: string, userEmail: string): Promise<boolean>;
   sendSocioCreatedEmail(email: string, nombre: string, tempPassword: string, porcentaje: string): Promise<boolean>;
   sendSocioFirstLoginEmail(email: string, nombre: string): Promise<boolean>;
   sendAdminCreatedEmail(email: string, nombre: string, tempPassword: string, permisos: string[]): Promise<boolean>;
@@ -862,6 +863,95 @@ class ResendEmailService implements EmailService {
     }
   }
 
+  async sendHighPriorityTicketNotification(adminEmail: string, ticket: TicketEmailData, userName: string, userEmail: string): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.support);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send high priority ticket notification');
+      return false;
+    }
+
+    const prioridadColor = ticket.prioridad === 'urgente' ? '#dc3545' : '#fd7e14';
+    const prioridadLabel = ticket.prioridad === 'urgente' ? 'URGENTE' : 'ALTA';
+
+    const categoriaTexto: Record<string, string> = {
+      'problema_tecnico': 'Problema Técnico',
+      'consulta_servicio': 'Consulta de Servicio',
+      'queja': 'Queja',
+      'sugerencia': 'Sugerencia',
+      'problema_pago': 'Problema de Pago',
+      'otro': 'Otro'
+    };
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: ${prioridadColor}; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">⚠️ TICKET ${prioridadLabel}</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0;">Requiere Atención Inmediata</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px; font-weight: bold;">Se ha creado un nuevo ticket de prioridad ${prioridadLabel.toLowerCase()}:</p>
+          
+          <div style="background: white; border-left: 4px solid ${prioridadColor}; padding: 20px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Número de Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>Título:</strong> ${ticket.titulo}</p>
+            <p style="margin: 5px 0;"><strong>Categoría:</strong> ${categoriaTexto[ticket.categoria] || ticket.categoria}</p>
+            <p style="margin: 5px 0;"><strong>Prioridad:</strong> <span style="color: ${prioridadColor}; font-weight: bold;">${prioridadLabel}</span></p>
+          </div>
+          
+          <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0; font-weight: bold;">Información del Usuario:</p>
+            <p style="margin: 5px 0;"><strong>Nombre:</strong> ${userName}</p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
+          </div>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0; font-weight: bold;">Descripción:</p>
+            <p style="margin: 0; white-space: pre-wrap;">${ticket.descripcion}</p>
+          </div>
+          
+          <p style="font-size: 14px; color: #666; text-align: center; margin-top: 20px;">
+            Por favor, atienda este ticket lo antes posible.
+          </p>
+          
+          ${generateSignatureHTML(SIGNATURE_CONFIG.soporte)}
+          
+          ${generateFooterHTML('Sistema de Notificaciones - Grúa RD')}
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `TICKET ${prioridadLabel} REQUIERE ATENCIÓN\n\nNúmero: #${ticket.id.slice(-8).toUpperCase()}\nTítulo: ${ticket.titulo}\nCategoría: ${categoriaTexto[ticket.categoria] || ticket.categoria}\nPrioridad: ${prioridadLabel}\n\nUsuario: ${userName} (${userEmail})\n\nDescripción:\n${ticket.descripcion}\n\n---\nGrúa RD - Sistema de Soporte\nsupport@gruard.com`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `Grúa RD Alertas <${resend.fromEmail}>`,
+        to: [adminEmail],
+        subject: `🚨 TICKET ${prioridadLabel} #${ticket.id.slice(-8).toUpperCase()} - ${ticket.titulo}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send high priority ticket notification:', error);
+        return false;
+      }
+
+      logger.info(`High priority ticket notification sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending high priority ticket notification:', error);
+      return false;
+    }
+  }
+
   async sendSocioCreatedEmail(email: string, nombre: string, tempPassword: string, porcentaje: string): Promise<boolean> {
     const resend = await getResendClient(EMAIL_ADDRESSES.info);
     if (!resend) {
@@ -1228,6 +1318,11 @@ class MockEmailService implements EmailService {
 
   async sendTicketSupportResponseEmail(email: string, userName: string, ticket: TicketEmailData, mensaje: string): Promise<boolean> {
     logger.info(`📧 [MOCK EMAIL] Respuesta a ticket #${ticket.id.slice(-8)} para ${email}`);
+    return true;
+  }
+
+  async sendHighPriorityTicketNotification(adminEmail: string, ticket: TicketEmailData, userName: string, userEmail: string): Promise<boolean> {
+    logger.info(`📧 [MOCK EMAIL] Notificación ticket URGENTE #${ticket.id.slice(-8)} a admin ${adminEmail} - Usuario: ${userName} (${userEmail})`);
     return true;
   }
 

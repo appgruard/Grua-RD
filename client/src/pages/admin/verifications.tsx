@@ -42,8 +42,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   ShieldCheck, Phone, IdCard, Search, Eye, CheckCircle, XCircle, Clock, 
-  UserCircle, Camera, Loader2, ImageIcon 
+  UserCircle, Camera, Loader2, ImageIcon, Mail, FileCheck, Calendar
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { format } from 'date-fns';
@@ -143,6 +144,60 @@ interface PendingCedulaResponse {
   stats: PendingCedulaStats;
 }
 
+interface PendingEmailUser {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  phone: string | null;
+  userType: string;
+  emailVerificado: boolean;
+  cedulaVerificada: boolean;
+  createdAt: string;
+}
+
+interface PendingEmailStats {
+  totalPending: number;
+  totalDrivers: number;
+  totalClients: number;
+  totalVerified: number;
+}
+
+interface PendingEmailResponse {
+  pendingEmails: PendingEmailUser[];
+  stats: PendingEmailStats;
+}
+
+interface PendingLicenseDriver {
+  id: string;
+  conductorId: string;
+  userId: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  phone: string | null;
+  licencia: string | null;
+  licenciaCategoria: string | null;
+  licenciaRestricciones: string | null;
+  licenciaFechaVencimiento: string | null;
+  licenciaFrontalUrl: string | null;
+  licenciaTraseraUrl: string | null;
+  licenciaVerificada: boolean | null;
+  licenciaCategoriaVerificada: boolean | null;
+  createdAt: string;
+}
+
+interface PendingLicenseStats {
+  totalPending: number;
+  totalDrivers: number;
+  totalVerified: number;
+}
+
+interface PendingLicenseResponse {
+  pendingLicenses: PendingLicenseDriver[];
+  stats: PendingLicenseStats;
+}
+
 type StatusFilter = 'all' | 'verified' | 'pending-phone' | 'pending-cedula' | 'unverified';
 
 export default function AdminVerifications() {
@@ -163,6 +218,20 @@ export default function AdminVerifications() {
   const [isCedulaRejectDialogOpen, setIsCedulaRejectDialogOpen] = useState(false);
   const [cedulaRejectReason, setCedulaRejectReason] = useState('');
   const [cedulaInput, setCedulaInput] = useState('');
+  
+  // Email verification state
+  const [selectedEmailUser, setSelectedEmailUser] = useState<PendingEmailUser | null>(null);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  
+  // License verification state
+  const [selectedLicenseDriver, setSelectedLicenseDriver] = useState<PendingLicenseDriver | null>(null);
+  const [isLicenseDialogOpen, setIsLicenseDialogOpen] = useState(false);
+  const [isLicenseRejectDialogOpen, setIsLicenseRejectDialogOpen] = useState(false);
+  const [licenseRejectReason, setLicenseRejectReason] = useState('');
+  const [licenseInput, setLicenseInput] = useState('');
+  const [licenseCategoryInput, setLicenseCategoryInput] = useState('');
+  const [licenseRestrictionsInput, setLicenseRestrictionsInput] = useState('');
+  const [licenseExpirationInput, setLicenseExpirationInput] = useState('');
 
   const queryParams = new URLSearchParams();
   if (searchTerm) queryParams.set('search', searchTerm);
@@ -194,6 +263,24 @@ export default function AdminVerifications() {
     queryFn: async () => {
       const res = await fetch('/api/admin/pending-cedula-verifications', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch pending cédulas');
+      return res.json();
+    },
+  });
+
+  const { data: pendingEmailsData, isLoading: isPendingEmailsLoading } = useQuery<PendingEmailResponse>({
+    queryKey: ['/api/admin/pending-email-verifications'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/pending-email-verifications', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch pending emails');
+      return res.json();
+    },
+  });
+
+  const { data: pendingLicensesData, isLoading: isPendingLicensesLoading } = useQuery<PendingLicenseResponse>({
+    queryKey: ['/api/admin/pending-license-verifications'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/pending-license-verifications', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch pending licenses');
       return res.json();
     },
   });
@@ -296,6 +383,92 @@ export default function AdminVerifications() {
     },
   });
 
+  // Email verification mutations
+  const verifyEmailMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest('POST', `/api/admin/users/${userId}/verify-email`, {});
+      if (!res.ok) throw new Error('Failed to verify email');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Email verificado', description: 'El correo ha sido verificado manualmente' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-email-verifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/verification-status'] });
+      setIsEmailDialogOpen(false);
+      setSelectedEmailUser(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const revokeEmailMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await apiRequest('POST', `/api/admin/users/${userId}/revoke-email`, {});
+      if (!res.ok) throw new Error('Failed to revoke email');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Verificación revocada', description: 'La verificación del correo ha sido revocada' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-email-verifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/verification-status'] });
+      setIsEmailDialogOpen(false);
+      setSelectedEmailUser(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // License verification mutations
+  const verifyLicenseMutation = useMutation({
+    mutationFn: async ({ conductorId, licencia, licenciaCategoria, licenciaRestricciones, licenciaFechaVencimiento }: { 
+      conductorId: string; 
+      licencia?: string; 
+      licenciaCategoria?: string;
+      licenciaRestricciones?: string;
+      licenciaFechaVencimiento?: string;
+    }) => {
+      const res = await apiRequest('POST', `/api/admin/conductores/${conductorId}/verify-license`, { 
+        licencia, licenciaCategoria, licenciaRestricciones, licenciaFechaVencimiento 
+      });
+      if (!res.ok) throw new Error('Failed to verify license');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Licencia verificada', description: 'La licencia ha sido verificada manualmente' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-license-verifications'] });
+      setIsLicenseDialogOpen(false);
+      setSelectedLicenseDriver(null);
+      setLicenseInput('');
+      setLicenseCategoryInput('');
+      setLicenseRestrictionsInput('');
+      setLicenseExpirationInput('');
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const rejectLicenseMutation = useMutation({
+    mutationFn: async ({ conductorId, reason }: { conductorId: string; reason: string }) => {
+      const res = await apiRequest('POST', `/api/admin/conductores/${conductorId}/reject-license`, { reason });
+      if (!res.ok) throw new Error('Failed to reject license');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Licencia rechazada', description: 'El conductor deberá verificar su licencia nuevamente' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-license-verifications'] });
+      setIsLicenseRejectDialogOpen(false);
+      setIsLicenseDialogOpen(false);
+      setSelectedLicenseDriver(null);
+      setLicenseRejectReason('');
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const handleViewHistory = (userId: string) => {
     setSelectedUserId(userId);
     setIsHistoryOpen(true);
@@ -333,6 +506,52 @@ export default function AdminVerifications() {
   const handleRejectCedula = () => {
     if (selectedCedulaUser) {
       rejectCedulaMutation.mutate({ userId: selectedCedulaUser.id, reason: cedulaRejectReason });
+    }
+  };
+
+  // Email verification handlers
+  const handleViewEmail = (user: PendingEmailUser) => {
+    setSelectedEmailUser(user);
+    setIsEmailDialogOpen(true);
+  };
+
+  const handleVerifyEmail = () => {
+    if (selectedEmailUser) {
+      verifyEmailMutation.mutate(selectedEmailUser.id);
+    }
+  };
+
+  const handleRevokeEmail = () => {
+    if (selectedEmailUser) {
+      revokeEmailMutation.mutate(selectedEmailUser.id);
+    }
+  };
+
+  // License verification handlers
+  const handleViewLicense = (driver: PendingLicenseDriver) => {
+    setSelectedLicenseDriver(driver);
+    setLicenseInput(driver.licencia || '');
+    setLicenseCategoryInput(driver.licenciaCategoria || '');
+    setLicenseRestrictionsInput(driver.licenciaRestricciones || '');
+    setLicenseExpirationInput(driver.licenciaFechaVencimiento ? driver.licenciaFechaVencimiento.split('T')[0] : '');
+    setIsLicenseDialogOpen(true);
+  };
+
+  const handleVerifyLicense = () => {
+    if (selectedLicenseDriver) {
+      verifyLicenseMutation.mutate({ 
+        conductorId: selectedLicenseDriver.conductorId,
+        licencia: licenseInput || undefined,
+        licenciaCategoria: licenseCategoryInput || undefined,
+        licenciaRestricciones: licenseRestrictionsInput || undefined,
+        licenciaFechaVencimiento: licenseExpirationInput || undefined,
+      });
+    }
+  };
+
+  const handleRejectLicense = () => {
+    if (selectedLicenseDriver) {
+      rejectLicenseMutation.mutate({ conductorId: selectedLicenseDriver.conductorId, reason: licenseRejectReason });
     }
   };
 
@@ -479,6 +698,24 @@ export default function AdminVerifications() {
             {pendingCedulasData?.stats.totalPending ? (
               <Badge variant="destructive" className="ml-2">
                 {pendingCedulasData.stats.totalPending}
+              </Badge>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="emails" data-testid="tab-emails">
+            <Mail className="w-4 h-4 mr-2" />
+            Emails Pendientes
+            {pendingEmailsData?.stats.totalPending ? (
+              <Badge variant="destructive" className="ml-2">
+                {pendingEmailsData.stats.totalPending}
+              </Badge>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="licenses" data-testid="tab-licenses">
+            <FileCheck className="w-4 h-4 mr-2" />
+            Licencias Pendientes
+            {pendingLicensesData?.stats.totalPending ? (
+              <Badge variant="destructive" className="ml-2">
+                {pendingLicensesData.stats.totalPending}
               </Badge>
             ) : null}
           </TabsTrigger>
@@ -884,7 +1121,462 @@ export default function AdminVerifications() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="emails">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                Correos Pendientes de Verificación Manual
+              </CardTitle>
+              <CardDescription>
+                Usuarios cuyo correo electrónico requiere verificación manual
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isPendingEmailsLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <Card key={i} className="p-4">
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="w-12 h-12 rounded-full" />
+                        <div className="flex-1">
+                          <Skeleton className="h-4 w-24 mb-2" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : pendingEmailsData?.pendingEmails.length === 0 ? (
+                <div className="text-center py-12" data-testid="empty-emails-state">
+                  <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Todo al día</h3>
+                  <p className="text-muted-foreground">
+                    No hay correos pendientes de verificación manual
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingEmailsData?.pendingEmails.map((user) => (
+                    <Card 
+                      key={user.id} 
+                      className="p-4 hover-elevate cursor-pointer transition-all"
+                      onClick={() => handleViewEmail(user)}
+                      data-testid={`card-pending-email-${user.id}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                          <Mail className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold truncate">{user.nombre} {user.apellido}</h4>
+                          <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {user.userType}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <Badge variant="secondary" className="gap-1">
+                          <Clock className="w-3 h-3" />
+                          Pendiente verificación
+                        </Badge>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {pendingEmailsData && pendingEmailsData.stats.totalPending > 0 && (
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                  <h4 className="font-medium mb-2">Estadísticas de Correos</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Conductores Pendientes</p>
+                      <p className="font-semibold">{pendingEmailsData.stats.totalDrivers}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Clientes Pendientes</p>
+                      <p className="font-semibold">{pendingEmailsData.stats.totalClients}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Total Verificados</p>
+                      <p className="font-semibold text-green-600 dark:text-green-400">{pendingEmailsData.stats.totalVerified}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Pendientes</p>
+                      <p className="font-semibold text-orange-600 dark:text-orange-400">{pendingEmailsData.stats.totalPending}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="licenses">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileCheck className="w-5 h-5" />
+                Licencias Pendientes de Verificación Manual
+              </CardTitle>
+              <CardDescription>
+                Conductores cuya licencia de conducir requiere verificación manual
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isPendingLicensesLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <Card key={i} className="p-4">
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="w-12 h-12 rounded-full" />
+                        <div className="flex-1">
+                          <Skeleton className="h-4 w-24 mb-2" />
+                          <Skeleton className="h-3 w-32" />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : pendingLicensesData?.pendingLicenses.length === 0 ? (
+                <div className="text-center py-12" data-testid="empty-licenses-state">
+                  <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Todo al día</h3>
+                  <p className="text-muted-foreground">
+                    No hay licencias pendientes de verificación manual
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pendingLicensesData?.pendingLicenses.map((driver) => (
+                    <Card 
+                      key={driver.id} 
+                      className="p-4 hover-elevate cursor-pointer transition-all"
+                      onClick={() => handleViewLicense(driver)}
+                      data-testid={`card-pending-license-${driver.id}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                          <FileCheck className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold truncate">{driver.nombre} {driver.apellido}</h4>
+                          <p className="text-sm text-muted-foreground truncate">{driver.email}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {driver.licencia && (
+                              <span className="text-xs text-muted-foreground">Lic: {driver.licencia}</span>
+                            )}
+                            {driver.licenciaCategoria && (
+                              <Badge variant="outline" className="text-xs">
+                                Cat. {driver.licenciaCategoria}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                        <Badge variant="secondary" className="gap-1">
+                          <Clock className="w-3 h-3" />
+                          Pendiente verificación
+                        </Badge>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {pendingLicensesData && pendingLicensesData.stats.totalPending > 0 && (
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                  <h4 className="font-medium mb-2">Estadísticas de Licencias</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total Conductores</p>
+                      <p className="font-semibold">{pendingLicensesData.stats.totalDrivers}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Licencias Verificadas</p>
+                      <p className="font-semibold text-green-600 dark:text-green-400">{pendingLicensesData.stats.totalVerified}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Pendientes</p>
+                      <p className="font-semibold text-orange-600 dark:text-orange-400">{pendingLicensesData.stats.totalPending}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Verificar Correo Electrónico</DialogTitle>
+            <DialogDescription>
+              Confirma la verificación manual del correo electrónico del usuario
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedEmailUser && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                  <Mail className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">{selectedEmailUser.nombre} {selectedEmailUser.apellido}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedEmailUser.email}</p>
+                  <Badge variant="outline" className="mt-1">{selectedEmailUser.userType}</Badge>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Teléfono</p>
+                  <p className="font-medium">{selectedEmailUser.phone || 'No disponible'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Cédula Verificada</p>
+                  <Badge variant={selectedEmailUser.cedulaVerificada ? "default" : "secondary"}>
+                    {selectedEmailUser.cedulaVerificada ? 'Sí' : 'No'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Al verificar este correo, el usuario podrá iniciar sesión y acceder a todas las funciones de la plataforma sin necesidad de confirmar su correo electrónico.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsEmailDialogOpen(false)}
+              disabled={verifyEmailMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleVerifyEmail}
+              disabled={verifyEmailMutation.isPending}
+              className="gap-2"
+              data-testid="button-verify-email"
+            >
+              {verifyEmailMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              Verificar Correo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isLicenseDialogOpen} onOpenChange={setIsLicenseDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Verificar Licencia de Conducir</DialogTitle>
+            <DialogDescription>
+              Revisa las imágenes de la licencia e ingresa los datos para verificar manualmente
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedLicenseDriver && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                  <FileCheck className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">{selectedLicenseDriver.nombre} {selectedLicenseDriver.apellido}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedLicenseDriver.email}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedLicenseDriver.licenciaFrontalUrl && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" />
+                      Licencia Frontal
+                    </Label>
+                    <div className="border rounded-lg overflow-hidden bg-muted/30">
+                      <img 
+                        src={`/api/admin/license-image/${selectedLicenseDriver.conductorId}/front`}
+                        alt="Licencia frontal"
+                        className="w-full max-h-[250px] object-contain"
+                        data-testid="img-license-front"
+                      />
+                    </div>
+                  </div>
+                )}
+                {selectedLicenseDriver.licenciaTraseraUrl && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" />
+                      Licencia Trasera
+                    </Label>
+                    <div className="border rounded-lg overflow-hidden bg-muted/30">
+                      <img 
+                        src={`/api/admin/license-image/${selectedLicenseDriver.conductorId}/back`}
+                        alt="Licencia trasera"
+                        className="w-full max-h-[250px] object-contain"
+                        data-testid="img-license-back"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {!selectedLicenseDriver.licenciaFrontalUrl && !selectedLicenseDriver.licenciaTraseraUrl && (
+                <div className="flex flex-col items-center justify-center py-8 border rounded-lg bg-muted/30">
+                  <ImageIcon className="w-12 h-12 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">No hay imágenes de licencia disponibles</p>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="license-number">Número de Licencia</Label>
+                  <Input
+                    id="license-number"
+                    value={licenseInput}
+                    onChange={(e) => setLicenseInput(e.target.value)}
+                    placeholder="Ingresa el número de licencia..."
+                    data-testid="input-license-number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="license-category">Categoría</Label>
+                  <Input
+                    id="license-category"
+                    value={licenseCategoryInput}
+                    onChange={(e) => setLicenseCategoryInput(e.target.value)}
+                    placeholder="Ej: A, B, C, D..."
+                    data-testid="input-license-category"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="license-restrictions">Restricciones</Label>
+                  <Input
+                    id="license-restrictions"
+                    value={licenseRestrictionsInput}
+                    onChange={(e) => setLicenseRestrictionsInput(e.target.value)}
+                    placeholder="Restricciones (si aplica)..."
+                    data-testid="input-license-restrictions"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="license-expiration" className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Fecha de Vencimiento
+                  </Label>
+                  <Input
+                    id="license-expiration"
+                    type="date"
+                    value={licenseExpirationInput}
+                    onChange={(e) => setLicenseExpirationInput(e.target.value)}
+                    data-testid="input-license-expiration"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsLicenseRejectDialogOpen(true)}
+              disabled={rejectLicenseMutation.isPending}
+              className="gap-2"
+              data-testid="button-reject-license"
+            >
+              <XCircle className="w-4 h-4" />
+              Rechazar
+            </Button>
+            <Button
+              onClick={handleVerifyLicense}
+              disabled={verifyLicenseMutation.isPending}
+              className="gap-2"
+              data-testid="button-verify-license"
+            >
+              {verifyLicenseMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              Verificar Licencia
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isLicenseRejectDialogOpen} onOpenChange={setIsLicenseRejectDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rechazar Licencia</DialogTitle>
+            <DialogDescription>
+              Proporciona una razón para rechazar la verificación. El conductor deberá verificar su licencia nuevamente.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <Textarea
+              placeholder="Razón del rechazo (opcional)..."
+              value={licenseRejectReason}
+              onChange={(e) => setLicenseRejectReason(e.target.value)}
+              className="min-h-[100px]"
+              data-testid="input-license-reject-reason"
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsLicenseRejectDialogOpen(false)}
+              disabled={rejectLicenseMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectLicense}
+              disabled={rejectLicenseMutation.isPending}
+              className="gap-2"
+              data-testid="button-confirm-license-reject"
+            >
+              {rejectLicenseMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <XCircle className="w-4 h-4" />
+              )}
+              Confirmar Rechazo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
         <DialogContent className="sm:max-w-lg">

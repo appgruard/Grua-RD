@@ -167,11 +167,14 @@ export default function AdminWallets() {
       const params = new URLSearchParams();
       if (statementStartDate) params.append('startDate', statementStartDate);
       if (statementEndDate) params.append('endDate', statementEndDate);
-      const res = await fetch(`/api/admin/operators/${selectedWallet?.conductorId}/statement?${params}`);
+      const res = await fetch(`/api/admin/operators/${selectedWallet?.conductorId}/statement?${params}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) throw new Error('Error al cargar estado de cuenta');
       return res.json();
     },
     enabled: !!selectedWallet?.conductorId && drawerOpen && activeTab === 'statement',
+    staleTime: 0,
   });
 
   const manualPayoutMutation = useMutation({

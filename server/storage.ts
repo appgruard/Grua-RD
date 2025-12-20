@@ -149,6 +149,10 @@ import {
   type Administrador,
   type InsertAdministrador,
   type AdministradorWithDetails,
+  systemErrors,
+  type SystemError,
+  type InsertSystemError,
+  type SystemErrorWithDetails,
 } from '@shared/schema';
 import {
   serviceReceipts,
@@ -424,6 +428,15 @@ export interface IStorage {
     urgentes: number;
     sinAsignar: number;
   }>;
+
+  // System Errors
+  createSystemError(data: InsertSystemError): Promise<SystemError>;
+  getSystemErrorById(id: string): Promise<SystemError | undefined>;
+  getSystemErrorByFingerprint(fingerprint: string): Promise<SystemError | undefined>;
+  updateSystemError(id: string, data: Partial<SystemError>): Promise<SystemError>;
+  getUnresolvedSystemErrors(limit?: number): Promise<SystemError[]>;
+  getAllSystemErrors(limit?: number): Promise<SystemError[]>;
+  getSystemErrorsByTicketId(ticketId: string): Promise<SystemError[]>;
 
   // Socios (Partners/Investors) - Module 2.5
   createSocio(socio: InsertSocio): Promise<Socio>;
@@ -1639,32 +1652,29 @@ export class DatabaseStorage implements IStorage {
 
   // Advanced Analytics (Module 2.3)
   async getServiceLocationsForHeatmap(startDate?: string, endDate?: string, precision: number = 3): Promise<Array<{ lat: number; lng: number; count: number; weight: number }>> {
-    const roundFactor = Math.pow(10, precision);
-    
-    let query = db
-      .select({
-        lat: sql<number>`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision})`.as('lat'),
-        lng: sql<number>`ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`.as('lng'),
-        count: sql<number>`COUNT(*)::int`.as('count'),
-      })
-      .from(servicios);
-
+    // Use raw SQL to avoid Drizzle's expression issues with GROUP BY
+    let dateFilter = '';
     if (startDate && endDate) {
-      query = query.where(
-        and(
-          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
-          sql`${servicios.createdAt} <= ${endDate}::timestamp`
-        )
-      ) as any;
+      dateFilter = `AND created_at >= '${startDate}'::timestamp AND created_at <= '${endDate}'::timestamp`;
     }
 
-    const results = await query
-      .groupBy(sql`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision}), ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`)
-      .orderBy(desc(sql`COUNT(*)`));
+    const results = await db.execute(sql`
+      SELECT 
+        ROUND(CAST(origen_lat AS NUMERIC), ${precision}) as lat,
+        ROUND(CAST(origen_lng AS NUMERIC), ${precision}) as lng,
+        COUNT(*)::int as count
+      FROM servicios
+      WHERE origen_lat IS NOT NULL AND origen_lng IS NOT NULL ${sql.raw(dateFilter)}
+      GROUP BY 
+        ROUND(CAST(origen_lat AS NUMERIC), ${precision}),
+        ROUND(CAST(origen_lng AS NUMERIC), ${precision})
+      ORDER BY count DESC
+    `);
 
-    const maxCount = Math.max(...results.map(r => r.count), 1);
+    const rows = results.rows as Array<{ lat: string; lng: string; count: number }>;
+    const maxCount = Math.max(...rows.map(r => r.count), 1);
     
-    return results.map(r => ({
+    return rows.map(r => ({
       lat: Number(r.lat),
       lng: Number(r.lng),
       count: r.count,
@@ -3030,6 +3040,70 @@ export class DatabaseStorage implements IStorage {
       .from(tickets);
     
     return stats;
+  }
+
+  // ==================== SYSTEM ERRORS ====================
+
+  async createSystemError(data: InsertSystemError): Promise<SystemError> {
+    const [error] = await db
+      .insert(systemErrors)
+      .values(data)
+      .returning();
+    return error;
+  }
+
+  async getSystemErrorById(id: string): Promise<SystemError | undefined> {
+    const [error] = await db
+      .select()
+      .from(systemErrors)
+      .where(eq(systemErrors.id, id))
+      .limit(1);
+    return error;
+  }
+
+  async getSystemErrorByFingerprint(fingerprint: string): Promise<SystemError | undefined> {
+    const [error] = await db
+      .select()
+      .from(systemErrors)
+      .where(and(
+        eq(systemErrors.fingerprint, fingerprint),
+        eq(systemErrors.resolved, false)
+      ))
+      .limit(1);
+    return error;
+  }
+
+  async updateSystemError(id: string, data: Partial<SystemError>): Promise<SystemError> {
+    const [updated] = await db
+      .update(systemErrors)
+      .set(data)
+      .where(eq(systemErrors.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getUnresolvedSystemErrors(limit: number = 50): Promise<SystemError[]> {
+    return await db
+      .select()
+      .from(systemErrors)
+      .where(eq(systemErrors.resolved, false))
+      .orderBy(desc(systemErrors.lastOccurrence))
+      .limit(limit);
+  }
+
+  async getAllSystemErrors(limit: number = 100): Promise<SystemError[]> {
+    return await db
+      .select()
+      .from(systemErrors)
+      .orderBy(desc(systemErrors.lastOccurrence))
+      .limit(limit);
+  }
+
+  async getSystemErrorsByTicketId(ticketId: string): Promise<SystemError[]> {
+    return await db
+      .select()
+      .from(systemErrors)
+      .where(eq(systemErrors.ticketId, ticketId));
   }
 
   // ==================== SOCIOS (PARTNERS/INVESTORS) - Module 2.5 ====================
@@ -4600,7 +4674,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // Record a manual payout to operator
+  // Record a manual payout to operator - this pays off debts
   async recordManualPayout(walletId: string, amount: string, adminId: string, notes?: string, evidenceUrl?: string): Promise<WalletTransaction> {
     // Get the wallet to update its balance
     const [wallet] = await db.select().from(operatorWallets)
@@ -4610,29 +4684,69 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Wallet not found');
     }
 
-    // Manual payout amount should be negative (money going out to operator)
-    // The amount is passed as a positive number, so we negate it
-    const payoutAmount = `-${Math.abs(parseFloat(amount)).toFixed(2)}`;
+    const paymentAmount = Math.abs(parseFloat(amount));
+    const currentDebt = parseFloat(wallet.totalDebt) || 0;
 
-    // Calculate new balance before transaction
-    const newBalance = (parseFloat(wallet.balance) + parseFloat(payoutAmount)).toFixed(2);
-
-    // Use a database transaction to ensure both insert and update succeed or fail together
+    // Use a database transaction to ensure all operations succeed or fail together
     return await db.transaction(async (tx) => {
-      // 1. Create wallet transaction
+      // 1. Get pending debts sorted by due date (oldest first)
+      const debts = await tx.select().from(operatorDebts)
+        .where(and(
+          eq(operatorDebts.walletId, walletId),
+          ne(operatorDebts.status, 'paid')
+        ))
+        .orderBy(operatorDebts.dueDate);
+
+      // 2. Apply payment to debts (oldest first)
+      let remainingPayment = paymentAmount;
+      let totalDebtPaid = 0;
+
+      for (const debt of debts) {
+        if (remainingPayment <= 0) break;
+
+        const debtRemaining = parseFloat(debt.remainingAmount);
+        if (debtRemaining <= 0) continue;
+
+        const paymentForThisDebt = Math.min(remainingPayment, debtRemaining);
+        const newRemaining = Math.max(0, debtRemaining - paymentForThisDebt);
+        const newStatus = newRemaining <= 0.01 ? 'paid' : 'partial';
+
+        await tx.update(operatorDebts)
+          .set({
+            remainingAmount: newRemaining.toFixed(2),
+            status: newStatus,
+            paidAt: newStatus === 'paid' ? new Date() : null
+          })
+          .where(eq(operatorDebts.id, debt.id));
+
+        remainingPayment -= paymentForThisDebt;
+        totalDebtPaid += paymentForThisDebt;
+      }
+
+      // 3. Create wallet transaction (amount is positive since this is a payment received)
       const [transaction] = await tx.insert(walletTransactions).values({
         walletId,
         type: 'manual_payout',
-        amount: payoutAmount,
+        amount: paymentAmount.toFixed(2),
         recordedByAdminId: adminId,
         evidenceUrl: evidenceUrl || null,
         notes: notes || null,
-        description: 'Pago manual a operador',
+        description: `Pago manual registrado - Deuda pagada: RD$${totalDebtPaid.toFixed(2)}`,
       }).returning();
 
-      // 2. Update wallet balance (reduce by the amount since this is payment to operator)
+      // 4. Update wallet totalDebt and potentially unblock cash services
+      const newDebt = Math.max(0, currentDebt - totalDebtPaid);
+      const updateData: Partial<OperatorWallet> = {
+        totalDebt: newDebt.toFixed(2)
+      };
+
+      // Unblock cash services if debt is fully paid
+      if (newDebt <= 0.01 && wallet.cashServicesBlocked) {
+        updateData.cashServicesBlocked = false;
+      }
+
       await tx.update(operatorWallets)
-        .set({ balance: newBalance })
+        .set(updateData)
         .where(eq(operatorWallets.id, walletId));
 
       return transaction;

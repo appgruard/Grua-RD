@@ -5,7 +5,7 @@ import { ArrowLeft, Shield, Database, Share2, Lock, UserCheck, Mail } from 'luci
 
 export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background safe-area-inset-top">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
           <Link href="/login">

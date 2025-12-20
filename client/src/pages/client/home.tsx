@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { calculateRoute, type Coordinates } from '@/lib/maps';
-import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck, AlertTriangle, Info, Clock, Navigation } from 'lucide-react';
+import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck, AlertTriangle, Info, Clock, Navigation, Camera, X, Image } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -88,6 +88,10 @@ export default function ClientHome() {
     setCost,
     routeGeometry,
     setRouteGeometry,
+    fotosContexto,
+    setFotosContexto,
+    notaCliente,
+    setNotaCliente,
     resetServiceRequest,
   } = useServiceRequest();
 
@@ -97,6 +101,7 @@ export default function ClientHome() {
   const [showExpandedCard, setShowExpandedCard] = useState(true);
   const distanceRef = useRef<number | null>(null);
   const hasInitialLocationRef = useRef(origin !== null);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
 
   const { data: insuranceStatus } = useQuery<{
     hasApprovedInsurance: boolean;
@@ -422,6 +427,8 @@ export default function ClientHome() {
         });
         return;
       }
+      setStep('additionalInfo');
+    } else if (step === 'additionalInfo') {
       setStep('confirm');
     }
   };
@@ -447,11 +454,13 @@ export default function ClientHome() {
       } else {
         setStep('location');
       }
+    } else if (step === 'additionalInfo') {
+      setStep('payment');
     } else if (step === 'confirm') {
       if (isExtractionService()) {
         setStep('location');
       } else {
-        setStep('payment');
+        setStep('additionalInfo');
       }
     }
   };
@@ -486,7 +495,7 @@ export default function ClientHome() {
     distanceRef.current = null;
   };
 
-  const handleConfirmRequest = () => {
+  const handleConfirmRequest = async () => {
     if (!origin || !servicioCategoria) {
       toast({
         title: 'Datos incompletos',
@@ -587,6 +596,57 @@ export default function ClientHome() {
       serviceData.requiereNegociacion = true;
       serviceData.estadoNegociacion = 'pendiente_evaluacion';
       serviceData.descripcionSituacion = descripcionSituacion.trim();
+    }
+
+    if (fotosContexto.length > 0) {
+      setIsUploadingPhotos(true);
+      try {
+        const uploadedUrls: string[] = [];
+        let uploadFailed = false;
+        for (let i = 0; i < fotosContexto.length && i < 3; i++) {
+          const formData = new FormData();
+          formData.append('photo', fotosContexto[i]);
+          formData.append('index', i.toString());
+          
+          const uploadRes = await fetch('/api/services/upload-context-photo', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+          });
+          
+          if (uploadRes.ok) {
+            const data = await uploadRes.json();
+            uploadedUrls.push(data.url);
+          } else {
+            uploadFailed = true;
+          }
+        }
+        
+        if (uploadedUrls[0]) serviceData.fotoContexto1Url = uploadedUrls[0];
+        if (uploadedUrls[1]) serviceData.fotoContexto2Url = uploadedUrls[1];
+        if (uploadedUrls[2]) serviceData.fotoContexto3Url = uploadedUrls[2];
+        
+        if (uploadFailed && uploadedUrls.length < fotosContexto.length) {
+          toast({
+            title: 'Algunas fotos no se subieron',
+            description: 'La solicitud continuara con las fotos que se pudieron subir',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        console.error('Error uploading context photos:', error);
+        toast({
+          title: 'Error al subir fotos',
+          description: 'Las fotos no se pudieron subir, pero la solicitud continuara sin ellas',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsUploadingPhotos(false);
+      }
+    }
+
+    if (notaCliente.trim()) {
+      serviceData.notaCliente = notaCliente.trim();
     }
 
     createServiceMutation.mutate(serviceData);
@@ -1149,6 +1209,132 @@ export default function ClientHome() {
             </div>
           )}
 
+          {step === 'additionalInfo' && (
+            <div className="flex flex-col h-full">
+              <div className="flex items-center gap-2 px-4 pb-2 flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePrevStep}
+                  data-testid="button-back"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h3 className="text-lg font-bold">Fotos y Notas</h3>
+                  <p className="text-sm text-muted-foreground">Opcional: agrega fotos o una nota para el operador</p>
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1 min-h-0 px-4">
+                <div className="space-y-4 pb-2">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Fotos del vehículo (máximo 3)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Sube fotos para ayudar al operador a entender mejor la situación
+                    </p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[0, 1, 2].map((index) => (
+                        <div 
+                          key={index}
+                          className="relative aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center overflow-hidden bg-muted/30 hover-elevate cursor-pointer"
+                        >
+                          {fotosContexto[index] ? (
+                            <>
+                              <img 
+                                src={URL.createObjectURL(fotosContexto[index])} 
+                                alt={`Foto ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute top-1 right-1 h-6 w-6 bg-background/80 hover:bg-background"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newFotos = [...fotosContexto];
+                                  newFotos.splice(index, 1);
+                                  setFotosContexto(newFotos);
+                                }}
+                                data-testid={`button-remove-photo-${index}`}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
+                              <Camera className="w-6 h-6 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground mt-1">Foto {index + 1}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const newFotos = [...fotosContexto];
+                                    newFotos[index] = file;
+                                    setFotosContexto(newFotos.filter(Boolean));
+                                  }
+                                }}
+                                data-testid={`input-photo-${index}`}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="notaCliente" className="text-sm font-medium">Nota para el operador</Label>
+                    <Textarea
+                      id="notaCliente"
+                      placeholder="Ej: El vehículo está en el estacionamiento B, nivel 2..."
+                      value={notaCliente}
+                      onChange={(e) => setNotaCliente(e.target.value)}
+                      className="min-h-[100px] resize-none"
+                      maxLength={500}
+                      data-testid="input-nota-cliente"
+                    />
+                    <p className="text-xs text-muted-foreground text-right">
+                      {notaCliente.length}/500 caracteres
+                    </p>
+                  </div>
+
+                  <Alert className="bg-blue-500/10 border-blue-500/30">
+                    <Info className="h-4 w-4 text-blue-500" />
+                    <AlertDescription className="text-blue-600 dark:text-blue-400 text-sm">
+                      Las fotos y notas son opcionales pero ayudan al operador a prepararse mejor para el servicio.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </ScrollArea>
+
+              <div className="px-4 pt-3 pb-2 flex-shrink-0 bg-background space-y-2">
+                <Button
+                  onClick={handleNextStep}
+                  className="w-full h-12 text-base"
+                  data-testid="button-next"
+                >
+                  Continuar
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setFotosContexto([]);
+                    setNotaCliente('');
+                    setStep('confirm');
+                  }}
+                  className="w-full text-muted-foreground"
+                  data-testid="button-skip"
+                >
+                  Omitir este paso
+                </Button>
+              </div>
+            </div>
+          )}
+
           {step === 'confirm' && (
             <div className="flex flex-col h-full">
               <div className="flex items-center gap-2 px-3 sm:px-4 pb-2 flex-shrink-0">
@@ -1317,11 +1503,16 @@ export default function ClientHome() {
               <div className="px-3 sm:px-4 pt-2 sm:pt-3 pb-2 flex-shrink-0 bg-background">
                 <Button
                   onClick={handleConfirmRequest}
-                  disabled={!origin || createServiceMutation.isPending}
+                  disabled={!origin || createServiceMutation.isPending || isUploadingPhotos}
                   className="w-full h-12 sm:h-14 text-sm sm:text-base font-semibold"
                   data-testid="button-confirm"
                 >
-                  {createServiceMutation.isPending ? (
+                  {isUploadingPhotos ? (
+                    <>
+                      <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
+                      Subiendo fotos...
+                    </>
+                  ) : createServiceMutation.isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
                       Enviando solicitud...
