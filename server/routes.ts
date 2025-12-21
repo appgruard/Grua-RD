@@ -5115,6 +5115,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No se puede cancelar un servicio completado" });
       }
 
+      // Get cancellation reason to check for penalties
+      const razon = await storage.getRazonCancelacion(razonCodigo);
+      let penalizacionAplicada = 0;
+      let bloqueoDuracionMinutos = 0;
+      let deductFromBalance = false;
+
+      // Calculate penalty based on service state
+      if (servicio.estado !== 'pendiente') {
+        const diasSemana = 7;
+        const fechaActual = new Date();
+        const hace7Dias = new Date(fechaActual.getTime() - (diasSemana * 24 * 60 * 60 * 1000));
+        
+        const cancelacionesRecientes = await storage.getCancelacionesByUsuarioId(req.user!.id, isClient ? 'cliente' : 'conductor');
+        const cancelacionesUltimaSemana = cancelacionesRecientes.filter((c: any) => new Date(c.fecha) > hace7Dias).length;
+
+        // Simple penalty calculation based on state
+        switch (servicio.estado) {
+          case 'aceptado':
+            penalizacionAplicada = Math.min(10 + (cancelacionesUltimaSemana * 2), 30);
+            bloqueoDuracionMinutos = 15;
+            break;
+          case 'conductor_en_sitio':
+            penalizacionAplicada = Math.min(25 + (cancelacionesUltimaSemana * 3), 60);
+            bloqueoDuracionMinutos = 60;
+            deductFromBalance = true;
+            break;
+          case 'cargando':
+          case 'en_progreso':
+            penalizacionAplicada = Math.min(50 + (cancelacionesUltimaSemana * 5), 100);
+            bloqueoDuracionMinutos = 120;
+            deductFromBalance = true;
+            break;
+          default:
+            penalizacionAplicada = 0;
+        }
+
+        // If reason excludes penalty, reset it
+        if (razon && !razon.penalizacionPredeterminada) {
+          penalizacionAplicada = 0;
+          bloqueoDuracionMinutos = 0;
+        }
+      }
+
       // Create cancellation record
       const cancelacion = await storage.createCancelacionServicio({
         servicioId,
@@ -5126,9 +5169,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nivelDemanda: 'medio',
         esHoraPico: false,
         zonaTipo: servicio.zonaTipo || 'urbana',
-        totalCancelacionesUsuario: isClient ? (servicio.clienteId === req.user!.id ? 0 : 0) : 0,
-        penalizacionAplicada: 0,
+        totalCancelacionesUsuario: 0,
+        penalizacionAplicada,
         reembolsoMonto: 0,
+        bloqueadoHasta: bloqueoDuracionMinutos > 0 ? new Date(Date.now() + bloqueoDuracionMinutos * 60 * 1000) : null,
       });
 
       // Update service to canceled
@@ -5136,6 +5180,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: 'cancelado',
         canceladoAt: new Date(),
       });
+
+      // FASE 5: INTEGRACIÓN - Deducir penalización del balance del conductor
+      if (isDriver && deductFromBalance && penalizacionAplicada > 0) {
+        try {
+          const conductor = await storage.getConductorByUserId(req.user!.id);
+          if (conductor) {
+            const wallet = await storage.getWalletByConductorId(conductor.id);
+            if (wallet) {
+              const newBalance = Math.max(0, parseFloat(wallet.balance) - penalizacionAplicada);
+              await storage.updateWallet(wallet.id, {
+                balance: newBalance.toFixed(2)
+              });
+
+              await storage.createWalletTransaction({
+                walletId: wallet.id,
+                servicioId,
+                type: 'cancellation_penalty',
+                amount: (-penalizacionAplicada).toFixed(2),
+                description: `Penalización por cancelación de servicio: RD$${penalizacionAplicada.toFixed(2)}`
+              });
+            }
+          }
+        } catch (error) {
+          logSystem.error('Error deducting penalty from wallet', error, { servicioId });
+        }
+      }
+
+      // FASE 5: INTEGRACIÓN - Revertir comisión si conductor cancela
+      if (isDriver && servicio.commissionProcessed) {
+        try {
+          const conductor = await storage.getConductorByUserId(req.user!.id);
+          if (conductor) {
+            const wallet = await storage.getWalletByConductorId(conductor.id);
+            if (wallet) {
+              // Reverse the commission: if 20% was taken, add it back
+              const commissionAmount = WalletService.calculateCommission(servicio.precioEstimado || 0);
+              const newBalance = parseFloat(wallet.balance) + commissionAmount;
+              
+              await storage.updateWallet(wallet.id, {
+                balance: newBalance.toFixed(2)
+              });
+
+              await storage.createWalletTransaction({
+                walletId: wallet.id,
+                servicioId,
+                type: 'commission_reversal',
+                amount: commissionAmount.toFixed(2),
+                description: `Reversa de comisión por cancelación: RD$${commissionAmount.toFixed(2)}`
+              });
+            }
+          }
+        } catch (error) {
+          logSystem.error('Error reversing commission', error, { servicioId });
+        }
+      }
+
+      // FASE 5: INTEGRACIÓN - Afectar rating del conductor si cancela
+      if (isDriver && penalizacionAplicada > 0) {
+        try {
+          const conductor = await storage.getConductorByUserId(req.user!.id);
+          if (conductor) {
+            const currentRating = parseFloat(conductor.calificacionPromedio || '5') || 5;
+            const ratingDeduction = penalizacionAplicada > 50 ? 1 : penalizacionAplicada > 25 ? 0.5 : 0.25;
+            const newRating = Math.max(1, currentRating - ratingDeduction);
+            
+            await storage.updateUser(req.user!.id, {
+              calificacionPromedio: newRating.toFixed(2)
+            });
+          }
+        } catch (error) {
+          logSystem.error('Error updating driver rating', error, { servicioId });
+        }
+      }
 
       logService.cancelled(servicioId, `Cancelled by ${isClient ? 'cliente' : isDriver ? 'conductor' : 'admin'}`);
 
@@ -5158,6 +5275,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         cancelacionId: cancelacion.id,
         mensaje: 'Servicio cancelado exitosamente',
+        penalizacionAplicada,
+        bloqueadoHasta: bloqueoDuracionMinutos > 0 ? new Date(Date.now() + bloqueoDuracionMinutos * 60 * 1000) : null,
       });
     } catch (error: any) {
       logSystem.error('Cancel service error', error);
