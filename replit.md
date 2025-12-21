@@ -64,6 +64,25 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 
 ## Recent Changes
 
+### December 21, 2025 - Fase 5: Integración con Sistemas Existentes
+- **Feature**: Completada la Fase 5 del plan de cancelación de servicios con integraciones críticas a WalletService, ratings y comisiones.
+- **Integraciones Implementadas**:
+  - **WalletService**: Deducción de penalizaciones del balance del conductor
+  - **Comisiones**: Reversa de comisión (20%) cuando conductor cancela después de ser procesada
+  - **Ratings**: Impacto dinámico en calificación del conductor basado en gravedad de cancelación
+  - **Penalizaciones**: Cálculo dinámico basado en estado, recidivismo, y duración de bloqueo
+- **Cambios Realizados**:
+  - `server/routes.ts`: POST /api/servicios/:id/cancelar actualizado con 200+ líneas de lógica de integración
+  - Deducción de balance: $10-$100 según estado (aceptado hasta en_progreso)
+  - Multiplicadores de recidivismo: +$2-$5 por cancelación en últimos 7 días
+  - Reversa de comisión: Agregada al balance si fue procesada
+  - Impacto en rating: -0.25 a -1.0 estrellas según gravedad
+  - Bloqueo temporal: 15-120 minutos según estado
+- **Documentación**:
+  - Creado REVISION_FASE_5_Y_6.md con análisis exhaustivo de implementación
+  - Incluye matriz de penalizaciones, casos de uso validados, y especificación de Fase 6
+- **Estado**: Fase 5 COMPLETADA | Fase 6 PENDIENTE (requiere Autonomous Mode para testing)
+
 ### December 20, 2025 - Fase 4: Frontend y UX para Sistema de Cancelación de Servicios
 - **Feature**: Completada la Fase 4 del plan de cancelación de servicios con mejoras visuales y UX.
 - **Mejoras Implementadas**:
