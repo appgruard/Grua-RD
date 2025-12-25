@@ -3267,13 +3267,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
     try {
-      const { telefono } = req.body;
+      const { email } = req.body;
 
-      if (!telefono) {
-        return res.status(400).json({ message: "Teléfono es requerido" });
+      if (!email) {
+        return res.status(400).json({ message: "Correo electrónico es requerido" });
       }
 
-      const user = await storage.getUserByPhone(telefono);
+      const user = await storage.getUserByEmail(email);
       if (!user) {
         return res.status(404).json({ message: "Usuario no encontrado" });
       }
@@ -3282,21 +3282,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiraEn = new Date(Date.now() + 10 * 60 * 1000);
 
       await storage.deleteExpiredVerificationCodes();
-      await storage.deletePriorVerificationCodes(telefono, 'recuperacion_password');
+      // We'll use email as identifier for password recovery instead of phone
+      await storage.deletePriorVerificationCodes(email, 'recuperacion_password');
 
       await storage.createVerificationCode({
-        telefono,
+        email,
         codigo,
         expiraEn,
         tipoOperacion: 'recuperacion_password',
       });
 
-      const mensaje = `Tu código de recuperación de contraseña para GruaRD es: ${codigo}. Válido por 10 minutos.`;
-      const smsService = await getSMSService();
-      await smsService.sendSMS(telefono, mensaje);
+      const emailService = await getEmailService();
+      await emailService.sendPasswordResetEmail(email, codigo);
 
       res.json({ 
-        message: "Código de recuperación enviado",
+        message: "Código de recuperación enviado al correo",
         expiresIn: 600
       });
     } catch (error: any) {
@@ -3307,9 +3307,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
     try {
-      const { telefono, codigo, nuevaPassword } = req.body;
+      const { email, codigo, nuevaPassword } = req.body;
 
-      if (!telefono || !codigo || !nuevaPassword) {
+      if (!email || !codigo || !nuevaPassword) {
         return res.status(400).json({ message: "Datos incompletos" });
       }
 
@@ -3317,7 +3317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
       }
 
-      const verificationCode = await storage.getActiveVerificationCode(telefono, 'recuperacion_password');
+      const verificationCode = await storage.getActiveVerificationCode(email, 'recuperacion_password');
 
       if (!verificationCode) {
         return res.status(400).json({ message: "Código inválido o expirado" });
@@ -3333,7 +3333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Código incorrecto" });
       }
 
-      const user = await storage.getUserByPhone(telefono);
+      const user = await storage.getUserByEmail(email);
       if (!user) {
         return res.status(404).json({ message: "Usuario no encontrado" });
       }
@@ -3346,7 +3346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Contraseña actualizada exitosamente" });
     } catch (error: any) {
-      logSystem.error('Reset password error', error, { telefono: req.body?.telefono });
+      logSystem.error('Reset password error', error, { email: req.body?.email });
       res.status(500).json({ message: "Error al resetear contraseña" });
     }
   });
