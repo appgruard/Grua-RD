@@ -32,6 +32,13 @@ Grúa RD uses a React 18 (TypeScript, Vite) frontend, an Express.js (Node.js) ba
 - **Admin Features**: Dashboard with analytics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration, document validation, support ticket system with Jira integration.
 - **Enterprise Portal (B2B)**: Business management, contract/tariff configuration, project tracking, scheduled services, invoicing.
 - **Real-time Communication**: WebSockets for location updates, chat, automatic service cancellation, negotiation chat.
+- **Service Cancellation Plan (In Progress)**: 
+    - **Proportional Penalties**: Charges based on a percentage of the total service cost, not fixed amounts.
+    - **Distance-Based Calculation**: Penalties adjusted according to distance traveled by the driver (e.g., higher if >10km).
+    - **Time & Delay Justification**: Customers can cancel without penalty if the operator exceeds the Estimated Time of Arrival (ETA) by a defined margin (taking traffic into account).
+    - **Driver Compensation**: Ensures drivers are compensated for expenses incurred before cancellation.
+    - **No Rating Penalty for Customers**: Rating remains unaffected by cancellations.
+    - **Status Tracking**: Justifications for penalties/exonerations stored for transparency.
 - **Notifications**: Web Push API, Capacitor push notifications, email (Resend).
 - **Payment Integration**: Azul API for card payments, cash, automatic commission splitting, operator wallet with scheduled payouts and same-day withdrawals, PDF receipts.
 - **Robust UX**: Skeleton loaders, empty states, dialogs, toast notifications, form validations, responsive design.
