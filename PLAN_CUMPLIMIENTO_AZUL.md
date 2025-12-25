@@ -2,10 +2,9 @@
 
 Este documento se enfoca exclusivamente en los cambios y elementos necesarios dentro de la aplicación móvil/web de Grúa RD para la certificación de Azul.
 
-## 1. Interfaz de Pago (Checkout)
-*   **Visualización de Logos:** Desplegar logos de Visa, MasterCard, Verified by Visa y MasterCard ID Check dentro del flujo de pago.
-*   **Moneda:** Mostrar explícitamente el símbolo **RD$** en el total a pagar.
-*   **Consentimiento:** Incluir un checkbox obligatorio: "Acepto las políticas de cancelación y reembolso" con un enlace que abra un modal resumen o redirija al landing.
+## 1. Interfaz de Pago (Checkout Optimizado)
+*   **One-Touch Payment:** El flujo debe priorizar el uso de tarjetas guardadas (`DataVaultToken`). El checkbox de políticas debe estar pre-seleccionado o integrado en el botón de "Solicitar Grúa" para no añadir pasos extra.
+*   **Visualización de Logos:** Desplegar logos de Visa, MasterCard, Verified by Visa y MasterCard ID Check de forma discreta para no saturar la interfaz móvil.
 
 ## 2. Transparencia en Cancelaciones (Módulo App)
 *   **Justificación de Cobros:** Al cancelar, la App debe mostrar el desglose (Penalización % + Recargo KM) antes de confirmar.

@@ -6,7 +6,9 @@ Este plan detalla la implementación técnica para integrar el sistema de cancel
 
 Para permitir cancelaciones con penalizaciones parciales sin recurrir a reembolsos manuales (que son lentos y costosos), utilizaremos el flujo de **Hold & Post**.
 
-1.  **Creación del Servicio:** Al solicitar la grúa, se realiza un `TrxType: Hold` por el monto total. Esto reserva los fondos en la tarjeta del cliente pero no los cobra definitivamente.
+1.  **Creación del Servicio (Flujo de 1-2 Toques):** 
+    *   Para mantener la rapidez, la App usará `DataVault` (tarjetas guardadas).
+    *   Al solicitar, el cliente confirma con un solo toque y el sistema realiza un `TrxType: Hold` en segundo plano. No hay pasos intermedios de redirección si la tarjeta ya está tokenizada.
 2.  **Cancelación del Servicio:**
     *   Si la cancelación es **sin penalización**: Se realiza un `TrxType: Void` (Anulación) sobre el `AzulOrderId` del Hold. Los fondos se liberan inmediatamente.
     *   Si la cancelación es **con penalización**: Se realiza un `TrxType: Post` (Captura) pero enviando el campo `Amount` con el valor de la penalización calculada. Esto cobra solo la penalización y libera el resto automáticamente.
