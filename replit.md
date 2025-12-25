@@ -24,6 +24,14 @@ The system features a mobile-first, responsive PWA built with `shadcn/ui` and Ta
 ### Technical Implementations
 Grúa RD uses a React 18 (TypeScript, Vite) frontend, an Express.js (Node.js) backend, and PostgreSQL (Neon) with Drizzle ORM. Authentication is handled by Passport.js (local strategy, bcrypt). Real-time features are powered by WebSockets (`ws` library). Mapbox GL JS with react-map-gl is used for mapping, routing, and geocoding. State management is handled by TanStack Query (React Query v5). The project maintains a modular structure and integrates Capacitor for native mobile functionality.
 
+### Servicio al Cliente y Contacto
+- **Dirección Física:** CARRT. JUAN BOSCH C/ PRINCIPAL #106, CANCA LA REYNA, ESPAILLAT, República Dominicana.
+- **Contactos:**
+  - General: info@gruard.com
+  - Soporte: support@gruard.com
+  - Pagos: payments@gruard.com
+  - Celular: 8293519324
+
 ### Feature Specifications
 **Core Features:**
 - **Authentication & Security**: Role-based access, dual-account system.

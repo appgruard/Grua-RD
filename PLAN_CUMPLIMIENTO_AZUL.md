@@ -16,15 +16,15 @@ Se crearán o actualizarán las siguientes páginas accesibles desde el pie de p
 *   **Visibilidad:** Checkbox obligatorio en el Checkout: "He leído y acepto las políticas de cancelación y reembolso".
 
 ### B. Información de Servicio al Cliente
-*   **Correo:** support@gruard.com / payments@gruard.com
-*   **Teléfono:** +1 (829) 351-9324
+*   **Correos:** info@gruard.com / support@gruard.com / payments@gruard.com
+*   **Teléfono (Cel.):** 829-351-9324
 *   **Ubicación:** Footer de todas las páginas y página de contacto.
 
 ### C. Política de Entrega
 *   **Contenido:** El servicio es digital e inmediato tras la asignación. Se aclarará que los tiempos dependen del tráfico y ubicación.
 
 ### D. Dirección Permanente y Moneda
-*   **Dirección:** CARRT. JUAN BOSCH C/ PRINCIPAL #106, Canca La Reyna, Espaillat, República Dominicana.
+*   **Dirección:** CARRT. JUAN BOSCH C/ PRINCIPAL #106, CANCA LA REYNA, ESPAILLAT, República Dominicana.
 *   **Moneda:** Se indicará explícitamente en el checkout que los cobros se realizan en **RD$ (Pesos Dominicanos)**.
 
 ### E. Políticas de Privacidad y Seguridad de Datos
