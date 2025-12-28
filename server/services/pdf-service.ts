@@ -115,15 +115,15 @@ export class PDFService {
         
         // Info Box (Receipt details)
         this.addReceiptSummary(doc, data, currentY);
-        currentY += 80;
+        currentY += 70;
 
         // Two columns: Client and Driver
         this.addParticipantsInfo(doc, data, currentY);
-        currentY += 120;
+        currentY += 100;
 
         // Service Journey
         this.addServicePath(doc, data, currentY);
-        currentY += 160; // Incrementado para evitar que el desglose se sobreponga
+        currentY += 135; // Reducido para ahorrar espacio vertical
 
         // Cost Table
         this.addModernCostBreakdown(doc, data, currentY);
@@ -257,19 +257,19 @@ export class PDFService {
     doc.fontSize(10).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("DESGLOSE ECONÓMICO", 50, y);
     doc.rect(50, y + 15, 30, 2).fill(this.BRAND_ACCENT);
     
-    let currentY = y + 35;
+    let currentY = y + 30; // Reducido de 35 a 30
     
     const addRow = (label: string, value: string, isTotal: boolean = false) => {
       if (isTotal) {
-        doc.rect(50, currentY, 500, 35).fill(this.BRAND_PRIMARY);
-        doc.fontSize(12).fillColor("#ffffff").font("Helvetica-Bold").text(label, 70, currentY + 12);
-        doc.fontSize(14).text(`RD$ ${value}`, 400, currentY + 10, { align: "right", width: 130 });
+        doc.rect(50, currentY, 500, 30).fill(this.BRAND_PRIMARY); // Reducido de 35 a 30
+        doc.fontSize(11).fillColor("#ffffff").font("Helvetica-Bold").text(label, 70, currentY + 10); // Reducida fuente de 12 a 11
+        doc.fontSize(12).text(`RD$ ${value}`, 400, currentY + 8, { align: "right", width: 130 }); // Reducida fuente de 14 a 12
       } else {
-        doc.fontSize(10).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(label, 70, currentY);
+        doc.fontSize(9).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(label, 70, currentY); // Reducida de 10 a 9
         doc.fillColor(this.TEXT_PRIMARY).font("Helvetica-Bold").text(`RD$ ${value}`, 400, currentY, { align: "right", width: 130 });
-        doc.moveTo(50, currentY + 15).lineTo(550, currentY + 15).strokeColor(this.BORDER_COLOR).lineWidth(0.5).stroke();
+        doc.moveTo(50, currentY + 12).lineTo(550, currentY + 12).strokeColor(this.BORDER_COLOR).lineWidth(0.5).stroke();
       }
-      currentY += isTotal ? 45 : 25;
+      currentY += isTotal ? 35 : 20; // Reducido espaciado
     };
     
     addRow("Cargo por Servicio de Grúa", data.costos.costoTotal);
@@ -300,10 +300,10 @@ export class PDFService {
 
   private addBrandedFooter(doc: PDFKit.PDFDocument): void {
     const pageHeight = doc.page.height;
-    const footerY = pageHeight - 80;
+    const footerY = pageHeight - 65; // Subido de 80 a 65 para ahorrar espacio
     doc.rect(50, footerY, 500, 0.5).fill(this.BORDER_COLOR);
-    doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 15, { align: "center", width: 500 });
-    doc.fontSize(10).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 35, { align: "center", width: 500 });
+    doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 10, { align: "center", width: 500 });
+    doc.fontSize(9).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 25, { align: "center", width: 500 });
     doc.rect(0, pageHeight - 5, doc.page.width, 5).fill(this.BRAND_PRIMARY);
   }
 
