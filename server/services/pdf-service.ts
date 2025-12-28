@@ -111,25 +111,25 @@ export class PDFService {
         this.addHeader(doc, data);
         
         // -- Main Sections --
-        let currentY = 140; // Reduced from 160
+        let currentY = 125; // Reducido significativamente de 140
         
         // Info Box (Receipt details)
         this.addReceiptSummary(doc, data, currentY);
-        currentY += 60; // Reduced from 70
+        currentY += 50; // Reducido de 60
 
         // Two columns: Client and Driver
         this.addParticipantsInfo(doc, data, currentY);
-        currentY += 90; // Reduced from 100
+        currentY += 80; // Reducido de 90
 
         // Service Journey
         this.addServicePath(doc, data, currentY);
-        currentY += 120; // Reduced from 135
+        currentY += 95; // Reducido de 120
 
         // Cost Table
         this.addModernCostBreakdown(doc, data, currentY);
 
         // -- Footer --
-        this.addBrandedFooter(doc); // Using updated method name if it exists, or just ensure it is called correctly
+        this.addBrandedFooter(doc);
 
         doc.end();
 
@@ -254,22 +254,22 @@ export class PDFService {
   }
 
   private addModernCostBreakdown(doc: PDFKit.PDFDocument, data: ReceiptData, y: number): void {
-    doc.fontSize(10).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("DESGLOSE ECONÓMICO", 50, y);
-    doc.rect(50, y + 15, 30, 2).fill(this.BRAND_ACCENT);
+    doc.fontSize(9).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("DESGLOSE ECONÓMICO", 50, y);
+    doc.rect(50, y + 12, 30, 1.5).fill(this.BRAND_ACCENT);
     
-    let currentY = y + 30; // Reducido de 35 a 30
+    let currentY = y + 22; // Reducido de 30
     
     const addRow = (label: string, value: string, isTotal: boolean = false) => {
       if (isTotal) {
-        doc.rect(50, currentY, 500, 30).fill(this.BRAND_PRIMARY); // Reducido de 35 a 30
-        doc.fontSize(11).fillColor("#ffffff").font("Helvetica-Bold").text(label, 70, currentY + 10); // Reducida fuente de 12 a 11
-        doc.fontSize(12).text(`RD$ ${value}`, 400, currentY + 8, { align: "right", width: 130 }); // Reducida fuente de 14 a 12
+        doc.rect(50, currentY, 500, 25).fill(this.BRAND_PRIMARY); // Reducido de 30 a 25
+        doc.fontSize(10).fillColor("#ffffff").font("Helvetica-Bold").text(label, 70, currentY + 8); // Reducida fuente
+        doc.fontSize(11).text(`RD$ ${value}`, 400, currentY + 7, { align: "right", width: 130 }); // Reducida fuente
       } else {
-        doc.fontSize(9).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(label, 70, currentY); // Reducida de 10 a 9
+        doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(label, 70, currentY); // Reducida a 8
         doc.fillColor(this.TEXT_PRIMARY).font("Helvetica-Bold").text(`RD$ ${value}`, 400, currentY, { align: "right", width: 130 });
-        doc.moveTo(50, currentY + 12).lineTo(550, currentY + 12).strokeColor(this.BORDER_COLOR).lineWidth(0.5).stroke();
+        doc.moveTo(50, currentY + 10).lineTo(550, currentY + 10).strokeColor(this.BORDER_COLOR).lineWidth(0.5).stroke();
       }
-      currentY += isTotal ? 35 : 20; // Reducido espaciado
+      currentY += isTotal ? 28 : 16; // Reducido espaciado drásticamente
     };
     
     addRow("Cargo por Servicio de Grúa", data.costos.costoTotal);
@@ -300,10 +300,9 @@ export class PDFService {
 
   private addBrandedFooter(doc: PDFKit.PDFDocument): void {
     const pageHeight = doc.page.height;
-    const footerY = pageHeight - 55; // Subido más (de 65 a 55)
+    const footerY = pageHeight - 45; // Subido aún más para evitar salto
     doc.rect(50, footerY, 500, 0.5).fill(this.BORDER_COLOR);
-    doc.fontSize(7).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 8, { align: "center", width: 500 });
-    doc.fontSize(8).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 20, { align: "center", width: 500 });
+    doc.fontSize(7).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE} | ¡Gracias por confiar en Grúa RD!`, 50, footerY + 10, { align: "center", width: 500 });
     doc.rect(0, pageHeight - 5, doc.page.width, 5).fill(this.BRAND_PRIMARY);
   }
 
