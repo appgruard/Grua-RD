@@ -111,25 +111,25 @@ export class PDFService {
         this.addHeader(doc, data);
         
         // -- Main Sections --
-        let currentY = 125; // Reducido significativamente de 140
+        let currentY = 160;
         
         // Info Box (Receipt details)
         this.addReceiptSummary(doc, data, currentY);
-        currentY += 50; // Reducido de 60
+        currentY += 80;
 
         // Two columns: Client and Driver
         this.addParticipantsInfo(doc, data, currentY);
-        currentY += 80; // Reducido de 90
+        currentY += 120;
 
         // Service Journey
         this.addServicePath(doc, data, currentY);
-        currentY += 95; // Reducido de 120
+        currentY += 160; // Incrementado para evitar que el desglose se sobreponga
 
         // Cost Table
         this.addModernCostBreakdown(doc, data, currentY);
 
         // -- Footer --
-        this.addBrandedFooter(doc);
+        this.addFooter(doc, data);
 
         doc.end();
 
@@ -234,42 +234,42 @@ export class PDFService {
     doc.fontSize(10).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("DETALLE DEL TRAYECTO", 50, y);
     doc.rect(50, y + 15, 30, 2).fill(this.BRAND_ACCENT);
     
-    const journeyY = y + 30; // Reducido de 35
+    const journeyY = y + 35;
     
     // Origin
-    doc.circle(60, journeyY, 3).fill(this.BRAND_ACCENT); // Radio reducido
-    doc.fontSize(8).fillColor(this.TEXT_TERTIARY).font("Helvetica-Bold").text("ORIGEN", 75, journeyY - 3);
-    doc.fontSize(8).fillColor(this.TEXT_PRIMARY).font("Helvetica").text(data.servicio.origenDireccion, 75, journeyY + 7, { width: 450 });
+    doc.circle(60, journeyY, 4).fill(this.BRAND_ACCENT);
+    doc.fontSize(9).fillColor(this.TEXT_TERTIARY).font("Helvetica-Bold").text("ORIGEN", 75, journeyY - 4);
+    doc.fontSize(9).fillColor(this.TEXT_PRIMARY).font("Helvetica").text(data.servicio.origenDireccion, 75, journeyY + 8, { width: 450 });
     
-    // Vertical Line - Más corta
-    doc.moveTo(60, journeyY + 5).lineTo(60, journeyY + 25).dash(2, { space: 2 }).strokeColor(this.TEXT_TERTIARY).stroke().undash();
+    // Vertical Line
+    doc.moveTo(60, journeyY + 8).lineTo(60, journeyY + 45).dash(2, { space: 2 }).strokeColor(this.TEXT_TERTIARY).stroke().undash();
     
     // Destino
-    const destY = journeyY + 35; // Reducido de 55
-    doc.circle(60, destY, 3).fill(this.BRAND_PRIMARY); // Radio reducido
-    doc.fontSize(8).fillColor(this.TEXT_TERTIARY).font("Helvetica-Bold").text("DESTINO", 75, destY - 3);
-    doc.fontSize(8).fillColor(this.TEXT_PRIMARY).font("Helvetica").text(data.servicio.destinoDireccion, 75, destY + 7, { width: 450 });
+    const destY = journeyY + 55;
+    doc.circle(60, destY, 4).fill(this.BRAND_PRIMARY);
+    doc.fontSize(9).fillColor(this.TEXT_TERTIARY).font("Helvetica-Bold").text("DESTINO", 75, destY - 4);
+    doc.fontSize(9).fillColor(this.TEXT_PRIMARY).font("Helvetica").text(data.servicio.destinoDireccion, 75, destY + 8, { width: 450 });
     
-    doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica-Bold").text(`DISTANCIA TOTAL: ${data.servicio.distanciaKm} KM`, 50, destY + 20); // Reducido salto
+    doc.fontSize(9).fillColor(this.TEXT_SECONDARY).font("Helvetica-Bold").text(`DISTANCIA TOTAL: ${data.servicio.distanciaKm} KM`, 50, destY + 45);
   }
 
   private addModernCostBreakdown(doc: PDFKit.PDFDocument, data: ReceiptData, y: number): void {
-    doc.fontSize(9).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("DESGLOSE ECONÓMICO", 50, y);
-    doc.rect(50, y + 12, 30, 1.5).fill(this.BRAND_ACCENT);
+    doc.fontSize(10).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("DESGLOSE ECONÓMICO", 50, y);
+    doc.rect(50, y + 15, 30, 2).fill(this.BRAND_ACCENT);
     
-    let currentY = y + 22; // Reducido de 30
+    let currentY = y + 35;
     
     const addRow = (label: string, value: string, isTotal: boolean = false) => {
       if (isTotal) {
-        doc.rect(50, currentY, 500, 25).fill(this.BRAND_PRIMARY); // Reducido de 30 a 25
-        doc.fontSize(10).fillColor("#ffffff").font("Helvetica-Bold").text(label, 70, currentY + 8); // Reducida fuente
-        doc.fontSize(11).text(`RD$ ${value}`, 400, currentY + 7, { align: "right", width: 130 }); // Reducida fuente
+        doc.rect(50, currentY, 500, 35).fill(this.BRAND_PRIMARY);
+        doc.fontSize(12).fillColor("#ffffff").font("Helvetica-Bold").text(label, 70, currentY + 12);
+        doc.fontSize(14).text(`RD$ ${value}`, 400, currentY + 10, { align: "right", width: 130 });
       } else {
-        doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(label, 70, currentY); // Reducida a 8
+        doc.fontSize(10).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(label, 70, currentY);
         doc.fillColor(this.TEXT_PRIMARY).font("Helvetica-Bold").text(`RD$ ${value}`, 400, currentY, { align: "right", width: 130 });
-        doc.moveTo(50, currentY + 10).lineTo(550, currentY + 10).strokeColor(this.BORDER_COLOR).lineWidth(0.5).stroke();
+        doc.moveTo(50, currentY + 15).lineTo(550, currentY + 15).strokeColor(this.BORDER_COLOR).lineWidth(0.5).stroke();
       }
-      currentY += isTotal ? 28 : 16; // Reducido espaciado drásticamente
+      currentY += isTotal ? 45 : 25;
     };
     
     addRow("Cargo por Servicio de Grúa", data.costos.costoTotal);
@@ -300,9 +300,10 @@ export class PDFService {
 
   private addBrandedFooter(doc: PDFKit.PDFDocument): void {
     const pageHeight = doc.page.height;
-    const footerY = pageHeight - 45; // Subido aún más para evitar salto
+    const footerY = pageHeight - 80;
     doc.rect(50, footerY, 500, 0.5).fill(this.BORDER_COLOR);
-    doc.fontSize(7).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE} | ¡Gracias por confiar en Grúa RD!`, 50, footerY + 10, { align: "center", width: 500 });
+    doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 15, { align: "center", width: 500 });
+    doc.fontSize(10).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 35, { align: "center", width: 500 });
     doc.rect(0, pageHeight - 5, doc.page.width, 5).fill(this.BRAND_PRIMARY);
   }
 
