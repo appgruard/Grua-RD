@@ -287,34 +287,29 @@ export class PDFService {
   }
 
   private addFooter(doc: PDFKit.PDFDocument, data: ReceiptData): void {
+    this.addBrandedFooter(doc);
+  }
+
+  private addBrandedHeader(doc: PDFKit.PDFDocument, title: string): void {
+    const pageWidth = doc.page.width;
+    doc.rect(0, 0, pageWidth, 5).fill(this.BRAND_PRIMARY);
+    doc.fontSize(24).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text(this.COMPANY_NAME, 50, 45);
+    doc.fontSize(9).fillColor(this.BRAND_ACCENT).font("Helvetica-Bold").text(this.COMPANY_TAGLINE.toUpperCase(), 52, 72, { characterSpacing: 1 });
+    doc.fontSize(16).fillColor(this.TEXT_PRIMARY).font("Helvetica-Bold").text(title, 300, 55, { align: "right", width: 250 });
+  }
+
+  private addBrandedFooter(doc: PDFKit.PDFDocument): void {
     const pageHeight = doc.page.height;
     const footerY = pageHeight - 80;
-    
     doc.rect(50, footerY, 500, 0.5).fill(this.BORDER_COLOR);
-    
-    doc
-      .fontSize(8)
-      .fillColor(this.TEXT_SECONDARY)
-      .font("Helvetica")
-      .text(
-        `GRUARD | RNC: Registro Nacional del Contribuyente | Tel: ${this.COMPANY_PHONE}`,
-        50,
-        footerY + 15,
-        { align: "center", width: 500 }
-      );
-      
-    doc
-      .fontSize(7)
-      .fillColor(this.TEXT_TERTIARY)
-      .text(
-        "Este recibo es un comprobante digital de asistencia vial generado por la plataforma Grúa RD.",
-        50,
-        footerY + 30,
-        { align: "center", width: 500 }
-      );
-      
+    doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`Razón Social: ${this.LEGAL_NAME} | RNC: Registro Nacional del Contribuyente | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 15, { align: "center", width: 500 });
+    doc.fontSize(10).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 35, { align: "center", width: 500 });
     doc.rect(0, pageHeight - 5, doc.page.width, 5).fill(this.BRAND_PRIMARY);
   }
+
+  private readonly BRAND_COLOR = "#0b2545";
+  private readonly SECONDARY_COLOR = "#4b5563";
+
 
   generateReceiptNumber(): string {
     const timestamp = Date.now();
