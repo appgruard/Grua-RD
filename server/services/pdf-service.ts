@@ -123,7 +123,7 @@ export class PDFService {
 
         // Service Journey
         this.addServicePath(doc, data, currentY);
-        currentY += 130;
+        currentY += 160; // Incrementado para evitar que el desglose se sobreponga
 
         // Cost Table
         this.addModernCostBreakdown(doc, data, currentY);
@@ -302,7 +302,7 @@ export class PDFService {
     const pageHeight = doc.page.height;
     const footerY = pageHeight - 80;
     doc.rect(50, footerY, 500, 0.5).fill(this.BORDER_COLOR);
-    doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`Razón Social: ${this.LEGAL_NAME} | RNC: Registro Nacional del Contribuyente | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 15, { align: "center", width: 500 });
+    doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 15, { align: "center", width: 500 });
     doc.fontSize(10).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 35, { align: "center", width: 500 });
     doc.rect(0, pageHeight - 5, doc.page.width, 5).fill(this.BRAND_PRIMARY);
   }
