@@ -79,10 +79,11 @@ export class PDFService {
   private readonly SUCCESS_COLOR = "#22c55e";
   private readonly BORDER_COLOR = "#e2e8f0";
   
-  private readonly COMPANY_NAME = "Grua RD";
-  private readonly COMPANY_TAGLINE = "Servicios de Grua Republica Dominicana";
-  private readonly COMPANY_PHONE = "(809) 555-1234";
-  private readonly COMPANY_EMAIL = "soporte@gruard.com";
+  private readonly COMPANY_NAME = "Grúa RD";
+  private readonly LEGAL_NAME = "GRUARD";
+  private readonly COMPANY_TAGLINE = "Servicios de Grúa República Dominicana";
+  private readonly COMPANY_PHONE = "829-351-9324";
+  private readonly COMPANY_EMAIL = "info@gruard.com";
   private readonly COMPANY_WEBSITE = "www.gruard.com";
   
   private readonly BRAND_COLOR = "#2563eb";
@@ -415,11 +416,11 @@ export class PDFService {
       .stroke();
     
     doc
-      .fontSize(9)
+      .fontSize(8)
       .fillColor(this.TEXT_SECONDARY)
       .font("Helvetica")
       .text(
-        `Tel: ${this.COMPANY_PHONE}  |  Email: ${this.COMPANY_EMAIL}  |  Web: ${this.COMPANY_WEBSITE}`,
+        `Razón Social: ${this.LEGAL_NAME}  |  Tel: ${this.COMPANY_PHONE}  |  Email: ${this.COMPANY_EMAIL}`,
         50,
         footerY + 15,
         { align: "center", width: 500 }
@@ -429,7 +430,7 @@ export class PDFService {
       .fontSize(10)
       .fillColor(this.BRAND_PRIMARY)
       .font("Helvetica-Bold")
-      .text("Gracias por confiar en Grua RD!", 50, footerY + 35, {
+      .text("¡Gracias por confiar en Grúa RD!", 50, footerY + 35, {
         align: "center",
         width: 500,
       });
