@@ -303,7 +303,7 @@ export class PDFService {
     const footerY = pageHeight - 80;
     doc.rect(50, footerY, 500, 0.5).fill(this.BORDER_COLOR);
     doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 15, { align: "center", width: 500 });
-    doc.fontSize(10).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 35, { align: "center", width: 500 });
+    doc.fontSize(9).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 25, { align: "center", width: 500 });
     doc.rect(0, pageHeight - 5, doc.page.width, 5).fill(this.BRAND_PRIMARY);
   }
 
