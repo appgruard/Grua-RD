@@ -10161,45 +10161,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized" });
       }
 
-      const PDFDocument = (await import('pdfkit')).default;
-      const doc = new PDFDocument();
+      // Utilizar PDFService para generar el recibo con el formato oficial
+      const receiptData = {
+        receiptNumber: pdfService.generateReceiptNumber(),
+        servicioId: servicio.id,
+        fecha: new Date(servicio.createdAt),
+        cliente: {
+          nombre: servicio.cliente?.nombre || "N/A",
+          apellido: servicio.cliente?.apellido || "",
+          email: (servicio.cliente as any)?.email || "N/A",
+          cedula: (servicio.cliente as any)?.cedula || undefined,
+        },
+        conductor: {
+          nombre: servicio.conductor?.nombre || "N/A",
+          apellido: servicio.conductor?.apellido || "",
+          placaGrua: (servicio.conductor as any)?.placaGrua || "N/A",
+        },
+        servicio: {
+          origenDireccion: servicio.origenDireccion,
+          destinoDireccion: servicio.destinoDireccion,
+          distanciaKm: servicio.distanciaKm || "0",
+        },
+        costos: {
+          costoTotal: parseFloat(servicio.costoTotal).toFixed(2),
+          montoOperador: parseFloat((servicio as any).montoOperador || "0").toFixed(2),
+          montoEmpresa: parseFloat((servicio as any).montoEmpresa || "0").toFixed(2),
+          porcentajeOperador: (servicio as any).porcentajeOperador || "0",
+          porcentajeEmpresa: (servicio as any).porcentajeEmpresa || "0",
+        },
+        metodoPago: servicio.metodoPago as "efectivo" | "tarjeta",
+        transactionId: (servicio as any).transactionId,
+      };
+
+      const pdfBuffer = await pdfService.generateReceipt(receiptData);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=recibo-${servicio.id}.pdf`);
-
-      doc.pipe(res);
-
-      doc.fontSize(20).text('Grúa RD', { align: 'center' });
-      doc.fontSize(16).text('Recibo de Servicio', { align: 'center' });
-      doc.moveDown();
-
-      doc.fontSize(12).text(`Número de Servicio: ${servicio.id}`);
-      doc.text(`Fecha: ${new Date(servicio.createdAt).toLocaleDateString('es-DO')}`);
-      doc.moveDown();
-
-      doc.text(`Cliente: ${servicio.cliente?.nombre} ${servicio.cliente?.apellido}`);
-      if (servicio.conductor) {
-        doc.text(`Conductor: ${servicio.conductor.nombre} ${servicio.conductor.apellido}`);
-      }
-      doc.moveDown();
-
-      doc.text(`Origen: ${servicio.origenDireccion}`);
-      doc.text(`Destino: ${servicio.destinoDireccion}`);
-      doc.text(`Distancia: ${servicio.distanciaKm} km`);
-      doc.moveDown();
-
-      doc.font('Helvetica-Bold').fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`);
-      doc.font('Helvetica').fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
-      if ((servicio as any).transactionId) {
-        doc.text(`ID de Transacción: ${(servicio as any).transactionId}`);
-      }
-      doc.moveDown();
-
-      doc.fontSize(10).text('Información Fiscal', { underline: true });
-      doc.text('GruaRD - República Dominicana');
-      doc.text('Este documento es válido como comprobante de pago');
-
-      doc.end();
+      res.send(pdfBuffer);
     } catch (error: any) {
       logSystem.error('Generate receipt error', error);
       res.status(500).json({ message: "Failed to generate receipt" });
