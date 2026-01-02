@@ -6,6 +6,12 @@ Este plan detalla la implementación técnica para integrar el sistema de cancel
 
 Para permitir cancelaciones con penalizaciones parciales sin recurrir a reembolsos manuales (que son lentos y costosos), utilizaremos el flujo de **Hold & Post**.
 
+### Credenciales y Entorno de Pruebas
+*   **URL Payment Page:** https://pruebas.azul.com.do/paymentpage/Default.aspx
+*   **MerchantID:** 39038540035
+*   **Algoritmo de Hash:** SHA512HMAC
+*   **Llave Privada (Pruebas):** `asdhakjshdkjasdasmndajksdkjaskldga8odya9d8yoasyd98asdyaisdhoaisyd0a8sydoashd8oasydoiahdpiashd09ayusidhaos8dy0a8dya08syd0a8ssdsax`
+
 1.  **Creación del Servicio (Flujo de 1-2 Toques):** 
     *   Para mantener la rapidez, la App usará `DataVault` (tarjetas guardadas).
     *   Al solicitar, el cliente confirma con un solo toque y el sistema realiza un `TrxType: Hold` en segundo plano. No hay pasos intermedios de redirección si la tarjeta ya está tokenizada.
@@ -53,5 +59,14 @@ Para soportar la transparencia requerida, añadiremos campos a la tabla `cancela
 ## 5. Próximos Pasos (Pendiente de Autorización)
 
 1.  Modificar `shared/schema.ts` para incluir los nuevos campos de auditoría de cancelación.
-2.  Actualizar `AzulPaymentService` para asegurar que el método `capturePayment` soporte el envío de montos menores al original (Captura Parcial).
+2.  Actualizar `AzulPaymentService` para asegurar que el método `capturePayment` soporte el envío de montos menores al original (Captura Parcial) y utilice la encriptación SHA512HMAC con la llave proporcionada.
 3.  Implementar la lógica de cálculo en `server/routes.ts` y conectarla con el servicio de Azul.
+
+## 6. Datos de Prueba (Tarjetas)
+Para las validaciones en el entorno de pruebas, se utilizarán las siguientes tarjetas:
+1.  `5413****3300****8960****0119` Exp. 202812 cvv. 979
+2.  `4012****0000****3333****0026` Exp. 202812 cvv. 123
+3.  `6011****0009****9009****9818` Exp. 202812 cvv. 818
+4.  `5424****1802****7979****1732` Exp. 202812 cvv. 732
+5.  `4260****5500****6184****5872` Exp. 202812 cvv. 872
+6.  `4005****5200****0000****0129` Exp. 202812 cvv. 977 (Límite RD$ 75)
