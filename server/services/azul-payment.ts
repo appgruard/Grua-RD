@@ -163,11 +163,11 @@ export class AzulPaymentService {
       ...data,
     };
 
-    // For Azul JSON API, some endpoints might require a specific hash format
-    // based on documentation. Usually it's an AuthHash header.
-    // We'll prepare the hash based on the values as per plan.
-    const hashString = Object.values(requestData).join('');
-    const authHash = this.generateAuthHash(hashString);
+    // Concatenate all values in order as per Azul JSON requirement
+    const values = Object.values(requestData).join('');
+    
+    // For SHA512HMAC, Azul expects the hash of the payload using the AuthKey
+    const authHash = this.generateAuthHash(values);
     
     const headers = {
       'Content-Type': 'application/json',
