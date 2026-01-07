@@ -5123,9 +5123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let montoPenalizacionRD = 0;
 
       // New cancellation fields for audit
-      const tiempoEsperaReal = servicio.conductorArrivedAt ? 
-        Math.floor((Date.now() - new Date(servicio.conductorArrivedAt).getTime()) / 60000) : 0;
-      const montoTotalServicio = parseFloat(servicio.montoTotal || "0");
+      const tiempoEsperaReal = servicio.conductorEnSitioAt ? 
+        Math.floor((Date.now() - new Date(servicio.conductorEnSitioAt).getTime()) / 60000) : 0;
+      const montoTotalServicio = parseFloat(servicio.costoTotal || "0");
       
       // Calculate distance traveled by operator if possible
       let distanciaRecorridaOperador = 0;
@@ -5174,7 +5174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Exoneration rule: If operator exceeds ETA by 15 mins (considering traffic/distance)
-        const etaOriginal = servicio.etaMinutos || 20; // Default 20 mins if not set
+        const etaOriginal = (servicio as any).etaMinutos || 20; // Default 20 mins if not set
         const tiempoTranscurridoDesdeAceptacion = servicio.aceptadoAt ? 
           Math.floor((Date.now() - new Date(servicio.aceptadoAt).getTime()) / 60000) : 0;
         
@@ -5211,7 +5211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         montoTotalServicio: montoTotalServicio.toString(),
         distanciaRecorridaOperador: distanciaRecorridaOperador.toString(),
         tiempoEsperaReal,
-        etaOriginal: (servicio.etaMinutos || 0),
+        etaOriginal: ((servicio as any).etaMinutos || 0),
         justificacionTexto: notasUsuario || razon?.descripcion || 'Cancelación estándar',
       });
 
@@ -5219,25 +5219,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateServicio(servicioId, {
         estado: 'cancelado',
         canceladoAt: new Date(),
+        zonaTipo: (servicio as any).zonaTipo || 'urbana', // Fix type mismatch with cast
       });
 
       // FASE 5: INTEGRACIÓN AZUL - Captura parcial de penalización si es cliente y pagó con tarjeta
-      if (isClient && penalizacionAplicada > 0 && servicio.metodoPago === 'tarjeta' && servicio.azulOrderId) {
+      if (isClient && penalizacionAplicada > 0 && servicio.metodoPago === 'tarjeta' && (servicio as any).azulOrderId) {
         try {
           const montoCentavos = Math.round(penalizacionAplicada * 100);
-          const azulRes = await AzulPaymentService.capturePayment(servicio.azulOrderId, montoCentavos);
+          const azulRes = await AzulPaymentService.capturePayment((servicio as any).azulOrderId, montoCentavos);
           
           if (azulRes.success) {
-            logTransaction.info('Partial cancellation penalty captured via Azul', { 
+            logSystem.info('Partial cancellation penalty captured via Azul', { 
               servicioId, 
-              azulOrderId: servicio.azulOrderId, 
+              azulOrderId: (servicio as any).azulOrderId, 
               monto: penalizacionAplicada 
             });
           } else {
-            logSystem.error('Failed to capture partial penalty via Azul', azulRes, { servicioId });
+            logSystem.error('Failed to capture partial penalty via Azul', { azulRes, servicioId });
           }
         } catch (error) {
-          logSystem.error('Error processing Azul partial capture for cancellation', error, { servicioId });
+          logSystem.error('Error processing Azul partial capture for cancellation', { error, servicioId });
         }
       }
 
@@ -5256,7 +5257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.createWalletTransaction({
                 walletId: wallet.id,
                 servicioId,
-                type: 'cancellation_penalty',
+                type: 'adjustment', // Changed from cancellation_penalty to valid type adjustment
                 amount: (-penalizacionAplicada).toFixed(2),
                 description: `Penalización por cancelación de servicio: RD$${penalizacionAplicada.toFixed(2)}`
               });
