@@ -18,10 +18,7 @@ const AZUL_PRODUCTION_URL = 'https://pagos.azul.com.do/webservices/JSON/Default.
 // Environment configuration
 const getAzulConfig = () => ({
   merchantId: process.env.AZUL_MERCHANT_ID || '',
-  merchantName: process.env.AZUL_MERCHANT_NAME || '',
-  merchantType: process.env.AZUL_MERCHANT_TYPE || '',
-  auth1: process.env.AZUL_AUTH1 || '',
-  auth2: process.env.AZUL_AUTH2 || '',
+  authKey: process.env.AZUL_AUTH_KEY || '',
   environment: (process.env.AZUL_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production',
   channel: process.env.AZUL_CHANNEL || 'EC',
   posInputMode: process.env.AZUL_POS_INPUT_MODE || 'E-Commerce',
@@ -136,20 +133,18 @@ export class AzulPaymentService {
    */
   static isConfigured(): boolean {
     const config = getAzulConfig();
-    return !!(config.merchantId && config.auth1 && config.auth2);
+    return !!(config.merchantId && config.authKey);
   }
 
   /**
-   * Generate auth hash for Azul requests
+   * Generate auth hash for Azul requests using SHA512HMAC
    */
-  private static generateAuthHash(data: Record<string, any>): string {
+  private static generateAuthHash(data: string): string {
     const config = getAzulConfig();
-    
-    // Concatenate all values in order with auth keys
-    const values = Object.values(data).join('');
-    const hashString = `${values}${config.auth1}${config.auth2}`;
-    
-    return crypto.createHash('sha512').update(hashString).digest('hex');
+    return crypto
+      .createHmac('sha512', config.authKey)
+      .update(data)
+      .digest('hex');
   }
 
   /**
@@ -162,21 +157,21 @@ export class AzulPaymentService {
     // Add common fields
     const requestData = {
       MerchantId: config.merchantId,
-      MerchantName: config.merchantName,
-      MerchantType: config.merchantType,
       Channel: config.channel,
       PosInputMode: config.posInputMode,
       CurrencyPosCode: '$',
       ...data,
     };
 
-    // Generate auth hash
-    const authHash = this.generateAuthHash(requestData);
+    // For Azul JSON API, some endpoints might require a specific hash format
+    // based on documentation. Usually it's an AuthHash header.
+    // We'll prepare the hash based on the values as per plan.
+    const hashString = Object.values(requestData).join('');
+    const authHash = this.generateAuthHash(hashString);
     
     const headers = {
       'Content-Type': 'application/json',
-      'Auth1': config.auth1,
-      'Auth2': config.auth2,
+      'AuthHash': authHash,
     };
 
     try {
