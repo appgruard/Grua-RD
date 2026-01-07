@@ -2664,12 +2664,15 @@ export const cancelacionesServicios = pgTable("cancelaciones_servicios", {
   motivoCancelacion: text("motivo_cancelacion"),
   razonCodigo: varchar("razon_codigo").references(() => razonesCancelacion.codigo),
   notasUsuario: text("notas_usuario"),
+  justificacionTexto: text("justificacion_texto"),
   
   // Calculation data
   distanciaRecorridaKm: decimal("distancia_recorrida_km", { precision: 6, scale: 2 }),
   distanciaTotalServicioKm: decimal("distancia_total_servicio_km", { precision: 6, scale: 2 }),
   tiempoDesdeAceptacionSegundos: integer("tiempo_desde_aceptacion_segundos"),
   tiempoDesdellegadaSegundos: integer("tiempo_desde_llegada_segundos"),
+  tiempoEsperaReal: integer("tiempo_espera_real"),
+  etaOriginal: integer("eta_original"),
   
   // Context factors
   nivelDemanda: nivelDemandaEnum("nivel_demanda"),
@@ -2686,6 +2689,7 @@ export const cancelacionesServicios = pgTable("cancelaciones_servicios", {
   // Penalty and refund
   penalizacionBase: decimal("penalizacion_base", { precision: 10, scale: 2 }),
   penalizacionAplicada: decimal("penalizacion_aplicada", { precision: 10, scale: 2 }).default("0.00"),
+  montoTotalServicio: decimal("monto_total_servicio", { precision: 10, scale: 2 }),
   reembolsoMonto: decimal("reembolso_monto", { precision: 10, scale: 2 }).default("0.00"),
   cambioRating: decimal("cambio_rating", { precision: 3, scale: 2 }),
   
