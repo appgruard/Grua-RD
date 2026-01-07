@@ -5120,8 +5120,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let penalizacionAplicada = 0;
       let bloqueoDuracionMinutos = 0;
       let deductFromBalance = false;
+      let montoPenalizacionRD = 0;
 
-      // Calculate penalty based on service state
+      // New cancellation fields for audit
+      const tiempoEsperaReal = servicio.conductorArrivedAt ? 
+        Math.floor((Date.now() - new Date(servicio.conductorArrivedAt).getTime()) / 60000) : 0;
+      const montoTotalServicio = parseFloat(servicio.montoTotal || "0");
+      
+      // Calculate distance traveled by operator if possible
+      let distanciaRecorridaOperador = 0;
+      if (servicio.conductorId) {
+        const conductor = await storage.getConductorByUserId(servicio.conductorId);
+        if (conductor && conductor.ubicacionLat && conductor.ubicacionLng && servicio.origenLat && servicio.origenLng) {
+          distanciaRecorridaOperador = calculateHaversineDistance(
+            { lat: parseFloat(conductor.ubicacionLat), lng: parseFloat(conductor.ubicacionLng) },
+            { lat: parseFloat(servicio.origenLat), lng: parseFloat(servicio.origenLng) }
+          );
+        }
+      }
+
+      // Calculate penalty based on service state and new business rules
       if (servicio.estado !== 'pendiente') {
         const diasSemana = 7;
         const fechaActual = new Date();
@@ -5130,35 +5148,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const cancelacionesRecientes = await storage.getCancelacionesByUsuarioId(req.user!.id, isClient ? 'cliente' : 'conductor');
         const cancelacionesUltimaSemana = cancelacionesRecientes.filter((c: any) => new Date(c.fecha) > hace7Dias).length;
 
-        // Simple penalty calculation based on state
+        // Proportional penalties based on percentage of total service cost
+        let porcentajePenalizacion = 0;
         switch (servicio.estado) {
           case 'aceptado':
-            penalizacionAplicada = Math.min(10 + (cancelacionesUltimaSemana * 2), 30);
+            // If driver has traveled more than 5km, higher penalty
+            porcentajePenalizacion = distanciaRecorridaOperador > 5 ? 15 : 10;
+            porcentajePenalizacion = Math.min(porcentajePenalizacion + (cancelacionesUltimaSemana * 2), 30);
             bloqueoDuracionMinutos = 15;
             break;
           case 'conductor_en_sitio':
-            penalizacionAplicada = Math.min(25 + (cancelacionesUltimaSemana * 3), 60);
+            // Base 25% if arrived
+            porcentajePenalizacion = Math.min(25 + (cancelacionesUltimaSemana * 3), 50);
             bloqueoDuracionMinutos = 60;
             deductFromBalance = true;
             break;
           case 'cargando':
           case 'en_progreso':
-            penalizacionAplicada = Math.min(50 + (cancelacionesUltimaSemana * 5), 100);
+            porcentajePenalizacion = Math.min(50 + (cancelacionesUltimaSemana * 5), 100);
             bloqueoDuracionMinutos = 120;
             deductFromBalance = true;
             break;
           default:
-            penalizacionAplicada = 0;
+            porcentajePenalizacion = 0;
+        }
+
+        // Exoneration rule: If operator exceeds ETA by 15 mins (considering traffic/distance)
+        const etaOriginal = servicio.etaMinutos || 20; // Default 20 mins if not set
+        const tiempoTranscurridoDesdeAceptacion = servicio.aceptadoAt ? 
+          Math.floor((Date.now() - new Date(servicio.aceptadoAt).getTime()) / 60000) : 0;
+        
+        if (isClient && tiempoTranscurridoDesdeAceptacion > (etaOriginal + 15)) {
+          porcentajePenalizacion = 0;
+          logSystem.info('Cancellation penalty exonerated due to ETA delay', { servicioId, etaOriginal, tiempoTranscurridoDesdeAceptacion });
         }
 
         // If reason excludes penalty, reset it
         if (razon && !razon.penalizacionPredeterminada) {
-          penalizacionAplicada = 0;
+          porcentajePenalizacion = 0;
           bloqueoDuracionMinutos = 0;
         }
+
+        montoPenalizacionRD = (montoTotalServicio * porcentajePenalizacion) / 100;
+        penalizacionAplicada = montoPenalizacionRD;
       }
 
-      // Create cancellation record
+      // Create cancellation record with new audit fields
       const cancelacion = await storage.createCancelacionServicio({
         servicioId,
         canceladoPorId: req.user!.id,
@@ -5173,6 +5208,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         penalizacionAplicada,
         reembolsoMonto: 0,
         bloqueadoHasta: bloqueoDuracionMinutos > 0 ? new Date(Date.now() + bloqueoDuracionMinutos * 60 * 1000) : null,
+        montoTotalServicio: montoTotalServicio.toString(),
+        distanciaRecorridaOperador: distanciaRecorridaOperador.toString(),
+        tiempoEsperaReal,
+        etaOriginal: (servicio.etaMinutos || 0),
+        justificacionTexto: notasUsuario || razon?.descripcion || 'Cancelación estándar',
       });
 
       // Update service to canceled
@@ -5180,6 +5220,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estado: 'cancelado',
         canceladoAt: new Date(),
       });
+
+      // FASE 5: INTEGRACIÓN AZUL - Captura parcial de penalización si es cliente y pagó con tarjeta
+      if (isClient && penalizacionAplicada > 0 && servicio.metodoPago === 'tarjeta' && servicio.azulOrderId) {
+        try {
+          const montoCentavos = Math.round(penalizacionAplicada * 100);
+          const azulRes = await AzulPaymentService.capturePayment(servicio.azulOrderId, montoCentavos);
+          
+          if (azulRes.success) {
+            logTransaction.info('Partial cancellation penalty captured via Azul', { 
+              servicioId, 
+              azulOrderId: servicio.azulOrderId, 
+              monto: penalizacionAplicada 
+            });
+          } else {
+            logSystem.error('Failed to capture partial penalty via Azul', azulRes, { servicioId });
+          }
+        } catch (error) {
+          logSystem.error('Error processing Azul partial capture for cancellation', error, { servicioId });
+        }
+      }
 
       // FASE 5: INTEGRACIÓN - Deducir penalización del balance del conductor
       if (isDriver && deductFromBalance && penalizacionAplicada > 0) {
