@@ -58,7 +58,7 @@ Para soportar la transparencia requerida, añadiremos campos a la tabla `cancela
 
 ## 5. Próximos Pasos (Pendiente de Autorización)
 
-1.  Modificar `shared/schema.ts` para incluir los nuevos campos de auditoría de cancelación.
+1.  ~~Modificar `shared/schema.ts` para incluir los nuevos campos de auditoría de cancelación.~~ (Completado)
 2.  Actualizar `AzulPaymentService` para asegurar que el método `capturePayment` soporte el envío de montos menores al original (Captura Parcial) y utilice la encriptación SHA512HMAC con la llave proporcionada.
 3.  Implementar la lógica de cálculo en `server/routes.ts` y conectarla con el servicio de Azul.
 
