@@ -155,7 +155,7 @@ export class AzulPaymentService {
     const url = getApiUrl();
     
     // Add common fields
-    const requestData = {
+    const requestData: Record<string, any> = {
       MerchantId: config.merchantId,
       Channel: config.channel,
       PosInputMode: config.posInputMode,
@@ -163,15 +163,20 @@ export class AzulPaymentService {
       ...data,
     };
 
-    // Concatenate all values in order as per Azul JSON requirement
+    // Concatenate values for SHA512HMAC AuthHash
+    // Important: Azul's AuthHash is typically HMAC-SHA512 of the concatenated values of ALL fields 
+    // in the order they appear in the request, using the AuthKey as the secret.
     const values = Object.values(requestData).join('');
     
-    // For SHA512HMAC, Azul expects the hash of the payload using the AuthKey
-    const authHash = this.generateAuthHash(values);
+    const authHash = crypto
+      .createHmac('sha512', config.authKey)
+      .update(values)
+      .digest('hex');
     
     const headers = {
       'Content-Type': 'application/json',
       'AuthHash': authHash,
+      'MerchantId': config.merchantId,
     };
 
     try {
