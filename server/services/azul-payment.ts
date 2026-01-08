@@ -154,39 +154,43 @@ export class AzulPaymentService {
     const config = getAzulConfig();
     const url = getApiUrl();
     
-    // Add common fields
+    // According to the provided example and standard Azul JSON API requirements:
+    // AuthHash must be HMAC-SHA512 of the concatenated values of specific fields, 
+    // where the secret key is also the AuthKey and it must be appended to the string before hashing.
+    
+    // For JSON Sale: MerchantId, Channel, PosInputMode, TrxType, Amount, Itbis, CustomOrderId
     const requestData: Record<string, any> = {
       MerchantId: config.merchantId,
       Channel: config.channel,
       PosInputMode: config.posInputMode,
-      CurrencyPosCode: '$',
-      ...data,
+      TrxType: data.TrxType || 'Sale',
+      Amount: data.Amount || '000000000000',
+      Itbis: data.Itbis || '000000000000',
+      CustomOrderId: data.CustomOrderId || '',
+      ...data
     };
 
-    // The example shows concatenation of values in a specific order:
-    // MerchantId + MerchantName + MerchantType + CurrencyCode + OrderNumber + Amount + ITBIS + 
-    // ApprovedUrl + DeclinedUrl + CancelUrl + UseCustomField1 + CustomField1Label + CustomField1Value + 
-    // UseCustomField2 + CustomField2Label + CustomField2Value + AuthKey
+    const hashString = [
+      requestData.MerchantId,
+      requestData.Channel,
+      requestData.PosInputMode,
+      requestData.TrxType,
+      requestData.Amount,
+      requestData.Itbis,
+      requestData.CustomOrderId,
+      config.authKey
+    ].join('');
     
-    // For our API request (not payment page), we must follow the specific order 
-    // expected by the JSON API, which usually follows the object key order or alphabetical.
-    // However, the user provided a specific example of concatenation.
-    
-    const values = Object.values(requestData).join('');
-    
-    // IMPORTANT: The AuthHash is HMAC-SHA512(ConcatenatedString, AuthKey)
-    // The key is the AuthKey, AND the message ALSO ends with the AuthKey as per PHP example.
-    const message = `${values}${config.authKey}`;
     const authHash = crypto
       .createHmac('sha512', config.authKey)
-      .update(message)
+      .update(hashString)
       .digest('hex');
     
     const headers = {
       'Content-Type': 'application/json',
       'AuthHash': authHash,
       'Auth1': config.authKey,
-      'Auth2': config.authKey,
+      'Auth2': config.authKey
     };
 
     try {
@@ -199,7 +203,7 @@ export class AzulPaymentService {
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(requestData),
+        body: jsonPayload,
       });
 
       if (!response.ok) {
