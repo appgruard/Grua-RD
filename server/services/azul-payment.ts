@@ -163,20 +163,30 @@ export class AzulPaymentService {
       ...data,
     };
 
-    // Concatenate values for SHA512HMAC AuthHash
-    // Important: Azul's AuthHash is typically HMAC-SHA512 of the concatenated values of ALL fields 
-    // in the order they appear in the request, using the AuthKey as the secret.
+    // The example shows concatenation of values in a specific order:
+    // MerchantId + MerchantName + MerchantType + CurrencyCode + OrderNumber + Amount + ITBIS + 
+    // ApprovedUrl + DeclinedUrl + CancelUrl + UseCustomField1 + CustomField1Label + CustomField1Value + 
+    // UseCustomField2 + CustomField2Label + CustomField2Value + AuthKey
+    
+    // For our API request (not payment page), we must follow the specific order 
+    // expected by the JSON API, which usually follows the object key order or alphabetical.
+    // However, the user provided a specific example of concatenation.
+    
     const values = Object.values(requestData).join('');
     
+    // IMPORTANT: The AuthHash is HMAC-SHA512(ConcatenatedString, AuthKey)
+    // The key is the AuthKey, AND the message ALSO ends with the AuthKey as per PHP example.
+    const message = `${values}${config.authKey}`;
     const authHash = crypto
       .createHmac('sha512', config.authKey)
-      .update(values)
+      .update(message)
       .digest('hex');
     
     const headers = {
       'Content-Type': 'application/json',
       'AuthHash': authHash,
-      'MerchantId': config.merchantId,
+      'Auth1': config.authKey,
+      'Auth2': config.authKey,
     };
 
     try {
