@@ -154,50 +154,43 @@ export class AzulPaymentService {
     const config = getAzulConfig();
     const url = getApiUrl();
     
-    // For Azul JSON WebService using SHA512HMAC:
-    // 1. Headers: Auth1 = MerchantId, Auth2 = AuthKey
-    // 2. AuthHash inside JSON: HMAC-SHA512(ConcatenatedValues, AuthKey)
-    // The ConcatenatedValues for Sale/Hold is: MerchantId + TrxType + Amount + Itbis + CustomOrderId + AuthKey
-    
-    const trxType = data.TrxType || 'Sale';
-    const amount = data.Amount || '000000000000';
-    const itbis = data.Itbis || '000000000000';
-    const customOrderId = data.CustomOrderId || '';
-
-    // Precise concatenation order from JSON manual
-    const hashString = `${config.merchantId}${trxType}${amount}${itbis}${customOrderId}${config.authKey}`;
-    
-    const authHash = crypto
-      .createHmac('sha512', config.authKey)
-      .update(hashString)
-      .digest('hex');
+    // Basándome en especificaciones oficiales de Azul para HMAC-SHA512 en API JSON:
+    // Auth1: MerchantId
+    // Auth2: HMAC-SHA512(JSON_PAYLOAD, AuthKey)
+    // El AuthKey se usa como clave secreta del HMAC. El payload es el JSON completo.
     
     const requestData = {
-      ...data,
       MerchantId: config.merchantId,
       Channel: config.channel,
       PosInputMode: config.posInputMode,
       CurrencyPosCode: '$',
-      AuthHash: authHash
+      ...data,
     };
 
+    const jsonPayload = JSON.stringify(requestData);
+    
+    const auth2Hash = crypto
+      .createHmac('sha512', config.authKey)
+      .update(jsonPayload)
+      .digest('hex');
+    
     const headers = {
       'Content-Type': 'application/json',
       'Auth1': config.merchantId,
-      'Auth2': config.authKey
+      'Auth2': auth2Hash
     };
 
     try {
       logSystem.info('Azul API request', { 
         url, 
-        method: trxType,
-        customOrderId
+        method: data.TrxType || 'Unknown',
+        customOrderId: data.CustomOrderId
       });
 
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(requestData),
+        body: jsonPayload,
       });
 
       if (!response.ok) {
