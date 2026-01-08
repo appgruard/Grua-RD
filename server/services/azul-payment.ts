@@ -169,6 +169,9 @@ export class AzulPaymentService {
 
     const jsonPayload = JSON.stringify(requestData);
     
+    // According to Azul documentation for JSON API:
+    // The Auth2 header should be the HMAC-SHA512 of the JSON payload
+    // using the AuthKey as the secret.
     const auth2Hash = crypto
       .createHmac('sha512', config.authKey)
       .update(jsonPayload)
@@ -180,12 +183,14 @@ export class AzulPaymentService {
       'Auth2': auth2Hash
     };
 
-    try {
-      logSystem.info('Azul API request', { 
-        url, 
-        method: data.TrxType || 'Unknown',
-        customOrderId: data.CustomOrderId
-      });
+    // Logging the request for debugging (without sensitive data if possible)
+    logSystem.info('Azul API request', { 
+      url, 
+      merchantId: config.merchantId,
+      trxType: data.TrxType,
+      customOrderId: data.CustomOrderId,
+      auth2HeaderLength: auth2Hash.length
+    });
 
       const response = await fetch(url, {
         method: 'POST',
