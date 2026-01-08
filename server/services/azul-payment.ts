@@ -154,56 +154,50 @@ export class AzulPaymentService {
     const config = getAzulConfig();
     const url = getApiUrl();
     
-    // According to the provided example and standard Azul JSON API requirements:
-    // AuthHash must be HMAC-SHA512 of the concatenated values of specific fields, 
-    // where the secret key is also the AuthKey and it must be appended to the string before hashing.
+    // For Azul JSON WebService using SHA512HMAC:
+    // 1. Headers: Auth1 = MerchantId, Auth2 = AuthKey
+    // 2. AuthHash inside JSON: HMAC-SHA512(ConcatenatedValues, AuthKey)
+    // The ConcatenatedValues for Sale/Hold is: MerchantId + TrxType + Amount + Itbis + CustomOrderId + AuthKey
     
-    // For JSON Sale: MerchantId, Channel, PosInputMode, TrxType, Amount, Itbis, CustomOrderId
-    const requestData: Record<string, any> = {
-      MerchantId: config.merchantId,
-      Channel: config.channel,
-      PosInputMode: config.posInputMode,
-      TrxType: data.TrxType || 'Sale',
-      Amount: data.Amount || '000000000000',
-      Itbis: data.Itbis || '000000000000',
-      CustomOrderId: data.CustomOrderId || '',
-      ...data
-    };
+    const trxType = data.TrxType || 'Sale';
+    const amount = data.Amount || '000000000000';
+    const itbis = data.Itbis || '000000000000';
+    const customOrderId = data.CustomOrderId || '';
 
-    const hashString = [
-      requestData.MerchantId,
-      requestData.Channel,
-      requestData.PosInputMode,
-      requestData.TrxType,
-      requestData.Amount,
-      requestData.Itbis,
-      requestData.CustomOrderId,
-      config.authKey
-    ].join('');
+    // Precise concatenation order from JSON manual
+    const hashString = `${config.merchantId}${trxType}${amount}${itbis}${customOrderId}${config.authKey}`;
     
     const authHash = crypto
       .createHmac('sha512', config.authKey)
       .update(hashString)
       .digest('hex');
     
+    const requestData = {
+      ...data,
+      MerchantId: config.merchantId,
+      Channel: config.channel,
+      PosInputMode: config.posInputMode,
+      CurrencyPosCode: '$',
+      AuthHash: authHash
+    };
+
     const headers = {
       'Content-Type': 'application/json',
-      'AuthHash': authHash,
-      'Auth1': config.authKey,
+      'Auth1': config.merchantId,
       'Auth2': config.authKey
     };
 
     try {
       logSystem.info('Azul API request', { 
         url, 
-        method: data.TrxType || 'Unknown',
-        customOrderId: data.CustomOrderId
+        method: trxType,
+        customOrderId
       });
 
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: jsonPayload,
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
