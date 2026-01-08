@@ -192,6 +192,7 @@ export class AzulPaymentService {
       auth2HeaderLength: auth2Hash.length
     });
 
+    try {
       const response = await fetch(url, {
         method: 'POST',
         headers,
