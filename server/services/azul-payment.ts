@@ -195,13 +195,21 @@ export class AzulPaymentService {
     // Auth2: HMAC-SHA512(JSON_PAYLOAD, AuthKey)
     // El AuthKey se usa como clave secreta del HMAC. El payload es el JSON completo.
     
-    const requestData = {
+    const requestData: Record<string, any> = {
       MerchantId: config.merchantId,
       Channel: config.channel,
       PosInputMode: config.posInputMode,
       CurrencyPosCode: '$',
       ...data,
     };
+
+    if (data.CardHolderInfo) {
+      requestData.CardHolderInfo = data.CardHolderInfo;
+    }
+
+    if (data.BrowserInfo) {
+      requestData.BrowserInfo = data.BrowserInfo;
+    }
 
     const jsonPayload = JSON.stringify(requestData);
     
@@ -425,6 +433,38 @@ export class AzulPaymentService {
         CustomerServicePhone: payment.customerServicePhone || '',
         OrderDescription: payment.orderDescription || '',
         SaveToDataVault: payment.saveToDataVault ? '1' : '0',
+        CardHolderInfo: payment.cardHolderInfo ? {
+          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
+          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || '',
+          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
+          BillingAddressLine2: payment.cardHolderInfo.billingAddressLine2 || '',
+          BillingAddressLine3: payment.cardHolderInfo.billingAddressLine3 || '',
+          BillingAddressState: payment.cardHolderInfo.billingAddressState || '',
+          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
+          Email: payment.cardHolderInfo.email || '',
+          Name: payment.cardHolderInfo.name,
+          PhoneHome: payment.cardHolderInfo.phoneHome || '',
+          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
+          PhoneWork: payment.cardHolderInfo.phoneWork || '',
+          ShippingAddressCity: payment.cardHolderInfo.shippingAddressCity || '',
+          ShippingAddressCountry: payment.cardHolderInfo.shippingAddressCountry || '',
+          ShippingAddressLine1: payment.cardHolderInfo.shippingAddressLine1 || '',
+          ShippingAddressLine2: payment.cardHolderInfo.shippingAddressLine2 || '',
+          ShippingAddressLine3: payment.cardHolderInfo.shippingAddressLine3 || '',
+          ShippingAddressState: payment.cardHolderInfo.shippingAddressState || '',
+          ShippingAddressZip: payment.cardHolderInfo.shippingAddressZip || '',
+        } : undefined,
+        BrowserInfo: payment.browserInfo ? {
+          AcceptHeader: payment.browserInfo.acceptHeader,
+          IPAddress: payment.browserInfo.ipAddress,
+          Language: payment.browserInfo.language,
+          ColorDepth: payment.browserInfo.colorDepth.toString(),
+          ScreenWidth: payment.browserInfo.screenWidth.toString(),
+          ScreenHeight: payment.browserInfo.screenHeight.toString(),
+          TimeZone: payment.browserInfo.timeZone,
+          UserAgent: payment.browserInfo.userAgent,
+          JavaScriptEnabled: payment.browserInfo.javaScriptEnabled,
+        } : undefined,
       };
 
       const response = await this.makeRequest(requestData);
@@ -486,6 +526,40 @@ export class AzulPaymentService {
         CustomerServicePhone: payment.customerServicePhone || '',
         OrderDescription: payment.orderDescription || '',
         SaveToDataVault: payment.saveToDataVault ? '1' : '0',
+        CardHolderInfo: payment.cardHolderInfo ? {
+          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
+          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || '',
+          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
+          BillingAddressLine2: payment.cardHolderInfo.billingAddressLine2 || '',
+          BillingAddressLine3: payment.cardHolderInfo.billingAddressLine3 || '',
+          BillingAddressState: payment.cardHolderInfo.billingAddressState || '',
+          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
+          Email: payment.cardHolderInfo.email || '',
+          Name: payment.cardHolderInfo.name,
+          PhoneHome: payment.cardHolderInfo.phoneHome || '',
+          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
+          PhoneWork: payment.cardHolderInfo.phoneWork || '',
+          ShippingAddressCity: payment.cardHolderInfo.shippingAddressCity || '',
+          ShippingAddressCountry: payment.cardHolderInfo.shippingAddressCountry || '',
+          ShippingAddressLine1: payment.cardHolderInfo.shippingAddressLine1 || '',
+          ShippingAddressLine2: payment.cardHolderInfo.shippingAddressLine2 || '',
+          ShippingAddressLine3: payment.cardHolderInfo.shippingAddressLine3 || '',
+          ShippingAddressState: payment.cardHolderInfo.shippingAddressState || '',
+          ShippingAddressZip: payment.cardHolderInfo.shippingAddressZip || '',
+        } : {
+          Name: cardData.cardHolderName || 'CLIENTE GRUA RD'
+        },
+        BrowserInfo: payment.browserInfo ? {
+          AcceptHeader: payment.browserInfo.acceptHeader,
+          IPAddress: payment.browserInfo.ipAddress,
+          Language: payment.browserInfo.language,
+          ColorDepth: payment.browserInfo.colorDepth.toString(),
+          ScreenWidth: payment.browserInfo.screenWidth.toString(),
+          ScreenHeight: payment.browserInfo.screenHeight.toString(),
+          TimeZone: payment.browserInfo.timeZone,
+          UserAgent: payment.browserInfo.userAgent,
+          JavaScriptEnabled: payment.browserInfo.javaScriptEnabled,
+        } : undefined,
       };
 
       const response = await this.makeRequest(requestData);
@@ -559,6 +633,38 @@ export class AzulPaymentService {
         CustomOrderId: payment.customOrderId,
         CustomerServicePhone: payment.customerServicePhone || '',
         OrderDescription: payment.orderDescription || '',
+        CardHolderInfo: payment.cardHolderInfo ? {
+          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
+          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || '',
+          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
+          BillingAddressLine2: payment.cardHolderInfo.billingAddressLine2 || '',
+          BillingAddressLine3: payment.cardHolderInfo.billingAddressLine3 || '',
+          BillingAddressState: payment.cardHolderInfo.billingAddressState || '',
+          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
+          Email: payment.cardHolderInfo.email || '',
+          Name: payment.cardHolderInfo.name,
+          PhoneHome: payment.cardHolderInfo.phoneHome || '',
+          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
+          PhoneWork: payment.cardHolderInfo.phoneWork || '',
+          ShippingAddressCity: payment.cardHolderInfo.shippingAddressCity || '',
+          ShippingAddressCountry: payment.cardHolderInfo.shippingAddressCountry || '',
+          ShippingAddressLine1: payment.cardHolderInfo.shippingAddressLine1 || '',
+          ShippingAddressLine2: payment.cardHolderInfo.shippingAddressLine2 || '',
+          ShippingAddressLine3: payment.cardHolderInfo.shippingAddressLine3 || '',
+          ShippingAddressState: payment.cardHolderInfo.shippingAddressState || '',
+          ShippingAddressZip: payment.cardHolderInfo.shippingAddressZip || '',
+        } : undefined,
+        BrowserInfo: payment.browserInfo ? {
+          AcceptHeader: payment.browserInfo.acceptHeader,
+          IPAddress: payment.browserInfo.ipAddress,
+          Language: payment.browserInfo.language,
+          ColorDepth: payment.browserInfo.colorDepth.toString(),
+          ScreenWidth: payment.browserInfo.screenWidth.toString(),
+          ScreenHeight: payment.browserInfo.screenHeight.toString(),
+          TimeZone: payment.browserInfo.timeZone,
+          UserAgent: payment.browserInfo.userAgent,
+          JavaScriptEnabled: payment.browserInfo.javaScriptEnabled,
+        } : undefined,
       };
 
       const response = await this.makeRequest(requestData);
@@ -770,6 +876,7 @@ export class AzulPaymentService {
     browserInfo: {
       userAgent: string;
       acceptHeader: string;
+      ipAddress?: string;
       colorDepth: number;
       screenHeight: number;
       screenWidth: number;
@@ -794,6 +901,39 @@ export class AzulPaymentService {
         Itbis: (payment.itbis || 0).toString().padStart(12, '0'),
         CustomOrderId: payment.customOrderId,
         ThreeDSAuthMethod: '02', // Challenge flow
+        CardHolderInfo: payment.cardHolderInfo ? {
+          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
+          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || '',
+          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
+          BillingAddressLine2: payment.cardHolderInfo.billingAddressLine2 || '',
+          BillingAddressLine3: payment.cardHolderInfo.billingAddressLine3 || '',
+          BillingAddressState: payment.cardHolderInfo.billingAddressState || '',
+          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
+          Email: payment.cardHolderInfo.email || '',
+          Name: payment.cardHolderInfo.name,
+          PhoneHome: payment.cardHolderInfo.phoneHome || '',
+          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
+          PhoneWork: payment.cardHolderInfo.phoneWork || '',
+          ShippingAddressCity: payment.cardHolderInfo.shippingAddressCity || '',
+          ShippingAddressCountry: payment.cardHolderInfo.shippingAddressCountry || '',
+          ShippingAddressLine1: payment.cardHolderInfo.shippingAddressLine1 || '',
+          ShippingAddressLine2: payment.cardHolderInfo.shippingAddressLine2 || '',
+          ShippingAddressLine3: payment.cardHolderInfo.shippingAddressLine3 || '',
+          ShippingAddressState: payment.cardHolderInfo.shippingAddressState || '',
+          ShippingAddressZip: payment.cardHolderInfo.shippingAddressZip || '',
+        } : undefined,
+        BrowserInfo: {
+          AcceptHeader: browserInfo.acceptHeader,
+          IPAddress: browserInfo.ipAddress || '0.0.0.0',
+          Language: browserInfo.language,
+          ColorDepth: browserInfo.colorDepth.toString(),
+          ScreenWidth: browserInfo.screenWidth.toString(),
+          ScreenHeight: browserInfo.screenHeight.toString(),
+          TimeZone: browserInfo.timeZoneOffset.toString(),
+          UserAgent: browserInfo.userAgent,
+          JavaScriptEnabled: 'true',
+        },
+      };
         BrowserUserAgent: browserInfo.userAgent,
         BrowserAcceptHeader: browserInfo.acceptHeader,
         BrowserColorDepth: browserInfo.colorDepth.toString(),
