@@ -45,6 +45,40 @@ export interface AzulTokenData {
   expiryYear: number;
 }
 
+export interface CardHolderInfo {
+  billingAddressCity?: string;
+  billingAddressCountry?: string;
+  billingAddressLine1?: string;
+  billingAddressLine2?: string;
+  billingAddressLine3?: string;
+  billingAddressState?: string;
+  billingAddressZip?: string;
+  email?: string;
+  name: string;
+  phoneHome?: string;
+  phoneMobile?: string;
+  phoneWork?: string;
+  shippingAddressCity?: string;
+  shippingAddressCountry?: string;
+  shippingAddressLine1?: string;
+  shippingAddressLine2?: string;
+  shippingAddressLine3?: string;
+  shippingAddressState?: string;
+  shippingAddressZip?: string;
+}
+
+export interface BrowserInfo {
+  acceptHeader: string;
+  ipAddress: string;
+  language: string;
+  colorDepth: number;
+  screenWidth: number;
+  screenHeight: number;
+  timeZone: string;
+  userAgent: string;
+  javaScriptEnabled: string;
+}
+
 export interface AzulPaymentRequest {
   amount: number; // In centavos (RD$100.00 = 10000)
   itbis?: number; // Tax in centavos
@@ -52,6 +86,8 @@ export interface AzulPaymentRequest {
   customerServicePhone?: string;
   orderDescription?: string;
   saveToDataVault?: boolean;
+  cardHolderInfo?: CardHolderInfo;
+  browserInfo?: BrowserInfo;
 }
 
 export interface AzulResponse {
