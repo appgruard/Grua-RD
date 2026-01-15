@@ -475,7 +475,8 @@ export class AzulPaymentService {
         OrderDescription: payment.orderDescription || 'Pago Gruas RD',
         SaveToDataVault: payment.saveToDataVault ? '1' : '0',
         Payments: '1',
-        Plan: '0'
+        Plan: '0',
+        ForceNo3DS: '1'
       };
 
       const response = await this.makeRequest(requestData);
