@@ -207,11 +207,13 @@ export class AzulPaymentService {
     
     // Auth1 and Auth2 headers are set to 'splitit' (static keys)
     // IMPORTANT: Azul requires these exact keys for certificate-based auth
-    const headers = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Auth1': 'splitit',
       'Auth2': 'splitit',
-      'Content-Length': Buffer.byteLength(jsonPayload)
+      'Content-Length': Buffer.byteLength(jsonPayload).toString(),
+      'User-Agent': 'GruaRD-App/1.0',
+      'Host': url.hostname
     };
 
     logSystem.info('Azul API request (Cert-based)', { 
