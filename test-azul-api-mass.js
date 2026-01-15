@@ -6,7 +6,7 @@ const fs = require('fs');
  * Pruebas de tarjetas estándar y escenarios 3DS.
  */
 
-const certPath = '/opt/certificados/gruard/app.gruard.com.crt';
+const certPath = '/opt/certificados/gruard/app.gruard.com.bundle.crt';
 const keyPath  = '/opt/certificados/gruard/app.gruard.com.key';
 const merchantId = "39038540035";
 
