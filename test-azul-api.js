@@ -17,13 +17,12 @@ const agent = new https.Agent({
   minVersion: 'TLSv1.2'
 });
 
-// Prueba con monto mínimo y datos válidos de prueba
 const payload = JSON.stringify({
   Channel: "EC",
   Store: "39038540035",
   PosInputMode: "E-Commerce",
   TrxType: "Sale",
-  Amount: "100", // RD$ 1.00
+  Amount: "100",
   Itbis: "18",
   CurrencyPosCode: "RD$",
   Payments: "1",
@@ -33,7 +32,8 @@ const payload = JSON.stringify({
   CustomerServicePhone: "8293519324",
   CardNumber: "4111111111111111",
   Expiration: "203012",
-  CVC: "123"
+  CVC: "123",
+  ForceNo3DS: "1" // Agregado según la imagen sugerida
 });
 
 const options = {
@@ -51,29 +51,19 @@ const options = {
   }
 };
 
-console.log('--- Probando Conexión Azul mTLS ---');
+console.log('--- Enviando petición mTLS con ForceNo3DS: 1 ---');
 
 const req = https.request(options, (res) => {
   let data = '';
   res.on('data', chunk => data += chunk);
   res.on('end', () => {
     console.log('STATUS:', res.statusCode);
-    try {
-      const parsed = JSON.parse(data);
-      console.log('RESPONSE:', JSON.stringify(parsed, null, 2));
-      if (parsed.IsoCode === '00') {
-        console.log('✅ EXITO: Conexión y Autenticación Correcta');
-      } else {
-        console.log('❌ ERROR AZUL:', parsed.ErrorDescription || parsed.ResponseMessage);
-      }
-    } catch (e) {
-      console.log('RESPONSE RAW:', data);
-    }
+    console.log('RESPONSE:', data);
   });
 });
 
 req.on('error', (err) => {
-  console.error('❌ ERROR DE RED:', err.message);
+  console.error('ERROR:', err);
 });
 
 req.write(payload);

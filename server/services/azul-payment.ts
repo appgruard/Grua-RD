@@ -200,6 +200,7 @@ export class AzulPaymentService {
       Store: config.merchantId,
       PosInputMode: config.posInputMode,
       CurrencyPosCode: 'RD$',
+      ForceNo3DS: '1', // Desactivar 3DS por defecto para mTLS según recomendación de Azul
       ...data,
     };
 
