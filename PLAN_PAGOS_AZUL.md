@@ -8,13 +8,13 @@ Este plan detalla los pasos necesarios para migrar el sistema de pagos actual a 
 - [x] Actualizar el script de prueba externo con la lógica de certificados.
 - [x] Documentar la ubicación necesaria de los certificados en el VPS.
 
-## Fase 2: Actualización del Servicio de Pagos (`AzulPaymentService`) (EN PROGRESO)
+## Fase 2: Actualización del Servicio de Pagos (`AzulPaymentService`) (COMPLETADA)
 - [x] Refactorizar `makeRequest` para usar `https.request` con el agente de certificados.
 - [x] Ajustar el payload de las transacciones para coincidir con la documentación oficial (`Store`, `Plan`, `Payments`, etc.).
 - [x] Implementar el manejo de errores basado en códigos HTTP y respuestas JSON de Azul.
 - [x] Actualizar los métodos de Venta, Hold, Post y Refund.
 
-## Fase 3: Integración y Pruebas en el Sistema
+## Fase 3: Integración y Pruebas en el Sistema (EN PROGRESO)
 - [ ] Actualizar las rutas de la API en `server/routes.ts` para usar la nueva lógica.
 - [ ] Realizar pruebas de conectividad desde el entorno de desarrollo (usando certificados de prueba si están disponibles).
 - [ ] Verificar el flujo de respuesta (ISO Codes) y almacenamiento de órdenes.

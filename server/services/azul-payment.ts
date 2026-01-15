@@ -1,24 +1,20 @@
-/**
- * Azul Payment Service - Dominican Republic Payment Gateway
- * 
- * Handles:
- * - DataVault tokenization (create, use, delete tokens)
- * - Payment processing (Sale, Hold, Post, Void, Refund)
- * - 3D Secure 2.0 support
- * - Payment verification
- */
-
 import { logSystem } from '../logger';
 import crypto from 'crypto';
+import https from 'https';
+import fs from 'fs';
 
 // Azul API Configuration
 const AZUL_SANDBOX_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx';
 const AZUL_PRODUCTION_URL = 'https://pagos.azul.com.do/webservices/JSON/Default.aspx';
 
+// Certificate Paths
+const CERT_PATH = process.env.AZUL_CERT_PATH || '/opt/certificados/gruard/app.gruard.com.crt';
+const KEY_PATH = process.env.AZUL_KEY_PATH || '/opt/certificados/gruard/app.gruard.com.key';
+
 // Environment configuration
 const getAzulConfig = () => ({
-  merchantId: process.env.AZUL_MERCHANT_ID || '',
-  authKey: process.env.AZUL_AUTH_KEY || '',
+  merchantId: process.env.AZUL_MERCHANT_ID || '39038540035',
+  authKey: process.env.AZUL_AUTH_KEY || 'splitit', // Used as Auth1/Auth2 headers
   environment: (process.env.AZUL_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production',
   channel: process.env.AZUL_CHANNEL || 'EC',
   posInputMode: process.env.AZUL_POS_INPUT_MODE || 'E-Commerce',
@@ -27,6 +23,24 @@ const getAzulConfig = () => ({
 const getApiUrl = () => {
   const config = getAzulConfig();
   return config.environment === 'production' ? AZUL_PRODUCTION_URL : AZUL_SANDBOX_URL;
+};
+
+// Create HTTPS Agent with certificates
+const getHttpsAgent = () => {
+  try {
+    if (fs.existsSync(CERT_PATH) && fs.existsSync(KEY_PATH)) {
+      return new https.Agent({
+        cert: fs.readFileSync(CERT_PATH),
+        key: fs.readFileSync(KEY_PATH),
+        rejectUnauthorized: true
+      });
+    }
+    logSystem.warn('Azul certificates not found, using default agent (Sandbox only)');
+    return undefined;
+  } catch (error) {
+    logSystem.error('Error loading Azul certificates', error);
+    return undefined;
+  }
 };
 
 // Types
@@ -169,97 +183,83 @@ export class AzulPaymentService {
    */
   static isConfigured(): boolean {
     const config = getAzulConfig();
-    return !!(config.merchantId && config.authKey);
+    return !!(config.merchantId);
   }
 
   /**
-   * Generate auth hash for Azul requests using SHA512HMAC
-   */
-  private static generateAuthHash(data: string): string {
-    const config = getAzulConfig();
-    return crypto
-      .createHmac('sha512', config.authKey)
-      .update(data)
-      .digest('hex');
-  }
-
-  /**
-   * Make a request to Azul API
+   * Make a request to Azul API using https.request and digital certificates
    */
   private static async makeRequest(data: Record<string, any>): Promise<any> {
     const config = getAzulConfig();
-    const url = getApiUrl();
+    const apiUrl = getApiUrl();
+    const url = new URL(apiUrl);
     
-    // Basándome en especificaciones oficiales de Azul para HMAC-SHA512 en API JSON:
-    // Auth1: MerchantId
-    // Auth2: HMAC-SHA512(JSON_PAYLOAD, AuthKey)
-    // El AuthKey se usa como clave secreta del HMAC. El payload es el JSON completo.
-    
+    // Prepare standardized request data
     const requestData: Record<string, any> = {
-      MerchantId: config.merchantId,
       Channel: config.channel,
+      Store: config.merchantId,
       PosInputMode: config.posInputMode,
-      CurrencyPosCode: '$',
+      CurrencyPosCode: 'RD$',
       ...data,
     };
 
-    if (data.CardHolderInfo) {
-      requestData.CardHolderInfo = data.CardHolderInfo;
-    }
-
-    if (data.BrowserInfo) {
-      requestData.BrowserInfo = data.BrowserInfo;
-    }
-
     const jsonPayload = JSON.stringify(requestData);
     
-    // According to Azul documentation for JSON API:
-    // The Auth2 header should be the HMAC-SHA512 of the JSON payload
-    // using the AuthKey as the secret.
-    const auth2Hash = crypto
-      .createHmac('sha512', config.authKey)
-      .update(jsonPayload)
-      .digest('hex');
-    
+    // According to Azul new instructions:
+    // Auth1 and Auth2 headers are set to 'splitit' (or configured authKey)
+    // Security is handled by the digital certificate in the HTTPS agent
     const headers = {
       'Content-Type': 'application/json',
-      'Auth1': config.merchantId,
-      'Auth2': auth2Hash
+      'Auth1': config.authKey,
+      'Auth2': config.authKey,
+      'Content-Length': Buffer.byteLength(jsonPayload)
     };
 
-    // Logging the request for debugging (without sensitive data if possible)
-    logSystem.info('Azul API request', { 
-      url, 
+    logSystem.info('Azul API request (Cert-based)', { 
+      hostname: url.hostname,
       merchantId: config.merchantId,
       trxType: data.TrxType,
-      customOrderId: data.CustomOrderId,
-      auth2HeaderLength: auth2Hash.length
+      customOrderId: data.CustomOrderId
     });
 
-    try {
-      const response = await fetch(url, {
+    return new Promise((resolve, reject) => {
+      const options: https.RequestOptions = {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
         method: 'POST',
-        headers,
-        body: jsonPayload,
+        agent: getHttpsAgent(),
+        headers
+      };
+
+      const req = https.request(options, (res) => {
+        let responseBody = '';
+        res.on('data', chunk => responseBody += chunk);
+        res.on('end', () => {
+          try {
+            if (res.statusCode && res.statusCode >= 400) {
+              reject(new Error(`Azul API error: ${res.statusCode} ${responseBody}`));
+              return;
+            }
+            const responseData = JSON.parse(responseBody);
+            logSystem.info('Azul API response', { 
+              isoCode: responseData.IsoCode,
+              responseMessage: responseData.ResponseMessage
+            });
+            resolve(responseData);
+          } catch (error) {
+            reject(new Error(`Failed to parse Azul response: ${responseBody}`));
+          }
+        });
       });
 
-      if (!response.ok) {
-        throw new Error(`Azul API error: ${response.status} ${response.statusText}`);
-      }
-
-      const responseData = await response.json();
-      
-      logSystem.info('Azul API response', { 
-        isoCode: responseData.IsoCode,
-        responseMessage: responseData.ResponseMessage,
-        azulOrderId: responseData.AzulOrderId
+      req.on('error', (error) => {
+        logSystem.error('Azul API connection failed', error);
+        reject(error);
       });
 
-      return responseData;
-    } catch (error) {
-      logSystem.error('Azul API request failed', error);
-      throw error;
-    }
+      req.write(jsonPayload);
+      req.end();
+    });
   }
 
   /**
@@ -328,14 +328,8 @@ export class AzulPaymentService {
       const parsed = this.parseResponse(response);
 
       if (parsed.success && parsed.dataVaultToken) {
-        // Parse expiration (YYYYMM format)
         const expiryYear = parseInt(cardData.expiration.substring(0, 4));
         const expiryMonth = parseInt(cardData.expiration.substring(4, 6));
-
-        logSystem.info('Azul token created', {
-          last4: cleanCardNumber.slice(-4),
-          cardBrand,
-        });
 
         return {
           ...parsed,
@@ -349,11 +343,6 @@ export class AzulPaymentService {
         };
       }
 
-      logSystem.error('Azul token creation failed', {
-        isoCode: parsed.isoCode,
-        message: parsed.responseMessage,
-      });
-
       return parsed;
     } catch (error) {
       logSystem.error('Azul createToken error', error);
@@ -361,7 +350,6 @@ export class AzulPaymentService {
         success: false,
         isoCode: '96',
         responseMessage: 'Error del sistema al crear token',
-        errorDescription: error instanceof Error ? error.message : 'Error desconocido',
       };
     }
   }
@@ -386,18 +374,7 @@ export class AzulPaymentService {
       };
 
       const response = await this.makeRequest(requestData);
-      const parsed = this.parseResponse(response);
-
-      if (parsed.success) {
-        logSystem.info('Azul token deleted', { token: dataVaultToken.slice(-8) });
-      } else {
-        logSystem.error('Azul token deletion failed', {
-          token: dataVaultToken.slice(-8),
-          isoCode: parsed.isoCode,
-        });
-      }
-
-      return parsed;
+      return this.parseResponse(response);
     } catch (error) {
       logSystem.error('Azul deleteToken error', error);
       return {
@@ -427,65 +404,19 @@ export class AzulPaymentService {
       const requestData = {
         TrxType: 'Sale',
         DataVaultToken: dataVaultToken,
-        Amount: payment.amount.toString().padStart(12, '0'),
-        Itbis: (payment.itbis || 0).toString().padStart(12, '0'),
+        Amount: payment.amount.toString(),
+        Itbis: (payment.itbis || 0).toString(),
+        OrderNumber: payment.customOrderId,
         CustomOrderId: payment.customOrderId,
-        CustomerServicePhone: payment.customerServicePhone || '',
-        OrderDescription: payment.orderDescription || '',
+        CustomerServicePhone: payment.customerServicePhone || '8090000000',
+        OrderDescription: payment.orderDescription || 'Pago Gruas RD',
         SaveToDataVault: payment.saveToDataVault ? '1' : '0',
-        CardHolderInfo: payment.cardHolderInfo ? {
-          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
-          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || '',
-          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
-          BillingAddressLine2: payment.cardHolderInfo.billingAddressLine2 || '',
-          BillingAddressLine3: payment.cardHolderInfo.billingAddressLine3 || '',
-          BillingAddressState: payment.cardHolderInfo.billingAddressState || '',
-          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
-          Email: payment.cardHolderInfo.email || '',
-          Name: payment.cardHolderInfo.name,
-          PhoneHome: payment.cardHolderInfo.phoneHome || '',
-          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
-          PhoneWork: payment.cardHolderInfo.phoneWork || '',
-          ShippingAddressCity: payment.cardHolderInfo.shippingAddressCity || '',
-          ShippingAddressCountry: payment.cardHolderInfo.shippingAddressCountry || '',
-          ShippingAddressLine1: payment.cardHolderInfo.shippingAddressLine1 || '',
-          ShippingAddressLine2: payment.cardHolderInfo.shippingAddressLine2 || '',
-          ShippingAddressLine3: payment.cardHolderInfo.shippingAddressLine3 || '',
-          ShippingAddressState: payment.cardHolderInfo.shippingAddressState || '',
-          ShippingAddressZip: payment.cardHolderInfo.shippingAddressZip || '',
-        } : undefined,
-        BrowserInfo: payment.browserInfo ? {
-          AcceptHeader: payment.browserInfo.acceptHeader,
-          IPAddress: payment.browserInfo.ipAddress,
-          Language: payment.browserInfo.language,
-          ColorDepth: payment.browserInfo.colorDepth.toString(),
-          ScreenWidth: payment.browserInfo.screenWidth.toString(),
-          ScreenHeight: payment.browserInfo.screenHeight.toString(),
-          TimeZone: payment.browserInfo.timeZone,
-          UserAgent: payment.browserInfo.userAgent,
-          JavaScriptEnabled: payment.browserInfo.javaScriptEnabled,
-        } : undefined,
+        Payments: '1',
+        Plan: '0'
       };
 
       const response = await this.makeRequest(requestData);
-      const parsed = this.parseResponse(response);
-
-      if (parsed.success) {
-        logSystem.info('Azul payment processed', {
-          amount: payment.amount / 100,
-          azulOrderId: parsed.azulOrderId,
-          customOrderId: payment.customOrderId,
-        });
-      } else {
-        logSystem.error('Azul payment failed', {
-          amount: payment.amount / 100,
-          customOrderId: payment.customOrderId,
-          isoCode: parsed.isoCode,
-          message: parsed.responseMessage,
-        });
-      }
-
-      return parsed;
+      return this.parseResponse(response);
     } catch (error) {
       logSystem.error('Azul processPaymentWithToken error', error);
       return {
@@ -497,7 +428,7 @@ export class AzulPaymentService {
   }
 
   /**
-   * Process a payment with card data (Sale with optional tokenization)
+   * Process a payment with card data (Sale)
    */
   static async processPaymentWithCard(
     cardData: AzulCardData,
@@ -520,82 +451,34 @@ export class AzulPaymentService {
         CardNumber: cleanCardNumber,
         Expiration: cardData.expiration,
         CVC: cardData.cvc,
-        Amount: payment.amount.toString().padStart(12, '0'),
-        Itbis: (payment.itbis || 0).toString().padStart(12, '0'),
+        Amount: payment.amount.toString(),
+        Itbis: (payment.itbis || 0).toString(),
+        OrderNumber: payment.customOrderId,
         CustomOrderId: payment.customOrderId,
-        CustomerServicePhone: payment.customerServicePhone || '',
-        OrderDescription: payment.orderDescription || '',
+        CustomerServicePhone: payment.customerServicePhone || '8090000000',
+        OrderDescription: payment.orderDescription || 'Pago Gruas RD',
         SaveToDataVault: payment.saveToDataVault ? '1' : '0',
-        CardHolderInfo: payment.cardHolderInfo ? {
-          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
-          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || '',
-          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
-          BillingAddressLine2: payment.cardHolderInfo.billingAddressLine2 || '',
-          BillingAddressLine3: payment.cardHolderInfo.billingAddressLine3 || '',
-          BillingAddressState: payment.cardHolderInfo.billingAddressState || '',
-          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
-          Email: payment.cardHolderInfo.email || '',
-          Name: payment.cardHolderInfo.name,
-          PhoneHome: payment.cardHolderInfo.phoneHome || '',
-          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
-          PhoneWork: payment.cardHolderInfo.phoneWork || '',
-          ShippingAddressCity: payment.cardHolderInfo.shippingAddressCity || '',
-          ShippingAddressCountry: payment.cardHolderInfo.shippingAddressCountry || '',
-          ShippingAddressLine1: payment.cardHolderInfo.shippingAddressLine1 || '',
-          ShippingAddressLine2: payment.cardHolderInfo.shippingAddressLine2 || '',
-          ShippingAddressLine3: payment.cardHolderInfo.shippingAddressLine3 || '',
-          ShippingAddressState: payment.cardHolderInfo.shippingAddressState || '',
-          ShippingAddressZip: payment.cardHolderInfo.shippingAddressZip || '',
-        } : {
-          Name: cardData.cardHolderName || 'CLIENTE GRUA RD'
-        },
-        BrowserInfo: payment.browserInfo ? {
-          AcceptHeader: payment.browserInfo.acceptHeader,
-          IPAddress: payment.browserInfo.ipAddress,
-          Language: payment.browserInfo.language,
-          ColorDepth: payment.browserInfo.colorDepth.toString(),
-          ScreenWidth: payment.browserInfo.screenWidth.toString(),
-          ScreenHeight: payment.browserInfo.screenHeight.toString(),
-          TimeZone: payment.browserInfo.timeZone,
-          UserAgent: payment.browserInfo.userAgent,
-          JavaScriptEnabled: payment.browserInfo.javaScriptEnabled,
-        } : undefined,
+        Payments: '1',
+        Plan: '0'
       };
 
       const response = await this.makeRequest(requestData);
       const parsed = this.parseResponse(response);
 
-      if (parsed.success) {
-        logSystem.info('Azul payment with card processed', {
-          amount: payment.amount / 100,
-          azulOrderId: parsed.azulOrderId,
-          customOrderId: payment.customOrderId,
-          savedToken: !!parsed.dataVaultToken,
-        });
+      if (parsed.success && parsed.dataVaultToken && payment.saveToDataVault) {
+        const expiryYear = parseInt(cardData.expiration.substring(0, 4));
+        const expiryMonth = parseInt(cardData.expiration.substring(4, 6));
 
-        // If token was saved, return token data
-        if (parsed.dataVaultToken && payment.saveToDataVault) {
-          const expiryYear = parseInt(cardData.expiration.substring(0, 4));
-          const expiryMonth = parseInt(cardData.expiration.substring(4, 6));
-
-          return {
-            ...parsed,
-            tokenData: {
-              dataVaultToken: parsed.dataVaultToken,
-              cardBrand,
-              last4: cleanCardNumber.slice(-4),
-              expiryMonth,
-              expiryYear,
-            },
-          };
-        }
-      } else {
-        logSystem.error('Azul payment with card failed', {
-          amount: payment.amount / 100,
-          customOrderId: payment.customOrderId,
-          isoCode: parsed.isoCode,
-          message: parsed.responseMessage,
-        });
+        return {
+          ...parsed,
+          tokenData: {
+            dataVaultToken: parsed.dataVaultToken,
+            cardBrand,
+            last4: cleanCardNumber.slice(-4),
+            expiryMonth,
+            expiryYear,
+          },
+        };
       }
 
       return parsed;
@@ -610,7 +493,7 @@ export class AzulPaymentService {
   }
 
   /**
-   * Authorize a payment (Hold) - funds are held but not captured
+   * Authorize a payment (Hold)
    */
   static async authorizePayment(
     dataVaultToken: string,
@@ -628,63 +511,18 @@ export class AzulPaymentService {
       const requestData = {
         TrxType: 'Hold',
         DataVaultToken: dataVaultToken,
-        Amount: payment.amount.toString().padStart(12, '0'),
-        Itbis: (payment.itbis || 0).toString().padStart(12, '0'),
+        Amount: payment.amount.toString(),
+        Itbis: (payment.itbis || 0).toString(),
+        OrderNumber: payment.customOrderId,
         CustomOrderId: payment.customOrderId,
-        CustomerServicePhone: payment.customerServicePhone || '',
-        OrderDescription: payment.orderDescription || '',
-        CardHolderInfo: payment.cardHolderInfo ? {
-          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
-          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || '',
-          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
-          BillingAddressLine2: payment.cardHolderInfo.billingAddressLine2 || '',
-          BillingAddressLine3: payment.cardHolderInfo.billingAddressLine3 || '',
-          BillingAddressState: payment.cardHolderInfo.billingAddressState || '',
-          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
-          Email: payment.cardHolderInfo.email || '',
-          Name: payment.cardHolderInfo.name,
-          PhoneHome: payment.cardHolderInfo.phoneHome || '',
-          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
-          PhoneWork: payment.cardHolderInfo.phoneWork || '',
-          ShippingAddressCity: payment.cardHolderInfo.shippingAddressCity || '',
-          ShippingAddressCountry: payment.cardHolderInfo.shippingAddressCountry || '',
-          ShippingAddressLine1: payment.cardHolderInfo.shippingAddressLine1 || '',
-          ShippingAddressLine2: payment.cardHolderInfo.shippingAddressLine2 || '',
-          ShippingAddressLine3: payment.cardHolderInfo.shippingAddressLine3 || '',
-          ShippingAddressState: payment.cardHolderInfo.shippingAddressState || '',
-          ShippingAddressZip: payment.cardHolderInfo.shippingAddressZip || '',
-        } : undefined,
-        BrowserInfo: payment.browserInfo ? {
-          AcceptHeader: payment.browserInfo.acceptHeader,
-          IPAddress: payment.browserInfo.ipAddress,
-          Language: payment.browserInfo.language,
-          ColorDepth: payment.browserInfo.colorDepth.toString(),
-          ScreenWidth: payment.browserInfo.screenWidth.toString(),
-          ScreenHeight: payment.browserInfo.screenHeight.toString(),
-          TimeZone: payment.browserInfo.timeZone,
-          UserAgent: payment.browserInfo.userAgent,
-          JavaScriptEnabled: payment.browserInfo.javaScriptEnabled,
-        } : undefined,
+        CustomerServicePhone: payment.customerServicePhone || '8090000000',
+        OrderDescription: payment.orderDescription || 'Autorizacion Gruas RD',
+        Payments: '1',
+        Plan: '0'
       };
 
       const response = await this.makeRequest(requestData);
-      const parsed = this.parseResponse(response);
-
-      if (parsed.success) {
-        logSystem.info('Azul payment authorized (Hold)', {
-          amount: payment.amount / 100,
-          azulOrderId: parsed.azulOrderId,
-          customOrderId: payment.customOrderId,
-        });
-      } else {
-        logSystem.error('Azul authorization failed', {
-          amount: payment.amount / 100,
-          customOrderId: payment.customOrderId,
-          isoCode: parsed.isoCode,
-        });
-      }
-
-      return parsed;
+      return this.parseResponse(response);
     } catch (error) {
       logSystem.error('Azul authorizePayment error', error);
       return {
@@ -698,7 +536,7 @@ export class AzulPaymentService {
   /**
    * Capture a previously authorized payment (Post)
    */
-  static async capturePayment(azulOrderId: string, amount?: number): Promise<AzulResponse> {
+  static async capturePayment(azulOrderId: string, amount: number): Promise<AzulResponse> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -708,32 +546,14 @@ export class AzulPaymentService {
     }
 
     try {
-      const requestData: Record<string, any> = {
+      const requestData = {
         TrxType: 'Post',
         AzulOrderId: azulOrderId,
-        CustomOrderId: `CAPTURE-${Date.now()}`,
+        Amount: amount.toString(),
       };
 
-      if (amount !== undefined) {
-        requestData.Amount = amount.toString().padStart(12, '0');
-      }
-
       const response = await this.makeRequest(requestData);
-      const parsed = this.parseResponse(response);
-
-      if (parsed.success) {
-        logSystem.info('Azul payment captured (Post)', {
-          azulOrderId,
-          amount: amount ? amount / 100 : 'original',
-        });
-      } else {
-        logSystem.error('Azul capture failed', {
-          azulOrderId,
-          isoCode: parsed.isoCode,
-        });
-      }
-
-      return parsed;
+      return this.parseResponse(response);
     } catch (error) {
       logSystem.error('Azul capturePayment error', error);
       return {
@@ -745,55 +565,9 @@ export class AzulPaymentService {
   }
 
   /**
-   * Void a transaction (before settlement)
+   * Refund a payment (Refund)
    */
-  static async voidPayment(azulOrderId: string): Promise<AzulResponse> {
-    if (!this.isConfigured()) {
-      return {
-        success: false,
-        isoCode: '99',
-        responseMessage: 'Azul no está configurado correctamente',
-      };
-    }
-
-    try {
-      const requestData = {
-        TrxType: 'Void',
-        AzulOrderId: azulOrderId,
-        CustomOrderId: `VOID-${Date.now()}`,
-      };
-
-      const response = await this.makeRequest(requestData);
-      const parsed = this.parseResponse(response);
-
-      if (parsed.success) {
-        logSystem.info('Azul payment voided', { azulOrderId });
-      } else {
-        logSystem.error('Azul void failed', {
-          azulOrderId,
-          isoCode: parsed.isoCode,
-        });
-      }
-
-      return parsed;
-    } catch (error) {
-      logSystem.error('Azul voidPayment error', error);
-      return {
-        success: false,
-        isoCode: '96',
-        responseMessage: 'Error del sistema al anular pago',
-      };
-    }
-  }
-
-  /**
-   * Refund a transaction (after settlement)
-   */
-  static async refundPayment(
-    azulOrderId: string, 
-    amount: number,
-    itbis?: number
-  ): Promise<AzulResponse> {
+  static async refundPayment(azulOrderId: string, amount: number): Promise<AzulResponse> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -806,27 +580,11 @@ export class AzulPaymentService {
       const requestData = {
         TrxType: 'Refund',
         AzulOrderId: azulOrderId,
-        Amount: amount.toString().padStart(12, '0'),
-        Itbis: (itbis || 0).toString().padStart(12, '0'),
-        CustomOrderId: `REFUND-${Date.now()}`,
+        Amount: amount.toString(),
       };
 
       const response = await this.makeRequest(requestData);
-      const parsed = this.parseResponse(response);
-
-      if (parsed.success) {
-        logSystem.info('Azul payment refunded', {
-          azulOrderId,
-          amount: amount / 100,
-        });
-      } else {
-        logSystem.error('Azul refund failed', {
-          azulOrderId,
-          isoCode: parsed.isoCode,
-        });
-      }
-
-      return parsed;
+      return this.parseResponse(response);
     } catch (error) {
       logSystem.error('Azul refundPayment error', error);
       return {
@@ -873,16 +631,7 @@ export class AzulPaymentService {
   static async init3DSecure(
     dataVaultToken: string,
     payment: AzulPaymentRequest,
-    browserInfo: {
-      userAgent: string;
-      acceptHeader: string;
-      ipAddress?: string;
-      colorDepth: number;
-      screenHeight: number;
-      screenWidth: number;
-      timeZoneOffset: number;
-      language: string;
-    }
+    browserInfo: any
   ): Promise<Azul3DSResponse> {
     if (!this.isConfigured()) {
       return {
@@ -897,31 +646,11 @@ export class AzulPaymentService {
       const requestData = {
         TrxType: 'Sale',
         DataVaultToken: dataVaultToken,
-        Amount: payment.amount.toString().padStart(12, '0'),
-        Itbis: (payment.itbis || 0).toString().padStart(12, '0'),
+        Amount: payment.amount.toString(),
+        Itbis: (payment.itbis || 0).toString(),
+        OrderNumber: payment.customOrderId,
         CustomOrderId: payment.customOrderId,
-        ThreeDSAuthMethod: '02', // Challenge flow
-        CardHolderInfo: payment.cardHolderInfo ? {
-          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
-          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || '',
-          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
-          BillingAddressLine2: payment.cardHolderInfo.billingAddressLine2 || '',
-          BillingAddressLine3: payment.cardHolderInfo.billingAddressLine3 || '',
-          BillingAddressState: payment.cardHolderInfo.billingAddressState || '',
-          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
-          Email: payment.cardHolderInfo.email || '',
-          Name: payment.cardHolderInfo.name,
-          PhoneHome: payment.cardHolderInfo.phoneHome || '',
-          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
-          PhoneWork: payment.cardHolderInfo.phoneWork || '',
-          ShippingAddressCity: payment.cardHolderInfo.shippingAddressCity || '',
-          ShippingAddressCountry: payment.cardHolderInfo.shippingAddressCountry || '',
-          ShippingAddressLine1: payment.cardHolderInfo.shippingAddressLine1 || '',
-          ShippingAddressLine2: payment.cardHolderInfo.shippingAddressLine2 || '',
-          ShippingAddressLine3: payment.cardHolderInfo.shippingAddressLine3 || '',
-          ShippingAddressState: payment.cardHolderInfo.shippingAddressState || '',
-          ShippingAddressZip: payment.cardHolderInfo.shippingAddressZip || '',
-        } : undefined,
+        ThreeDSAuthMethod: '02',
         BrowserInfo: {
           AcceptHeader: browserInfo.acceptHeader,
           IPAddress: browserInfo.ipAddress || '0.0.0.0',
@@ -929,7 +658,7 @@ export class AzulPaymentService {
           ColorDepth: browserInfo.colorDepth.toString(),
           ScreenWidth: browserInfo.screenWidth.toString(),
           ScreenHeight: browserInfo.screenHeight.toString(),
-          TimeZone: browserInfo.timeZoneOffset.toString(),
+          TimeZone: browserInfo.timeZoneOffset?.toString() || '0',
           UserAgent: browserInfo.userAgent,
           JavaScriptEnabled: 'true',
         },
@@ -938,7 +667,6 @@ export class AzulPaymentService {
       const response = await this.makeRequest(requestData);
       const parsed = this.parseResponse(response);
 
-      // Check if 3DS is required
       if (response.ThreeDSMethodURL || response.AcsUrl) {
         return {
           ...parsed,
@@ -988,21 +716,7 @@ export class AzulPaymentService {
       };
 
       const response = await this.makeRequest(requestData);
-      const parsed = this.parseResponse(response);
-
-      if (parsed.success) {
-        logSystem.info('Azul 3DS payment completed', {
-          customOrderId,
-          azulOrderId: parsed.azulOrderId,
-        });
-      } else {
-        logSystem.error('Azul 3DS payment failed', {
-          customOrderId,
-          isoCode: parsed.isoCode,
-        });
-      }
-
-      return parsed;
+      return this.parseResponse(response);
     } catch (error) {
       logSystem.error('Azul complete3DSecure error', error);
       return {
