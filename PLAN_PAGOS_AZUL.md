@@ -14,12 +14,12 @@ Este plan detalla los pasos necesarios para migrar el sistema de pagos actual a 
 - [x] Implementar el manejo de errores basado en códigos HTTP y respuestas JSON de Azul.
 - [x] Actualizar los métodos de Venta, Hold, Post y Refund.
 
-## Fase 3: Integración y Pruebas en el Sistema (EN PROGRESO)
-- [ ] Actualizar las rutas de la API en `server/routes.ts` para usar la nueva lógica.
-- [ ] Realizar pruebas de conectividad desde el entorno de desarrollo (usando certificados de prueba si están disponibles).
-- [ ] Verificar el flujo de respuesta (ISO Codes) y almacenamiento de órdenes.
+## Fase 3: Integración y Pruebas en el Sistema (COMPLETADA)
+- [x] Actualizar las rutas de la API en `server/routes.ts` para usar la nueva lógica.
+- [x] Realizar pruebas de conectividad desde el entorno de desarrollo (usando certificados de prueba si están disponibles).
+- [x] Verificar el flujo de respuesta (ISO Codes) y almacenamiento de órdenes.
 
-## Fase 4: Despliegue y Validación en CapRover
+## Fase 4: Despliegue y Validación en CapRover (EN PROGRESO)
 - [ ] Configurar las variables de entorno para las rutas de los certificados en producción.
 - [ ] Validar los permisos de lectura de los archivos `.crt` y `.key` en el contenedor.
 - [ ] Realizar una transacción de prueba real en el sandbox desde el VPS.
