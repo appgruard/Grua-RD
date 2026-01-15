@@ -206,11 +206,11 @@ export class AzulPaymentService {
     const jsonPayload = JSON.stringify(requestData);
     
     // Auth1 and Auth2 headers are set to 'splitit' (static keys)
-    // Security is handled by the digital certificate in the HTTPS agent
+    // IMPORTANT: Azul requires these exact keys for certificate-based auth
     const headers = {
       'Content-Type': 'application/json',
-      'Auth1': config.authKey,
-      'Auth2': config.authKey,
+      'Auth1': 'splitit',
+      'Auth2': 'splitit',
       'Content-Length': Buffer.byteLength(jsonPayload)
     };
 
