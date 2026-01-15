@@ -934,14 +934,6 @@ export class AzulPaymentService {
           JavaScriptEnabled: 'true',
         },
       };
-        BrowserUserAgent: browserInfo.userAgent,
-        BrowserAcceptHeader: browserInfo.acceptHeader,
-        BrowserColorDepth: browserInfo.colorDepth.toString(),
-        BrowserScreenHeight: browserInfo.screenHeight.toString(),
-        BrowserScreenWidth: browserInfo.screenWidth.toString(),
-        BrowserTZ: browserInfo.timeZoneOffset.toString(),
-        BrowserLanguage: browserInfo.language,
-      };
 
       const response = await this.makeRequest(requestData);
       const parsed = this.parseResponse(response);
