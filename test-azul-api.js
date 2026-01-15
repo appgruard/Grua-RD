@@ -1,97 +1,89 @@
-const crypto = require('crypto');
-// Descomenta si usas Node < 18
-// const fetch = require('node-fetch');
+const https = require('https');
+const fs = require('fs');
 
-// CONFIGURACIÓN (Actualizada con los datos proporcionados)
+// CONFIGURACIÓN DE RUTAS DE CERTIFICADOS (Ajustar según entorno)
+const certPath = process.env.AZUL_CERT_PATH || '/opt/certificados/gruard/app.gruard.com.crt';
+const keyPath  = process.env.AZUL_KEY_PATH || '/opt/certificados/gruard/app.gruard.com.key';
+
+// Verificar existencia de certificados antes de iniciar
+if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
+  console.error('❌ ERROR: No se encontraron los certificados en las rutas especificadas.');
+  console.error(`Buscando en:\nCert: ${certPath}\nKey: ${keyPath}`);
+  process.exit(1);
+}
+
+// HTTPS Agent con certificado digital
+const agent = new https.Agent({
+  cert: fs.readFileSync(certPath),
+  key: fs.readFileSync(keyPath),
+  rejectUnauthorized: true
+});
+
 const CONFIG = {
   merchantId: '39038540035',
-  authKey: 'splitit', // Nota: Usando 'splitit' como AuthKey para el HMAC según instrucciones
-  url: 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx',
-  channel: 'EC',
-  posInputMode: 'E-Commerce'
+  hostname: 'pagos.azul.com.do', // Producción/Sandbox URL según corresponda
+  path: '/WebServices/JSON/default.aspx'
 };
 
-// Tarjetas de prueba proporcionadas
-const TEST_CARDS = [
-  { number: '5424180279791732', type: 'Mastercard' },
-  { number: '6011000990099818', type: 'Discover' },
-  { number: '4260550061845872', type: 'Visa' },
-  { number: '4035874000424977', type: 'Visa' },
-  { number: '5426064000424979', type: 'Mastercard' },
-  { number: '4012000033330026', type: 'Visa' }
-];
+async function testAzulPayment() {
+  console.log("--- Iniciando Prueba de Pago Azul (Certificados Digitales) ---");
 
-// Tarjetas 3DS (Requieren AuthKey: '3dsecure')
-const TDS_CARDS = [
-  { number: '4761120010000492', desc: 'Sin fricción con 3DSMethod' },
-  { number: '4147463011110117', desc: 'Sin fricción sin 3DSMethod' },
-  { number: '4005520000000129', desc: 'Desafío con 3DSMethod Limite 100' }
-];
+  const payload = JSON.stringify({
+    Channel: "EC",
+    Store: CONFIG.merchantId,
+    PosInputMode: "E-Commerce",
+    TrxType: "Sale",
+    Amount: "10000",          // RD$100.00
+    Itbis: "1800",            // RD$18.00
+    CurrencyPosCode: "RD$",
+    Payments: "1",
+    Plan: "0",
+    OrderNumber: "DEV-" + Date.now(),
+    CustomOrderId: "DEV-" + Date.now(),
+    CustomerServicePhone: "8091112222",
+    CardNumber: "4111111111111111", // Usar tarjetas del listado
+    Expiration: "203412",
+    CVC: "123"
+  });
 
-async function testAzulPayment(card, is3DS = false) {
-  const currentAuthKey = is3DS ? '3dsecure' : CONFIG.authKey;
-  
-  console.log(`\n--- Probando Tarjeta: ${card.number} (${is3DS ? '3DS: ' + card.desc : card.type}) ---`);
-
-  const paymentRequest = {
-    MerchantId: CONFIG.merchantId,
-    TrxType: 'Sale',
-    CardNumber: card.number,
-    Expiration: '203412', // Fecha futura 12/34
-    CVC: card.number.startsWith('3') ? '1234' : '123',
-    Amount: '000000010000', // RD$100.00
-    Itbis: '000000000000',
-    CurrencyPosCode: '$',
-    Channel: CONFIG.channel,
-    PosInputMode: CONFIG.posInputMode,
-    CustomOrderId: 'TEST-' + (is3DS ? '3DS-' : '') + Date.now(),
-    OrderDescription: 'Prueba de integración Azul'
+  const options = {
+    hostname: CONFIG.hostname,
+    path: CONFIG.path,
+    method: 'POST',
+    agent,
+    headers: {
+      'Content-Type': 'application/json',
+      'Auth1': 'splitit', // Credenciales fijas según instrucción de Azul
+      'Auth2': 'splitit',
+      'Content-Length': Buffer.byteLength(payload)
+    }
   };
 
-  const jsonPayload = JSON.stringify(paymentRequest);
-
-  // Generación del hash HMAC-SHA512
-  const auth2Hash = crypto
-    .createHmac('sha512', currentAuthKey)
-    .update(jsonPayload)
-    .digest('hex');
-
-  try {
-    const response = await fetch(CONFIG.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Auth1': CONFIG.merchantId,
-        'Auth2': auth2Hash
-      },
-      body: jsonPayload
+  const req = https.request(options, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      console.log('STATUS:', res.statusCode);
+      console.log('RESPONSE:', data);
+      try {
+        const jsonResponse = JSON.parse(data);
+        if (jsonResponse.IsoCode === '00') {
+          console.log("✅ PAGO EXITOSO");
+        } else {
+          console.log("❌ PAGO RECHAZADO:", jsonResponse.ResponseMessage);
+        }
+      } catch (e) {
+        console.log("⚠️ No se pudo parsear la respuesta JSON");
+      }
     });
+  });
 
-    const result = await response.json();
-    
-    console.log(`ISO Code: ${result.IsoCode} - ${result.ResponseMessage}`);
-    if (result.AzulOrderId) console.log(`Azul Order ID: ${result.AzulOrderId}`);
-    
-    if (result.IsoCode === '00') {
-      console.log("✅ RESULTADO: APROBADA");
-    } else {
-      console.log("❌ RESULTADO: DECLINADA/ERROR");
-    }
-  } catch (error) {
-    console.error("Error en la conexión:", error.message);
-  }
+  req.on('error', (err) => {
+    console.error('❌ ERROR DE CONEXIÓN:', err);
+  });
+
+  req.write(payload);
+  req.end();
 }
 
-async function runTests() {
-  console.log("INICIANDO PRUEBAS DE API AZUL CON DATOS REALES");
-  
-  // Probar la primera tarjeta normal
-  await testAzulPayment(TEST_CARDS[0]);
-  
-  // Probar la primera tarjeta 3DS
-  await testAzulPayment(TDS_CARDS[0], true);
-  
-  console.log("\nPruebas completadas. Puedes editar el script para probar otras tarjetas del listado.");
-}
-
-runTests();
+testAzulPayment();
