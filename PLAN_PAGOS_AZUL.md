@@ -19,10 +19,10 @@ Este plan detalla los pasos necesarios para migrar el sistema de pagos actual a 
 - [x] Realizar pruebas de conectividad desde el entorno de desarrollo (usando certificados de prueba si están disponibles).
 - [x] Verificar el flujo de respuesta (ISO Codes) y almacenamiento de órdenes.
 
-## Fase 4: Despliegue y Validación en CapRover (EN PROGRESO)
-- [ ] Configurar las variables de entorno para las rutas de los certificados en producción.
-- [ ] Validar los permisos de lectura de los archivos `.crt` y `.key` en el contenedor.
-- [ ] Realizar una transacción de prueba real en el sandbox desde el VPS.
+## Fase 4: Despliegue y Validación en CapRover (COMPLETADA)
+- [x] Configurar las variables de entorno para las rutas de los certificados en producción.
+- [x] Validar los permisos de lectura de los archivos `.crt` y `.key` en el contenedor.
+- [x] Realizar una transacción de prueba real en el sandbox desde el VPS.
 
 ---
 

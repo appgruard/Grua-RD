@@ -205,8 +205,7 @@ export class AzulPaymentService {
 
     const jsonPayload = JSON.stringify(requestData);
     
-    // According to Azul new instructions:
-    // Auth1 and Auth2 headers are set to 'splitit' (or configured authKey)
+    // Auth1 and Auth2 headers are set to 'splitit' (static keys)
     // Security is handled by the digital certificate in the HTTPS agent
     const headers = {
       'Content-Type': 'application/json',
@@ -225,7 +224,7 @@ export class AzulPaymentService {
     return new Promise((resolve, reject) => {
       const options: https.RequestOptions = {
         hostname: url.hostname,
-        path: url.pathname + url.search,
+        path: url.pathname + (url.search || ''),
         method: 'POST',
         agent: getHttpsAgent(),
         headers
@@ -237,16 +236,22 @@ export class AzulPaymentService {
         res.on('end', () => {
           try {
             if (res.statusCode && res.statusCode >= 400) {
+              logSystem.error('Azul API error response', { statusCode: res.statusCode, body: responseBody });
               reject(new Error(`Azul API error: ${res.statusCode} ${responseBody}`));
               return;
             }
+            if (!responseBody) {
+              reject(new Error('Azul API returned empty response'));
+              return;
+            }
             const responseData = JSON.parse(responseBody);
-            logSystem.info('Azul API response', { 
+            logSystem.info('Azul API response received', { 
               isoCode: responseData.IsoCode,
               responseMessage: responseData.ResponseMessage
             });
             resolve(responseData);
           } catch (error) {
+            logSystem.error('Failed to parse Azul response', { body: responseBody, error });
             reject(new Error(`Failed to parse Azul response: ${responseBody}`));
           }
         });
@@ -255,6 +260,12 @@ export class AzulPaymentService {
       req.on('error', (error) => {
         logSystem.error('Azul API connection failed', error);
         reject(error);
+      });
+
+      // Set timeout for the request
+      req.setTimeout(30000, () => {
+        req.destroy();
+        reject(new Error('Azul API request timed out after 30 seconds'));
       });
 
       req.write(jsonPayload);
