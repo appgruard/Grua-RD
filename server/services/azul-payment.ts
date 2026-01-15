@@ -227,7 +227,9 @@ export class AzulPaymentService {
         path: url.pathname + (url.search || ''),
         method: 'POST',
         agent: getHttpsAgent(),
-        headers
+        headers,
+        // Forzar versión mínima de TLS para cumplimiento de seguridad de Azul
+        minVersion: 'TLSv1.2' as any
       };
 
       const req = https.request(options, (res) => {

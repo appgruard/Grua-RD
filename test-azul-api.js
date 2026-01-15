@@ -13,7 +13,9 @@ if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
 const agent = new https.Agent({
   cert: fs.readFileSync(certPath),
   key: fs.readFileSync(keyPath),
-  rejectUnauthorized: true
+  rejectUnauthorized: true,
+  // Asegurar TLS 1.2+ para compatibilidad con Azul
+  minVersion: 'TLSv1.2'
 });
 
 const payload = JSON.stringify({
@@ -43,17 +45,21 @@ const options = {
     'Content-Type': 'application/json',
     'Auth1': 'splitit',
     'Auth2': 'splitit',
-    'Content-Length': Buffer.byteLength(payload)
+    'Content-Length': Buffer.byteLength(payload),
+    // Azul a veces requiere User-Agent o Host explícito
+    'User-Agent': 'GruaRD-App/1.0',
+    'Host': 'pagos.azul.com.do'
   }
 };
 
-console.log('--- Enviando petición con Auth1/Auth2: splitit ---');
+console.log('--- Enviando petición mTLS (TLSv1.2 min) ---');
 
 const req = https.request(options, (res) => {
   let data = '';
   res.on('data', chunk => data += chunk);
   res.on('end', () => {
     console.log('STATUS:', res.statusCode);
+    console.log('HEADERS:', JSON.stringify(res.headers, null, 2));
     console.log('RESPONSE:', data);
   });
 });
