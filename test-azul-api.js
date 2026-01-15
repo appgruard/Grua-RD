@@ -26,19 +26,18 @@ const agent = new https.Agent({
   minVersion: 'TLSv1.2'
 });
 
-// --- LISTADO DE TARJETAS DE PRUEBA ---
+// --- LISTADO DE TARJETAS DE PRUEBA ACTUALIZADO ---
 const testCards = [
-  { number: "5424000018020000", brand: "Mastercard" }, // Placeholder for 5424****1802****
-  { number: "6011000000090000", brand: "Discover" },   // Placeholder for 6011****0009****
-  { number: "4260000055000000", brand: "Visa" },       // Placeholder for 4260****5500****
-  { number: "4035000087400000", brand: "Visa" },       // Placeholder for 4035****8740****
-  { number: "5426000006400000", brand: "Mastercard" }, // Placeholder for 5426****0640****
-  { number: "4012000000003333", brand: "Visa" },       // Placeholder for 4012****0000****
+  "5424180279791732",
+  "6011000990099818",
+  "4260550061845872",
+  "4035874000424977",
+  "5426064000424979",
+  "4012000033330026"
 ];
 
-// Usamos la primera tarjeta de la lista para la prueba
-const selectedId = 5; // Cambiar índice para probar otras
-const cardNumber = testCards[selectedId].number;
+// Usamos la tarjeta #6 completa de tu lista por defecto
+const cardNumber = testCards[5]; 
 
 // --- PAYLOAD DE LA TRANSACCIÓN ---
 const payload = JSON.stringify({
@@ -54,7 +53,7 @@ const payload = JSON.stringify({
   OrderNumber: "GRUA-" + Date.now(),
   CustomOrderId: "GRUA-" + Date.now(),
   CustomerServicePhone: "8293519324",
-  CardNumber: "4012000033330026", // Usando la tarjeta #6 completa de tu lista
+  CardNumber: cardNumber,
   Expiration: "203412",           // 12/34 como solicitaste
   CVC: "123",
   ForceNo3DS: "1"
@@ -68,17 +67,17 @@ const options = {
   agent: agent,
   headers: {
     'Content-Type': 'application/json',
-    'Auth1': 'splitit', // Header solicitado para mTLS
-    'Auth2': 'splitit', // Header solicitado para mTLS
+    'Auth1': 'splitit',
+    'Auth2': 'splitit',
     'Content-Length': Buffer.byteLength(payload),
     'User-Agent': 'GruaRD-App/1.0',
     'Host': 'pagos.azul.com.do'
   }
 };
 
-console.log('--- INICIANDO PRUEBA AZUL mTLS ---');
+console.log('--- INICIANDO PRUEBA AZUL mTLS (NÚMEROS CORREGIDOS) ---');
 console.log('Merchant ID:', merchantId);
-console.log('Tarjeta:', "4012000033330026");
+console.log('Tarjeta:', cardNumber);
 console.log('Expiración:', "203412");
 
 const req = https.request(options, (res) => {
