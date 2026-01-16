@@ -194,12 +194,13 @@ export class AzulPaymentService {
     const apiUrl = getApiUrl();
     const url = new URL(apiUrl);
     
-    // Prepare standardized request data
+    // Prepare standardized request data according to Azul documentation
     const requestData: Record<string, any> = {
       Channel: config.channel,
       Store: config.merchantId,
       PosInputMode: config.posInputMode,
-      CurrencyPosCode: 'RD$',
+      CurrencyPosCode: '$', // Según documentación Azul: usar "$"
+      AcquirerRefData: '1', // Campo requerido por documentación
       ForceNo3DS: '1', // Desactivar 3DS por defecto para mTLS según recomendación de Azul
       ...data,
     };
@@ -551,8 +552,9 @@ export class AzulPaymentService {
 
   /**
    * Capture a previously authorized payment (Post)
+   * Según documentación Azul: requiere Channel, Store, AzulOrderId, Amount, Itbis
    */
-  static async capturePayment(azulOrderId: string, amount: number): Promise<AzulResponse> {
+  static async capturePayment(azulOrderId: string, amount: number, itbis?: number): Promise<AzulResponse> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -566,6 +568,7 @@ export class AzulPaymentService {
         TrxType: 'Post',
         AzulOrderId: azulOrderId,
         Amount: amount.toString(),
+        Itbis: (itbis || 0).toString(),
       };
 
       const response = await this.makeRequest(requestData);
@@ -582,8 +585,9 @@ export class AzulPaymentService {
 
   /**
    * Refund a payment (Refund)
+   * Según documentación Azul: requiere OriginalDate (formato YYYYMMDD), AzulOrderId, Amount, Itbis
    */
-  static async refundPayment(azulOrderId: string, amount: number): Promise<AzulResponse> {
+  static async refundPayment(azulOrderId: string, amount: number, itbis?: number, originalDate?: string): Promise<AzulResponse> {
     if (!this.isConfigured()) {
       return {
         success: false,
@@ -593,10 +597,17 @@ export class AzulPaymentService {
     }
 
     try {
+      // OriginalDate debe ser la fecha de la transacción original en formato YYYYMMDD
+      const refundDate = originalDate || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      
       const requestData = {
         TrxType: 'Refund',
         AzulOrderId: azulOrderId,
         Amount: amount.toString(),
+        Itbis: (itbis || 0).toString(),
+        OriginalDate: refundDate,
+        Payments: '1',
+        Plan: '0',
       };
 
       const response = await this.makeRequest(requestData);
