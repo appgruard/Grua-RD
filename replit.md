@@ -65,7 +65,12 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **PostgreSQL (Neon)**: Main database.
 - **Mapbox**: Maps (Mapbox GL JS via react-map-gl), Directions API, Geocoding API.
 - **Waze**: Deep links for driver navigation.
-- **Azul API**: Payment gateway for Dominican Republic.
+- **Azul API**: Payment gateway for Dominican Republic (mTLS with digital certificates).
+  - **Estado**: Pendiente de vinculación del certificado con Merchant ID por parte de Azul.
+  - **Certificado**: app.gruard.com.bundle.crt (incluye CA de Azul)
+  - **Merchant ID**: 39038540035
+  - **Auth Headers**: splitit (para transacciones estándar) / 3dsecure (para 3DS)
+  - **Ruta en servidor**: /opt/certificados/gruard/ (CapRover) → /etc/azul/certs/ (container)
 - **Web Push API**: For push notifications.
 - **Replit Object Storage**: For document storage.
 - **Twilio**: SMS service for OTP delivery.
