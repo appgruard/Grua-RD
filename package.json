@@ -14,7 +14,7 @@
     "@capacitor/android": "^7.4.4",
     "@capacitor/app": "^7.1.0",
     "@capacitor/camera": "^7.0.2",
-    "@capacitor/cli": "^7.4.4",
+    "@capacitor/cli": "^7.4.5",
     "@capacitor/core": "^7.4.4",
     "@capacitor/filesystem": "^7.1.5",
     "@capacitor/geolocation": "^7.1.5",
@@ -141,5 +141,8 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "overrides": {
+    "tar": "^7.5.3"
   }
 }
