@@ -84,7 +84,27 @@ console.log(`
 ╚════════════════════════════════════════════════════════════════╝
 `);
 
-function run(cmd: string, options?: { cwd?: string }) {
+// Whitelist of allowed commands to prevent command injection
+const ALLOWED_COMMANDS = [
+  'npm run build',
+  'npx cap sync android',
+  'npx cap sync ios',
+  './gradlew assembleRelease',
+  './gradlew assembleDebug',
+] as const;
+
+type AllowedCommand = typeof ALLOWED_COMMANDS[number];
+
+function isAllowedCommand(cmd: string): cmd is AllowedCommand {
+  return ALLOWED_COMMANDS.includes(cmd as AllowedCommand);
+}
+
+function run(cmd: AllowedCommand, options?: { cwd?: string }) {
+  // Validate command is in whitelist to prevent command injection
+  if (!isAllowedCommand(cmd)) {
+    throw new Error(`Command not allowed: ${cmd}. Only whitelisted commands can be executed.`);
+  }
+  
   console.log(`\n▶ ${cmd}\n`);
   try {
     execSync(cmd, { stdio: 'inherit', ...options });
