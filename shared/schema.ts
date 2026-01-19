@@ -215,7 +215,6 @@ export const users = pgTable("users", {
   fotoVerificadaScore: decimal("foto_verificada_score", { precision: 5, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   // Cancelaciones fields (for clientes only)
-  bloqueadoHasta: timestamp("bloqueado_hasta"),
   cancelacionesTotales: integer("cancelaciones_totales").default(0),
   cancelacionesUltimos7dias: integer("cancelaciones_ultimos_7_dias").default(0),
   cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
@@ -249,7 +248,6 @@ export const conductores = pgTable("conductores", {
   categoriasConfiguradas: boolean("categorias_configuradas").default(false),
   vehiculosRegistrados: boolean("vehiculos_registrados").default(false),
   // Cancelaciones fields
-  bloqueadoHasta: timestamp("bloqueado_hasta"),
   cancelacionesTotales: integer("cancelaciones_totales").default(0),
   cancelacionesUltimos7dias: integer("cancelaciones_ultimos_7_dias").default(0),
   cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
