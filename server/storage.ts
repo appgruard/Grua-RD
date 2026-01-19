@@ -682,23 +682,141 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // Users
   async getUserById(id: string): Promise<UserWithConductor | undefined> {
-    const result = await db.query.users.findFirst({
-      where: eq(users.id, id),
-      with: {
-        conductor: true,
-      },
-    });
-    return result;
+    // Use raw SQL to avoid schema mismatch with columns that don't exist in production
+    const userResults = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at,
+             estado_cuenta, calificacion_promedio, email_verificado, 
+             foto_verificada, foto_verificada_score, cedula_image_url
+      FROM users 
+      WHERE id = ${id}
+      LIMIT 1
+    `);
+    
+    if (!userResults.rows || userResults.rows.length === 0) {
+      return undefined;
+    }
+    
+    const row = userResults.rows[0] as any;
+    const user: any = {
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      userType: row.user_type,
+      fotoUrl: row.foto_url,
+      telefono: row.phone,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      createdAt: row.created_at,
+      estadoCuenta: row.estado_cuenta,
+      calificacionPromedio: row.calificacion_promedio,
+      emailVerificado: row.email_verificado,
+      fotoVerificada: row.foto_verificada,
+      fotoVerificadaScore: row.foto_verificada_score,
+      cedulaImageUrl: row.cedula_image_url,
+    };
+    
+    // Get conductor data if user is a conductor
+    const conductorResults = await db.execute(sql`
+      SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
+             licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
+             balance_disponible, balance_pendiente
+      FROM conductores 
+      WHERE user_id = ${id}
+      LIMIT 1
+    `);
+    
+    if (conductorResults.rows && conductorResults.rows.length > 0) {
+      const cRow = conductorResults.rows[0] as any;
+      user.conductor = {
+        id: cRow.id,
+        userId: cRow.user_id,
+        disponible: cRow.disponible,
+        ubicacionLat: cRow.ubicacion_lat,
+        ubicacionLng: cRow.ubicacion_lng,
+        vehiculosRegistrados: cRow.vehiculos_registrados,
+        licencia: cRow.licencia,
+        licenciaCategoria: cRow.licencia_categoria,
+        licenciaVerificada: cRow.licencia_verificada,
+        bloqueadoHasta: cRow.bloqueado_hasta,
+        balanceDisponible: cRow.balance_disponible,
+        balancePendiente: cRow.balance_pendiente,
+      };
+    }
+    
+    return user as UserWithConductor;
   }
 
   async getUserByEmail(email: string): Promise<UserWithConductor | undefined> {
-    const result = await db.query.users.findFirst({
-      where: eq(users.email, email),
-      with: {
-        conductor: true,
-      },
-    });
-    return result;
+    // Use raw SQL to avoid schema mismatch with columns that don't exist in production
+    const userResults = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at,
+             estado_cuenta, calificacion_promedio, email_verificado, 
+             foto_verificada, foto_verificada_score, cedula_image_url
+      FROM users 
+      WHERE email = ${email}
+      LIMIT 1
+    `);
+    
+    if (!userResults.rows || userResults.rows.length === 0) {
+      return undefined;
+    }
+    
+    const row = userResults.rows[0] as any;
+    const user: any = {
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      userType: row.user_type,
+      fotoUrl: row.foto_url,
+      telefono: row.phone,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      createdAt: row.created_at,
+      estadoCuenta: row.estado_cuenta,
+      calificacionPromedio: row.calificacion_promedio,
+      emailVerificado: row.email_verificado,
+      fotoVerificada: row.foto_verificada,
+      fotoVerificadaScore: row.foto_verificada_score,
+      cedulaImageUrl: row.cedula_image_url,
+    };
+    
+    // Get conductor data
+    const conductorResults = await db.execute(sql`
+      SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
+             licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
+             balance_disponible, balance_pendiente
+      FROM conductores 
+      WHERE user_id = ${user.id}
+      LIMIT 1
+    `);
+    
+    if (conductorResults.rows && conductorResults.rows.length > 0) {
+      const cRow = conductorResults.rows[0] as any;
+      user.conductor = {
+        id: cRow.id,
+        userId: cRow.user_id,
+        disponible: cRow.disponible,
+        ubicacionLat: cRow.ubicacion_lat,
+        ubicacionLng: cRow.ubicacion_lng,
+        vehiculosRegistrados: cRow.vehiculos_registrados,
+        licencia: cRow.licencia,
+        licenciaCategoria: cRow.licencia_categoria,
+        licenciaVerificada: cRow.licencia_verificada,
+        bloqueadoHasta: cRow.bloqueado_hasta,
+        balanceDisponible: cRow.balance_disponible,
+        balancePendiente: cRow.balance_pendiente,
+      };
+    }
+    
+    return user as UserWithConductor;
   }
 
   async getUserByEmailAndType(email: string, userType: string): Promise<UserWithConductor | undefined> {
@@ -773,13 +891,76 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsersByEmail(email: string): Promise<UserWithConductor[]> {
-    const results = await db.query.users.findMany({
-      where: eq(users.email, email),
-      with: {
-        conductor: true,
-      },
-    });
-    return results;
+    // Use raw SQL to avoid schema mismatch with columns that don't exist in production
+    const userResults = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at,
+             estado_cuenta, calificacion_promedio, email_verificado, 
+             foto_verificada, foto_verificada_score, cedula_image_url
+      FROM users 
+      WHERE email = ${email}
+    `);
+    
+    if (!userResults.rows || userResults.rows.length === 0) {
+      return [];
+    }
+    
+    const usersData: UserWithConductor[] = [];
+    
+    for (const row of userResults.rows as any[]) {
+      const user: any = {
+        id: row.id,
+        email: row.email,
+        passwordHash: row.password_hash,
+        nombre: row.nombre,
+        apellido: row.apellido,
+        userType: row.user_type,
+        fotoUrl: row.foto_url,
+        telefono: row.phone,
+        cedula: row.cedula,
+        cedulaVerificada: row.cedula_verificada,
+        telefonoVerificado: row.telefono_verificado,
+        createdAt: row.created_at,
+        estadoCuenta: row.estado_cuenta,
+        calificacionPromedio: row.calificacion_promedio,
+        emailVerificado: row.email_verificado,
+        fotoVerificada: row.foto_verificada,
+        fotoVerificadaScore: row.foto_verificada_score,
+        cedulaImageUrl: row.cedula_image_url,
+      };
+      
+      // Get conductor data if exists
+      const conductorResults = await db.execute(sql`
+        SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
+               licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
+               balance_disponible, balance_pendiente
+        FROM conductores 
+        WHERE user_id = ${user.id}
+        LIMIT 1
+      `);
+      
+      if (conductorResults.rows && conductorResults.rows.length > 0) {
+        const cRow = conductorResults.rows[0] as any;
+        user.conductor = {
+          id: cRow.id,
+          userId: cRow.user_id,
+          disponible: cRow.disponible,
+          ubicacionLat: cRow.ubicacion_lat,
+          ubicacionLng: cRow.ubicacion_lng,
+          vehiculosRegistrados: cRow.vehiculos_registrados,
+          licencia: cRow.licencia,
+          licenciaCategoria: cRow.licencia_categoria,
+          licenciaVerificada: cRow.licencia_verificada,
+          bloqueadoHasta: cRow.bloqueado_hasta,
+          balanceDisponible: cRow.balance_disponible,
+          balancePendiente: cRow.balance_pendiente,
+        };
+      }
+      
+      usersData.push(user as UserWithConductor);
+    }
+    
+    return usersData;
   }
 
   async getBasicUsersByEmail(email: string): Promise<User[]> {
