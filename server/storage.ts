@@ -4802,7 +4802,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCancelacionesByUsuarioId(usuarioId: string, tipo: 'cliente' | 'conductor'): Promise<CancelacionServicioWithDetails[]> {
-    return await db.query.cancelacionesServicios.findMany({
+    const results = await db.query.cancelacionesServicios.findMany({
       where: and(
         eq(cancelacionesServicios.canceladoPorId, usuarioId),
         eq(cancelacionesServicios.tipoCancelador, tipo)
@@ -4813,22 +4813,24 @@ export class DatabaseStorage implements IStorage {
         razonCancelacion: true,
       },
       orderBy: desc(cancelacionesServicios.createdAt),
-    }) as Promise<CancelacionServicioWithDetails[]>;
+    });
+    return results as unknown as CancelacionServicioWithDetails[];
   }
 
   async getCancelacionesByServicioId(servicioId: string): Promise<CancelacionServicioWithDetails | undefined> {
-    return await db.query.cancelacionesServicios.findFirst({
+    const result = await db.query.cancelacionesServicios.findFirst({
       where: eq(cancelacionesServicios.servicioId, servicioId),
       with: {
         servicio: true,
         canceladoPor: true,
         razonCancelacion: true,
       },
-    }) as Promise<CancelacionServicioWithDetails | undefined>;
+    });
+    return result as unknown as CancelacionServicioWithDetails | undefined;
   }
 
   async getAllCancelaciones(limit: number = 100): Promise<CancelacionServicioWithDetails[]> {
-    return await db.query.cancelacionesServicios.findMany({
+    const results = await db.query.cancelacionesServicios.findMany({
       with: {
         servicio: true,
         canceladoPor: true,
@@ -4836,7 +4838,8 @@ export class DatabaseStorage implements IStorage {
       },
       orderBy: desc(cancelacionesServicios.createdAt),
       limit,
-    }) as Promise<CancelacionServicioWithDetails[]>;
+    });
+    return results as unknown as CancelacionServicioWithDetails[];
   }
 
   async updateCancelacion(id: string, data: Partial<CancelacionServicio>): Promise<CancelacionServicio> {
@@ -4848,20 +4851,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllRazonesCancelacion(): Promise<RazonCancelacion[]> {
-    return await db.query.razonesCancelacion.findMany({
+    const results = await db.query.razonesCancelacion.findMany({
       where: eq(razonesCancelacion.activa, true),
       orderBy: asc(razonesCancelacion.codigo),
-    }) as Promise<RazonCancelacion[]>;
+    });
+    return results as unknown as RazonCancelacion[];
   }
 
   async getRazonCancelacionByCodigo(codigo: string): Promise<RazonCancelacion | undefined> {
-    return await db.query.razonesCancelacion.findFirst({
+    const result = await db.query.razonesCancelacion.findFirst({
       where: eq(razonesCancelacion.codigo, codigo),
-    }) as Promise<RazonCancelacion | undefined>;
+    });
+    return result as unknown as RazonCancelacion | undefined;
   }
 
   async getZonaDemandaByCoords(lat: number, lng: number): Promise<ZonaDemanda | undefined> {
-    return await db.query.zonasDemanada.findFirst() as Promise<ZonaDemanda | undefined>;
+    const result = await db.query.zonasDemanada.findFirst();
+    return result as unknown as ZonaDemanda | undefined;
   }
 
   async updateZonaDemanda(id: string, data: Partial<ZonaDemanda>): Promise<ZonaDemanda> {

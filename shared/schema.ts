@@ -2625,7 +2625,7 @@ export const razonesCancelacion = pgTable("razones_cancelacion", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   codigo: varchar("codigo").notNull().unique(),
   descripcion: text("descripcion").notNull(),
-  aplicaA: tipoCanceladorEnum("aplica_a").default("ambos"),
+  aplicaA: text("aplica_a").$type<"cliente" | "conductor" | "ambos">().default("ambos"),
   penalizacionPredeterminada: boolean("penalizacion_predeterminada").default(true),
   activa: boolean("activa").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
