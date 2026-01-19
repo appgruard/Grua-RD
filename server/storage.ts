@@ -702,13 +702,66 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmailAndType(email: string, userType: string): Promise<UserWithConductor | undefined> {
-    const result = await db.query.users.findFirst({
-      where: and(eq(users.email, email), eq(users.userType, userType as any)),
-      with: {
-        conductor: true,
-      },
-    });
-    return result;
+    // Use raw SQL to avoid schema mismatch with columns that don't exist in production
+    const userResults = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at,
+             estado_cuenta, calificacion_promedio, email_verificado, 
+             foto_verificada, foto_verificada_score, cedula_image_url
+      FROM users 
+      WHERE email = ${email} AND user_type = ${userType}
+      LIMIT 1
+    `);
+    
+    if (!userResults.rows || userResults.rows.length === 0) {
+      return undefined;
+    }
+    
+    const row = userResults.rows[0] as any;
+    const user: any = {
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      userType: row.user_type,
+      fotoUrl: row.foto_url,
+      telefono: row.phone,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      createdAt: row.created_at,
+      estadoCuenta: row.estado_cuenta,
+      calificacionPromedio: row.calificacion_promedio,
+      emailVerificado: row.email_verificado,
+      fotoVerificada: row.foto_verificada,
+      fotoVerificadaScore: row.foto_verificada_score,
+      cedulaImageUrl: row.cedula_image_url,
+    };
+    
+    // Get conductor data if user is a conductor
+    if (userType === 'conductor') {
+      const conductorResults = await db.execute(sql`
+        SELECT id, user_id, disponible, lat, lng, vehiculos_registrados
+        FROM conductores 
+        WHERE user_id = ${user.id}
+        LIMIT 1
+      `);
+      
+      if (conductorResults.rows && conductorResults.rows.length > 0) {
+        const cRow = conductorResults.rows[0] as any;
+        user.conductor = {
+          id: cRow.id,
+          oderId: cRow.user_id,
+          disponible: cRow.disponible,
+          lat: cRow.lat,
+          lng: cRow.lng,
+          vehiculosRegistrados: cRow.vehiculos_registrados,
+        };
+      }
+    }
+    
+    return user as UserWithConductor;
   }
 
   async getUsersByEmail(email: string): Promise<UserWithConductor[]> {
