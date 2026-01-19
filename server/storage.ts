@@ -742,7 +742,9 @@ export class DatabaseStorage implements IStorage {
     // Get conductor data if user is a conductor
     if (userType === 'conductor') {
       const conductorResults = await db.execute(sql`
-        SELECT id, user_id, disponible, lat, lng, vehiculos_registrados
+        SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
+               licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
+               balance_disponible, balance_pendiente
         FROM conductores 
         WHERE user_id = ${user.id}
         LIMIT 1
@@ -752,11 +754,17 @@ export class DatabaseStorage implements IStorage {
         const cRow = conductorResults.rows[0] as any;
         user.conductor = {
           id: cRow.id,
-          oderId: cRow.user_id,
+          userId: cRow.user_id,
           disponible: cRow.disponible,
-          lat: cRow.lat,
-          lng: cRow.lng,
+          ubicacionLat: cRow.ubicacion_lat,
+          ubicacionLng: cRow.ubicacion_lng,
           vehiculosRegistrados: cRow.vehiculos_registrados,
+          licencia: cRow.licencia,
+          licenciaCategoria: cRow.licencia_categoria,
+          licenciaVerificada: cRow.licencia_verificada,
+          bloqueadoHasta: cRow.bloqueado_hasta,
+          balanceDisponible: cRow.balance_disponible,
+          balancePendiente: cRow.balance_pendiente,
         };
       }
     }
