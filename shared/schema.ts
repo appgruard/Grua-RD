@@ -2694,7 +2694,6 @@ export const cancelacionesServicios = pgTable("cancelaciones_servicios", {
   // Processing status
   reembolsoProcesado: boolean("reembolso_procesado").default(false),
   penalizacionProcesada: boolean("penalizacion_procesada").default(false),
-  bloqueadoHasta: timestamp("bloqueado_hasta"),
   
   // Admin review
   evaluacionPenalizacion: evaluacionPenalizacionEnum("evaluacion_penalizacion"),
