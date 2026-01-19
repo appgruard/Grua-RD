@@ -722,8 +722,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBasicUsersByEmail(email: string): Promise<User[]> {
-    const results = await db.select().from(users).where(eq(users.email, email));
-    return results;
+    // Use raw SQL to select only core columns that are guaranteed to exist
+    // This avoids schema mismatch errors when new columns (like cancelaciones_*) 
+    // don't exist in production yet
+    const results = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, telefono, user_type, 
+             foto_url, cedula, cedula_verificada, telefono_verificado, activo, created_at
+      FROM users 
+      WHERE email = ${email}
+    `);
+    
+    return (results.rows || []).map((row: any) => ({
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      telefono: row.telefono,
+      userType: row.user_type,
+      fotoUrl: row.foto_url,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      activo: row.activo,
+      createdAt: row.created_at,
+    })) as User[];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
