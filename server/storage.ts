@@ -227,6 +227,7 @@ export interface IStorage {
   cancelExpiredServicios(timeoutMinutes: number): Promise<Servicio[]>;
   getRecentlyCancelledServices(withinMinutes: number): Promise<Servicio[]>;
   getAllServicios(): Promise<ServicioWithDetails[]>;
+  getServiciosPendingCommission(): Promise<Servicio[]>;
   updateServicio(id: string, data: Partial<Servicio>): Promise<Servicio>;
   acceptServicio(id: string, conductorId: string, vehiculoId?: string): Promise<Servicio>;
 
@@ -1185,6 +1186,45 @@ export class DatabaseStorage implements IStorage {
       orderBy: desc(servicios.createdAt),
     });
     return results as any;
+  }
+
+  async getServiciosPendingCommission(): Promise<Servicio[]> {
+    // Schema-aware approach: check if commission_processed column exists first
+    const columnCheck = await db.execute(sql`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'servicios' AND column_name = 'commission_processed'
+    `);
+    
+    const hasCommissionColumn = (columnCheck.rows?.length || 0) > 0;
+    
+    if (hasCommissionColumn) {
+      // Column exists, use optimized query
+      const results = await db.execute(sql`
+        SELECT id, cliente_id, conductor_id, estado, metodo_pago, costo_total, 
+               commission_processed
+        FROM servicios 
+        WHERE estado = 'completado' 
+          AND (commission_processed IS NULL OR commission_processed = false)
+          AND conductor_id IS NOT NULL 
+          AND metodo_pago IS NOT NULL 
+          AND costo_total IS NOT NULL
+      `);
+      
+      return (results.rows || []).map((row: any) => ({
+        id: row.id,
+        clienteId: row.cliente_id,
+        conductorId: row.conductor_id,
+        estado: row.estado,
+        metodoPago: row.metodo_pago,
+        costoTotal: row.costo_total,
+        commissionProcessed: row.commission_processed ?? false,
+      })) as unknown as Servicio[];
+    } else {
+      // Column doesn't exist - return empty array to skip processing
+      // This indicates schema needs migration
+      console.warn('commission_processed column not found in servicios table. Run database migrations.');
+      return [];
+    }
   }
 
   async updateServicio(id: string, data: Partial<Servicio>): Promise<Servicio> {

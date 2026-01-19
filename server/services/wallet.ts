@@ -884,15 +884,21 @@ export class WalletService {
     total: number;
     processed: number;
     failed: number;
+    skipped: boolean;
   }> {
-    const allServices = await storage.getAllServicios();
-    const pendingServices = allServices.filter(s => 
-      s.estado === 'completado' && 
-      !s.commissionProcessed && 
-      s.conductorId && 
-      s.metodoPago && 
-      s.costoTotal
-    );
+    // Use getServiciosPendingCommission with error handling for schema mismatches
+    let pendingServices;
+    try {
+      pendingServices = await storage.getServiciosPendingCommission();
+    } catch (error: any) {
+      // If the query fails (e.g., missing column), log and skip commission processing
+      // This prevents the application from failing to start due to schema mismatches
+      logSystem.warn('Skipping commission processing due to database schema issue', {
+        error: error.message,
+        hint: 'This may indicate a missing column in the servicios table. Run database migrations.'
+      });
+      return { total: 0, processed: 0, failed: 0, skipped: true };
+    }
 
     let processedCount = 0;
     let failedCount = 0;
@@ -929,7 +935,8 @@ export class WalletService {
     return {
       total: pendingServices.length,
       processed: processedCount,
-      failed: failedCount
+      failed: failedCount,
+      skipped: false
     };
   }
 }

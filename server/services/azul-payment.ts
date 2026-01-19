@@ -179,6 +179,22 @@ const ISO_CODES: Record<string, string> = {
 
 export class AzulPaymentService {
   /**
+   * Generate numeric OrderNumber in YYYYMMDDHHMMSS format with random suffix
+   * Azul requires numeric-only OrderNumber values
+   */
+  static generateOrderNumber(): string {
+    const now = new Date();
+    const timestamp = now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0');
+    const randomSuffix = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+    return timestamp + randomSuffix;
+  }
+
+  /**
    * Check if Azul is properly configured
    */
   static isConfigured(): boolean {
@@ -337,7 +353,7 @@ export class AzulPaymentService {
         CardNumber: cleanCardNumber,
         Expiration: cardData.expiration,
         CVC: cardData.cvc,
-        CustomOrderId: `TOKEN-${Date.now()}`,
+        CustomOrderId: this.generateOrderNumber(),
       };
 
       const response = await this.makeRequest(requestData);
@@ -386,7 +402,7 @@ export class AzulPaymentService {
       const requestData = {
         TrxType: 'DELETE',
         DataVaultToken: dataVaultToken,
-        CustomOrderId: `DELETE-${Date.now()}`,
+        CustomOrderId: this.generateOrderNumber(),
       };
 
       const response = await this.makeRequest(requestData);
@@ -417,13 +433,14 @@ export class AzulPaymentService {
     }
 
     try {
+      const orderNumber = this.generateOrderNumber();
       const requestData = {
         TrxType: 'Sale',
         DataVaultToken: dataVaultToken,
         Amount: payment.amount.toString(),
         Itbis: (payment.itbis || 0).toString(),
-        OrderNumber: payment.customOrderId,
-        CustomOrderId: payment.customOrderId,
+        OrderNumber: orderNumber,
+        CustomOrderId: payment.customOrderId || orderNumber,
         CustomerServicePhone: payment.customerServicePhone || '8090000000',
         OrderDescription: payment.orderDescription || 'Pago Gruas RD',
         SaveToDataVault: payment.saveToDataVault ? '1' : '0',
@@ -461,6 +478,7 @@ export class AzulPaymentService {
     try {
       const cleanCardNumber = cardData.cardNumber.replace(/\D/g, '');
       const cardBrand = this.detectCardBrand(cleanCardNumber);
+      const orderNumber = this.generateOrderNumber();
       
       const requestData = {
         TrxType: 'Sale',
@@ -469,8 +487,8 @@ export class AzulPaymentService {
         CVC: cardData.cvc,
         Amount: payment.amount.toString(),
         Itbis: (payment.itbis || 0).toString(),
-        OrderNumber: payment.customOrderId,
-        CustomOrderId: payment.customOrderId,
+        OrderNumber: orderNumber,
+        CustomOrderId: payment.customOrderId || orderNumber,
         CustomerServicePhone: payment.customerServicePhone || '8090000000',
         OrderDescription: payment.orderDescription || 'Pago Gruas RD',
         SaveToDataVault: payment.saveToDataVault ? '1' : '0',
@@ -525,13 +543,14 @@ export class AzulPaymentService {
     }
 
     try {
+      const orderNumber = this.generateOrderNumber();
       const requestData = {
         TrxType: 'Hold',
         DataVaultToken: dataVaultToken,
         Amount: payment.amount.toString(),
         Itbis: (payment.itbis || 0).toString(),
-        OrderNumber: payment.customOrderId,
-        CustomOrderId: payment.customOrderId,
+        OrderNumber: orderNumber,
+        CustomOrderId: payment.customOrderId || orderNumber,
         CustomerServicePhone: payment.customerServicePhone || '8090000000',
         OrderDescription: payment.orderDescription || 'Autorizacion Gruas RD',
         Payments: '1',
@@ -670,13 +689,14 @@ export class AzulPaymentService {
     }
 
     try {
+      const orderNumber = this.generateOrderNumber();
       const requestData = {
         TrxType: 'Sale',
         DataVaultToken: dataVaultToken,
         Amount: payment.amount.toString(),
         Itbis: (payment.itbis || 0).toString(),
-        OrderNumber: payment.customOrderId,
-        CustomOrderId: payment.customOrderId,
+        OrderNumber: orderNumber,
+        CustomOrderId: payment.customOrderId || orderNumber,
         ThreeDSAuthMethod: '02',
         BrowserInfo: {
           AcceptHeader: browserInfo.acceptHeader,
