@@ -722,10 +722,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBasicUsersByEmail(email: string): Promise<User[]> {
-    // Use ultra-minimal column set for maximum compatibility with older schemas
-    // Only select columns absolutely required for authentication
+    // Select columns that exist in production database
+    // Note: production uses 'phone' not 'telefono'
     const results = await db.execute(sql`
-      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at
       FROM users 
       WHERE email = ${email}
     `);
@@ -738,6 +739,11 @@ export class DatabaseStorage implements IStorage {
       apellido: row.apellido,
       userType: row.user_type,
       fotoUrl: row.foto_url,
+      telefono: row.phone,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      createdAt: row.created_at,
     })) as User[];
   }
 
