@@ -722,12 +722,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBasicUsersByEmail(email: string): Promise<User[]> {
-    // Use raw SQL to select only core columns that are guaranteed to exist
-    // This avoids schema mismatch errors when new columns (like cancelaciones_*) 
-    // don't exist in production yet
+    // Use ultra-minimal column set for maximum compatibility with older schemas
+    // Only select columns absolutely required for authentication
     const results = await db.execute(sql`
-      SELECT id, email, password_hash, nombre, apellido, telefono, user_type, 
-             foto_url, cedula, cedula_verificada, telefono_verificado, activo, created_at
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url
       FROM users 
       WHERE email = ${email}
     `);
@@ -738,14 +736,8 @@ export class DatabaseStorage implements IStorage {
       passwordHash: row.password_hash,
       nombre: row.nombre,
       apellido: row.apellido,
-      telefono: row.telefono,
       userType: row.user_type,
       fotoUrl: row.foto_url,
-      cedula: row.cedula,
-      cedulaVerificada: row.cedula_verificada,
-      telefonoVerificado: row.telefono_verificado,
-      activo: row.activo,
-      createdAt: row.created_at,
     })) as User[];
   }
 
