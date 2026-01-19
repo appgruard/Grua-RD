@@ -429,7 +429,7 @@ ${errorRecord.metadata ? `**Metadata (contexto adicional):**\n\`\`\`json\n${erro
 
     const errorData: InsertSystemError = {
       fingerprint,
-      errorType: error.errorType as any,
+      errorType: (error.errorType === 'system_error' ? 'unknown' : (['validation', 'authentication', 'authorization', 'database', 'network', 'timeout', 'configuration', 'external_api', 'file_system', 'memory', 'unknown'].includes(error.errorType) ? error.errorType : 'unknown')) as any,
       errorSource: error.errorSource as any,
       severity: error.severity as any,
       message: error.message,

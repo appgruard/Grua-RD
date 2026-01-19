@@ -2080,35 +2080,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getComisionesByEstado(estado: 'pendiente' | 'procesando' | 'pagado' | 'fallido', tipo: 'operador' | 'empresa'): Promise<ComisionWithDetails[]> {
-    if (tipo === 'operador') {
-      const results = await db.query.comisiones.findMany({
-        where: eq(comisiones.estadoPagoOperador, estado),
-        with: {
-          servicio: {
-            with: {
-              cliente: true,
-              conductor: true,
-            },
-          },
-        },
-        orderBy: desc(comisiones.createdAt),
-      });
-      return results as ComisionWithDetails[];
-    } else {
-      const results = await db.query.comisiones.findMany({
-        where: eq(comisiones.estadoPagoEmpresa, estado),
-        with: {
-          servicio: {
-            with: {
-              cliente: true,
-              conductor: true,
-            },
-          },
-        },
-        orderBy: desc(comisiones.createdAt),
-      });
-      return results as ComisionWithDetails[];
-    }
+    const whereClause = tipo === 'operador' 
+      ? eq(comisiones.estadoPagoOperador, estado)
+      : eq(comisiones.estadoPagoEmpresa, estado);
+
+    const results = await db.query.comisiones.findMany({
+      where: whereClause,
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
+          }
+        }
+      },
+      orderBy: desc(comisiones.createdAt),
+    });
+    return results as unknown as ComisionWithDetails[];
   }
 
   async getAllComisiones(): Promise<ComisionWithDetails[]> {

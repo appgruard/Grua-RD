@@ -2380,16 +2380,17 @@ export const errorSourceEnum = pgEnum("error_source", [
 
 // Error type enum - classification of error
 export const errorTypeEnum = pgEnum("error_type", [
-  "connection_error",
-  "timeout_error",
-  "validation_error",
-  "permission_error",
-  "not_found_error",
-  "rate_limit_error",
-  "configuration_error",
-  "integration_error",
-  "system_error",
-  "unknown_error"
+  "validation",
+  "authentication",
+  "authorization",
+  "database",
+  "network",
+  "timeout",
+  "configuration",
+  "external_api",
+  "file_system",
+  "memory",
+  "unknown"
 ]);
 
 // System Errors Table (for tracking and deduplication)
@@ -2438,7 +2439,7 @@ export const systemErrorsRelations = relations(systemErrors, ({ one }) => ({
 export const insertSystemErrorSchema = createInsertSchema(systemErrors, {
   fingerprint: z.string().min(1),
   message: z.string().min(1),
-  errorType: z.enum(["connection_error", "timeout_error", "validation_error", "permission_error", "not_found_error", "rate_limit_error", "configuration_error", "integration_error", "system_error", "unknown_error"]),
+  errorType: z.enum(["validation", "authentication", "authorization", "database", "network", "timeout", "configuration", "external_api", "file_system", "memory", "unknown"]),
   errorSource: z.enum(["database", "external_api", "internal_service", "authentication", "payment", "file_storage", "websocket", "email", "sms", "unknown"]),
   severity: z.enum(["low", "medium", "high", "critical"]),
   calculatedPriority: z.enum(["baja", "media", "alta", "urgente"]).optional(),
