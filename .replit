@@ -20,4 +20,4 @@ author = 53119234
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "npm start"
