@@ -180,7 +180,9 @@ class FilesystemStorageProvider implements StorageProvider {
         logger.info('Created filesystem storage directory', { baseDir: this.baseDir });
       }
     } catch (error) {
-      logger.error('Failed to create storage directory', {
+      // In read-only environments like some CapRover setups, we ignore mkdir errors
+      // if the directory is already handled or if the system will use object storage instead.
+      logger.warn('Note: Could not create base storage directory. This is expected in some production environments.', {
         baseDir: this.baseDir,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -208,7 +210,12 @@ class FilesystemStorageProvider implements StorageProvider {
     const dir = path.dirname(fullPath);
 
     if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch (err) {
+        // Silently ignore if we can't create the sub-directory
+        // In some environments this might fail but the path might be handled by a volume
+      }
     }
 
     fs.writeFileSync(fullPath, options.buffer);
