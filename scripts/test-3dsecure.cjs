@@ -16,32 +16,16 @@
 const AZUL_TEST_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx';
 const AZUL_3DS_METHOD_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedsmethod';
 
-// Configuración de prueba - Usa variables de entorno para credenciales
+// AMBIENTE DE PRUEBAS SOLAMENTE - NO usar estas credenciales en producción
 const TEST_CONFIG = {
-  merchantId: process.env.AZUL_MERCHANT_ID || '',
-  auth1: process.env.AZUL_AUTH1 || process.env.AZUL_AUTH_KEY || '',
-  auth2: process.env.AZUL_AUTH2 || process.env.AZUL_AUTH_KEY || '',
+  merchantId: process.env.AZUL_MERCHANT_ID || '39038540035',
+  auth1: process.env.AZUL_AUTH1 || process.env.AZUL_AUTH_KEY || '3dsecure',
+  auth2: process.env.AZUL_AUTH2 || process.env.AZUL_AUTH_KEY || '3dsecure',
   channel: process.env.AZUL_CHANNEL || 'EC',
 };
 
-// Validar configuración
 function validateConfig() {
-  const missing = [];
-  if (!TEST_CONFIG.merchantId) missing.push('AZUL_MERCHANT_ID');
-  if (!TEST_CONFIG.auth1) missing.push('AZUL_AUTH1 or AZUL_AUTH_KEY');
-  if (!TEST_CONFIG.auth2) missing.push('AZUL_AUTH2 or AZUL_AUTH_KEY');
-  
-  if (missing.length > 0) {
-    console.error('\n❌ Error: Faltan variables de entorno requeridas:');
-    missing.forEach(v => console.error(`   - ${v}`));
-    console.error('\nConfigura las siguientes variables de entorno:');
-    console.error('  export AZUL_MERCHANT_ID="tu_merchant_id"');
-    console.error('  export AZUL_AUTH_KEY="tu_auth_key"  # Para Auth1 y Auth2');
-    console.error('  # O individualmente:');
-    console.error('  export AZUL_AUTH1="tu_auth1"');
-    console.error('  export AZUL_AUTH2="tu_auth2"');
-    process.exit(1);
-  }
+  console.log('\n⚠️  AMBIENTE DE PRUEBAS - Endpoint: pruebas.azul.com.do');
 }
 
 // Tarjetas de prueba
