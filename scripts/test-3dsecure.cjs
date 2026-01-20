@@ -117,15 +117,12 @@ const TEST_CARDS = {
   }
 };
 
-// Generar OrderNumber numérico (YYYYMMDDHHMMSS + 4 dígitos aleatorios)
+// Generar OrderNumber numérico (máximo 15 dígitos según Azul)
+// Formato: timestamp corto + random (15 dígitos máx)
 function generateOrderNumber() {
-  const now = new Date();
-  const timestamp = now.getFullYear().toString() +
-    String(now.getMonth() + 1).padStart(2, '0') +
-    String(now.getDate()).padStart(2, '0') +
-    String(now.getHours()).padStart(2, '0') +
-    String(now.getMinutes()).padStart(2, '0') +
-    String(now.getSeconds()).padStart(2, '0');
+  const now = Date.now();
+  // Usar los últimos 11 dígitos del timestamp + 4 aleatorios = 15 dígitos
+  const timestamp = (now % 100000000000).toString().padStart(11, '0');
   const random = Math.floor(1000 + Math.random() * 9000);
   return timestamp + random.toString();
 }
