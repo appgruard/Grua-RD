@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,28 +27,46 @@ interface ThreeDSSession {
 
 const TEST_CARDS = [
   { 
-    name: 'Frictionless (Aprobacion automatica)', 
-    number: '4761120010000492', 
-    expected: 'Aprobado sin interaccion del usuario',
-    badge: 'success'
+    name: 'Frictionless con 3DS Method', 
+    number: '4265880000000007', 
+    expiration: '202812',
+    expected: 'Aprobado con Method',
+    badge: 'default' as const
   },
   { 
-    name: '3DS Method Required', 
-    number: '5555555555554444', 
-    expected: 'Requiere recoleccion de datos del navegador',
-    badge: 'warning'
+    name: 'Frictionless sin 3DS Method', 
+    number: '4147463011110117',
+    expiration: '202812',
+    expected: 'Aprobado directo',
+    badge: 'default' as const
   },
   { 
-    name: 'Challenge Required', 
-    number: '4000000000001091', 
-    expected: 'Requiere autenticacion adicional',
-    badge: 'info'
+    name: 'Challenge con 3DS Method', 
+    number: '4005520000000129',
+    expiration: '202812',
+    expected: 'Requiere autenticacion',
+    badge: 'secondary' as const
   },
   { 
-    name: 'Authentication Failed', 
-    number: '4000000000001000', 
-    expected: 'Fallo de autenticacion (esperado)',
-    badge: 'destructive'
+    name: 'Challenge sin 3DS Method', 
+    number: '4761120010000492',
+    expiration: '202812',
+    expected: 'Challenge directo',
+    badge: 'secondary' as const
+  },
+  { 
+    name: 'Visa Estandar', 
+    number: '4000000000000002',
+    expiration: '202812',
+    expected: 'Prueba generica Visa',
+    badge: 'outline' as const
+  },
+  { 
+    name: 'Mastercard Estandar', 
+    number: '5555555555554444',
+    expiration: '202812',
+    expected: 'Prueba generica MC',
+    badge: 'outline' as const
   },
 ];
 
@@ -59,9 +77,9 @@ export default function Test3DS() {
   const [pollingStatus, setPollingStatus] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
-  const [cardNumber, setCardNumber] = useState('4761120010000492');
+  const [cardNumber, setCardNumber] = useState('4265880000000007');
   const [expMonth, setExpMonth] = useState('12');
-  const [expYear, setExpYear] = useState('2025');
+  const [expYear, setExpYear] = useState('2028');
   const [cvv, setCvv] = useState('123');
   const [amount, setAmount] = useState('100.00');
   const [holderName, setHolderName] = useState('Test User');
@@ -132,27 +150,17 @@ export default function Test3DS() {
     setSession(null);
     
     try {
-      const amountInCents = Math.round(parseFloat(amount) * 100);
+      const amountNum = parseFloat(amount);
       const expiration = `${expYear}${expMonth.padStart(2, '0')}`;
       
       const payload = {
-        cardData: {
-          cardNumber: cardNumber.replace(/\s/g, ''),
-          expiration,
-          cvc: cvv,
-          cardHolderName: holderName,
-        },
-        paymentRequest: {
-          amount: amountInCents,
-          customOrderId: `TEST-${Date.now()}`,
-          orderDescription: 'Prueba 3D Secure',
-          cardHolderInfo: {
-            name: holderName,
-            email: 'test@gruard.com',
-            billingAddressCountry: 'DO',
-          },
-          browserInfo: getBrowserInfo(),
-        },
+        cardNumber: cardNumber.replace(/\s/g, ''),
+        expiration,
+        cvc: cvv,
+        amount: amountNum,
+        cardHolderName: holderName,
+        browserInfo: getBrowserInfo(),
+        customOrderId: `TEST-${Date.now()}`,
       };
       
       const res = await apiRequest('POST', '/api/azul/3ds/initiate', payload);
@@ -198,8 +206,11 @@ export default function Test3DS() {
     }
   };
 
-  const selectTestCard = (number: string) => {
-    setCardNumber(number);
+  const selectTestCard = (card: typeof TEST_CARDS[0]) => {
+    setCardNumber(card.number);
+    const exp = card.expiration;
+    setExpYear(exp.substring(0, 4));
+    setExpMonth(exp.substring(4, 6));
     setSession(null);
   };
 
@@ -236,55 +247,57 @@ export default function Test3DS() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <a href="/" className="text-muted-foreground hover:text-foreground">
+    <div className="min-h-screen bg-background p-3 sm:p-4 md:p-8">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <a href="/" className="text-muted-foreground hover:text-foreground p-2 -ml-2">
             <ArrowLeft className="h-5 w-5" />
           </a>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Shield className="h-6 w-6 text-primary" />
-              Prueba 3D Secure 2.0
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
+              <span className="truncate">Prueba 3D Secure 2.0</span>
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Prueba el flujo de pagos con autenticacion 3DS de Azul
             </p>
           </div>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Tarjetas de Prueba
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
+              Tarjetas de Prueba Azul
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Selecciona una tarjeta para probar diferentes escenarios de 3DS
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-3">
+          <CardContent className="pt-0">
+            <div className="grid gap-2 sm:gap-3">
               {TEST_CARDS.map((card) => (
                 <button
                   key={card.number}
                   type="button"
-                  onClick={() => selectTestCard(card.number)}
+                  onClick={() => selectTestCard(card)}
                   data-testid={`card-${card.number}`}
-                  className={`p-4 rounded-lg border text-left transition-colors hover-elevate ${
+                  className={`p-3 sm:p-4 rounded-lg border text-left transition-colors hover-elevate ${
                     cardNumber === card.number 
                       ? 'border-primary bg-primary/5' 
                       : 'border-border'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium">{card.name}</p>
-                      <p className="text-sm text-muted-foreground font-mono">
+                      <p className="font-medium text-sm sm:text-base">{card.name}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground font-mono truncate">
                         {card.number.replace(/(\d{4})/g, '$1 ').trim()}
                       </p>
                     </div>
-                    <Badge variant={card.badge as any}>{card.expected}</Badge>
+                    <Badge variant={card.badge} className="w-fit text-xs">
+                      {card.expected}
+                    </Badge>
                   </div>
                 </button>
               ))}
@@ -293,40 +306,42 @@ export default function Test3DS() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Datos de la Tarjeta</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="text-base sm:text-lg">Datos de la Tarjeta</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Los datos se envian de forma segura al servidor
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+          <CardContent className="space-y-4 pt-0">
+            <div className="grid gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cardNumber">Numero de Tarjeta</Label>
+                <Label htmlFor="cardNumber" className="text-sm">Numero de Tarjeta</Label>
                 <Input
                   id="cardNumber"
                   data-testid="input-card-number"
                   value={cardNumber}
                   onChange={(e) => setCardNumber(e.target.value)}
-                  placeholder="4761 1200 1000 0492"
+                  placeholder="4265 8800 0000 0007"
                   maxLength={19}
+                  className="font-mono text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="holderName">Nombre del Titular</Label>
+                <Label htmlFor="holderName" className="text-sm">Nombre del Titular</Label>
                 <Input
                   id="holderName"
                   data-testid="input-holder-name"
                   value={holderName}
                   onChange={(e) => setHolderName(e.target.value)}
                   placeholder="JOHN DOE"
+                  className="text-sm"
                 />
               </div>
             </div>
             
-            <div className="grid gap-4 grid-cols-3">
+            <div className="grid gap-3 grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="expMonth">Mes</Label>
+                <Label htmlFor="expMonth" className="text-sm">Mes</Label>
                 <Input
                   id="expMonth"
                   data-testid="input-exp-month"
@@ -334,21 +349,23 @@ export default function Test3DS() {
                   onChange={(e) => setExpMonth(e.target.value)}
                   placeholder="12"
                   maxLength={2}
+                  className="text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="expYear">Ano</Label>
+                <Label htmlFor="expYear" className="text-sm">Ano</Label>
                 <Input
                   id="expYear"
                   data-testid="input-exp-year"
                   value={expYear}
                   onChange={(e) => setExpYear(e.target.value)}
-                  placeholder="2025"
+                  placeholder="2028"
                   maxLength={4}
+                  className="text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cvv">CVV</Label>
+                <Label htmlFor="cvv" className="text-sm">CVV</Label>
                 <Input
                   id="cvv"
                   data-testid="input-cvv"
@@ -357,18 +374,20 @@ export default function Test3DS() {
                   placeholder="123"
                   maxLength={4}
                   type="password"
+                  className="text-sm"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="amount">Monto (RD$)</Label>
+              <Label htmlFor="amount" className="text-sm">Monto (RD$)</Label>
               <Input
                 id="amount"
                 data-testid="input-amount"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="100.00"
+                className="text-sm"
               />
             </div>
 
@@ -395,26 +414,26 @@ export default function Test3DS() {
 
         {session && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-3 sm:pb-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                 {getStatusIcon(session.status)}
                 Estado de la Sesion
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-0">
               <div className="grid gap-2 text-sm">
-                <div className="flex justify-between">
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                   <span className="text-muted-foreground">Session ID:</span>
-                  <span className="font-mono text-xs">{session.sessionId}</span>
+                  <span className="font-mono text-xs break-all">{session.sessionId}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Estado:</span>
                   {getStatusBadge(session.status)}
                 </div>
                 {session.threeDSServerTransID && (
-                  <div className="flex justify-between">
+                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                     <span className="text-muted-foreground">3DS Trans ID:</span>
-                    <span className="font-mono text-xs">{session.threeDSServerTransID}</span>
+                    <span className="font-mono text-xs break-all">{session.threeDSServerTransID}</span>
                   </div>
                 )}
               </div>
@@ -453,7 +472,7 @@ export default function Test3DS() {
                     </p>
                     <iframe
                       src={session.challengeUrl}
-                      className="w-full h-96 border rounded-lg"
+                      className="w-full h-80 sm:h-96 border rounded-lg"
                       title="3DS Challenge"
                       data-testid="iframe-3ds-challenge"
                     />
@@ -465,7 +484,7 @@ export default function Test3DS() {
                 <>
                   <Separator />
                   <div className="space-y-2">
-                    <h4 className="font-medium">Resultado del Pago</h4>
+                    <h4 className="font-medium text-sm sm:text-base">Resultado del Pago</h4>
                     <div className="grid gap-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Exitoso:</span>
@@ -484,15 +503,15 @@ export default function Test3DS() {
                         </div>
                       )}
                       {session.result.responseMessage && (
-                        <div className="flex justify-between">
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                           <span className="text-muted-foreground">Mensaje:</span>
-                          <span>{session.result.responseMessage}</span>
+                          <span className="text-right">{session.result.responseMessage}</span>
                         </div>
                       )}
                       {session.result.errorDescription && (
-                        <div className="flex justify-between">
+                        <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                           <span className="text-muted-foreground">Error:</span>
-                          <span className="text-red-500">{session.result.errorDescription}</span>
+                          <span className="text-red-500 text-right">{session.result.errorDescription}</span>
                         </div>
                       )}
                     </div>
@@ -504,22 +523,14 @@ export default function Test3DS() {
         )}
 
         <Card>
-          <CardHeader>
-            <CardTitle>Informacion Tecnica</CardTitle>
+          <CardHeader className="pb-3 sm:pb-6">
+            <CardTitle className="text-base sm:text-lg">Informacion Tecnica</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              <strong>Ambiente:</strong> Sandbox (pruebas.azul.com.do)
-            </p>
-            <p>
-              <strong>Merchant ID:</strong> 39038540035
-            </p>
-            <p>
-              <strong>Flujos soportados:</strong> Frictionless, 3DS Method, Challenge
-            </p>
-            <p>
-              <strong>Callback URL:</strong> https://app.gruard.com/api/azul/3ds/callback
-            </p>
+          <CardContent className="text-xs sm:text-sm text-muted-foreground space-y-1 pt-0">
+            <p><strong>Ambiente:</strong> Sandbox (pruebas.azul.com.do)</p>
+            <p><strong>Merchant ID:</strong> 39038540035</p>
+            <p><strong>Flujos:</strong> Frictionless, 3DS Method, Challenge</p>
+            <p className="break-all"><strong>Callback:</strong> https://app.gruard.com/api/azul/3ds/callback</p>
           </CardContent>
         </Card>
       </div>
