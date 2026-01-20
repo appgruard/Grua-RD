@@ -74,6 +74,7 @@ const AseguradoraPerfil = lazy(() => import('@/pages/aseguradora/AseguradoraPerf
 
 const NotFound = lazy(() => import('@/pages/not-found'));
 const PrivacyPolicy = lazy(() => import('@/pages/privacy-policy'));
+const Test3DS = lazy(() => import('@/pages/test-3ds'));
 
 function LoadingFallback() {
   return (
@@ -485,6 +486,11 @@ function Router() {
         <ProtectedRoute allowedTypes={['aseguradora']}>
           <AseguradoraDashboard />
         </ProtectedRoute>
+      </Route>
+
+      {/* Test Routes */}
+      <Route path="/test-3ds">
+        <Test3DS />
       </Route>
 
       <Route path="/">
