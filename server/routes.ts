@@ -8793,12 +8793,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AZUL 3D SECURE 2.0 PAYMENT ENDPOINTS
   // ========================================
 
-  // In-memory store for 3DS sessions (use Redis in production)
+  // In-memory store for 3DS sessions (use Redis/DB in production)
   const threeDSSessions = new Map<string, {
     azulOrderId: string;
+    userId: string;
     amount: number;
     customOrderId: string;
     createdAt: Date;
+    methodTimeout?: NodeJS.Timeout;
     status: 'pending' | 'method_complete' | 'challenge_complete' | 'approved' | 'declined';
     flowType?: string;
     challengeData?: any;
@@ -8807,8 +8809,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Clean up old sessions (older than 15 minutes)
   setInterval(() => {
     const now = new Date();
-    for (const [sessionId, session] of threeDSSessions.entries()) {
+    const entries = Array.from(threeDSSessions.entries());
+    for (let i = 0; i < entries.length; i++) {
+      const [sessionId, session] = entries[i];
       if (now.getTime() - session.createdAt.getTime() > 15 * 60 * 1000) {
+        if (session.methodTimeout) clearTimeout(session.methodTimeout);
         threeDSSessions.delete(sessionId);
       }
     }
@@ -8855,9 +8860,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await AzulPaymentService.initiate3DSPaymentWithCard(cardData, payment, browser, sessionId);
 
+      const userId = req.user!.id;
+
       if (result.flowType === 'APPROVED') {
         threeDSSessions.set(sessionId, {
           azulOrderId: result.azulOrderId!,
+          userId,
           amount,
           customOrderId: payment.customOrderId,
           createdAt: new Date(),
@@ -8876,11 +8884,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (result.flowType === '3D2METHOD') {
+        const methodTimeout = setTimeout(async () => {
+          const session = threeDSSessions.get(sessionId);
+          if (session && session.status === 'pending') {
+            logSystem.info('3DS Method timeout, sending NOT_RECEIVED', { sessionId });
+            try {
+              await AzulPaymentService.processThreeDSMethod(session.azulOrderId, 'NOT_RECEIVED');
+            } catch (e) {
+              logSystem.error('3DS Method timeout error', e);
+            }
+          }
+        }, 10000);
+
         threeDSSessions.set(sessionId, {
           azulOrderId: result.azulOrderId!,
+          userId,
           amount,
           customOrderId: payment.customOrderId,
           createdAt: new Date(),
+          methodTimeout,
           status: 'pending',
           flowType: '3D2METHOD',
         });
@@ -8897,6 +8919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (result.flowType === '3D') {
         threeDSSessions.set(sessionId, {
           azulOrderId: result.azulOrderId!,
+          userId,
           amount,
           customOrderId: payment.customOrderId,
           createdAt: new Date(),
@@ -8942,6 +8965,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!session) {
       logSystem.warn('3DS session not found', { sessionId });
       return res.status(404).send('Session not found');
+    }
+
+    // Clear timeout since we received the notification
+    if (session.methodTimeout) {
+      clearTimeout(session.methodTimeout);
+      session.methodTimeout = undefined;
     }
 
     try {

@@ -66,11 +66,22 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Mapbox**: Maps (Mapbox GL JS via react-map-gl), Directions API, Geocoding API.
 - **Waze**: Deep links for driver navigation.
 - **Azul API**: Payment gateway for Dominican Republic (mTLS with digital certificates).
-  - **Estado**: Pendiente de vinculación del certificado con Merchant ID por parte de Azul.
+  - **Estado**: 3D Secure 2.0 integrado y probado en sandbox.
   - **Certificado**: app.gruard.com.bundle.crt (incluye CA de Azul)
   - **Merchant ID**: 39038540035
-  - **Auth Headers**: splitit (para transacciones estándar) / 3dsecure (para 3DS)
-  - **Ruta en servidor**: /opt/certificados/gruard/ (CapRover) → /etc/azul/certs/ (container)
+  - **Auth Headers**: splitit (para transacciones estandar) / 3dsecure (para 3DS 2.0)
+  - **Ruta en servidor**: /opt/certificados/gruard/ (CapRover) -> /etc/azul/certs/ (container)
+  - **3DS 2.0 Endpoints**:
+    - `POST /api/azul/3ds/initiate` - Iniciar pago con autenticacion 3DS
+    - `POST /api/azul/3ds/method-notification` - Callback del 3DS Method
+    - `POST /api/azul/3ds/callback` - Callback del desafio 3DS
+    - `GET /api/azul/3ds/status/:sessionId` - Consultar estado de sesion 3DS
+  - **Flujos 3DS soportados**:
+    - Frictionless (sin friccion): Aprobacion automatica sin intervencion del usuario
+    - 3DS Method: Recoleccion de datos del navegador antes del desafio
+    - Challenge (desafio): Redireccion a la pagina del emisor para autenticacion
+  - **OrderNumber**: Maximo 15 digitos numericos (timestamp + sufijo aleatorio)
+  - **NOTA PRODUCCION**: Las sesiones 3DS se almacenan en memoria. Para produccion, migrar a Redis o PostgreSQL para persistencia entre reinicios y soporte multi-instancia.
 - **Web Push API**: For push notifications.
 - **Replit Object Storage**: For document storage.
 - **Twilio**: SMS service for OTP delivery.
