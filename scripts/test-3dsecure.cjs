@@ -11,10 +11,69 @@
  * - 4147463011110059 - Desafío sin 3DSMethod
  * 
  * Uso: node scripts/test-3dsecure.cjs [cardType]
+ * 
+ * IMPORTANTE: Requiere certificados mTLS en /opt/certificados/gruard/
  */
+
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
 const AZUL_TEST_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx';
 const AZUL_3DS_METHOD_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedsmethod';
+
+// Rutas de certificados mTLS
+const CERT_PATHS = {
+  cert: process.env.AZUL_CERT_PATH || '/opt/certificados/gruard/app.gruard.com.crt',
+  key: process.env.AZUL_KEY_PATH || '/opt/certificados/gruard/app.gruard.com.key',
+  ca: process.env.AZUL_CA_PATH || '/opt/certificados/gruard/app.gruard.com.bundle.crt',
+};
+
+// Cargar certificados
+let httpsAgent = null;
+function loadCertificates() {
+  try {
+    console.log('\n📜 Cargando certificados mTLS...');
+    console.log(`  Cert: ${CERT_PATHS.cert}`);
+    console.log(`  Key: ${CERT_PATHS.key}`);
+    console.log(`  CA: ${CERT_PATHS.ca}`);
+    
+    const certExists = fs.existsSync(CERT_PATHS.cert);
+    const keyExists = fs.existsSync(CERT_PATHS.key);
+    const caExists = fs.existsSync(CERT_PATHS.ca);
+    
+    console.log(`  Cert existe: ${certExists ? '✅' : '❌'}`);
+    console.log(`  Key existe: ${keyExists ? '✅' : '❌'}`);
+    console.log(`  CA existe: ${caExists ? '✅' : '❌'}`);
+    
+    if (!certExists || !keyExists) {
+      console.error('\n❌ Error: Certificados no encontrados');
+      console.error('Rutas esperadas:');
+      console.error(`  - ${CERT_PATHS.cert}`);
+      console.error(`  - ${CERT_PATHS.key}`);
+      console.error('\nPuedes especificar rutas alternativas con variables de entorno:');
+      console.error('  AZUL_CERT_PATH, AZUL_KEY_PATH, AZUL_CA_PATH');
+      process.exit(1);
+    }
+    
+    const agentOptions = {
+      cert: fs.readFileSync(CERT_PATHS.cert),
+      key: fs.readFileSync(CERT_PATHS.key),
+      rejectUnauthorized: true,
+    };
+    
+    if (caExists) {
+      agentOptions.ca = fs.readFileSync(CERT_PATHS.ca);
+    }
+    
+    httpsAgent = new https.Agent(agentOptions);
+    console.log('✅ Certificados cargados correctamente\n');
+    return true;
+  } catch (error) {
+    console.error('\n❌ Error cargando certificados:', error.message);
+    process.exit(1);
+  }
+}
 
 // AMBIENTE DE PRUEBAS SOLAMENTE - NO usar estas credenciales en producción
 const TEST_CONFIG = {
@@ -74,29 +133,54 @@ function generateTransactionId() {
   return Date.now().toString();
 }
 
-// Función para hacer peticiones HTTP POST
+// Función para hacer peticiones HTTP POST con mTLS
 async function makeRequest(url, data, auth1, auth2) {
   console.log('\n📤 Enviando petición a:', url);
   console.log('📋 Datos:', JSON.stringify(data, null, 2));
   
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Auth1': auth1,
-      'Auth2': auth2,
-    },
-    body: JSON.stringify(data),
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const postData = JSON.stringify(data);
+    
+    const options = {
+      hostname: urlObj.hostname,
+      port: 443,
+      path: urlObj.pathname + urlObj.search,
+      method: 'POST',
+      agent: httpsAgent,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'Auth1': auth1,
+        'Auth2': auth2,
+      },
+    };
+    
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      
+      res.on('end', () => {
+        console.log('\n📥 Respuesta raw:', responseData);
+        try {
+          resolve(JSON.parse(responseData));
+        } catch {
+          resolve({ raw: responseData });
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      console.error('\n❌ Error en la petición:', error.message);
+      reject(error);
+    });
+    
+    req.write(postData);
+    req.end();
   });
-
-  const text = await response.text();
-  console.log('\n📥 Respuesta raw:', text);
-  
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { raw: text };
-  }
 }
 
 // PASO 1: Solicitud inicial de pago con 3D Secure
@@ -408,6 +492,9 @@ async function main() {
   
   // Validar configuración antes de continuar
   validateConfig();
+  
+  // Cargar certificados mTLS
+  loadCertificates();
   
   console.log('\n📋 Configuración actual:');
   console.log(`  Merchant ID: ${TEST_CONFIG.merchantId}`);
