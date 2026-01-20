@@ -342,6 +342,79 @@ async function runFullTest(cardKey) {
   }
 }
 
+// Ejecutar todas las pruebas
+async function runAllTests() {
+  const results = {};
+  const cardKeys = Object.keys(TEST_CARDS);
+  
+  console.log('\n' + '🧪'.repeat(40));
+  console.log('EJECUTANDO TODAS LAS PRUEBAS');
+  console.log(`Total de tarjetas: ${cardKeys.length}`);
+  console.log('🧪'.repeat(40));
+  
+  for (const cardKey of cardKeys) {
+    console.log('\n\n' + '▓'.repeat(80));
+    console.log(`PRUEBA ${cardKeys.indexOf(cardKey) + 1}/${cardKeys.length}: ${cardKey}`);
+    console.log('▓'.repeat(80));
+    
+    try {
+      const result = await runFullTest(cardKey);
+      results[cardKey] = {
+        success: result.IsoCode === '00' || result.IsoCode === '3D' || result.IsoCode === '3D2METHOD',
+        isoCode: result.IsoCode,
+        responseMessage: result.ResponseMessage,
+        authorizationCode: result.AuthorizationCode || null,
+        azulOrderId: result.AZULOrderId,
+      };
+    } catch (error) {
+      results[cardKey] = {
+        success: false,
+        error: error.message,
+      };
+    }
+    
+    // Esperar entre pruebas para no saturar el servidor
+    console.log('\n⏳ Esperando 3 segundos antes de la siguiente prueba...');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+  
+  return results;
+}
+
+// Mostrar resumen de resultados
+function showSummary(results) {
+  console.log('\n\n' + '═'.repeat(80));
+  console.log('📊 RESUMEN DE RESULTADOS');
+  console.log('═'.repeat(80));
+  
+  const successful = Object.values(results).filter(r => r.success).length;
+  const failed = Object.values(results).filter(r => !r.success).length;
+  
+  console.log(`\n✅ Exitosas: ${successful}`);
+  console.log(`❌ Fallidas: ${failed}`);
+  console.log(`📈 Total: ${Object.keys(results).length}`);
+  
+  console.log('\n' + '-'.repeat(80));
+  console.log('Detalle por tarjeta:');
+  console.log('-'.repeat(80));
+  
+  Object.entries(results).forEach(([cardKey, result]) => {
+    const card = TEST_CARDS[cardKey];
+    const status = result.success ? '✅' : '❌';
+    console.log(`\n${status} ${card.description} (${card.number})`);
+    console.log(`   IsoCode: ${result.isoCode || 'N/A'}`);
+    console.log(`   ResponseMessage: ${result.responseMessage || result.error || 'N/A'}`);
+    if (result.authorizationCode) {
+      console.log(`   AuthorizationCode: ${result.authorizationCode}`);
+    }
+    if (result.azulOrderId) {
+      console.log(`   AZULOrderId: ${result.azulOrderId}`);
+    }
+  });
+  
+  console.log('\n' + '═'.repeat(80));
+}
+
 // Menú de pruebas
 async function main() {
   console.log('\n╔════════════════════════════════════════════════════════════════════════════════╗');
@@ -362,18 +435,27 @@ async function main() {
     console.log(`  ${key}: ${card.number} - ${card.description}`);
   });
 
-  // Ejecutar pruebas con cada tipo de tarjeta
-  const testCard = process.argv[2] || 'frictionlessWithMethod';
+  const testCard = process.argv[2];
   
-  if (TEST_CARDS[testCard]) {
+  // Si se pasa "all" o no se pasa argumento, ejecutar todas las pruebas
+  if (!testCard || testCard === 'all') {
+    console.log('\n🔄 Ejecutando TODAS las pruebas...');
+    const results = await runAllTests();
+    showSummary(results);
+  } else if (TEST_CARDS[testCard]) {
     await runFullTest(testCard);
   } else {
-    console.log('\n⚠️ Tarjeta no válida. Usando tarjeta por defecto: frictionlessWithMethod');
-    await runFullTest('frictionlessWithMethod');
+    console.log('\n⚠️ Tarjeta no válida. Opciones:');
+    console.log('  - node scripts/test-3dsecure.cjs          (ejecutar todas)');
+    console.log('  - node scripts/test-3dsecure.cjs all      (ejecutar todas)');
+    Object.keys(TEST_CARDS).forEach(key => {
+      console.log(`  - node scripts/test-3dsecure.cjs ${key}`);
+    });
+    process.exit(1);
   }
   
   console.log('\n' + '═'.repeat(80));
-  console.log('PRUEBA FINALIZADA');
+  console.log('PRUEBAS FINALIZADAS');
   console.log('═'.repeat(80));
 }
 
