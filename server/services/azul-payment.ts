@@ -30,10 +30,23 @@ const getApiUrl = () => {
 // Create HTTPS Agent with certificates
 const getHttpsAgent = () => {
   try {
+    logSystem.info('Checking Azul certificates', { 
+      certPath: CERT_PATH, 
+      keyPath: KEY_PATH,
+      certExists: fs.existsSync(CERT_PATH),
+      keyExists: fs.existsSync(KEY_PATH)
+    });
+    
     if (fs.existsSync(CERT_PATH) && fs.existsSync(KEY_PATH)) {
+      const cert = fs.readFileSync(CERT_PATH);
+      const key = fs.readFileSync(KEY_PATH);
+      logSystem.info('Azul certificates loaded successfully', { 
+        certSize: cert.length,
+        keySize: key.length
+      });
       return new https.Agent({
-        cert: fs.readFileSync(CERT_PATH),
-        key: fs.readFileSync(KEY_PATH),
+        cert,
+        key,
         rejectUnauthorized: true
       });
     }
@@ -851,6 +864,8 @@ export class AzulPaymentService {
       hostname: urlObj.hostname,
       merchantId: config.merchantId,
       path: urlObj.pathname,
+      auth3DS: auth3DS,
+      payloadKeys: Object.keys(requestData),
     });
 
     return new Promise((resolve, reject) => {
@@ -868,15 +883,23 @@ export class AzulPaymentService {
         res.on('data', chunk => responseBody += chunk);
         res.on('end', () => {
           try {
+            logSystem.info('Azul 3DS raw response', { 
+              statusCode: res.statusCode,
+              headers: res.headers,
+              bodyLength: responseBody.length,
+              bodyPreview: responseBody.substring(0, 500),
+            });
+            
             if (!responseBody) {
               reject(new Error('Azul API returned empty response'));
               return;
             }
             const responseData = JSON.parse(responseBody);
-            logSystem.info('Azul 3DS API response', { 
+            logSystem.info('Azul 3DS API response parsed', { 
               isoCode: responseData.IsoCode,
               responseMessage: responseData.ResponseMessage,
               azulOrderId: responseData.AzulOrderId,
+              allKeys: Object.keys(responseData),
             });
             resolve(responseData);
           } catch (error) {
