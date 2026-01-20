@@ -14,10 +14,12 @@ const KEY_PATH = process.env.AZUL_KEY_PATH || '/etc/azul/certs/app.gruard.com.ke
 // Environment configuration
 const getAzulConfig = () => ({
   merchantId: process.env.AZUL_MERCHANT_ID || '39038540035',
-  authKey: process.env.AZUL_AUTH_KEY || 'splitit', // Used as Auth1/Auth2 headers
+  authKey: process.env.AZUL_AUTH_KEY || 'splitit',
+  auth3DS: process.env.AZUL_AUTH_3DS || '3dsecure',
   environment: (process.env.AZUL_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production',
   channel: process.env.AZUL_CHANNEL || 'EC',
   posInputMode: process.env.AZUL_POS_INPUT_MODE || 'E-Commerce',
+  baseUrl: process.env.APP_BASE_URL || 'https://app.gruard.com',
 });
 
 const getApiUrl = () => {
@@ -126,6 +128,36 @@ export interface Azul3DSResponse extends AzulResponse {
   requires3DS?: boolean;
 }
 
+export interface ThreeDSMethodResponse extends AzulResponse {
+  methodForm?: string;
+  azulOrderId?: string;
+}
+
+export interface ThreeDSChallengeResponse extends AzulResponse {
+  redirectPostUrl?: string;
+  creq?: string;
+  md?: string;
+  paReq?: string;
+  azulOrderId?: string;
+}
+
+export interface Initiate3DSPaymentResult {
+  success: boolean;
+  sessionId: string;
+  azulOrderId?: string;
+  isoCode: string;
+  responseMessage: string;
+  flowType: '3D2METHOD' | '3D' | 'APPROVED' | 'DECLINED' | 'ERROR';
+  methodForm?: string;
+  challengeData?: {
+    redirectPostUrl: string;
+    creq: string;
+    md?: string;
+  };
+  authorizationCode?: string;
+  errorDescription?: string;
+}
+
 // ISO Response Codes
 const ISO_CODES: Record<string, string> = {
   '00': 'Aprobada',
@@ -179,19 +211,13 @@ const ISO_CODES: Record<string, string> = {
 
 export class AzulPaymentService {
   /**
-   * Generate numeric OrderNumber in YYYYMMDDHHMMSS format with random suffix
-   * Azul requires numeric-only OrderNumber values
+   * Generate numeric OrderNumber (max 15 digits as required by Azul)
    */
   static generateOrderNumber(): string {
-    const now = new Date();
-    const timestamp = now.getFullYear().toString() +
-      String(now.getMonth() + 1).padStart(2, '0') +
-      String(now.getDate()).padStart(2, '0') +
-      String(now.getHours()).padStart(2, '0') +
-      String(now.getMinutes()).padStart(2, '0') +
-      String(now.getSeconds()).padStart(2, '0');
-    const randomSuffix = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
-    return timestamp + randomSuffix;
+    const now = Date.now();
+    const timestamp = (now % 100000000000).toString().padStart(11, '0');
+    const random = Math.floor(1000 + Math.random() * 9000);
+    return timestamp + random.toString();
   }
 
   /**
@@ -794,6 +820,304 @@ export class AzulPaymentService {
   static formatExpiration(month: number, year: number): string {
     const fullYear = year < 100 ? 2000 + year : year;
     return `${fullYear}${month.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Make a 3DS-specific request with 3dsecure auth headers
+   */
+  private static async make3DSRequest(url: string, data: Record<string, any>): Promise<any> {
+    const config = getAzulConfig();
+    const urlObj = new URL(url);
+    
+    const requestData: Record<string, any> = {
+      Channel: config.channel,
+      Store: config.merchantId,
+      ...data,
+    };
+
+    const jsonPayload = JSON.stringify(requestData);
+    const auth3DS = config.auth3DS;
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Auth1': auth3DS,
+      'Auth2': auth3DS,
+      'Content-Length': Buffer.byteLength(jsonPayload).toString(),
+      'User-Agent': 'GruaRD-App/1.0',
+      'Host': urlObj.hostname
+    };
+
+    logSystem.info('Azul 3DS API request', { 
+      hostname: urlObj.hostname,
+      merchantId: config.merchantId,
+      path: urlObj.pathname,
+    });
+
+    return new Promise((resolve, reject) => {
+      const options: https.RequestOptions = {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + (urlObj.search || ''),
+        method: 'POST',
+        agent: getHttpsAgent(),
+        headers,
+        minVersion: 'TLSv1.2' as any
+      };
+
+      const req = https.request(options, (res) => {
+        let responseBody = '';
+        res.on('data', chunk => responseBody += chunk);
+        res.on('end', () => {
+          try {
+            if (!responseBody) {
+              reject(new Error('Azul API returned empty response'));
+              return;
+            }
+            const responseData = JSON.parse(responseBody);
+            logSystem.info('Azul 3DS API response', { 
+              isoCode: responseData.IsoCode,
+              responseMessage: responseData.ResponseMessage,
+              azulOrderId: responseData.AzulOrderId,
+            });
+            resolve(responseData);
+          } catch (error) {
+            logSystem.error('Failed to parse Azul 3DS response', { body: responseBody, error });
+            reject(new Error(`Failed to parse Azul response: ${responseBody}`));
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        logSystem.error('Azul 3DS API connection failed', error);
+        reject(error);
+      });
+
+      req.setTimeout(30000, () => {
+        req.destroy();
+        reject(new Error('Azul 3DS API request timed out'));
+      });
+
+      req.write(jsonPayload);
+      req.end();
+    });
+  }
+
+  /**
+   * Initiate a 3D Secure 2.0 payment with card data
+   */
+  static async initiate3DSPaymentWithCard(
+    cardData: AzulCardData,
+    payment: AzulPaymentRequest,
+    browserInfo: BrowserInfo,
+    sessionId: string
+  ): Promise<Initiate3DSPaymentResult> {
+    const config = getAzulConfig();
+    const apiUrl = getApiUrl();
+
+    try {
+      const cleanCardNumber = cardData.cardNumber.replace(/\D/g, '');
+      const orderNumber = this.generateOrderNumber();
+
+      const requestData = {
+        CardNumber: cleanCardNumber,
+        Expiration: cardData.expiration,
+        CVC: cardData.cvc,
+        PosInputMode: 'E-Commerce',
+        TrxType: 'Sale',
+        Amount: payment.amount.toString(),
+        Itbis: (payment.itbis || 0).toString(),
+        OrderNumber: orderNumber,
+        CustomOrderId: payment.customOrderId || `GRD-${sessionId}`,
+        DataVaultToken: '',
+        SaveToDataVault: payment.saveToDataVault ? '1' : '0',
+        ForceNo3DS: '',
+        ThreeDSAuth: {
+          TermUrl: `${config.baseUrl}/api/azul/3ds/callback?sid=${sessionId}`,
+          MethodNotificationUrl: `${config.baseUrl}/api/azul/3ds/method-notification?sid=${sessionId}`,
+          RequestorChallengeIndicator: '01',
+        },
+        CardHolderInfo: payment.cardHolderInfo ? {
+          Name: payment.cardHolderInfo.name,
+          Email: payment.cardHolderInfo.email || '',
+          PhoneHome: payment.cardHolderInfo.phoneHome || '',
+          PhoneMobile: payment.cardHolderInfo.phoneMobile || '',
+          BillingAddressLine1: payment.cardHolderInfo.billingAddressLine1 || '',
+          BillingAddressCity: payment.cardHolderInfo.billingAddressCity || '',
+          BillingAddressCountry: payment.cardHolderInfo.billingAddressCountry || 'DO',
+          BillingAddressZip: payment.cardHolderInfo.billingAddressZip || '',
+        } : undefined,
+        BrowserInfo: {
+          AcceptHeader: browserInfo.acceptHeader,
+          IPAddress: browserInfo.ipAddress,
+          Language: browserInfo.language,
+          ColorDepth: browserInfo.colorDepth.toString(),
+          ScreenWidth: browserInfo.screenWidth.toString(),
+          ScreenHeight: browserInfo.screenHeight.toString(),
+          TimeZone: browserInfo.timeZone,
+          UserAgent: browserInfo.userAgent,
+          JavaScriptEnabled: browserInfo.javaScriptEnabled,
+        },
+      };
+
+      const response = await this.make3DSRequest(apiUrl, requestData);
+
+      if (response.IsoCode === '3D2METHOD') {
+        return {
+          success: true,
+          sessionId,
+          azulOrderId: response.AzulOrderId,
+          isoCode: response.IsoCode,
+          responseMessage: response.ResponseMessage,
+          flowType: '3D2METHOD',
+          methodForm: response.ThreeDSMethod?.MethodForm,
+        };
+      }
+
+      if (response.IsoCode === '3D') {
+        return {
+          success: true,
+          sessionId,
+          azulOrderId: response.AzulOrderId,
+          isoCode: response.IsoCode,
+          responseMessage: response.ResponseMessage,
+          flowType: '3D',
+          challengeData: {
+            redirectPostUrl: response.ThreeDSChallenge?.RedirectPostUrl,
+            creq: response.ThreeDSChallenge?.CReq,
+            md: response.ThreeDSChallenge?.MD,
+          },
+        };
+      }
+
+      if (response.IsoCode === '00') {
+        return {
+          success: true,
+          sessionId,
+          azulOrderId: response.AzulOrderId,
+          isoCode: response.IsoCode,
+          responseMessage: response.ResponseMessage,
+          flowType: 'APPROVED',
+          authorizationCode: response.AuthorizationCode,
+        };
+      }
+
+      return {
+        success: false,
+        sessionId,
+        azulOrderId: response.AzulOrderId,
+        isoCode: response.IsoCode || 'Error',
+        responseMessage: response.ResponseMessage || 'Error desconocido',
+        flowType: 'DECLINED',
+        errorDescription: response.ErrorDescription,
+      };
+    } catch (error) {
+      logSystem.error('Azul initiate3DSPayment error', error);
+      return {
+        success: false,
+        sessionId,
+        isoCode: '96',
+        responseMessage: 'Error del sistema al iniciar pago 3DS',
+        flowType: 'ERROR',
+        errorDescription: error instanceof Error ? error.message : 'Error desconocido',
+      };
+    }
+  }
+
+  /**
+   * Process 3DS Method notification and continue authentication
+   */
+  static async processThreeDSMethod(
+    azulOrderId: string,
+    status: 'RECEIVED' | 'NOT_RECEIVED'
+  ): Promise<Initiate3DSPaymentResult & { sessionId?: string }> {
+    const config = getAzulConfig();
+    const apiUrl = `${getApiUrl()}?processthreedsmethod`;
+
+    try {
+      const requestData = {
+        AzulOrderId: azulOrderId,
+        MethodNotificationStatus: status,
+      };
+
+      const response = await this.make3DSRequest(apiUrl, requestData);
+
+      if (response.IsoCode === '00') {
+        return {
+          success: true,
+          sessionId: '',
+          azulOrderId: response.AzulOrderId,
+          isoCode: response.IsoCode,
+          responseMessage: response.ResponseMessage,
+          flowType: 'APPROVED',
+          authorizationCode: response.AuthorizationCode,
+        };
+      }
+
+      if (response.IsoCode === '3D') {
+        return {
+          success: true,
+          sessionId: '',
+          azulOrderId: response.AzulOrderId,
+          isoCode: response.IsoCode,
+          responseMessage: response.ResponseMessage,
+          flowType: '3D',
+          challengeData: {
+            redirectPostUrl: response.ThreeDSChallenge?.RedirectPostUrl,
+            creq: response.ThreeDSChallenge?.CReq,
+            md: response.ThreeDSChallenge?.MD,
+          },
+        };
+      }
+
+      return {
+        success: false,
+        sessionId: '',
+        azulOrderId: response.AzulOrderId,
+        isoCode: response.IsoCode || 'Error',
+        responseMessage: response.ResponseMessage || 'Error desconocido',
+        flowType: 'DECLINED',
+        errorDescription: response.ErrorDescription,
+      };
+    } catch (error) {
+      logSystem.error('Azul processThreeDSMethod error', error);
+      return {
+        success: false,
+        sessionId: '',
+        isoCode: '96',
+        responseMessage: 'Error al procesar 3DS Method',
+        flowType: 'ERROR',
+        errorDescription: error instanceof Error ? error.message : 'Error desconocido',
+      };
+    }
+  }
+
+  /**
+   * Process 3DS Challenge result
+   */
+  static async processThreeDSChallenge(
+    azulOrderId: string,
+    cres?: string
+  ): Promise<AzulResponse> {
+    const apiUrl = `${getApiUrl()}?processthreedsChallenge`;
+
+    try {
+      const requestData: Record<string, any> = {
+        AzulOrderId: azulOrderId,
+      };
+      
+      if (cres) {
+        requestData.CRes = cres;
+      }
+
+      const response = await this.make3DSRequest(apiUrl, requestData);
+      return this.parseResponse(response);
+    } catch (error) {
+      logSystem.error('Azul processThreeDSChallenge error', error);
+      return {
+        success: false,
+        isoCode: '96',
+        responseMessage: 'Error al procesar desafio 3DS',
+      };
+    }
   }
 
   /**
