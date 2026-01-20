@@ -866,6 +866,8 @@ export class AzulPaymentService {
       path: urlObj.pathname,
       auth3DS: auth3DS,
       payloadKeys: Object.keys(requestData),
+      amount: requestData.Amount,
+      itbis: requestData.Itbis,
     });
 
     return new Promise((resolve, reject) => {
@@ -940,6 +942,9 @@ export class AzulPaymentService {
       const cleanCardNumber = cardData.cardNumber.replace(/\D/g, '');
       const orderNumber = this.generateOrderNumber();
 
+      // Itbis debe ser string vacio si es 0, segun documentacion Azul
+      const itbisValue = payment.itbis && payment.itbis > 0 ? payment.itbis.toString() : '';
+      
       const requestData = {
         CardNumber: cleanCardNumber,
         Expiration: cardData.expiration,
@@ -947,7 +952,7 @@ export class AzulPaymentService {
         PosInputMode: 'E-Commerce',
         TrxType: 'Sale',
         Amount: payment.amount.toString(),
-        Itbis: (payment.itbis || 0).toString(),
+        Itbis: itbisValue,
         OrderNumber: orderNumber,
         CustomOrderId: payment.customOrderId || `GRD-${sessionId}`,
         DataVaultToken: '',
