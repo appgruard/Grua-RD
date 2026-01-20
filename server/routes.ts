@@ -1,6 +1,7 @@
 import express, { type Express, type Request, type Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { storageService } from "./storage-service";
 import { pushService } from "./push-service";
@@ -8785,6 +8786,266 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(503).json({ 
       message: "El servicio de pagos está en proceso de migración. Por favor intente más tarde.",
       configured: false 
+    });
+  });
+
+  // ========================================
+  // AZUL 3D SECURE 2.0 PAYMENT ENDPOINTS
+  // ========================================
+
+  // In-memory store for 3DS sessions (use Redis in production)
+  const threeDSSessions = new Map<string, {
+    azulOrderId: string;
+    amount: number;
+    customOrderId: string;
+    createdAt: Date;
+    status: 'pending' | 'method_complete' | 'challenge_complete' | 'approved' | 'declined';
+    flowType?: string;
+    challengeData?: any;
+  }>();
+
+  // Clean up old sessions (older than 15 minutes)
+  setInterval(() => {
+    const now = new Date();
+    for (const [sessionId, session] of threeDSSessions.entries()) {
+      if (now.getTime() - session.createdAt.getTime() > 15 * 60 * 1000) {
+        threeDSSessions.delete(sessionId);
+      }
+    }
+  }, 60000);
+
+  // Initiate 3DS payment
+  app.post("/api/azul/3ds/initiate", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { cardNumber, expiration, cvc, amount, itbis, cardHolderName, browserInfo, customOrderId, saveCard } = req.body;
+
+      if (!cardNumber || !expiration || !cvc || !amount) {
+        return res.status(400).json({ message: "Missing required fields: cardNumber, expiration, cvc, amount" });
+      }
+
+      if (!browserInfo) {
+        return res.status(400).json({ message: "Browser information is required for 3DS" });
+      }
+
+      const sessionId = crypto.randomUUID();
+      const cardData = {
+        cardNumber,
+        expiration,
+        cvc,
+        cardHolderName,
+      };
+
+      const payment = {
+        amount: Math.round(amount * 100),
+        itbis: itbis ? Math.round(itbis * 100) : 0,
+        customOrderId: customOrderId || `GRD-${sessionId.substring(0, 8)}`,
+        saveToDataVault: saveCard || false,
+        cardHolderInfo: cardHolderName ? { name: cardHolderName, email: req.user?.email } : undefined,
+      };
+
+      const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0] || req.socket.remoteAddress || '0.0.0.0';
+      const browser = {
+        ...browserInfo,
+        ipAddress: clientIp,
+      };
+
+      const result = await AzulPaymentService.initiate3DSPaymentWithCard(cardData, payment, browser, sessionId);
+
+      if (result.flowType === 'APPROVED') {
+        threeDSSessions.set(sessionId, {
+          azulOrderId: result.azulOrderId!,
+          amount,
+          customOrderId: payment.customOrderId,
+          createdAt: new Date(),
+          status: 'approved',
+          flowType: 'APPROVED',
+        });
+
+        return res.json({
+          success: true,
+          sessionId,
+          flowType: 'APPROVED',
+          azulOrderId: result.azulOrderId,
+          authorizationCode: result.authorizationCode,
+          message: 'Pago aprobado',
+        });
+      }
+
+      if (result.flowType === '3D2METHOD') {
+        threeDSSessions.set(sessionId, {
+          azulOrderId: result.azulOrderId!,
+          amount,
+          customOrderId: payment.customOrderId,
+          createdAt: new Date(),
+          status: 'pending',
+          flowType: '3D2METHOD',
+        });
+
+        return res.json({
+          success: true,
+          sessionId,
+          flowType: '3D2METHOD',
+          methodForm: result.methodForm,
+          message: 'Se requiere verificacion 3DS Method',
+        });
+      }
+
+      if (result.flowType === '3D') {
+        threeDSSessions.set(sessionId, {
+          azulOrderId: result.azulOrderId!,
+          amount,
+          customOrderId: payment.customOrderId,
+          createdAt: new Date(),
+          status: 'pending',
+          flowType: '3D',
+          challengeData: result.challengeData,
+        });
+
+        return res.json({
+          success: true,
+          sessionId,
+          flowType: '3D',
+          challengeData: result.challengeData,
+          message: 'Se requiere autenticacion 3DS',
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        sessionId,
+        flowType: result.flowType,
+        isoCode: result.isoCode,
+        message: result.responseMessage || 'Pago rechazado',
+        errorDescription: result.errorDescription,
+      });
+    } catch (error) {
+      logSystem.error('3DS initiate error', error);
+      res.status(500).json({ message: "Error al iniciar pago 3DS" });
+    }
+  });
+
+  // 3DS Method notification callback (called by Azul iframe)
+  app.post("/api/azul/3ds/method-notification", async (req: Request, res: Response) => {
+    const sessionId = req.query.sid as string;
+    
+    logSystem.info('3DS Method notification received', { sessionId, body: req.body });
+
+    if (!sessionId) {
+      return res.status(400).send('Missing session ID');
+    }
+
+    const session = threeDSSessions.get(sessionId);
+    if (!session) {
+      logSystem.warn('3DS session not found', { sessionId });
+      return res.status(404).send('Session not found');
+    }
+
+    try {
+      const result = await AzulPaymentService.processThreeDSMethod(session.azulOrderId, 'RECEIVED');
+
+      session.status = 'method_complete';
+      session.flowType = result.flowType;
+
+      if (result.flowType === 'APPROVED') {
+        session.status = 'approved';
+      } else if (result.flowType === '3D') {
+        session.challengeData = result.challengeData;
+      }
+
+      threeDSSessions.set(sessionId, session);
+
+      // Return HTML that notifies parent window
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head><title>3DS Method Complete</title></head>
+        <body>
+          <script>
+            if (window.parent) {
+              window.parent.postMessage({
+                type: '3DS_METHOD_COMPLETE',
+                sessionId: '${sessionId}',
+                flowType: '${result.flowType}',
+                success: ${result.success},
+                challengeData: ${JSON.stringify(result.challengeData || null)}
+              }, '*');
+            }
+          </script>
+          <p>Processing...</p>
+        </body>
+        </html>
+      `;
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      logSystem.error('3DS Method notification error', error);
+      res.status(500).send('Error processing 3DS Method');
+    }
+  });
+
+  // 3DS Challenge callback (redirect from ACS)
+  app.post("/api/azul/3ds/callback", async (req: Request, res: Response) => {
+    const sessionId = req.query.sid as string;
+    const cres = req.body.cres || req.body.CRes;
+
+    logSystem.info('3DS Challenge callback received', { sessionId, hasCres: !!cres });
+
+    if (!sessionId) {
+      return res.status(400).send('Missing session ID');
+    }
+
+    const session = threeDSSessions.get(sessionId);
+    if (!session) {
+      logSystem.warn('3DS session not found', { sessionId });
+      return res.status(404).send('Session not found');
+    }
+
+    try {
+      const result = await AzulPaymentService.processThreeDSChallenge(session.azulOrderId, cres);
+
+      session.status = result.success ? 'approved' : 'declined';
+      threeDSSessions.set(sessionId, session);
+
+      // Redirect back to app with result
+      const resultParams = new URLSearchParams({
+        sid: sessionId,
+        success: result.success.toString(),
+        code: result.isoCode,
+        azulOrderId: result.azulOrderId || '',
+        authCode: result.authorizationCode || '',
+      });
+
+      const redirectUrl = `/pago-resultado?${resultParams.toString()}`;
+      res.redirect(redirectUrl);
+    } catch (error) {
+      logSystem.error('3DS Challenge callback error', error);
+      res.redirect(`/pago-resultado?sid=${sessionId}&success=false&error=processing_error`);
+    }
+  });
+
+  // Get 3DS session status
+  app.get("/api/azul/3ds/status/:sessionId", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const { sessionId } = req.params;
+    const session = threeDSSessions.get(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found or expired" });
+    }
+
+    res.json({
+      sessionId,
+      status: session.status,
+      flowType: session.flowType,
+      azulOrderId: session.azulOrderId,
+      challengeData: session.status === 'method_complete' && session.flowType === '3D' ? session.challengeData : undefined,
     });
   });
 
