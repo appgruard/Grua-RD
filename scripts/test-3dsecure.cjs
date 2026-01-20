@@ -59,12 +59,14 @@ function loadCertificates() {
     const agentOptions = {
       cert: fs.readFileSync(CERT_PATHS.cert),
       key: fs.readFileSync(CERT_PATHS.key),
-      rejectUnauthorized: true,
+      rejectUnauthorized: false, // Azul usa su propia CA - deshabilitamos verificación para pruebas
     };
     
     if (caExists) {
       agentOptions.ca = fs.readFileSync(CERT_PATHS.ca);
     }
+    
+    console.log('⚠️  rejectUnauthorized=false (solo para ambiente de pruebas)');
     
     httpsAgent = new https.Agent(agentOptions);
     console.log('✅ Certificados cargados correctamente\n');
