@@ -59,14 +59,24 @@ async function runChallengeTest() {
     CVC: '123',
     PosInputMode: 'E-Commerce',
     TrxType: 'Sale',
-    Amount: '100', // Monto muy pequeño para forzar 3DS si es necesario
-    Itbis: '18',
+    Amount: '100000', // RD$1000.00 (Monto sugerido por el script manual para forzar desafío)
+    Itbis: '18000',
     OrderNumber: orderNumber,
     CustomOrderId: `TEST-VPS-${orderNumber}`,
     ThreeDSAuth: {
       TermUrl: `http://${vpsIp}:5000/callback`, 
       MethodNotificationUrl: `http://${vpsIp}:5000/method`,
-      RequestorChallengeIndicator: '04' // Forzar desafío
+      RequestorChallengeIndicator: '01' // Cambiado a '01' según el script manual
+    },
+    CardHolderInfo: {
+      Name: 'Juan Perez Prueba',
+      Email: 'test@gruard.com',
+      PhoneHome: '8095551234',
+      PhoneMobile: '8295551234',
+      BillingAddressLine1: 'Calle Principal #123',
+      BillingAddressCity: 'Santo Domingo',
+      BillingAddressCountry: 'DO',
+      BillingAddressZip: '10101'
     },
     BrowserInfo: {
       AcceptHeader: 'text/html,application/xhtml+xml',
