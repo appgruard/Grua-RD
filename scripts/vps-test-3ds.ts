@@ -1,5 +1,7 @@
 
 import axios from 'axios';
+import https from 'https';
+import fs from 'fs';
 
 /**
  * Script de Prueba 3D Secure para VPS Externo
@@ -10,8 +12,26 @@ const CONFIG = {
   merchantId: process.env.AZUL_MERCHANT_ID || '39038540035',
   auth1: process.env.AZUL_AUTH1 || 'splitit',
   auth2: process.env.AZUL_AUTH2 || 'splitit',
-  azulUrl: 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx'
+  azulUrl: 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx',
+  certPath: './server/services/azul-certs/app.gruard.com.crt',
+  keyPath: './server/services/azul-certs/app.gruard.com.key',
+  caPath: './server/services/azul-certs/app.gruard.com.bundle.crt'
 };
+
+function getHttpsAgent() {
+  if (fs.existsSync(CONFIG.certPath) && fs.existsSync(CONFIG.keyPath)) {
+    const agentOptions: any = {
+      cert: fs.readFileSync(CONFIG.certPath),
+      key: fs.readFileSync(CONFIG.keyPath),
+      rejectUnauthorized: false
+    };
+    if (fs.existsSync(CONFIG.caPath)) {
+      agentOptions.ca = fs.readFileSync(CONFIG.caPath);
+    }
+    return new https.Agent(agentOptions);
+  }
+  return undefined;
+}
 
 async function getVpsIp() {
   try {
@@ -25,9 +45,11 @@ async function getVpsIp() {
 async function runChallengeTest() {
   const vpsIp = await getVpsIp();
   const orderNumber = `VPS${Date.now().toString().slice(-8)}`;
+  const agent = getHttpsAgent();
   
   console.log(`🚀 Iniciando Test 3DS en VPS (IP: ${vpsIp})`);
   console.log(`📦 OrderNumber: ${orderNumber}`);
+  console.log(`📜 Certificados: ${agent ? 'Cargados' : 'No encontrados (usando agente por defecto)'}`);
 
   const payload = {
     Channel: 'EC',
@@ -42,7 +64,6 @@ async function runChallengeTest() {
     OrderNumber: orderNumber,
     CustomOrderId: `TEST-VPS-${orderNumber}`,
     ThreeDSAuth: {
-      // Nota: Aquí deberías poner la URL de tu listener local en el VPS si lo tienes
       TermUrl: `http://${vpsIp}:5000/callback`, 
       MethodNotificationUrl: `http://${vpsIp}:5000/method`,
       RequestorChallengeIndicator: '04' // Forzar desafío
@@ -65,7 +86,8 @@ async function runChallengeTest() {
         'Auth1': CONFIG.auth1,
         'Auth2': CONFIG.auth2,
         'Content-Type': 'application/json'
-      }
+      },
+      httpsAgent: agent
     });
 
     console.log('\n✅ Respuesta de Azul:');
