@@ -496,7 +496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const testCard = {
         cardNumber: "4005520000000129",
         expiration: "202812",
-        cvc: "123",
+        cvc: "999", // CVC 999 para tarjetas 3DS de prueba en Azul
         cardHolderName: "Juan Perez Prueba"
       };
 
