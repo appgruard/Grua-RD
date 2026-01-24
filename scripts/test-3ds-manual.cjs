@@ -120,7 +120,7 @@ async function initiatePayment() {
 
   const transactionId = Date.now().toString();
   const orderNumber = generateOrderNumber();
-  const baseUrl = process.env.APP_BASE_URL || 'https://app.gruard.com';
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000';
 
   const request = {
     Channel: TEST_CONFIG.channel,
@@ -336,7 +336,7 @@ function generateChallengeHTML(redirectPostUrl, creq, termUrl) {
     </div>
     
     <form id="challengeForm" method="POST" action="${redirectPostUrl}" target="challengeFrame" class="hidden">
-      <input type="hidden" name="creq" value="${creq}">
+      <input type="hidden" name="CReq" value="${creq}">
     </form>
   </div>
 
@@ -496,7 +496,7 @@ async function main() {
     console.log('PASO 3: Challenge Manual');
     console.log('='.repeat(80));
     
-    const baseUrl = process.env.APP_BASE_URL || 'https://app.gruard.com';
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000';
     const termUrl = baseUrl + '/api/azul/3ds/callback?sid=' + Date.now();
     
     const htmlContent = generateChallengeHTML(
