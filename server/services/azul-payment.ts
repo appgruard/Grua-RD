@@ -8,8 +8,8 @@ const AZUL_SANDBOX_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.a
 const AZUL_PRODUCTION_URL = 'https://pagos.azul.com.do/webservices/JSON/Default.aspx';
 
 // Certificate Paths
-const CERT_PATH = process.env.AZUL_CERT_PATH || '/opt/certificados/gruard/app.gruard.com.bundle.crt';
-const KEY_PATH = process.env.AZUL_KEY_PATH || '/opt/certificados/gruard/app.gruard.com.key';
+const CERT_PATH = process.env.AZUL_CERT_PATH || '/etc/azul/certs/app.gruard.com.bundle.crt';
+const KEY_PATH = process.env.AZUL_KEY_PATH || '/etc/azul/certs/app.gruard.com.key';
 
 // Environment configuration
 const getAzulConfig = () => ({
