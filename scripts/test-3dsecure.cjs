@@ -247,7 +247,8 @@ async function runFullTest(cardKey) {
       console.log('\n[Paso 3] Azul respondió con 3D2METHOD');
       
       // Paso 4
-      await step2_SubmitMethodForm(step1Response.ThreeDSMethodData);
+      const methodData = step1Response.ThreeDSMethodData || step1Response.threeDSMethodData;
+      await step2_SubmitMethodForm(methodData);
       
       // Paso 5
       const step3Response = await step3_ContinueAuthentication(step1Response.AzulOrderId, 'RECEIVED');
