@@ -468,8 +468,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.session());
 
   // Test endpoint for AZUL 3DS Challenge (Card 0129)
-  app.get("/api/test/azul-3ds-challenge", async (_req, res) => {
+  app.get("/api/test/azul-3ds-challenge", async (req, res) => {
     try {
+      logSystem.info("Testing 3DS Challenge endpoint", { path: req.path });
       const orderNumber = AzulPaymentService.generateOrderNumber();
       const transactionId = Date.now().toString();
       
@@ -512,6 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result
       });
     } catch (error: any) {
+      logSystem.error("Error in 3DS challenge test endpoint", error);
       res.status(500).json({ error: error.message });
     }
   });
