@@ -522,17 +522,40 @@ async function main() {
     console.log(`\n${challengeData.RedirectPostUrl}\n`);
     console.log('4. Si es una URL de pruebas que espera un POST, usa el siguiente formulario HTML temporal:');
     
-    const tempHtmlPath = '/tmp/azul-manual-form.html';
+    const tempHtmlPath = './azul-manual-form.html';
     const formHtml = `
-      <form id="azulForm" method="POST" action="${challengeData.RedirectPostUrl}">
-        <input type="hidden" name="creq" value="${challengeData.CReq}">
-        <p>Haz clic para iniciar el desafío manual:</p>
-        <button type="submit">Iniciar Desafío</button>
-      </form>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Azul 3DS Challenge Manual</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; max-width: 600px; margin: 0 auto; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; background: #f9f9f9; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        code { background: #eee; padding: 2px 4px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Desafío 3D Secure</h2>
+        <p>Haz clic en el botón de abajo para iniciar el desafío en una nueva pestaña.</p>
+        <form id="azulForm" method="POST" action="${challengeData.RedirectPostUrl}" target="_blank">
+            <input type="hidden" name="creq" value="${challengeData.CReq}">
+            <button type="submit">Iniciar Desafío Manual</button>
+        </form>
+        <p style="margin-top: 20px; font-size: 0.9em; color: #666;">
+            OTP de prueba: <code>1234</code><br>
+            Al finalizar, copia el valor de <code>cres</code> de la URL y pégalo en la terminal.
+        </p>
+    </div>
+</body>
+</html>
     `;
     fs.writeFileSync(tempHtmlPath, formHtml);
     
-    console.log(`   (Se ha creado un formulario de ayuda en: ${tempHtmlPath})`);
+    console.log(`   (Se ha creado un formulario de ayuda en el directorio raíz: ${tempHtmlPath})`);
+    console.log('   Ábrelo haciendo clic derecho sobre el archivo en el panel de archivos y seleccionando "Open in Tab" o descargándolo.');
     console.log('5. Completa el desafío (OTP: 1234).');
     console.log('6. Serás redirigido a una URL que contiene "?cres=...".');
     console.log('7. COPIA el valor del parámetro "cres" de la barra de direcciones.');
