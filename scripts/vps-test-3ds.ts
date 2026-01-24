@@ -59,8 +59,8 @@ async function runChallengeTest() {
     CVC: '123',
     PosInputMode: 'E-Commerce',
     TrxType: 'Sale',
-    Amount: '7500', // RD$75.00
-    Itbis: '1350',
+    Amount: '100', // Monto muy pequeño para forzar 3DS si es necesario
+    Itbis: '18',
     OrderNumber: orderNumber,
     CustomOrderId: `TEST-VPS-${orderNumber}`,
     ThreeDSAuth: {
