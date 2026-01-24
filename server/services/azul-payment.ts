@@ -711,6 +711,86 @@ export class AzulPaymentService {
   }
 
   /**
+   * Initialize 3D Secure authentication with explicit card data
+   */
+  static async init3DSecureWithCard(
+    cardData: AzulCardData,
+    payment: AzulPaymentRequest,
+    browserInfo: any
+  ): Promise<Azul3DSResponse> {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        isoCode: '99',
+        responseMessage: 'Azul no está configurado correctamente',
+        requires3DS: false,
+      };
+    }
+
+    try {
+      const orderNumber = this.generateOrderNumber();
+      const requestData = {
+        TrxType: 'Sale',
+        CardNumber: cardData.cardNumber,
+        Expiration: cardData.expiration,
+        CVC: cardData.cvc,
+        Amount: payment.amount.toString(),
+        Itbis: (payment.itbis || 0).toString(),
+        OrderNumber: orderNumber,
+        CustomOrderId: payment.customOrderId || orderNumber,
+        CustomerServicePhone: payment.customerServicePhone || '8090000000',
+        OrderDescription: payment.orderDescription || 'Pago 3DS Gruas RD',
+        ThreeDSAuth: {
+          TermUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-callback`,
+          MethodNotificationUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-method-notification`,
+          RequestorChallengeIndicator: '01', // Prefer challenge
+        },
+        CardHolderInfo: {
+          Name: cardData.cardHolderName || 'Juan Perez',
+          Email: payment.cardHolderInfo?.email || 'test@gruard.com',
+          PhoneHome: payment.cardHolderInfo?.phoneHome || '8095551234',
+          PhoneMobile: payment.cardHolderInfo?.phoneMobile || '8295551234',
+          BillingAddressLine1: payment.cardHolderInfo?.billingAddressLine1 || 'Calle Principal #123',
+          BillingAddressCity: payment.cardHolderInfo?.billingAddressCity || 'Santo Domingo',
+          BillingAddressCountry: payment.cardHolderInfo?.billingAddressCountry || 'DO',
+          BillingAddressZip: payment.cardHolderInfo?.billingAddressZip || '10101',
+        },
+        BrowserInfo: {
+          AcceptHeader: browserInfo.acceptHeader,
+          IPAddress: browserInfo.ipAddress,
+          Language: browserInfo.language,
+          ColorDepth: browserInfo.colorDepth.toString(),
+          ScreenWidth: browserInfo.screenWidth.toString(),
+          ScreenHeight: browserInfo.screenHeight.toString(),
+          TimeZone: browserInfo.timeZone,
+          UserAgent: browserInfo.userAgent,
+          JavaScriptEnabled: browserInfo.javaScriptEnabled,
+        },
+      };
+
+      const response = await this.makeRequest(requestData);
+      const parsed = this.parseResponse(response);
+
+      return {
+        ...parsed,
+        threeDSMethodURL: response.ThreeDSMethodURL,
+        threeDSServerTransID: response.ThreeDSServerTransID,
+        acsUrl: response.ThreeDSChallenge?.RedirectPostUrl,
+        creq: response.ThreeDSChallenge?.CReq,
+        requires3DS: response.IsoCode === '3D' || response.IsoCode === '3D2METHOD',
+      };
+    } catch (error) {
+      logSystem.error('Azul init3DSecureWithCard error', error);
+      return {
+        success: false,
+        isoCode: '96',
+        responseMessage: 'Error del sistema al iniciar 3DS',
+        requires3DS: false,
+      };
+    }
+  }
+
+  /**
    * Initialize 3D Secure authentication
    */
   static async init3DSecure(
