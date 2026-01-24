@@ -93,7 +93,10 @@ function generateTransactionId() {
 
 async function makeRequest(url, data, auth1, auth2) {
   console.log('\nEnviando peticion a: ' + url);
-  console.log('Datos: ' + JSON.stringify(data, null, 2));
+  // Ocultamos datos sensibles en logs pero mantenemos la estructura
+  const logData = { ...data };
+  if (logData.CardNumber) logData.CardNumber = logData.CardNumber.substring(0, 6) + '******';
+  console.log('Datos: ' + JSON.stringify(logData, null, 2));
   
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
@@ -102,7 +105,7 @@ async function makeRequest(url, data, auth1, auth2) {
     const options = {
       hostname: urlObj.hostname,
       port: 443,
-      path: urlObj.pathname + urlObj.search,
+      path: urlObj.pathname + (urlObj.search || ''), // Asegurar que los query params se envíen
       method: 'POST',
       agent: httpsAgent,
       headers: {
