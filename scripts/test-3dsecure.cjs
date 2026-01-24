@@ -155,7 +155,7 @@ async function step1_InitialPaymentRequest(card, transactionId) {
     ThreeDSAuth: {
       TermUrl: 'https://www.google.com',
       MethodNotificationUrl: 'https://www.google.com',
-      RequestorChallengeIndicator: '04',
+      RequestorChallengeIndicator: '01',
     },
     CardHolderInfo: {
       Name: 'Juan Perez Prueba',
@@ -168,7 +168,7 @@ async function step1_InitialPaymentRequest(card, transactionId) {
       BillingAddressZip: '10101',
     },
     BrowserInfo: {
-      AcceptHeader: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      AcceptHeader: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
       IPAddress: '200.88.232.119',
       Language: 'es-DO',
       ColorDepth: '24',
