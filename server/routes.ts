@@ -480,20 +480,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const browserInfo = {
-        acceptHeader: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        acceptHeader: "text/html,application/xhtml+xml,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         ipAddress: "200.88.232.119",
         language: "es-DO",
         colorDepth: 24,
         screenWidth: 1920,
         screenHeight: 1080,
         timeZone: "240",
-        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         javaScriptEnabled: "true",
       };
 
+      // Tarjeta de prueba para 3DS Challenge según documentación de Azul
+      const testCard = {
+        cardNumber: "4005520000000129",
+        expiration: "202812",
+        cvc: "123",
+        cardHolderName: "Juan Perez Prueba"
+      };
+
       // Iniciar el pago 3DS directamente con la tarjeta de prueba
-      const result = await AzulPaymentService.init3DSecure(
-        "", // Sin token, usaremos datos de tarjeta manual en el servicio si es necesario
+      const result = await AzulPaymentService.init3DSecureWithCard(
+        testCard,
         paymentData,
         browserInfo
       );
