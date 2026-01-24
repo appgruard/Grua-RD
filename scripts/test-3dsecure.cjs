@@ -186,7 +186,15 @@ async function step1_InitialPaymentRequest(card, transactionId) {
 async function step2_SubmitMethodForm(threeDSMethodData) {
   console.log('\n' + '='.repeat(80));
   console.log('PASO 4: Envío de detalles del ambiente del tarjetahabiente (MethodForm)');
-  console.log('URL: ' + threeDSMethodData.ThreeDSMethodUrl);
+  
+  if (!threeDSMethodData || !threeDSMethodData.ThreeDSMethodUrl) {
+    console.log('ADVERTENCIA: ThreeDSMethodData o ThreeDSMethodUrl no presentes.');
+    console.log('Contenido recibido:', JSON.stringify(threeDSMethodData, null, 2));
+    console.log('Continuando simulacion...');
+  } else {
+    console.log('URL: ' + threeDSMethodData.ThreeDSMethodUrl);
+  }
+  
   console.log('='.repeat(80));
   
   // En un entorno real, esto sería un post manual desde el navegador del cliente
@@ -245,6 +253,7 @@ async function runFullTest(cardKey) {
 
     if (step1Response.IsoCode === '3D2METHOD') {
       console.log('\n[Paso 3] Azul respondió con 3D2METHOD');
+      console.log('Response data:', JSON.stringify(step1Response, null, 2));
       
       // Paso 4
       const methodData = step1Response.ThreeDSMethodData || step1Response.threeDSMethodData;
