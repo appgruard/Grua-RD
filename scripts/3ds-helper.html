@@ -65,36 +65,42 @@
                 return false;
             }
 
+            // Detectamos si la URL ya contiene parámetros (como el token de Modirum)
+            // Si es así, a veces el ACS prefiere recibir el creq en el cuerpo pero a una URL base limpia
+            // O a veces simplemente necesita que NO se pierda el token.
             this.action = url;
             
             // Limpiamos campos previos para evitar duplicados si se re-envía
-            const existingCreq = this.querySelector('input[name="creq"]');
-            if (existingCreq) existingCreq.remove();
-            const existingthreeDSJS = this.querySelector('input[name="threeDSJS"]');
-            if (existingthreeDSJS) existingthreeDSJS.remove();
-            const existingTermUrl = this.querySelector('input[name="termUrl"]');
-            if (existingTermUrl) existingTermUrl.remove();
+            const fieldsToRemove = ['creq', 'threeDSJS', 'termUrl', 'threeDSRequestorTransID'];
+            fieldsToRemove.forEach(name => {
+                const el = this.querySelector(`input[name="${name}"]`);
+                if (el) el.remove();
+            });
+
+            const addField = (name, value) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                this.appendChild(input);
+            };
 
             // Campo creq (obligatorio para 3DS2)
-            const inputCreq = document.createElement('input');
-            inputCreq.type = 'hidden';
-            inputCreq.name = 'creq';
-            inputCreq.value = creqValue;
-            this.appendChild(inputCreq);
+            addField('creq', creqValue);
+
+            // Intentamos extraer el ID de transacción del CReq (Base64) para mayor compatibilidad
+            try {
+                const decoded = JSON.parse(atob(creqValue));
+                if (decoded.threeDSServerTransID) {
+                    addField('threeDSRequestorTransID', decoded.threeDSServerTransID);
+                }
+            } catch (e) {}
 
             // Campo threeDSJS (a veces requerido por simuladores)
-            const inputJS = document.createElement('input');
-            inputJS.type = 'hidden';
-            inputJS.name = 'threeDSJS';
-            inputJS.value = 'true';
-            this.appendChild(inputJS);
+            addField('threeDSJS', 'true');
 
             // Campo TermUrl (donde redirigirá al terminar)
-            const inputTerm = document.createElement('input');
-            inputTerm.type = 'hidden';
-            inputTerm.name = 'termUrl';
-            inputTerm.value = document.getElementById('termUrl').value.trim() || 'https://www.google.com';
-            this.appendChild(inputTerm);
+            addField('termUrl', document.getElementById('termUrl').value.trim() || 'https://www.google.com');
             
             return true;
         };

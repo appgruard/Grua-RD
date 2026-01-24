@@ -1,0 +1,47 @@
+root@srv1170768:~# node ./3dsecure13.cjs challengeWithMethod
+
+Cargando certificados mTLS...
+  Cert: /opt/certificados/gruard/app.gruard.com.crt
+  Key: /opt/certificados/gruard/app.gruard.com.key
+  CA: /opt/certificados/gruard/app.gruard.com.bundle.crt
+Certificados cargados correctamente
+
+
+================================================================================
+PASO 1: El cliente somete detalles al Comercio
+================================================================================
+
+================================================================================
+PASO 2: Inicio del proceso de autenticación 3DS (Solicitud a Azul)
+Tarjeta: Desafio con 3DSMethod
+================================================================================
+
+Enviando peticion a: https://pruebas.azul.com.do/webservices/JSON/Default.aspx
+
+[Paso 3] Azul respondió con 3D2METHOD
+
+================================================================================
+PASO 4: Envío de detalles del ambiente del tarjetahabiente (MethodForm)
+URL detectada: https://3ds-acs.test.modirum.com/mdpayacs/3ds-method
+================================================================================
+Simulando envío de ThreeDSMethodData al ACS del emisor...
+Respuesta del ACS recibida en MethodNotificationUrl.
+
+================================================================================
+PASO 5-6: Continuar proceso de autenticación 3DS (MethodNotificationStatus)
+================================================================================
+
+Enviando peticion a: https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedsmethod
+
+[Paso 6] Azul indica que requiere DESAFÍO
+
+================================================================================
+PASO 7: Desafío 3DS (Inicio del desafío)
+1. Abre scripts/3ds-helper.html en tu navegador.
+
+   URL: https://3ds-acs.test.modirum.com/mdpayacs/creq;token=365961411.1769291711.gEV3Hil1ycUJHy51Ql-y-JjSkV19369o8-BLlUe4Pr4
+
+   CReq: ewogICAgImFjc1RyYW5zSUQiOiAiYmNkZDI4ZTgtODMwNy00MzAyLTk2M2ItM2YyMzc3NDRiMWY4IiwKICAgICJjaGFsbGVuZ2VXaW5kb3dTaXplIjogIjAzIiwKICAgICJtZXNzYWdlVHlwZSI6ICJDUmVxIiwKICAgICJtZXNzYWdlVmVyc2lvbiI6ICIyLjIuMCIsCiAgICAidGhyZWVEU1NlcnZlclRyYW5zSUQiOiAiMmFiZmE0ZGQtNDdkZC01MTRlLTgwMDAtMDAwMDA0MDUwNzliIgp9
+================================================================================
+
+[?] Ingresa el CRes obtenido tras el desafío:
