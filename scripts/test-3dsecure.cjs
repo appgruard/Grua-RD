@@ -565,7 +565,7 @@ async function runFullTest(cardKey, completeChallenge = true) {
       console.log('    1. Ve a: ' + challengeData.RedirectPostUrl);
       console.log('    2. Envía (POST) el creq: ' + challengeData.CReq);
       console.log('    3. Completa el OTP en el navegador.');
-      console.log('    4. Obtendrás un "CRes" al final.');
+      console.log('    4. Obtendrás un "CRes" al final (está dentro del campo oculto "cres").');
       
       const readline = require('readline').createInterface({
         input: process.stdin,
@@ -573,7 +573,7 @@ async function runFullTest(cardKey, completeChallenge = true) {
       });
 
       const cres = await new Promise(resolve => {
-        readline.question('\n[?] Ingresa el CRes obtenido del navegador: ', (input) => {
+        readline.question('\n[?] Ingresa el valor de "cres" (el código largo en base64): ', (input) => {
           readline.close();
           const cleanInput = input.trim().replace(/^["']|["']$/g, '');
           resolve(cleanInput);
@@ -586,6 +586,11 @@ async function runFullTest(cardKey, completeChallenge = true) {
         
         if (step3Response.IsoCode === '00') {
           console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+        } else {
+          console.log('\n[INFO] La transacción finalizó con código: ' + step3Response.IsoCode);
+          if (step3Response.ErrorDescription) {
+             console.log('       Error: ' + step3Response.ErrorDescription);
+          }
         }
         return step3Response;
       } else {
