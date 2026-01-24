@@ -187,12 +187,20 @@ async function step2_SubmitMethodForm(threeDSMethodData) {
   console.log('\n' + '='.repeat(80));
   console.log('PASO 4: Envío de detalles del ambiente del tarjetahabiente (MethodForm)');
   
-  if (!threeDSMethodData || !threeDSMethodData.ThreeDSMethodUrl) {
-    console.log('ADVERTENCIA: ThreeDSMethodData o ThreeDSMethodUrl no presentes.');
+  // Extraer URL del formulario si viene en ThreeDSMethod.MethodForm
+  let methodUrl = threeDSMethodData?.ThreeDSMethodUrl;
+  
+  if (!methodUrl && threeDSMethodData?.MethodForm) {
+    const match = threeDSMethodData.MethodForm.match(/action=["']([^"']+)["']/);
+    if (match) methodUrl = match[1];
+  }
+
+  if (!methodUrl) {
+    console.log('ADVERTENCIA: URL de 3DS Method no encontrada.');
     console.log('Contenido recibido:', JSON.stringify(threeDSMethodData, null, 2));
     console.log('Continuando simulacion...');
   } else {
-    console.log('URL: ' + threeDSMethodData.ThreeDSMethodUrl);
+    console.log('URL detectada: ' + methodUrl);
   }
   
   console.log('='.repeat(80));
@@ -256,7 +264,10 @@ async function runFullTest(cardKey) {
       console.log('Response data:', JSON.stringify(step1Response, null, 2));
       
       // Paso 4
-      const methodData = step1Response.ThreeDSMethodData || step1Response.threeDSMethodData;
+      // Azul entrega ThreeDSMethod.MethodForm en lugar de ThreeDSMethodData directo
+      const methodData = step1Response.ThreeDSMethodData || 
+                         step1Response.threeDSMethodData || 
+                         step1Response.ThreeDSMethod;
       await step2_SubmitMethodForm(methodData);
       
       // Paso 5
