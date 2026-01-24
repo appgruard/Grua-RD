@@ -7,9 +7,9 @@ import axios from 'axios';
  */
 
 const CONFIG = {
-  merchantId: process.env.AZUL_MERCHANT_ID || 'ID_DE_PRUEBA',
-  auth1: process.env.AZUL_AUTH1 || 'AUTH1_DE_PRUEBA',
-  auth2: process.env.AZUL_AUTH2 || 'AUTH2_DE_PRUEBA',
+  merchantId: process.env.AZUL_MERCHANT_ID || '39038540035',
+  auth1: process.env.AZUL_AUTH1 || 'splitit',
+  auth2: process.env.AZUL_AUTH2 || 'splitit',
   azulUrl: 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx'
 };
 
