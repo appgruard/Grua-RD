@@ -494,6 +494,7 @@ class ResendEmailService implements EmailService {
   }
 
   async sendServiceNotification(email: string, subject: string, message: string): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.info);
     const html = `
       <!DOCTYPE html>
       <html>
@@ -518,12 +519,37 @@ class ResendEmailService implements EmailService {
       </html>
     `;
 
-    return this.sendEmail({
-      to: email,
-      subject: `Grúa RD: ${subject}`,
-      html,
-      text: `${message}\n\n---\nGrúa RD\nDepartamento de Servicios\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`,
-    });
+    const text = `${message}\n\n---\nGrúa RD\nDepartamento de Servicios\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+
+    if (!resend) {
+      return this.sendEmail({
+        to: email,
+        subject: `Grúa RD: ${subject}`,
+        html,
+        text,
+      });
+    }
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `Grúa RD Servicios <${resend.fromEmail}>`,
+        to: [email],
+        subject: `Grúa RD: ${subject}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send service notification:', error);
+        return false;
+      }
+
+      logger.info(`Service notification sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending service notification:', error);
+      return false;
+    }
   }
 
   async sendPasswordResetEmail(email: string, resetLink: string, userName?: string): Promise<boolean> {
@@ -571,12 +597,36 @@ class ResendEmailService implements EmailService {
 
     const text = `${greeting},\n\nRecibimos una solicitud para restablecer tu contraseña Grúa RD.\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n${resetLink}\n\nEste enlace expirará en 1 hora.\n\nSi no solicitaste esto, ignora este correo.\n\n---\nGrúa RD\nDepartamento de Seguridad\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
-    return this.sendEmail({
-      to: email,
-      subject: 'Restablecer tu contraseña de Grúa RD',
-      html,
-      text,
-    });
+    const resend = await getResendClient(EMAIL_ADDRESSES.verification);
+    if (!resend) {
+      return this.sendEmail({
+        to: email,
+        subject: 'Restablecer tu contraseña de Grúa RD',
+        html,
+        text,
+      });
+    }
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `Grúa RD Seguridad <${resend.fromEmail}>`,
+        to: [email],
+        subject: 'Restablecer tu contraseña de Grúa RD',
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send password reset email:', error);
+        return false;
+      }
+
+      logger.info(`Password reset email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending password reset email:', error);
+      return false;
+    }
   }
 
   async sendDocumentApprovalEmail(email: string, documentType: string, approved: boolean, reason?: string): Promise<boolean> {
@@ -625,12 +675,36 @@ class ResendEmailService implements EmailService {
 
     const text = `Tu documento ${documentType} ha sido ${status}.${reason ? `\n\nMotivo: ${reason}` : ''}${!approved ? '\n\nPor favor, sube un nuevo documento que cumpla con los requisitos.' : ''}\n\n---\nGrúa RD\nDepartamento de Verificaciones\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
 
-    return this.sendEmail({
-      to: email,
-      subject: `Grúa RD: Tu documento ha sido ${status}`,
-      html,
-      text,
-    });
+    const resend = await getResendClient(EMAIL_ADDRESSES.verification);
+    if (!resend) {
+      return this.sendEmail({
+        to: email,
+        subject: `Grúa RD: Tu documento ha sido ${status}`,
+        html,
+        text,
+      });
+    }
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `Grúa RD Verificaciones <${resend.fromEmail}>`,
+        to: [email],
+        subject: `Grúa RD: Tu documento ha sido ${status}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send document approval email:', error);
+        return false;
+      }
+
+      logger.info(`Document approval email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending document approval email:', error);
+      return false;
+    }
   }
 
   async sendTicketCreatedEmail(email: string, userName: string, ticket: TicketEmailData): Promise<boolean> {
@@ -953,7 +1027,7 @@ class ResendEmailService implements EmailService {
   }
 
   async sendSocioCreatedEmail(email: string, nombre: string, tempPassword: string, porcentaje: string): Promise<boolean> {
-    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    const resend = await getResendClient(EMAIL_ADDRESSES.socios);
     if (!resend) {
       logger.error('Resend not configured, cannot send socio created email');
       return false;
@@ -1032,7 +1106,7 @@ class ResendEmailService implements EmailService {
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `Grúa RD <${resend.fromEmail}>`,
+        from: `Grúa RD Inversores <${resend.fromEmail}>`,
         to: [email],
         subject: 'Bienvenido al Portal de Socios Grúa RD - Credenciales de Acceso',
         html,
@@ -1053,9 +1127,92 @@ class ResendEmailService implements EmailService {
   }
 
   async sendSocioFirstLoginEmail(email: string, nombre: string): Promise<boolean> {
-    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    const resend = await getResendClient(EMAIL_ADDRESSES.socios);
     if (!resend) {
       logger.error('Resend not configured, cannot send socio first login email');
+      return false;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Grúa RD - Portal de Socios</h1>
+          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Primer Inicio de Sesion</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">Estimado/a ${nombre},</p>
+          
+          <p style="font-size: 16px;">
+            Gracias por ser parte del equipo inversor de Grúa RD. Hemos registrado su primer inicio de sesion en el portal.
+          </p>
+          
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #856404; margin: 0 0 10px 0;">Recordatorio de Seguridad:</h4>
+            <p style="margin: 0; font-size: 14px; color: #856404;">
+              Si aun no ha cambiado su contrasena temporal, le recomendamos hacerlo desde la seccion "Mi Perfil" para mayor seguridad.
+            </p>
+          </div>
+          
+          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Guia rapida del Dashboard:</h3>
+            <ul style="margin: 0; padding-left: 20px; color: #555;">
+              <li style="margin-bottom: 10px;"><strong>Resumen:</strong> Vista general de sus distribuciones y participacion</li>
+              <li style="margin-bottom: 10px;"><strong>Distribuciones:</strong> Historial detallado de pagos recibidos</li>
+              <li style="margin-bottom: 10px;"><strong>Reportes:</strong> Descargue informes financieros en PDF</li>
+              <li style="margin-bottom: 10px;"><strong>Perfil:</strong> Actualice sus datos bancarios y contrasena</li>
+            </ul>
+          </div>
+          
+          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
+            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Proxima Distribucion:</h4>
+            <p style="margin: 0; font-size: 14px; color: #555;">
+              Las distribuciones se calculan mensualmente. Recibira una notificacion cuando su distribucion este lista.
+            </p>
+          </div>
+          
+          ${generateSignatureHTML(SIGNATURE_CONFIG.inversores)}
+          
+          ${generateFooterHTML('Grúa RD - Juntos construimos el futuro')}
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `Estimado/a ${nombre},\n\nGracias por ser parte del equipo inversor de Grúa RD. Hemos registrado su primer inicio de sesion.\n\nRecordatorio: Si no ha cambiado su contrasena temporal, le recomendamos hacerlo por seguridad.\n\nGuia del Dashboard:\n- Resumen: Vista general de distribuciones\n- Distribuciones: Historial de pagos\n- Reportes: Informes financieros\n- Perfil: Datos bancarios y contrasena\n\n---\nGrúa RD\nDepartamento de Relaciones con Inversores\nsocios@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `Grúa RD Inversores <${resend.fromEmail}>`,
+        to: [email],
+        subject: 'Bienvenido al Portal de Socios Grúa RD - Primer Inicio de Sesion',
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send socio first login email:', error);
+        return false;
+      }
+
+      logger.info(`Socio first login email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending socio first login email:', error);
+      return false;
+    }
+  }
+
+  async sendAdminCreatedEmail(email: string, nombre: string, tempPassword: string, permisos: string[]): Promise<boolean> {
+    const resend = await getResendClient(EMAIL_ADDRESSES.admin);
+    if (!resend) {
+      logger.error('Resend not configured, cannot send admin created email');
       return false;
     }
 
