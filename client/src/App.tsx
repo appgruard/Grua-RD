@@ -160,12 +160,15 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
+const Test3DSGUI = lazy(() => import('@/pages/test-3ds-gui'));
+
 function Router() {
   const { user } = useAuth();
 
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Switch>
+        <Route path="/test/3ds" component={Test3DSGUI} />
         <Route path="/login" component={Login} />
         <Route path="/onboarding" component={OnboardingWizard} />
         <Route path="/verify-otp" component={VerifyOTP} />

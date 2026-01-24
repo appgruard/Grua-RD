@@ -501,9 +501,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Iniciar el pago 3DS directamente con la tarjeta de prueba
+      // El monto total es 11800 (10000 + 1800 de ITBIS)
       const result = await AzulPaymentService.init3DSecureWithCard(
         testCard,
-        paymentData,
+        {
+          amount: 10000,
+          itbis: 1800,
+          customOrderId: "TEST-3DS-" + transactionId,
+          orderDescription: "Prueba 3DS Challenge Card 0129",
+        },
         browserInfo
       );
 
@@ -514,6 +520,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       logSystem.error("Error in 3DS challenge test endpoint", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Test endpoint to process 3DS Challenge response (CRes)
+  app.post("/api/payments/azul/process-challenge", async (req, res) => {
+    try {
+      const { azulOrderId, cres } = req.body;
+      
+      if (!azulOrderId || !cres) {
+        return res.status(400).json({ error: "AzulOrderId y CRes son requeridos" });
+      }
+
+      logSystem.info("Processing 3DS Challenge response", { azulOrderId });
+
+      const result = await AzulPaymentService.processThreeDSChallenge(
+        azulOrderId,
+        cres
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error("Error processing 3DS challenge", error);
       res.status(500).json({ error: error.message });
     }
   });

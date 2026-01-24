@@ -334,6 +334,82 @@ export class AzulPaymentService {
   }
 
   /**
+   * Process 3D Secure challenge response
+   */
+  static async processThreeDSChallenge(
+    azulOrderId: string,
+    cres: string
+  ): Promise<AzulResponse> {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        isoCode: '99',
+        responseMessage: 'Azul no está configurado correctamente',
+      };
+    }
+
+    try {
+      const config = getAzulConfig();
+      const requestData = {
+        Channel: config.channel,
+        Store: config.merchantId,
+        AzulOrderId: azulOrderId,
+        CRes: cres,
+      };
+
+      // Endpoint específico para procesar el challenge
+      const url = `https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedschallenge`;
+      
+      const jsonPayload = JSON.stringify(requestData);
+      const authKey = config.authKey || 'splitit';
+      
+      const options: https.RequestOptions = {
+        method: 'POST',
+        agent: getHttpsAgent(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Auth1': authKey,
+          'Auth2': authKey,
+          'Content-Length': Buffer.byteLength(jsonPayload).toString(),
+          'User-Agent': 'GruaRD-App/1.0',
+        },
+        minVersion: 'TLSv1.2' as any
+      };
+
+      return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const req = https.request({
+          ...options,
+          hostname: urlObj.hostname,
+          path: urlObj.pathname + urlObj.search,
+        }, (res) => {
+          let body = '';
+          res.on('data', chunk => body += chunk);
+          res.on('end', () => {
+            try {
+              const responseData = JSON.parse(body);
+              resolve(this.parseResponse(responseData));
+            } catch (e) {
+              reject(new Error(`Error parsing challenge response: ${body}`));
+            }
+          });
+        });
+
+        req.on('error', reject);
+        req.write(jsonPayload);
+        req.end();
+      });
+    } catch (error) {
+      logSystem.error('Azul processThreeDSChallenge error', error);
+      return {
+        success: false,
+        isoCode: '96',
+        responseMessage: 'Error del sistema al procesar desafío',
+      };
+    }
+  }
+
+  /**
    * Parse Azul response to standard format
    */
   private static parseResponse(response: any): AzulResponse {
