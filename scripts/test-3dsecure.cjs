@@ -243,28 +243,42 @@ async function step2_ProcessThreeDSMethod(azulOrderId, status) {
   return response;
 }
 
-async function httpPost(url, postData, headers = {}) {
+async function httpPost(url, postData, headers = {}, cookies = '') {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
+    const requestHeaders = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Length': Buffer.byteLength(postData),
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'es-DO,es;q=0.9,en;q=0.8',
+      ...headers,
+    };
+    
+    if (cookies) {
+      requestHeaders['Cookie'] = cookies;
+    }
+    
     const options = {
       hostname: urlObj.hostname,
       port: 443,
       path: urlObj.pathname + (urlObj.search || ''),
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(postData),
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        ...headers,
-      },
+      headers: requestHeaders,
     };
     
     const req = https.request(options, (res) => {
       let responseData = '';
       res.on('data', (chunk) => { responseData += chunk; });
       res.on('end', () => {
-        resolve({ status: res.statusCode, headers: res.headers, body: responseData });
+        const setCookies = res.headers['set-cookie'] || [];
+        const cookieStr = setCookies.map(c => c.split(';')[0]).join('; ');
+        resolve({ 
+          status: res.statusCode, 
+          headers: res.headers, 
+          body: responseData,
+          cookies: cookieStr
+        });
       });
     });
     
@@ -274,6 +288,33 @@ async function httpPost(url, postData, headers = {}) {
   });
 }
 
+function extractHiddenInputs(html) {
+  const inputs = {};
+  const regex = /<input[^>]*>/gi;
+  let match;
+  
+  while ((match = regex.exec(html)) !== null) {
+    const inputTag = match[0];
+    if (!/type\s*=\s*["']?hidden["']?/i.test(inputTag)) continue;
+    
+    const nameMatch = inputTag.match(/name\s*=\s*["']([^"']+)["']/i) || 
+                      inputTag.match(/name\s*=\s*([^\s>]+)/i);
+    const valueMatch = inputTag.match(/value\s*=\s*["']([^"']*)["']/i) ||
+                       inputTag.match(/value\s*=\s*([^\s>]*)/i);
+    
+    if (nameMatch && nameMatch[1]) {
+      inputs[nameMatch[1]] = valueMatch ? valueMatch[1] : '';
+    }
+  }
+  
+  return inputs;
+}
+
+function extractFormAction(html) {
+  const formMatch = html.match(/<form[^>]*action\s*=\s*["']([^"']+)["'][^>]*>/i);
+  return formMatch ? formMatch[1] : null;
+}
+
 async function simulateACSChallenge(redirectPostUrl, creq) {
   console.log('\n' + '='.repeat(80));
   console.log('PASO 3a: Simulando interaccion del usuario con el ACS');
@@ -281,105 +322,131 @@ async function simulateACSChallenge(redirectPostUrl, creq) {
   console.log('CReq (primeros 80 chars): ' + (creq ? creq.substring(0, 80) + '...' : 'N/A'));
   console.log('='.repeat(80));
 
+  let sessionCookies = '';
+
   try {
-    console.log('\n[1/3] Enviando CReq al ACS...');
-    const step1 = await httpPost(redirectPostUrl, 'creq=' + encodeURIComponent(creq));
+    console.log('\n[1/4] Enviando CReq al ACS...');
+    const step1 = await httpPost(redirectPostUrl, 'creq=' + encodeURIComponent(creq), {}, sessionCookies);
     console.log('Status: ' + step1.status);
     
-    let cresMatch = step1.body.match(/name=["']?cres["']?\s+value=["']([^"']+)["']/i) ||
-                    step1.body.match(/name=["']?CRes["']?\s+value=["']([^"']+)["']/i);
-    
-    if (cresMatch && cresMatch[1]) {
-      console.log('CRes obtenido directamente: ' + cresMatch[1].substring(0, 50) + '...');
-      return cresMatch[1];
+    if (step1.cookies) {
+      sessionCookies = step1.cookies;
+      console.log('Cookies de sesion capturadas: ' + sessionCookies.substring(0, 50) + '...');
     }
     
-    const authFormMatch = step1.body.match(/<form[^>]*action=["']([^"']+)["'][^>]*>/i);
-    if (!authFormMatch) {
+    let cres = extractCRes(step1.body);
+    if (cres) {
+      console.log('CRes obtenido directamente: ' + cres.substring(0, 50) + '...');
+      return cres;
+    }
+    
+    let authUrl = extractFormAction(step1.body);
+    if (!authUrl) {
       console.log('No se encontro formulario de autenticacion');
       console.log('Respuesta (primeros 500 chars): ' + step1.body.substring(0, 500));
       return null;
     }
     
-    let authUrl = authFormMatch[1];
     if (!authUrl.startsWith('http')) {
       const urlObj = new URL(redirectPostUrl);
       authUrl = urlObj.origin + (authUrl.startsWith('/') ? '' : '/') + authUrl;
     }
     console.log('Formulario de autenticacion: ' + authUrl);
     
-    const hiddenInputs = {};
-    const inputMatches = step1.body.matchAll(/<input[^>]*type=["']?hidden["']?[^>]*>/gi);
-    for (const match of inputMatches) {
-      const nameMatch = match[0].match(/name=["']?([^"'\s>]+)["']?/i);
-      const valueMatch = match[0].match(/value=["']?([^"'\s>]*)["']?/i);
-      if (nameMatch && nameMatch[1]) {
-        hiddenInputs[nameMatch[1]] = valueMatch ? valueMatch[1] : '';
-      }
-    }
+    const hiddenInputs = extractHiddenInputs(step1.body);
     console.log('Campos ocultos encontrados: ' + Object.keys(hiddenInputs).join(', '));
     
-    console.log('\n[2/3] Enviando codigo OTP de prueba (1234)...');
+    console.log('\n[2/4] Enviando codigo OTP de prueba (1234)...');
     const formData = new URLSearchParams();
     for (const [key, value] of Object.entries(hiddenInputs)) {
       formData.append(key, value);
     }
     formData.append('otp', '1234');
     formData.append('password', '1234');
-    formData.append('pin', '1234');
-    formData.append('code', '1234');
     
-    const step2 = await httpPost(authUrl, formData.toString());
+    const step2 = await httpPost(authUrl, formData.toString(), {}, sessionCookies);
     console.log('Status: ' + step2.status);
     
-    cresMatch = step2.body.match(/name=["']?cres["']?\s+value=["']([^"']+)["']/i) ||
-                step2.body.match(/name=["']?CRes["']?\s+value=["']([^"']+)["']/i) ||
-                step2.body.match(/value=["']([^"']+)["'][^>]*name=["']?cres["']?/i);
-    
-    if (cresMatch && cresMatch[1]) {
-      console.log('CRes obtenido: ' + cresMatch[1].substring(0, 50) + '...');
-      return cresMatch[1];
+    if (step2.cookies) {
+      sessionCookies = sessionCookies ? sessionCookies + '; ' + step2.cookies : step2.cookies;
     }
     
-    const nextFormMatch = step2.body.match(/<form[^>]*action=["']([^"']+)["'][^>]*>/i);
-    if (nextFormMatch) {
-      let nextUrl = nextFormMatch[1];
+    cres = extractCRes(step2.body);
+    if (cres) {
+      console.log('CRes obtenido: ' + cres.substring(0, 50) + '...');
+      return cres;
+    }
+    
+    let nextUrl = extractFormAction(step2.body);
+    if (nextUrl) {
       if (!nextUrl.startsWith('http')) {
         const urlObj = new URL(authUrl);
         nextUrl = urlObj.origin + (nextUrl.startsWith('/') ? '' : '/') + nextUrl;
       }
       console.log('Formulario adicional detectado: ' + nextUrl);
       
-      const nextHiddenInputs = {};
-      const nextInputMatches = step2.body.matchAll(/<input[^>]*type=["']?hidden["']?[^>]*>/gi);
-      for (const match of nextInputMatches) {
-        const nameMatch = match[0].match(/name=["']?([^"'\s>]+)["']?/i);
-        const valueMatch = match[0].match(/value=["']?([^"'\s>]*)["']?/i);
-        if (nameMatch && nameMatch[1]) {
-          nextHiddenInputs[nameMatch[1]] = valueMatch ? valueMatch[1] : '';
-        }
-      }
+      const nextHiddenInputs = extractHiddenInputs(step2.body);
+      console.log('Campos ocultos: ' + Object.keys(nextHiddenInputs).join(', '));
       
-      console.log('\n[3/3] Enviando formulario final...');
-      const finalFormData = new URLSearchParams();
+      console.log('\n[3/4] Enviando formulario intermedio...');
+      const nextFormData = new URLSearchParams();
       for (const [key, value] of Object.entries(nextHiddenInputs)) {
-        finalFormData.append(key, value);
+        nextFormData.append(key, value);
       }
       
-      const step3 = await httpPost(nextUrl, finalFormData.toString());
+      const step3 = await httpPost(nextUrl, nextFormData.toString(), {}, sessionCookies);
       console.log('Status: ' + step3.status);
       
-      cresMatch = step3.body.match(/name=["']?cres["']?\s+value=["']([^"']+)["']/i) ||
-                  step3.body.match(/name=["']?CRes["']?\s+value=["']([^"']+)["']/i);
-      
-      if (cresMatch && cresMatch[1]) {
-        console.log('CRes obtenido: ' + cresMatch[1].substring(0, 50) + '...');
-        return cresMatch[1];
+      if (step3.cookies) {
+        sessionCookies = sessionCookies ? sessionCookies + '; ' + step3.cookies : step3.cookies;
       }
+      
+      cres = extractCRes(step3.body);
+      if (cres) {
+        console.log('CRes obtenido: ' + cres.substring(0, 50) + '...');
+        return cres;
+      }
+      
+      let finalUrl = extractFormAction(step3.body);
+      if (finalUrl) {
+        if (!finalUrl.startsWith('http')) {
+          const urlObj = new URL(nextUrl);
+          finalUrl = urlObj.origin + (finalUrl.startsWith('/') ? '' : '/') + finalUrl;
+        }
+        
+        const finalHiddenInputs = extractHiddenInputs(step3.body);
+        console.log('\n[4/4] Enviando formulario final...');
+        console.log('URL: ' + finalUrl);
+        console.log('Campos: ' + Object.keys(finalHiddenInputs).join(', '));
+        
+        const finalFormData = new URLSearchParams();
+        for (const [key, value] of Object.entries(finalHiddenInputs)) {
+          finalFormData.append(key, value);
+        }
+        
+        const step4 = await httpPost(finalUrl, finalFormData.toString(), {}, sessionCookies);
+        console.log('Status: ' + step4.status);
+        
+        cres = extractCRes(step4.body);
+        if (cres) {
+          console.log('CRes obtenido: ' + cres.substring(0, 50) + '...');
+          return cres;
+        }
+        
+        console.log('\nNo se pudo obtener CRes automaticamente.');
+        console.log('Respuesta final (primeros 800 chars):');
+        console.log(step4.body.substring(0, 800));
+        return null;
+      }
+      
+      console.log('\nNo se pudo obtener CRes automaticamente.');
+      console.log('Respuesta (primeros 800 chars):');
+      console.log(step3.body.substring(0, 800));
+      return null;
     }
     
     console.log('\nNo se pudo obtener CRes automaticamente.');
-    console.log('Respuesta final (primeros 800 chars):');
+    console.log('Respuesta (primeros 800 chars):');
     console.log(step2.body.substring(0, 800));
     return null;
     
@@ -387,6 +454,26 @@ async function simulateACSChallenge(redirectPostUrl, creq) {
     console.error('Error durante simulacion ACS: ' + error.message);
     return null;
   }
+}
+
+function extractCRes(html) {
+  const patterns = [
+    /name\s*=\s*["']?cres["']?\s+value\s*=\s*["']([^"']+)["']/i,
+    /name\s*=\s*["']?CRes["']?\s+value\s*=\s*["']([^"']+)["']/i,
+    /value\s*=\s*["']([^"']+)["'][^>]*name\s*=\s*["']?cres["']?/i,
+    /value\s*=\s*["']([^"']+)["'][^>]*name\s*=\s*["']?CRes["']?/i,
+    /<input[^>]*name\s*=\s*["']?cres["']?[^>]*value\s*=\s*["']([^"']+)["']/i,
+    /<input[^>]*value\s*=\s*["']([^"']+)["'][^>]*name\s*=\s*["']?cres["']?/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
 }
 
 async function step3_ProcessThreeDSChallenge(azulOrderId, cres) {
