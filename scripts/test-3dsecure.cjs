@@ -3,6 +3,7 @@ const fs = require('fs');
 
 const AZUL_TEST_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx';
 const AZUL_3DS_METHOD_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedsmethod';
+const AZUL_3DS_CHALLENGE_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedschallenge';
 
 const CERT_PATHS = {
   cert: process.env.AZUL_CERT_PATH || '/opt/certificados/gruard/app.gruard.com.crt',
@@ -242,13 +243,50 @@ async function step2_ProcessThreeDSMethod(azulOrderId, status) {
   return response;
 }
 
-async function runFullTest(cardKey) {
+async function step3_ProcessThreeDSChallenge(azulOrderId, cres) {
+  console.log('\n' + '='.repeat(80));
+  console.log('PASO 3: Procesar resultado del Challenge 3D Secure');
+  console.log('AzulOrderId: ' + azulOrderId);
+  console.log('CRes: ' + (cres ? cres.substring(0, 50) + '...' : 'N/A'));
+  console.log('='.repeat(80));
+
+  const request = {
+    Channel: TEST_CONFIG.channel,
+    Store: TEST_CONFIG.merchantId,
+    AzulOrderId: azulOrderId,
+  };
+  
+  if (cres) {
+    request.CRes = cres;
+  }
+
+  const response = await makeRequest(AZUL_3DS_CHALLENGE_URL, request, TEST_CONFIG.auth1, TEST_CONFIG.auth2);
+
+  console.log('\nRespuesta procesada:');
+  console.log('  IsoCode: ' + response.IsoCode);
+  console.log('  ResponseMessage: ' + response.ResponseMessage);
+  console.log('  AuthorizationCode: ' + (response.AuthorizationCode || 'N/A'));
+  console.log('  ErrorDescription: ' + (response.ErrorDescription || 'N/A'));
+
+  if (response.IsoCode === '00') {
+    console.log('\n[EXITO] Transaccion aprobada despues del Challenge 3DS');
+    console.log('  AuthorizationCode: ' + response.AuthorizationCode);
+  } else {
+    console.log('\n[ERROR] Challenge 3DS no exitoso');
+    console.log('  IsoCode: ' + response.IsoCode);
+  }
+
+  return response;
+}
+
+async function runFullTest(cardKey, completeChallenge = true) {
   const card = TEST_CARDS[cardKey];
   const transactionId = generateTransactionId();
   
   console.log('\n' + '-'.repeat(80));
   console.log('INICIANDO PRUEBA: ' + card.description);
   console.log('Transaction ID: ' + transactionId);
+  console.log('Completar Challenge automaticamente: ' + (completeChallenge ? 'SI' : 'NO'));
   console.log('-'.repeat(80));
 
   try {
@@ -275,17 +313,48 @@ async function runFullTest(cardKey) {
         return step2Response;
       }
       
-      if (step2Response.IsoCode === '3D' && step2Response.ThreeDSChallenge) {
-        console.log('\n[WARN] Se requiere desafio del usuario');
-        console.log('En produccion, el usuario seria redirigido a: ' + step2Response.ThreeDSChallenge.RedirectPostUrl);
+      if (step2Response.IsoCode === '3D') {
+        console.log('\n[INFO] Se requiere desafio 3D Secure');
+        if (step2Response.ThreeDSChallenge) {
+          console.log('  RedirectPostUrl: ' + step2Response.ThreeDSChallenge.RedirectPostUrl);
+        }
+        
+        if (completeChallenge) {
+          console.log('\nProcesando Challenge 3DS automaticamente (endpoint processthreedschallenge)...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, null);
+          
+          if (step3Response.IsoCode === '00') {
+            console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+          }
+          return step3Response;
+        }
+        
         return step2Response;
       }
       
       return step2Response;
     }
 
-    if (step1Response.IsoCode === '3D' && step1Response.ThreeDSChallenge) {
-      console.log('\n[WARN] Se requiere desafio del usuario (sin 3DS Method)');
+    if (step1Response.IsoCode === '3D') {
+      console.log('\n[INFO] Se requiere desafio 3D Secure (sin 3DS Method)');
+      if (step1Response.ThreeDSChallenge) {
+        console.log('  RedirectPostUrl: ' + step1Response.ThreeDSChallenge.RedirectPostUrl);
+      }
+      
+      if (completeChallenge) {
+        console.log('\nProcesando Challenge 3DS automaticamente (endpoint processthreedschallenge)...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, null);
+        
+        if (step3Response.IsoCode === '00') {
+          console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+        }
+        return step3Response;
+      }
+      
       return step1Response;
     }
 
@@ -415,6 +484,7 @@ async function main() {
 module.exports = {
   step1_InitialPaymentRequest,
   step2_ProcessThreeDSMethod,
+  step3_ProcessThreeDSChallenge,
   runFullTest,
   TEST_CARDS,
   TEST_CONFIG,
