@@ -153,8 +153,8 @@ async function step1_InitialPaymentRequest(card, transactionId) {
     CVC: card.cvc,
     PosInputMode: 'E-Commerce',
     TrxType: 'Sale',
-    Amount: '100000',
-    Itbis: '18000',
+    Amount: '100', // RD$1.00 para evitar error 51
+    Itbis: '18',
     OrderNumber: orderNumber,
     CustomOrderId: 'GRD-' + transactionId,
     DataVaultToken: '',
@@ -163,7 +163,7 @@ async function step1_InitialPaymentRequest(card, transactionId) {
     ThreeDSAuth: {
       TermUrl: baseUrl + '/api/azul/3ds/callback?sid=' + transactionId,
       MethodNotificationUrl: baseUrl + '/api/azul/3ds/method-notification?sid=' + transactionId,
-      RequestorChallengeIndicator: '01',
+      RequestorChallengeIndicator: '04', // Forzar desafío
     },
     CardHolderInfo: {
       Name: 'Juan Perez Prueba',
@@ -728,7 +728,9 @@ async function main() {
     const results = await runAllTests();
     showSummary(results);
   } else if (TEST_CARDS[testCard]) {
-    await runFullTest(testCard);
+    // Para modo manual, podemos pasar false al segundo parametro si queremos que se detenga
+    // Pero por defecto el script intenta automatizarlo.
+    await runFullTest(testCard, true); 
   } else {
     console.log('\nTarjeta no valida. Opciones:');
     console.log('  node test-3dsecure.cjs          (ejecutar todas)');
