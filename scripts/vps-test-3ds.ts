@@ -59,17 +59,17 @@ async function runChallengeTest() {
     CVC: '123',
     PosInputMode: 'E-Commerce',
     TrxType: 'Sale',
-    Amount: '100', // RD$1.00
-    Itbis: '18',
+    Amount: '100000', // RD$1,000.00
+    Itbis: '18000',
     OrderNumber: orderNumber,
     CustomOrderId: `TEST-VPS-${orderNumber}`,
     ThreeDSAuth: {
       TermUrl: `http://${vpsIp}:5000/callback`, 
       MethodNotificationUrl: `http://${vpsIp}:5000/method`,
-      RequestorChallengeIndicator: '04' // Mandate Challenge (según documentación oficial)
+      RequestorChallengeIndicator: '04' 
     },
     CardHolderInfo: {
-      Name: 'Juan Perez Prueba',
+      Name: 'Juan Perez Challenge',
       Email: 'test@gruard.com',
       PhoneHome: '8095551234',
       PhoneMobile: '8295551234',
@@ -79,10 +79,10 @@ async function runChallengeTest() {
       BillingAddressZip: '10101'
     },
     BrowserInfo: {
-      AcceptHeader: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8', // Header más completo según docs
+      AcceptHeader: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
       IPAddress: vpsIp,
       JavaScriptEnabled: 'true',
-      UserAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0', // UserAgent más real
+      UserAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       ColorDepth: '24',
       ScreenWidth: '1920',
       ScreenHeight: '1080',
@@ -105,7 +105,12 @@ async function runChallengeTest() {
 
     if (response.data.IsoCode === '3D2METHOD' || response.data.IsoCode === '3D') {
       console.log('\n⚠️ DESAFÍO DETECTADO CORRECTAMENTE');
-      console.log('URL de Redirección:', response.data.ThreeDSChallenge?.RedirectPostUrl);
+      const challenge = response.data.ThreeDSChallenge;
+      if (challenge) {
+        console.log('URL de Redirección:', challenge.RedirectPostUrl);
+        console.log('CReq:', challenge.CReq);
+        console.log('\nPara probar el challenge manualmente, envía un POST a la URL de redirección con el campo creq.');
+      }
     } else {
       console.log('\nℹ️ La transacción se procesó con otro código:', response.data.IsoCode);
     }
