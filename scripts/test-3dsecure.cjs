@@ -243,22 +243,91 @@ async function step2_ProcessThreeDSMethod(azulOrderId, status) {
   return response;
 }
 
+async function simulateACSChallenge(redirectPostUrl, creq) {
+  console.log('\n' + '='.repeat(80));
+  console.log('PASO 3a: Simulando interaccion del usuario con el ACS');
+  console.log('RedirectPostUrl: ' + redirectPostUrl);
+  console.log('CReq (primeros 80 chars): ' + (creq ? creq.substring(0, 80) + '...' : 'N/A'));
+  console.log('='.repeat(80));
+
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(redirectPostUrl);
+    const postData = 'creq=' + encodeURIComponent(creq);
+    
+    const options = {
+      hostname: urlObj.hostname,
+      port: 443,
+      path: urlObj.pathname + urlObj.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    };
+    
+    console.log('\nEnviando CReq al ACS...');
+    
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      res.on('data', (chunk) => { responseData += chunk; });
+      res.on('end', () => {
+        console.log('Status del ACS: ' + res.statusCode);
+        
+        const cresMatch = responseData.match(/name=["']?cres["']?\s+value=["']([^"']+)["']/i) ||
+                          responseData.match(/name=["']?CRes["']?\s+value=["']([^"']+)["']/i) ||
+                          responseData.match(/value=["']([^"']+)["']\s+name=["']?cres["']?/i);
+        
+        if (cresMatch && cresMatch[1]) {
+          console.log('CRes obtenido del ACS: ' + cresMatch[1].substring(0, 50) + '...');
+          resolve(cresMatch[1]);
+        } else {
+          console.log('Respuesta del ACS (primeros 500 chars):');
+          console.log(responseData.substring(0, 500));
+          
+          const formMatch = responseData.match(/<form[^>]*action=["']([^"']+)["'][^>]*>/i);
+          if (formMatch) {
+            console.log('\nFormulario detectado, action: ' + formMatch[1]);
+          }
+          
+          resolve(null);
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      console.error('Error al contactar ACS: ' + error.message);
+      reject(error);
+    });
+    
+    req.write(postData);
+    req.end();
+  });
+}
+
 async function step3_ProcessThreeDSChallenge(azulOrderId, cres) {
   console.log('\n' + '='.repeat(80));
-  console.log('PASO 3: Procesar resultado del Challenge 3D Secure');
+  console.log('PASO 3b: Procesar resultado del Challenge 3D Secure');
   console.log('AzulOrderId: ' + azulOrderId);
   console.log('CRes: ' + (cres ? cres.substring(0, 50) + '...' : 'N/A'));
   console.log('='.repeat(80));
+
+  if (!cres) {
+    console.log('\n[ERROR] No se proporciono CRes - se requiere para completar el challenge');
+    return {
+      IsoCode: '',
+      ResponseMessage: '',
+      ErrorDescription: 'CRes es requerido para completar el challenge 3DS',
+    };
+  }
 
   const request = {
     Channel: TEST_CONFIG.channel,
     Store: TEST_CONFIG.merchantId,
     AzulOrderId: azulOrderId,
+    CRes: cres,
   };
-  
-  if (cres) {
-    request.CRes = cres;
-  }
 
   const response = await makeRequest(AZUL_3DS_CHALLENGE_URL, request, TEST_CONFIG.auth1, TEST_CONFIG.auth2);
 
@@ -315,20 +384,32 @@ async function runFullTest(cardKey, completeChallenge = true) {
       
       if (step2Response.IsoCode === '3D') {
         console.log('\n[INFO] Se requiere desafio 3D Secure');
-        if (step2Response.ThreeDSChallenge) {
-          console.log('  RedirectPostUrl: ' + step2Response.ThreeDSChallenge.RedirectPostUrl);
+        const challengeData = step2Response.ThreeDSChallenge;
+        if (challengeData) {
+          console.log('  RedirectPostUrl: ' + challengeData.RedirectPostUrl);
+          console.log('  CReq disponible: ' + (challengeData.CReq ? 'SI' : 'NO'));
         }
         
-        if (completeChallenge) {
-          console.log('\nProcesando Challenge 3DS automaticamente (endpoint processthreedschallenge)...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        if (completeChallenge && challengeData && challengeData.RedirectPostUrl && challengeData.CReq) {
+          console.log('\nSimulando interaccion del usuario con el ACS de pruebas...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
-          const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, null);
+          const cres = await simulateACSChallenge(challengeData.RedirectPostUrl, challengeData.CReq);
           
-          if (step3Response.IsoCode === '00') {
-            console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+          if (cres) {
+            console.log('\nEnviando CRes a Azul (endpoint processthreedschallenge)...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
+            
+            if (step3Response.IsoCode === '00') {
+              console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+            }
+            return step3Response;
+          } else {
+            console.log('\n[WARN] No se pudo obtener CRes del ACS - el challenge requiere interaccion manual');
+            return step2Response;
           }
-          return step3Response;
         }
         
         return step2Response;
@@ -339,20 +420,32 @@ async function runFullTest(cardKey, completeChallenge = true) {
 
     if (step1Response.IsoCode === '3D') {
       console.log('\n[INFO] Se requiere desafio 3D Secure (sin 3DS Method)');
-      if (step1Response.ThreeDSChallenge) {
-        console.log('  RedirectPostUrl: ' + step1Response.ThreeDSChallenge.RedirectPostUrl);
+      const challengeData = step1Response.ThreeDSChallenge;
+      if (challengeData) {
+        console.log('  RedirectPostUrl: ' + challengeData.RedirectPostUrl);
+        console.log('  CReq disponible: ' + (challengeData.CReq ? 'SI' : 'NO'));
       }
       
-      if (completeChallenge) {
-        console.log('\nProcesando Challenge 3DS automaticamente (endpoint processthreedschallenge)...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      if (completeChallenge && challengeData && challengeData.RedirectPostUrl && challengeData.CReq) {
+        console.log('\nSimulando interaccion del usuario con el ACS de pruebas...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, null);
+        const cres = await simulateACSChallenge(challengeData.RedirectPostUrl, challengeData.CReq);
         
-        if (step3Response.IsoCode === '00') {
-          console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+        if (cres) {
+          console.log('\nEnviando CRes a Azul (endpoint processthreedschallenge)...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
+          
+          if (step3Response.IsoCode === '00') {
+            console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+          }
+          return step3Response;
+        } else {
+          console.log('\n[WARN] No se pudo obtener CRes del ACS - el challenge requiere interaccion manual');
+          return step1Response;
         }
-        return step3Response;
       }
       
       return step1Response;
@@ -485,6 +578,7 @@ module.exports = {
   step1_InitialPaymentRequest,
   step2_ProcessThreeDSMethod,
   step3_ProcessThreeDSChallenge,
+  simulateACSChallenge,
   runFullTest,
   TEST_CARDS,
   TEST_CONFIG,
