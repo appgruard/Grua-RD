@@ -467,6 +467,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Test endpoint for AZUL 3DS Challenge (Card 0129)
+  app.get("/api/test/azul-3ds-challenge", async (_req, res) => {
+    try {
+      const orderNumber = AzulPaymentService.generateOrderNumber();
+      const transactionId = Date.now().toString();
+      
+      const paymentData = {
+        amount: 10000, // RD$100.00
+        customOrderId: "TEST-3DS-" + transactionId,
+        orderDescription: "Prueba 3DS Challenge Card 0129",
+      };
+
+      const browserInfo = {
+        acceptHeader: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ipAddress: "200.88.232.119",
+        language: "es-DO",
+        colorDepth: 24,
+        screenWidth: 1920,
+        screenHeight: 1080,
+        timeZone: "240",
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+        javaScriptEnabled: "true",
+      };
+
+      // Iniciar el pago 3DS directamente con la tarjeta de prueba
+      const result = await AzulPaymentService.init3DSecure(
+        "", // Sin token, usaremos datos de tarjeta manual en el servicio si es necesario
+        paymentData,
+        browserInfo
+      );
+
+      res.json({
+        message: "Proceso 3DS iniciado",
+        orderNumber,
+        result
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Helper function to check if user needs verification
   const userNeedsVerification = async (user: any): Promise<boolean> => {
     if (!user) return false;

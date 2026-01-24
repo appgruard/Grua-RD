@@ -504,9 +504,33 @@ async function main() {
       challengeData.CReq,
       termUrl
     );
+
+    // Mejorar la captura de CRes en el HTML generado
+    const improvedHtmlContent = htmlContent.replace(
+      '// Escuchar mensajes del iframe',
+      `
+    // Auto-extraer CRes si la URL del iframe cambia (si es posible por Same-Origin, si no, manual)
+    setInterval(() => {
+      try {
+        const frame = document.getElementById('challengeFrame');
+        if (frame && frame.contentWindow) {
+          const frameUrl = frame.contentWindow.location.href;
+          const urlObj = new URL(frameUrl);
+          const cres = urlObj.searchParams.get('cres') || urlObj.searchParams.get('CRes');
+          if (cres) {
+            document.getElementById('cresOutput').value = cres;
+          }
+        }
+      } catch (e) {
+        // Ignorar errores de cross-origin
+      }
+    }, 1000);
+
+    // Escuchar mensajes del iframe`
+    );
     
     const htmlPath = '/tmp/3ds-challenge-test.html';
-    fs.writeFileSync(htmlPath, htmlContent);
+    fs.writeFileSync(htmlPath, improvedHtmlContent);
     
     console.log('\n*** ARCHIVO HTML GENERADO ***');
     console.log('Ruta: ' + htmlPath);
