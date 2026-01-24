@@ -7,9 +7,9 @@ const AZUL_3DS_METHOD_URL = 'https://pruebas.azul.com.do/webservices/JSON/Defaul
 const AZUL_3DS_CHALLENGE_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedschallenge';
 
 const CERT_PATHS = {
-  cert: process.env.AZUL_CERT_PATH || '/opt/certificados/gruard/app.gruard.com.crt',
-  key: process.env.AZUL_KEY_PATH || '/opt/certificados/gruard/app.gruard.com.key',
-  ca: process.env.AZUL_CA_PATH || '/opt/certificados/gruard/app.gruard.com.bundle.crt',
+  cert: process.env.AZUL_CERT_PATH || './server/services/azul-certs/app.gruard.com.crt',
+  key: process.env.AZUL_KEY_PATH || './server/services/azul-certs/app.gruard.com.key',
+  ca: process.env.AZUL_CA_PATH || './server/services/azul-certs/app.gruard.com.bundle.crt',
 };
 
 const TEST_CONFIG = {

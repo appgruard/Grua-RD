@@ -7,9 +7,9 @@ import fs from 'fs';
 const AZUL_SANDBOX_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx';
 const AZUL_PRODUCTION_URL = 'https://pagos.azul.com.do/webservices/JSON/Default.aspx';
 
-// Certificate Paths (Prefer relative paths for container compatibility)
-const CERT_PATH = process.env.AZUL_CERT_PATH || '/etc/azul/certs/app.gruard.com.bundle.crt';
-const KEY_PATH = process.env.AZUL_KEY_PATH || '/etc/azul/certs/app.gruard.com.key';
+// Certificate Paths
+const CERT_PATH = process.env.AZUL_CERT_PATH || './server/services/azul-certs/app.gruard.com.bundle.crt';
+const KEY_PATH = process.env.AZUL_KEY_PATH || './server/services/azul-certs/app.gruard.com.key';
 
 // Environment configuration
 const getAzulConfig = () => ({
