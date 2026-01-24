@@ -575,7 +575,8 @@ async function runFullTest(cardKey, completeChallenge = true) {
       const cres = await new Promise(resolve => {
         readline.question('\n[?] Ingresa el CRes obtenido del navegador: ', (input) => {
           readline.close();
-          resolve(input.trim());
+          const cleanInput = input.trim().replace(/^["']|["']$/g, '');
+          resolve(cleanInput);
         });
       });
       
