@@ -614,23 +614,40 @@ async function runFullTest(cardKey, completeChallenge = true) {
       }
       
       if (completeChallenge && challengeData && challengeData.RedirectPostUrl && challengeData.CReq) {
-        console.log('\nSimulando interaccion del usuario con el ACS de pruebas...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('\n[!] DETENCION PARA PASO MANUAL (Sin 3DS Method)');
+        console.log('    1. Ve a: ' + challengeData.RedirectPostUrl);
+        console.log('    2. Envía (POST) el creq: ' + challengeData.CReq);
+        console.log('    3. Completa el OTP en el navegador.');
+        console.log('    4. Obtendrás un "CRes" al final (está dentro del campo oculto "cres").');
         
-        const cres = await simulateACSChallenge(challengeData.RedirectPostUrl, challengeData.CReq);
+        const readline = require('readline').createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+
+        const cres = await new Promise(resolve => {
+          readline.question('\n[?] Ingresa el valor de "cres" (el código largo en base64): ', (input) => {
+            readline.close();
+            const cleanInput = input.trim().replace(/^["']|["']$/g, '');
+            resolve(cleanInput);
+          });
+        });
         
         if (cres) {
-          console.log('\nEnviando CRes a Azul (endpoint processthreedschallenge)...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
+          console.log('\nEnviando CRes ingresado a Azul (endpoint processthreedschallenge)...');
           const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
           
           if (step3Response.IsoCode === '00') {
             console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+          } else {
+            console.log('\n[INFO] La transacción finalizó con código: ' + step3Response.IsoCode);
+            if (step3Response.ErrorDescription) {
+               console.log('       Error: ' + step3Response.ErrorDescription);
+            }
           }
           return step3Response;
         } else {
-          console.log('\n[WARN] No se pudo obtener CRes del ACS - el challenge requiere interaccion manual');
+          console.log('\n[WARN] No se ingreso CRes - el challenge no pudo ser completado');
           return step1Response;
         }
       }
