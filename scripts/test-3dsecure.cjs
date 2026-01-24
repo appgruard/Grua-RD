@@ -154,8 +154,8 @@ async function step1_InitialPaymentRequest(card, transactionId) {
     OrderNumber: orderNumber,
     CustomOrderId: 'GRD-' + transactionId,
     ThreeDSAuth: {
-      TermUrl: 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx?3ds-callback',
-      MethodNotificationUrl: 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx?3ds-method',
+      TermUrl: 'https://www.google.com',
+      MethodNotificationUrl: 'https://www.google.com',
       RequestorChallengeIndicator: '04',
     },
     CardHolderInfo: {
