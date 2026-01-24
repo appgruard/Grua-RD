@@ -89,7 +89,7 @@ export default function Test3DSPage() {
                 className="w-full"
               >
                 {initMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Iniciar Pago de Prueba (RD$118.00)
+                Iniciar Pago de Prueba (RD$1.18)
               </Button>
             </CardContent>
           </Card>

@@ -501,12 +501,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Iniciar el pago 3DS directamente con la tarjeta de prueba
-      // El monto total es 11800 (10000 + 1800 de ITBIS)
+      // El monto total es 118 (100 + 18 de ITBIS) según script de prueba exitoso
       const result = await AzulPaymentService.init3DSecureWithCard(
         testCard,
         {
-          amount: 10000,
-          itbis: 1800,
+          amount: 100,
+          itbis: 18,
           customOrderId: "TEST-3DS-" + transactionId,
           orderDescription: "Prueba 3DS Challenge Card 0129",
         },
