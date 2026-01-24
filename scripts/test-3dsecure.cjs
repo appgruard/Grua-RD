@@ -773,7 +773,7 @@ async function main() {
     console.log('  node test-3dsecure.cjs          (ejecutar todas)');
     console.log('  node test-3dsecure.cjs all      (ejecutar todas)');
     Object.keys(TEST_CARDS).forEach(key => {
-      console.log('  node test-3dsecure.cjs ' + key);
+      console.log('  3dsecure.cjs ' + key);
     });
     process.exit(1);
   }
