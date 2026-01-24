@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3DS Challenge Helper - Gruard</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.5; max-width: 800px; margin: 40px auto; padding: 20px; background: #f4f4f5; color: #18181b; }
+        .card { background: white; padding: 24px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e4e4e7; }
+        h1 { margin-top: 0; color: #09090b; }
+        .field { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 14px; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #d4d4d8; border-radius: 4px; font-family: monospace; font-size: 14px; box-sizing: border-box; }
+        textarea { height: 100px; resize: vertical; }
+        button { background: #000; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px; }
+        button:hover { background: #27272a; }
+        .instructions { font-size: 13px; color: #71717a; margin-top: 20px; border-top: 1px solid #e4e4e7; padding-top: 20px; }
+        code { background: #f1f1f1; padding: 2px 4px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>3DS Challenge Helper</h1>
+        
+        <form id="challengeForm" method="POST" target="_blank">
+            <div class="field">
+                <label for="acsUrl">URL de Redirección (ACS URL):</label>
+                <input type="text" id="acsUrl" placeholder="https://3ds-acs.test.modirum.com/..." required>
+            </div>
+            
+            <div class="field">
+                <label for="creq">Valor del CReq:</label>
+                <textarea id="creq" placeholder="Pegue aquí el código largo CReq generado por el script..." required></textarea>
+            </div>
+            
+            <button type="submit" id="submitBtn">Abrir Desafío en Nueva Pestaña</button>
+        </form>
+
+        <div class="instructions">
+            <p><strong>Instrucciones para el VPS:</strong></p>
+            <ol>
+                <li>Ejecuta el script en tu VPS: <code>node scripts/test-3dsecure.cjs challengeWithMethod</code></li>
+                <li>Copia la <strong>URL de Redirección</strong> y el <strong>CReq</strong> de la terminal.</li>
+                <li>Pégalos en este formulario y haz clic en el botón negro.</li>
+                <li>En la nueva pestaña, ingresa el OTP: <code>1234</code>.</li>
+                <li>Al finalizar, el navegador te mostrará una página de "Processing".</li>
+                <li>Presiona <code>Ctrl+U</code> (o inspecciona la página) para buscar el campo <code>name="cres"</code>.</li>
+                <li>Copia ese valor de <strong>CRes</strong> y pégalo de vuelta en tu terminal del VPS.</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('challengeForm').onsubmit = function(e) {
+            const url = document.getElementById('acsUrl').value.trim();
+            const creqValue = document.getElementById('creq').value.trim();
+            
+            if (!url.startsWith('http')) {
+                alert('La URL debe comenzar con http o https');
+                return false;
+            }
+
+            this.action = url;
+            
+            // Limpiamos campos previos para evitar duplicados si se re-envía
+            const existingInput = this.querySelector('input[name="creq"]');
+            if (existingInput) existingInput.remove();
+
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'creq';
+            input.value = creqValue;
+            this.appendChild(input);
+            
+            return true;
+        };
+    </script>
+</body>
+</html>

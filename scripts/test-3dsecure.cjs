@@ -562,43 +562,46 @@ async function runFullTest(cardKey, completeChallenge = true) {
           console.log('  RedirectPostUrl: ' + challengeData.RedirectPostUrl);
           console.log('  CReq disponible: ' + (challengeData.CReq ? 'SI' : 'NO'));
         }
-        
         if (completeChallenge && challengeData && challengeData.RedirectPostUrl && challengeData.CReq) {
-      console.log('\n[!] DETENCION PARA PASO MANUAL');
-      console.log('    1. Ve a: ' + challengeData.RedirectPostUrl);
-      console.log('    2. Envía (POST) el creq: ' + challengeData.CReq);
-      console.log('    3. Completa el OTP en el navegador.');
-      console.log('    4. Obtendrás un "CRes" al final (está dentro del campo oculto "cres").');
-      
-      const readline = require('readline').createInterface({
-        input: process.stdin,
-        output: process.stdout
-      });
-
-      const cres = await new Promise(resolve => {
-        readline.question('\n[?] Ingresa el valor de "cres" (el código largo en base64): ', (input) => {
-          readline.close();
-          const cleanInput = input.trim().replace(/^["']|["']$/g, '');
-          resolve(cleanInput);
-        });
-      });
-      
-      if (cres) {
-        console.log('\nEnviando CRes ingresado a Azul (endpoint processthreedschallenge)...');
-        const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
+        console.log('\n' + '='.repeat(80));
+        console.log('PASO MANUAL REQUERIDO:');
+        console.log('1. Abre el archivo scripts/3ds-helper.html en tu navegador local.');
+        console.log('2. Copia y pega estos datos en la página:');
+        console.log('\n   URL de Redirección: ' + challengeData.RedirectPostUrl);
+        console.log('\n   CReq: ' + challengeData.CReq);
+        console.log('\n3. Sigue las instrucciones en la página HTML.');
+        console.log('='.repeat(80));
         
-        if (step3Response.IsoCode === '00') {
-          console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
-        } else {
-          console.log('\n[INFO] La transacción finalizó con código: ' + step3Response.IsoCode);
-          if (step3Response.ErrorDescription) {
-             console.log('       Error: ' + step3Response.ErrorDescription);
+        const readline = require('readline').createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+
+        const cres = await new Promise(resolve => {
+          readline.question('\n[?] Ingresa el valor de "cres" obtenido del navegador: ', (input) => {
+            readline.close();
+            const cleanInput = input.trim().replace(/^["']|["']$/g, '');
+            resolve(cleanInput);
+          });
+        });
+        
+        if (cres) {
+          console.log('\nEnviando CRes ingresado a Azul (endpoint processthreedschallenge)...');
+          const step3Response = await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
+          
+          if (step3Response.IsoCode === '00') {
+            console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de Challenge 3DS)');
+          } else {
+            console.log('\n[INFO] La transacción finalizó con código: ' + step3Response.IsoCode);
+            if (step3Response.ErrorDescription) {
+               console.log('       Error: ' + step3Response.ErrorDescription);
+            }
           }
+          return step3Response;
+        } else {
+          console.log('\n[WARN] No se ingreso CRes - el challenge no pudo ser completado');
+          return step2Response;
         }
-        return step3Response;
-      } else {
-        console.log('\n[WARN] No se ingreso CRes - el challenge no pudo ser completado');
-        return step2Response;
       }
     }
         
