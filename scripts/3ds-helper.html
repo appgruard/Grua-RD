@@ -32,6 +32,11 @@
                 <label for="creq">Valor del CReq:</label>
                 <textarea id="creq" placeholder="Pegue aquí el código largo CReq generado por el script..." required></textarea>
             </div>
+
+            <div class="field">
+                <label for="termUrl">TermUrl (Opcional - Google por defecto):</label>
+                <input type="text" id="termUrl" value="https://www.google.com">
+            </div>
             
             <button type="submit" id="submitBtn">Abrir Desafío en Nueva Pestaña</button>
         </form>
@@ -63,14 +68,33 @@
             this.action = url;
             
             // Limpiamos campos previos para evitar duplicados si se re-envía
-            const existingInput = this.querySelector('input[name="creq"]');
-            if (existingInput) existingInput.remove();
+            const existingCreq = this.querySelector('input[name="creq"]');
+            if (existingCreq) existingCreq.remove();
+            const existingthreeDSJS = this.querySelector('input[name="threeDSJS"]');
+            if (existingthreeDSJS) existingthreeDSJS.remove();
+            const existingTermUrl = this.querySelector('input[name="termUrl"]');
+            if (existingTermUrl) existingTermUrl.remove();
 
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'creq';
-            input.value = creqValue;
-            this.appendChild(input);
+            // Campo creq (obligatorio para 3DS2)
+            const inputCreq = document.createElement('input');
+            inputCreq.type = 'hidden';
+            inputCreq.name = 'creq';
+            inputCreq.value = creqValue;
+            this.appendChild(inputCreq);
+
+            // Campo threeDSJS (a veces requerido por simuladores)
+            const inputJS = document.createElement('input');
+            inputJS.type = 'hidden';
+            inputJS.name = 'threeDSJS';
+            inputJS.value = 'true';
+            this.appendChild(inputJS);
+
+            // Campo TermUrl (donde redirigirá al terminar)
+            const inputTerm = document.createElement('input');
+            inputTerm.type = 'hidden';
+            inputTerm.name = 'termUrl';
+            inputTerm.value = document.getElementById('termUrl').value.trim() || 'https://www.google.com';
+            this.appendChild(inputTerm);
             
             return true;
         };
