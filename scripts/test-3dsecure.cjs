@@ -134,13 +134,12 @@ async function makeRequest(url, data, auth1, auth2) {
 
 async function step1_InitialPaymentRequest(card, transactionId) {
   console.log('\n' + '='.repeat(80));
-  console.log('PASO 1: Solicitud inicial de pago con 3D Secure');
+  console.log('PASO 2: Inicio del proceso de autenticación 3DS (Solicitud a Azul)');
   console.log('Tarjeta: ' + card.description);
   console.log('='.repeat(80));
 
   const orderNumber = generateOrderNumber();
-  const baseUrl = process.env.APP_BASE_URL || 'https://app.gruard.com';
-
+  
   const request = {
     Channel: TEST_CONFIG.channel,
     Store: TEST_CONFIG.merchantId,
@@ -184,9 +183,22 @@ async function step1_InitialPaymentRequest(card, transactionId) {
   return await makeRequest(AZUL_TEST_URL, request, TEST_CONFIG.auth1, TEST_CONFIG.auth2);
 }
 
-async function step2_ProcessThreeDSMethod(azulOrderId, status) {
+async function step2_SubmitMethodForm(threeDSMethodData) {
   console.log('\n' + '='.repeat(80));
-  console.log('PASO 2: Procesar resultado del 3DS Method');
+  console.log('PASO 4: Envío de detalles del ambiente del tarjetahabiente (MethodForm)');
+  console.log('URL: ' + threeDSMethodData.ThreeDSMethodUrl);
+  console.log('='.repeat(80));
+  
+  // En un entorno real, esto sería un post manual desde el navegador del cliente
+  console.log('Simulando envío de ThreeDSMethodData al ACS del emisor...');
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  console.log('Respuesta del ACS recibida en MethodNotificationUrl.');
+  return { status: 'RECEIVED' };
+}
+
+async function step3_ContinueAuthentication(azulOrderId, status) {
+  console.log('\n' + '='.repeat(80));
+  console.log('PASO 5-6: Continuar proceso de autenticación 3DS (MethodNotificationStatus)');
   console.log('='.repeat(80));
 
   const request = {
@@ -199,9 +211,9 @@ async function step2_ProcessThreeDSMethod(azulOrderId, status) {
   return await makeRequest(AZUL_3DS_METHOD_URL, request, TEST_CONFIG.auth1, TEST_CONFIG.auth2);
 }
 
-async function step3_ProcessThreeDSChallenge(azulOrderId, cres) {
+async function step4_ProcessThreeDSChallenge(azulOrderId, cres) {
   console.log('\n' + '='.repeat(80));
-  console.log('PASO 3b: Procesar resultado del Challenge 3D Secure');
+  console.log('PASO 8-9: Finalización (ProcessThreeDSChallenge)');
   console.log('='.repeat(80));
 
   const request = {
@@ -219,29 +231,39 @@ async function runFullTest(cardKey) {
   const transactionId = generateTransactionId();
   
   try {
+    console.log('\n' + '='.repeat(80));
+    console.log('PASO 1: El cliente somete detalles al Comercio');
+    console.log('='.repeat(80));
+
     const step1Response = await step1_InitialPaymentRequest(card, transactionId);
     
+    // Paso 3 (Respuesta)
     if (step1Response.IsoCode === '00') {
-      console.log('\n[EXITO] TRANSACCION COMPLETADA (Sin friccion)');
+      console.log('\n[Paso 9] FINALIZADO: Pago completado (Sin fricción)');
       return step1Response;
     }
 
     if (step1Response.IsoCode === '3D2METHOD') {
-      console.log('\nSimulando espera de notificacion del 3DS Method...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('\n[Paso 3] Azul respondió con 3D2METHOD');
       
-      const step2Response = await step2_ProcessThreeDSMethod(step1Response.AzulOrderId, 'RECEIVED');
+      // Paso 4
+      await step2_SubmitMethodForm(step1Response.ThreeDSMethodData);
       
-      if (step2Response.IsoCode === '00') {
-        console.log('\n[EXITO] TRANSACCION COMPLETADA (Despues de 3DS Method)');
-        return step2Response;
+      // Paso 5
+      const step3Response = await step3_ContinueAuthentication(step1Response.AzulOrderId, 'RECEIVED');
+      
+      // Paso 6 (Respuesta)
+      if (step3Response.IsoCode === '00') {
+        console.log('\n[Paso 9] FINALIZADO: Pago completado (Post-Method)');
+        return step3Response;
       }
       
-      if (step2Response.IsoCode === '3D') {
-        const challengeData = step2Response.ThreeDSChallenge;
+      if (step3Response.IsoCode === '3D') {
+        console.log('\n[Paso 6] Azul indica que requiere DESAFÍO');
+        const challengeData = step3Response.ThreeDSChallenge;
         if (challengeData && challengeData.RedirectPostUrl && challengeData.CReq) {
           console.log('\n' + '='.repeat(80));
-          console.log('PASO MANUAL REQUERIDO:');
+          console.log('PASO 7: Desafío 3DS (Inicio del desafío)');
           console.log('1. Abre scripts/3ds-helper.html en tu navegador.');
           console.log('\n   URL: ' + challengeData.RedirectPostUrl);
           console.log('\n   CReq: ' + challengeData.CReq);
@@ -253,25 +275,27 @@ async function runFullTest(cardKey) {
           });
 
           const cres = await new Promise(resolve => {
-            readline.question('\n[?] Ingresa el CRes obtenido: ', (input) => {
+            readline.question('\n[?] Ingresa el CRes obtenido tras el desafío: ', (input) => {
               readline.close();
               resolve(input.trim().replace(/^["']|["']$/g, ''));
             });
           });
 
           if (cres) {
-            return await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
+            // Paso 8 & 9
+            return await step4_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
           }
         }
       }
-      return step2Response;
+      return step3Response;
     }
 
     if (step1Response.IsoCode === '3D') {
+      console.log('\n[Paso 3] Azul respondió indicando DESAFÍO directo');
       const challengeData = step1Response.ThreeDSChallenge;
       if (challengeData && challengeData.RedirectPostUrl && challengeData.CReq) {
         console.log('\n' + '='.repeat(80));
-        console.log('PASO MANUAL REQUERIDO:');
+        console.log('PASO 7: Desafío 3DS');
         console.log('\n   URL: ' + challengeData.RedirectPostUrl);
         console.log('\n   CReq: ' + challengeData.CReq);
         console.log('='.repeat(80));
@@ -282,14 +306,15 @@ async function runFullTest(cardKey) {
         });
 
         const cres = await new Promise(resolve => {
-          readline.question('\n[?] Ingresa el CRes obtenido: ', (input) => {
+          readline.question('\n[?] Ingresa el CRes obtenido tras el desafío: ', (input) => {
             readline.close();
             resolve(input.trim().replace(/^["']|["']$/g, ''));
           });
         });
 
         if (cres) {
-          return await step3_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
+          // Paso 8 & 9
+          return await step4_ProcessThreeDSChallenge(step1Response.AzulOrderId, cres);
         }
       }
       return step1Response;
