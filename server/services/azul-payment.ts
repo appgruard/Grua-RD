@@ -334,6 +334,87 @@ export class AzulPaymentService {
   }
 
   /**
+   * Continue 3DS authentication after Method Notification
+   */
+  static async continue3DSAuthentication(
+    azulOrderId: string,
+    status: string = 'RECEIVED'
+  ): Promise<Azul3DSResponse> {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        isoCode: '99',
+        responseMessage: 'Azul no está configurado correctamente',
+      };
+    }
+
+    try {
+      const config = getAzulConfig();
+      const requestData = {
+        Channel: config.channel,
+        Store: config.merchantId,
+        AzulOrderId: azulOrderId,
+        MethodNotificationStatus: status,
+      };
+
+      const url = `https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedsmethod`;
+      
+      const jsonPayload = JSON.stringify(requestData);
+      const authKey = config.authKey || 'splitit';
+      
+      const options: https.RequestOptions = {
+        method: 'POST',
+        agent: getHttpsAgent(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Auth1': authKey,
+          'Auth2': authKey,
+          'Content-Length': Buffer.byteLength(jsonPayload).toString(),
+          'User-Agent': 'GruaRD-App/1.0',
+        },
+        minVersion: 'TLSv1.2' as any
+      };
+
+      return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const req = https.request({
+          ...options,
+          hostname: urlObj.hostname,
+          path: urlObj.pathname + urlObj.search,
+        }, (res) => {
+          let body = '';
+          res.on('data', chunk => body += chunk);
+          res.on('end', () => {
+            try {
+              const responseData = JSON.parse(body);
+              const parsed = this.parseResponse(responseData);
+              resolve({
+                ...parsed,
+                acsUrl: responseData.ThreeDSChallenge?.RedirectPostUrl,
+                creq: responseData.ThreeDSChallenge?.CReq,
+                requires3DS: responseData.IsoCode === '3D',
+              });
+            } catch (e) {
+              reject(new Error(`Error parsing continue response: ${body}`));
+            }
+          });
+        });
+
+        req.on('error', reject);
+        req.write(jsonPayload);
+        req.end();
+      });
+    } catch (error) {
+      logSystem.error('Azul continue3DSAuthentication error', error);
+      return {
+        success: false,
+        isoCode: '96',
+        responseMessage: 'Error del sistema al continuar 3DS',
+      };
+    }
+  }
+
+  /**
    * Process 3D Secure challenge response
    */
   static async processThreeDSChallenge(

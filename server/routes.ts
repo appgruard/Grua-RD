@@ -524,6 +524,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test endpoint to continue 3DS authentication after Method (Paso 5-6)
+  app.post("/api/test/azul-3ds-continue", async (req, res) => {
+    try {
+      const { azulOrderId, status } = req.body;
+      if (!azulOrderId) return res.status(400).json({ error: "AzulOrderId es requerido" });
+
+      logSystem.info("Continuing 3DS authentication", { azulOrderId, status });
+      const result = await AzulPaymentService.continue3DSAuthentication(azulOrderId, status || 'RECEIVED');
+      
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error("Error continuing 3DS authentication", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Test endpoint to process 3DS Challenge response (CRes)
   app.post("/api/payments/azul/process-challenge", async (req, res) => {
     try {

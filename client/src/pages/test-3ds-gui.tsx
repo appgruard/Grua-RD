@@ -65,6 +65,33 @@ export default function Test3DSPage() {
     }
   });
 
+  // Paso 2: Continuar tras Method
+  const continueMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/test/azul-3ds-continue", {
+        azulOrderId,
+        status: 'RECEIVED'
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setPaymentResult(data);
+      if (data.requires3DS && data.acsUrl && data.creq) {
+        setStep(3);
+        toast({ title: "Desafío Requerido", description: "Azul indica que se requiere el desafío 3DS." });
+      } else if (data.success) {
+        setStep(5);
+        toast({ title: "Pago Exitoso", description: "El pago se completó tras el método." });
+      } else {
+        toast({ 
+          title: "Error", 
+          description: data.errorDescription || data.responseMessage || "Error al continuar 3DS",
+          variant: "destructive" 
+        });
+      }
+    }
+  });
+
   return (
     <div className="container mx-auto py-10 max-w-2xl">
       <div className="flex flex-col gap-6">
@@ -113,9 +140,11 @@ export default function Test3DSPage() {
                 </AlertDescription>
               </Alert>
               <Button 
-                onClick={() => setStep(3)} 
+                onClick={() => continueMutation.mutate()} 
+                disabled={continueMutation.isPending}
                 className="w-full"
               >
+                {continueMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Continuar al Desafío
               </Button>
             </CardContent>
