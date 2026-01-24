@@ -243,6 +243,37 @@ async function step2_ProcessThreeDSMethod(azulOrderId, status) {
   return response;
 }
 
+async function httpPost(url, postData, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      port: 443,
+      path: urlObj.pathname + (urlObj.search || ''),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        ...headers,
+      },
+    };
+    
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      res.on('data', (chunk) => { responseData += chunk; });
+      res.on('end', () => {
+        resolve({ status: res.statusCode, headers: res.headers, body: responseData });
+      });
+    });
+    
+    req.on('error', (error) => reject(error));
+    req.write(postData);
+    req.end();
+  });
+}
+
 async function simulateACSChallenge(redirectPostUrl, creq) {
   console.log('\n' + '='.repeat(80));
   console.log('PASO 3a: Simulando interaccion del usuario con el ACS');
@@ -250,60 +281,112 @@ async function simulateACSChallenge(redirectPostUrl, creq) {
   console.log('CReq (primeros 80 chars): ' + (creq ? creq.substring(0, 80) + '...' : 'N/A'));
   console.log('='.repeat(80));
 
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(redirectPostUrl);
-    const postData = 'creq=' + encodeURIComponent(creq);
+  try {
+    console.log('\n[1/3] Enviando CReq al ACS...');
+    const step1 = await httpPost(redirectPostUrl, 'creq=' + encodeURIComponent(creq));
+    console.log('Status: ' + step1.status);
     
-    const options = {
-      hostname: urlObj.hostname,
-      port: 443,
-      path: urlObj.pathname + urlObj.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(postData),
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-    };
+    let cresMatch = step1.body.match(/name=["']?cres["']?\s+value=["']([^"']+)["']/i) ||
+                    step1.body.match(/name=["']?CRes["']?\s+value=["']([^"']+)["']/i);
     
-    console.log('\nEnviando CReq al ACS...');
+    if (cresMatch && cresMatch[1]) {
+      console.log('CRes obtenido directamente: ' + cresMatch[1].substring(0, 50) + '...');
+      return cresMatch[1];
+    }
     
-    const req = https.request(options, (res) => {
-      let responseData = '';
-      res.on('data', (chunk) => { responseData += chunk; });
-      res.on('end', () => {
-        console.log('Status del ACS: ' + res.statusCode);
-        
-        const cresMatch = responseData.match(/name=["']?cres["']?\s+value=["']([^"']+)["']/i) ||
-                          responseData.match(/name=["']?CRes["']?\s+value=["']([^"']+)["']/i) ||
-                          responseData.match(/value=["']([^"']+)["']\s+name=["']?cres["']?/i);
-        
-        if (cresMatch && cresMatch[1]) {
-          console.log('CRes obtenido del ACS: ' + cresMatch[1].substring(0, 50) + '...');
-          resolve(cresMatch[1]);
-        } else {
-          console.log('Respuesta del ACS (primeros 500 chars):');
-          console.log(responseData.substring(0, 500));
-          
-          const formMatch = responseData.match(/<form[^>]*action=["']([^"']+)["'][^>]*>/i);
-          if (formMatch) {
-            console.log('\nFormulario detectado, action: ' + formMatch[1]);
-          }
-          
-          resolve(null);
+    const authFormMatch = step1.body.match(/<form[^>]*action=["']([^"']+)["'][^>]*>/i);
+    if (!authFormMatch) {
+      console.log('No se encontro formulario de autenticacion');
+      console.log('Respuesta (primeros 500 chars): ' + step1.body.substring(0, 500));
+      return null;
+    }
+    
+    let authUrl = authFormMatch[1];
+    if (!authUrl.startsWith('http')) {
+      const urlObj = new URL(redirectPostUrl);
+      authUrl = urlObj.origin + (authUrl.startsWith('/') ? '' : '/') + authUrl;
+    }
+    console.log('Formulario de autenticacion: ' + authUrl);
+    
+    const hiddenInputs = {};
+    const inputMatches = step1.body.matchAll(/<input[^>]*type=["']?hidden["']?[^>]*>/gi);
+    for (const match of inputMatches) {
+      const nameMatch = match[0].match(/name=["']?([^"'\s>]+)["']?/i);
+      const valueMatch = match[0].match(/value=["']?([^"'\s>]*)["']?/i);
+      if (nameMatch && nameMatch[1]) {
+        hiddenInputs[nameMatch[1]] = valueMatch ? valueMatch[1] : '';
+      }
+    }
+    console.log('Campos ocultos encontrados: ' + Object.keys(hiddenInputs).join(', '));
+    
+    console.log('\n[2/3] Enviando codigo OTP de prueba (1234)...');
+    const formData = new URLSearchParams();
+    for (const [key, value] of Object.entries(hiddenInputs)) {
+      formData.append(key, value);
+    }
+    formData.append('otp', '1234');
+    formData.append('password', '1234');
+    formData.append('pin', '1234');
+    formData.append('code', '1234');
+    
+    const step2 = await httpPost(authUrl, formData.toString());
+    console.log('Status: ' + step2.status);
+    
+    cresMatch = step2.body.match(/name=["']?cres["']?\s+value=["']([^"']+)["']/i) ||
+                step2.body.match(/name=["']?CRes["']?\s+value=["']([^"']+)["']/i) ||
+                step2.body.match(/value=["']([^"']+)["'][^>]*name=["']?cres["']?/i);
+    
+    if (cresMatch && cresMatch[1]) {
+      console.log('CRes obtenido: ' + cresMatch[1].substring(0, 50) + '...');
+      return cresMatch[1];
+    }
+    
+    const nextFormMatch = step2.body.match(/<form[^>]*action=["']([^"']+)["'][^>]*>/i);
+    if (nextFormMatch) {
+      let nextUrl = nextFormMatch[1];
+      if (!nextUrl.startsWith('http')) {
+        const urlObj = new URL(authUrl);
+        nextUrl = urlObj.origin + (nextUrl.startsWith('/') ? '' : '/') + nextUrl;
+      }
+      console.log('Formulario adicional detectado: ' + nextUrl);
+      
+      const nextHiddenInputs = {};
+      const nextInputMatches = step2.body.matchAll(/<input[^>]*type=["']?hidden["']?[^>]*>/gi);
+      for (const match of nextInputMatches) {
+        const nameMatch = match[0].match(/name=["']?([^"'\s>]+)["']?/i);
+        const valueMatch = match[0].match(/value=["']?([^"'\s>]*)["']?/i);
+        if (nameMatch && nameMatch[1]) {
+          nextHiddenInputs[nameMatch[1]] = valueMatch ? valueMatch[1] : '';
         }
-      });
-    });
+      }
+      
+      console.log('\n[3/3] Enviando formulario final...');
+      const finalFormData = new URLSearchParams();
+      for (const [key, value] of Object.entries(nextHiddenInputs)) {
+        finalFormData.append(key, value);
+      }
+      
+      const step3 = await httpPost(nextUrl, finalFormData.toString());
+      console.log('Status: ' + step3.status);
+      
+      cresMatch = step3.body.match(/name=["']?cres["']?\s+value=["']([^"']+)["']/i) ||
+                  step3.body.match(/name=["']?CRes["']?\s+value=["']([^"']+)["']/i);
+      
+      if (cresMatch && cresMatch[1]) {
+        console.log('CRes obtenido: ' + cresMatch[1].substring(0, 50) + '...');
+        return cresMatch[1];
+      }
+    }
     
-    req.on('error', (error) => {
-      console.error('Error al contactar ACS: ' + error.message);
-      reject(error);
-    });
+    console.log('\nNo se pudo obtener CRes automaticamente.');
+    console.log('Respuesta final (primeros 800 chars):');
+    console.log(step2.body.substring(0, 800));
+    return null;
     
-    req.write(postData);
-    req.end();
-  });
+  } catch (error) {
+    console.error('Error durante simulacion ACS: ' + error.message);
+    return null;
+  }
 }
 
 async function step3_ProcessThreeDSChallenge(azulOrderId, cres) {
