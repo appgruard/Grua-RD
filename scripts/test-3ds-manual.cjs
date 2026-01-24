@@ -511,56 +511,34 @@ async function main() {
       termUrl
     );
 
-    // Mejorar la captura de CRes en el HTML generado
-    const improvedHtmlContent = htmlContent.replace(
-      '// Escuchar mensajes del iframe',
-      `
-    // Auto-extraer CRes si la URL del iframe cambia (si es posible por Same-Origin, si no, manual)
-    setInterval(() => {
-      try {
-        const frame = document.getElementById('challengeFrame');
-        if (frame && frame.contentWindow) {
-          const frameUrl = frame.contentWindow.location.href;
-          const urlObj = new URL(frameUrl);
-          const cres = urlObj.searchParams.get('cres') || urlObj.searchParams.get('CRes');
-          if (cres) {
-            document.getElementById('cresOutput').value = cres;
-          }
-        }
-      } catch (e) {
-        // Ignorar errores de cross-origin
-      }
-    }, 1000);
+    console.log('\n' + '!'.repeat(80));
+    console.log('¡ATENCIÓN: EL PROCESO DE CHALLENGE AHORA ES COMPLETAMENTE MANUAL!');
+    console.log('!'.repeat(80));
+    console.log('\nSigue estos pasos EXACTAMENTE:');
+    console.log('1. Copia el siguiente valor de CReq:');
+    console.log(`\n${challengeData.CReq}\n`);
+    console.log('2. Abre una pestaña de incógnito en tu navegador.');
+    console.log('3. Ve a la siguiente URL del ACS de Azul:');
+    console.log(`\n${challengeData.RedirectPostUrl}\n`);
+    console.log('4. Si es una URL de pruebas que espera un POST, usa el siguiente formulario HTML temporal:');
+    
+    const tempHtmlPath = '/tmp/azul-manual-form.html';
+    const formHtml = `
+      <form id="azulForm" method="POST" action="${challengeData.RedirectPostUrl}">
+        <input type="hidden" name="creq" value="${challengeData.CReq}">
+        <p>Haz clic para iniciar el desafío manual:</p>
+        <button type="submit">Iniciar Desafío</button>
+      </form>
+    `;
+    fs.writeFileSync(tempHtmlPath, formHtml);
+    
+    console.log(`   (Se ha creado un formulario de ayuda en: ${tempHtmlPath})`);
+    console.log('5. Completa el desafío (OTP: 1234).');
+    console.log('6. Serás redirigido a una URL que contiene "?cres=...".');
+    console.log('7. COPIA el valor del parámetro "cres" de la barra de direcciones.');
+    console.log('\n' + '-'.repeat(80));
 
-    // Escuchar mensajes del iframe`
-    );
-    
-    const htmlPath = '/tmp/3ds-challenge-test.html';
-    fs.writeFileSync(htmlPath, improvedHtmlContent);
-    
-    console.log('\n*** ARCHIVO HTML GENERADO ***');
-    console.log('Ruta: ' + htmlPath);
-    console.log('\nOpciones para completar el challenge:');
-    console.log('');
-    console.log('OPCION A - Usando el archivo HTML:');
-    console.log('  1. Copia el archivo a tu maquina local');
-    console.log('  2. Abrelo en un navegador');
-    console.log('  3. Haz clic en "Iniciar Challenge"');
-    console.log('  4. Ingresa el OTP: 1234');
-    console.log('  5. Copia el CRes resultante');
-    console.log('');
-    console.log('OPCION B - Usando curl/browser manualmente:');
-    console.log('  RedirectPostUrl: ' + challengeData.RedirectPostUrl);
-    console.log('  CReq: ' + challengeData.CReq.substring(0, 60) + '...');
-    console.log('');
-    console.log('OPCION C - Solo validar el flujo hasta aqui:');
-    console.log('  Escribe "skip" para saltar el paso del CRes');
-    console.log('');
-    
-    console.log('AzulOrderId para referencia: ' + azulOrderId);
-    console.log('');
-    
-    const cres = await prompt('Pega el CRes aqui (o "skip" para saltar): ');
+    const cres = await prompt('\n⌨️  Pega aquí el valor de "cres" para completar la transacción (o "skip"): ');
     
     if (!cres || cres.toLowerCase() === 'skip') {
       console.log('\n*** Test terminado sin completar el challenge ***');
