@@ -59,14 +59,14 @@ async function runChallengeTest() {
     CVC: '123',
     PosInputMode: 'E-Commerce',
     TrxType: 'Sale',
-    Amount: '100', // RD$1.00 - Intentamos de nuevo con monto mínimo y el indicador corregido
+    Amount: '100', // RD$1.00
     Itbis: '18',
     OrderNumber: orderNumber,
     CustomOrderId: `TEST-VPS-${orderNumber}`,
     ThreeDSAuth: {
       TermUrl: `http://${vpsIp}:5000/callback`, 
       MethodNotificationUrl: `http://${vpsIp}:5000/method`,
-      RequestorChallengeIndicator: '04' // Volvemos a '04' (Show challenge) pero con CardHolderInfo presente
+      RequestorChallengeIndicator: '04' // Mandate Challenge (según documentación oficial)
     },
     CardHolderInfo: {
       Name: 'Juan Perez Prueba',
@@ -79,10 +79,10 @@ async function runChallengeTest() {
       BillingAddressZip: '10101'
     },
     BrowserInfo: {
-      AcceptHeader: 'text/html,application/xhtml+xml',
+      AcceptHeader: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8', // Header más completo según docs
       IPAddress: vpsIp,
       JavaScriptEnabled: 'true',
-      UserAgent: 'VPS-Test-Agent/1.0',
+      UserAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0', // UserAgent más real
       ColorDepth: '24',
       ScreenWidth: '1920',
       ScreenHeight: '1080',
