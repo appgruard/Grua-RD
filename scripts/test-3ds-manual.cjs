@@ -499,6 +499,12 @@ async function main() {
     const baseUrl = process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000';
     const termUrl = baseUrl + '/api/azul/3ds/callback?sid=' + Date.now();
     
+    // Loguear datos para depuracion manual
+    console.log('\n--- DATOS DE CHALLENGE PARA COPIAR SI ES NECESARIO ---');
+    console.log('RedirectPostUrl: ' + challengeData.RedirectPostUrl);
+    console.log('CReq: ' + challengeData.CReq);
+    console.log('------------------------------------------------------\n');
+    
     const htmlContent = generateChallengeHTML(
       challengeData.RedirectPostUrl,
       challengeData.CReq,
