@@ -13,9 +13,9 @@ const CONFIG = {
   auth1: process.env.AZUL_AUTH1 || 'splitit',
   auth2: process.env.AZUL_AUTH2 || 'splitit',
   azulUrl: 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx',
-  certPath: './server/services/azul-certs/app.gruard.com.crt',
-  keyPath: './server/services/azul-certs/app.gruard.com.key',
-  caPath: './server/services/azul-certs/app.gruard.com.bundle.crt'
+  certPath: 'opt/certificados/azul-certs/app.gruard.com.crt',
+  keyPath: 'opt/certificados/gruard/app.gruard.com.key',
+  caPath: 'opt/certificados/gruard/app.gruard.com.bundle.crt'
 };
 
 function getHttpsAgent() {
