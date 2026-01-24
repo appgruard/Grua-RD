@@ -59,8 +59,8 @@ async function runChallengeTest() {
     CVC: '123',
     PosInputMode: 'E-Commerce',
     TrxType: 'Sale',
-    Amount: '100000', // RD$1,000.00
-    Itbis: '18000',
+    Amount: '100', // RD$1.00 para evitar error 51 (fondos insuficientes)
+    Itbis: '18',
     OrderNumber: orderNumber,
     CustomOrderId: `TEST-VPS-${orderNumber}`,
     ThreeDSAuth: {
@@ -69,7 +69,7 @@ async function runChallengeTest() {
       RequestorChallengeIndicator: '04' 
     },
     CardHolderInfo: {
-      Name: 'Juan Perez Challenge',
+      Name: 'Juan Perez Challenge', // El nombre "Challenge" a veces ayuda en simuladores
       Email: 'test@gruard.com',
       PhoneHome: '8095551234',
       PhoneMobile: '8295551234',
