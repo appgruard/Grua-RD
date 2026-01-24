@@ -1,0 +1,63 @@
+root@srv1170768:~# node ./3dsecure12.cjs challengeWithMethod
+
+Cargando certificados mTLS...
+  Cert: /opt/certificados/gruard/app.gruard.com.crt
+  Key: /opt/certificados/gruard/app.gruard.com.key
+  CA: /opt/certificados/gruard/app.gruard.com.bundle.crt
+Certificados cargados correctamente
+
+
+================================================================================
+PASO 1: El cliente somete detalles al Comercio
+================================================================================
+
+================================================================================
+PASO 2: Inicio del proceso de autenticación 3DS (Solicitud a Azul)
+Tarjeta: Desafio con 3DSMethod
+================================================================================
+
+Enviando peticion a: https://pruebas.azul.com.do/webservices/JSON/Default.aspx
+
+[Paso 3] Azul respondió con 3D2METHOD
+Response data: {
+  "AuthorizationCode": "",
+  "AzulOrderId": "44874144",
+  "CustomOrderId": "GRD-1769291413332",
+  "DateTime": "20260124175014",
+  "ErrorDescription": "",
+  "IsoCode": "3D2METHOD",
+  "LotNumber": "",
+  "RRN": "",
+  "ResponseCode": "ISO8583",
+  "ResponseMessage": "3D_SECURE_2_METHOD",
+  "ThreeDSMethod": {
+    "MethodForm": "<iframe id=\"tdsMmethodTgtFrame\" name=\"tdsMmethodTgtFrame\" style=\"visibility: hidden; width: 1px; height: 1px;\" xmlns=\"http://www.w3.org/1999/xhtml\">\n    <!--.-->\n</iframe><form id=\"tdsMmethodForm\" name=\"tdsMmethodForm\" action=\"https://3ds-acs.test.modirum.com/mdpayacs/3ds-method\" method=\"post\" target=\"tdsMmethodTgtFrame\" xmlns=\"http://www.w3.org/1999/xhtml\">\n    <input type=\"hidden\" name=\"3DSMethodData\" value=\"eyAidGhyZWVEU1NlcnZlclRyYW5zSUQiIDogIjU2N2Q1ZWU4LTY3MWItNTNlOC04MDAwLTAwMDAwNDA1MDc0YiIsICJ0aHJlZURTTWV0aG9kTm90aWZpY2F0aW9uVVJMIiA6ICJodHRwczovL3d3dy5nb29nbGUuY29tIiB9\"/>\n    <input type=\"hidden\" name=\"threeDSMethodData\" value=\"eyAidGhyZWVEU1NlcnZlclRyYW5zSUQiIDogIjU2N2Q1ZWU4LTY3MWItNTNlOC04MDAwLTAwMDAwNDA1MDc0YiIsICJ0aHJlZURTTWV0aG9kTm90aWZpY2F0aW9uVVJMIiA6ICJodHRwczovL3d3dy5nb29nbGUuY29tIiB9\"/>\n    <script type=\"text/javascript\">\n\t\t\t\tdocument.getElementById(\"tdsMmethodForm\").submit();\n\t\t\t</script>\n</form>"
+  },
+  "Ticket": ""
+}
+
+================================================================================
+PASO 4: Envío de detalles del ambiente del tarjetahabiente (MethodForm)
+URL detectada: https://3ds-acs.test.modirum.com/mdpayacs/3ds-method
+================================================================================
+Simulando envío de ThreeDSMethodData al ACS del emisor...
+Respuesta del ACS recibida en MethodNotificationUrl.
+
+================================================================================
+PASO 5-6: Continuar proceso de autenticación 3DS (MethodNotificationStatus)
+================================================================================
+
+Enviando peticion a: https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedsmethod
+
+[Paso 6] Azul indica que requiere DESAFÍO
+
+================================================================================
+PASO 7: Desafío 3DS (Inicio del desafío)
+1. Abre scripts/3ds-helper.html en tu navegador.
+
+   URL: https://3ds-acs.test.modirum.com/mdpayacs/creq;token=365961321.1769291428.s-emRkeN95r5RVv0QILAnBjs9LDrNRrQg8-z137pNOI
+
+   CReq: ewogICAgImFjc1RyYW5zSUQiOiAiOWNmMmJiNDItMTE0Zi00NTNkLTkxNjgtYTFhZDY1YjFmMDNjIiwKICAgICJjaGFsbGVuZ2VXaW5kb3dTaXplIjogIjAzIiwKICAgICJtZXNzYWdlVHlwZSI6ICJDUmVxIiwKICAgICJtZXNzYWdlVmVyc2lvbiI6ICIyLjIuMCIsCiAgICAidGhyZWVEU1NlcnZlclRyYW5zSUQiOiAiNTY3ZDVlZTgtNjcxYi01M2U4LTgwMDAtMDAwMDA0MDUwNzRiIgp9
+================================================================================
+
+[?] Ingresa el CRes obtenido tras el desafío: 

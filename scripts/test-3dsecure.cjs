@@ -261,7 +261,6 @@ async function runFullTest(cardKey) {
 
     if (step1Response.IsoCode === '3D2METHOD') {
       console.log('\n[Paso 3] Azul respondió con 3D2METHOD');
-      console.log('Response data:', JSON.stringify(step1Response, null, 2));
       
       // Paso 4
       // Azul entrega ThreeDSMethod.MethodForm en lugar de ThreeDSMethodData directo
