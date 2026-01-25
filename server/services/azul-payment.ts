@@ -898,12 +898,12 @@ export class AzulPaymentService {
         CustomOrderId: payment.customOrderId || orderNumber,
         CustomerServicePhone: payment.customerServicePhone || '8090000000',
         OrderDescription: payment.orderDescription || 'Pago 3DS Gruas RD',
+        ForceNo3DS: '', // Habilitar 3DS - sobrescribir el valor por defecto
         ThreeDSAuth: {
           TermUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-callback`,
           MethodNotificationUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-method-notification`,
-          RequestorChallengeIndicator: payment.browserInfo?.requestorChallengeIndicator || '04', // Default to 04 for testing if not provided
+          RequestorChallengeIndicator: payment.browserInfo?.requestorChallengeIndicator || '04',
         },
-        ThreeDSAuthMethod: '02',
         CardHolderInfo: {
           Name: cardData.cardHolderName || 'Juan Perez',
           Email: payment.cardHolderInfo?.email || 'test@gruard.com',
