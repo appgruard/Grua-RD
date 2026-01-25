@@ -806,6 +806,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reports/neon-pricing-pdf", async (req, res) => {
     try {
       const PDFDocument = (await import('pdfkit')).default;
+      const fs = await import('fs');
+      const path = await import('path');
       const doc = new PDFDocument({ margin: 50 });
       
       res.setHeader('Content-Type', 'application/pdf');
@@ -813,8 +815,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.pipe(res);
       
+      // Logo de la empresa
+      const logoPath = path.join(process.cwd(), 'attached_assets', 'Grúa_20251124_024218_0000_1763966543810.png');
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, (doc.page.width - 120) / 2, 40, { width: 120 });
+        doc.moveDown(6);
+      }
+      
       // Header con branding
-      doc.fontSize(24).fillColor('#1a1a2e').text('GruaRD', { align: 'center' });
+      doc.fontSize(24).fillColor('#1a1a2e').text('Grua RD', { align: 'center' });
       doc.fontSize(10).fillColor('#666').text('Servicios de Grua y Asistencia Vial', { align: 'center' });
       doc.moveDown(0.5);
       doc.fontSize(8).text('www.gruard.com | app.gruard.com', { align: 'center' });
@@ -902,7 +911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(1.5);
       
       // Ventajas
-      doc.fontSize(14).fillColor('#1a1a2e').text('Ventajas para GruaRD', { underline: true });
+      doc.fontSize(14).fillColor('#1a1a2e').text('Ventajas para Grua RD', { underline: true });
       doc.moveDown(0.8);
       doc.fontSize(10).fillColor('#333');
       doc.text('Scale-to-zero: En horas de baja actividad no se paga compute');
@@ -930,7 +939,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Pie de pagina
       doc.fontSize(8).fillColor('#999').text('Documento generado el ' + new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' }), { align: 'center' });
-      doc.text('GruaRD - Four One Development', { align: 'center' });
+      doc.text('Grua RD - Four One Development', { align: 'center' });
       
       doc.end();
     } catch (error: any) {
@@ -960,7 +969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Encabezado
       doc.fontSize(20).text('Reporte de Prueba 3D Secure 2.0', { align: 'center' });
       doc.moveDown();
-      doc.fontSize(12).text('GruaRD - Sistema de Pagos Azul', { align: 'center' });
+      doc.fontSize(12).text('Grua RD - Sistema de Pagos Azul', { align: 'center' });
       doc.moveDown(2);
       
       // Linea separadora
@@ -1009,7 +1018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
       doc.moveDown();
       doc.fontSize(8).text('Documento generado automaticamente - ' + new Date().toLocaleString('es-DO'), { align: 'center' });
-      doc.text('GruaRD - Servicios de Grua y Asistencia Vial', { align: 'center' });
+      doc.text('Grua RD - Servicios de Grua y Asistencia Vial', { align: 'center' });
       
       doc.end();
     } catch (error: any) {
