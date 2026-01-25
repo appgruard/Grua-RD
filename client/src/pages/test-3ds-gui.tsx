@@ -285,37 +285,38 @@ export default function Test3DSPage() {
               </Alert>
               
               {/* Debug info */}
-              <div className="bg-muted p-3 rounded text-xs space-y-1 font-mono">
+              <div className="bg-muted p-3 rounded text-xs space-y-1 font-mono overflow-auto">
                 <div><strong>ACS URL:</strong> {challengeUrl || 'NO URL'}</div>
                 <div><strong>CReq:</strong> {challengeCreq ? `${challengeCreq.substring(0, 50)}...` : 'NO CREQ'}</div>
                 <div><strong>AzulOrderId:</strong> {azulOrderId}</div>
               </div>
               
-              <Button 
-                onClick={() => {
-                  if (!challengeUrl || !challengeCreq) {
-                    alert('Faltan datos del challenge');
-                    return;
-                  }
-                  // Crear y enviar formulario dinamicamente
-                  const form = document.createElement('form');
-                  form.method = 'POST';
-                  form.action = challengeUrl;
-                  const input = document.createElement('input');
-                  input.type = 'hidden';
-                  input.name = 'creq';
-                  input.value = challengeCreq;
-                  form.appendChild(input);
-                  document.body.appendChild(form);
-                  form.submit();
-                }}
-                className="w-full"
-                disabled={!challengeUrl || !challengeCreq}
-                data-testid="button-go-to-challenge"
-              >
-                <Lock className="mr-2 h-4 w-4" />
-                Ir al Challenge (Redireccion)
-              </Button>
+              {/* Formulario visible para enviar al ACS */}
+              {challengeUrl && challengeCreq ? (
+                <form 
+                  method="POST" 
+                  action={challengeUrl}
+                  className="space-y-3"
+                >
+                  <input type="hidden" name="creq" value={challengeCreq} />
+                  <Button 
+                    type="submit"
+                    className="w-full"
+                    data-testid="button-go-to-challenge"
+                  >
+                    <Lock className="mr-2 h-4 w-4" />
+                    Ir al Challenge (Redireccion)
+                  </Button>
+                </form>
+              ) : (
+                <Button 
+                  disabled
+                  className="w-full"
+                >
+                  <Lock className="mr-2 h-4 w-4" />
+                  Esperando datos del challenge...
+                </Button>
+              )}
               
               <div className="space-y-3">
                 <div className="space-y-2">
