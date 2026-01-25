@@ -396,6 +396,12 @@ export class AzulPaymentService {
           res.on('end', () => {
             try {
               const responseData = JSON.parse(body);
+              logSystem.info('=== CONTINUE 3DS RESPONSE ===', { 
+                response: JSON.stringify(responseData, null, 2),
+                hasThreeDSChallenge: !!responseData.ThreeDSChallenge,
+                acsUrl: responseData.ThreeDSChallenge?.RedirectPostUrl,
+                creq: responseData.ThreeDSChallenge?.CReq?.substring(0, 50),
+              });
               const parsed = this.parseResponse(responseData);
               resolve({
                 ...parsed,
