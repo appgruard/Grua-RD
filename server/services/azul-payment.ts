@@ -900,7 +900,7 @@ export class AzulPaymentService {
         ThreeDSAuth: {
           TermUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-callback`,
           MethodNotificationUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-method-notification`,
-          RequestorChallengeIndicator: '01', // Prefer challenge
+          RequestorChallengeIndicator: payment.browserInfo?.requestorChallengeIndicator || '01', // Use provided indicator or default to 01
         },
         CardHolderInfo: {
           Name: cardData.cardHolderName || 'Juan Perez',

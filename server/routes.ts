@@ -496,8 +496,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const testCard = {
         cardNumber: "4005520000000129",
         expiration: "202812",
-        cvc: "999", // CVC 999 para tarjetas 3DS de prueba en Azul
-        cardHolderName: "Juan Perez Prueba"
+        cvc: "123", // Card 0129 uses 123 for challenge
+        cardHolderName: "Juan Perez Challenge"
       };
 
       // Iniciar el pago 3DS directamente con la tarjeta de prueba
@@ -509,6 +509,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           itbis: 18,
           customOrderId: "TEST-3DS-" + transactionId,
           orderDescription: "Prueba 3DS Challenge Card 0129",
+          browserInfo: {
+            ...browserInfo,
+            requestorChallengeIndicator: '04' // Force challenge
+          }
         },
         browserInfo
       );
