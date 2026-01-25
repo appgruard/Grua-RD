@@ -182,6 +182,20 @@ app.use(
   })
 );
 
+// Permitir CORS para endpoints de callback 3DS de Azul (antes del middleware principal)
+// Estos endpoints reciben POSTs desde el ACS de Azul (dominio externo)
+app.use([
+  '/api/payments/azul/3ds-callback',
+  '/api/payments/azul/3ds-method-notification',
+  '/api/azul/3ds/callback',
+  '/api/azul/3ds/method-notification'
+], cors({
+  origin: true, // Permitir cualquier origen para estos endpoints
+  credentials: true,
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+}));
+
 const allowedOrigins = isDevelopment
   ? ["http://localhost:5000", "http://127.0.0.1:5000"]
   : process.env.ALLOWED_ORIGINS?.split(",").map(o => o.trim()) || [];
@@ -204,6 +218,11 @@ app.use(
       
       // Allow file:// for local testing on mobile devices
       if (origin.startsWith('file://')) {
+        return callback(null, true);
+      }
+      
+      // Allow Azul 3DS ACS domains
+      if (origin.includes('modirum.com') || origin.includes('azul.com.do')) {
         return callback(null, true);
       }
       
