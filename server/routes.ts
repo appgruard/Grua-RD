@@ -495,18 +495,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardHolderName: "Juan Perez Challenge"
       };
 
-      // Paso 2-3: Iniciar el pago 3DS con RequestorChallengeIndicator=04 para forzar challenge
+      // Paso 2-3: Iniciar el pago 3DS - EXACTAMENTE igual al script test-3dsecure.cjs
       const initResult = await AzulPaymentService.init3DSecureWithCard(
         testCard,
         {
-          amount: 11800,
-          itbis: 1800,
-          customOrderId: "TEST-3DS-" + transactionId,
-          orderDescription: "Prueba 3DS Challenge con Friccion",
-          browserInfo: {
-            ...browserInfo,
-            requestorChallengeIndicator: '04'
-          }
+          amount: 100,  // 1 peso = 100 centavos como en el script
+          itbis: 18,    // 18 centavos como en el script
+          customOrderId: "GRD-" + transactionId,
         },
         browserInfo
       );
@@ -738,17 +733,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardHolderName: "Test Challenge User"
       };
 
+      // EXACTAMENTE igual al script test-3dsecure.cjs
       const result = await AzulPaymentService.init3DSecureWithCard(
         testCard,
         {
-          amount: 100,
-          itbis: 18,
-          customOrderId: "GUI-3DS-" + transactionId,
-          orderDescription: "Prueba 3DS Challenge GUI",
-          browserInfo: {
-            ...browserInfo,
-            requestorChallengeIndicator: '04' // Forzar challenge con friccion
-          }
+          amount: 100,  // 1 peso = 100 centavos
+          itbis: 18,    // 18 centavos
+          customOrderId: "GRD-" + transactionId,
         },
         browserInfo
       );
