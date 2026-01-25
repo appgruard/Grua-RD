@@ -106,6 +106,7 @@ export interface BrowserInfo {
   timeZone: string;
   userAgent: string;
   javaScriptEnabled: string;
+  requestorChallengeIndicator?: string;
 }
 
 export interface AzulPaymentRequest {
