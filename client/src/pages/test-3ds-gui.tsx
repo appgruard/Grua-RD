@@ -294,18 +294,22 @@ export default function Test3DSPage() {
                 </AlertDescription>
               </Alert>
               
+              {/* Debug info */}
+              <div className="bg-muted p-3 rounded text-xs space-y-1 font-mono">
+                <div><strong>ACS URL:</strong> {challengeUrl || 'NO URL'}</div>
+                <div><strong>CReq:</strong> {challengeCreq ? `${challengeCreq.substring(0, 50)}...` : 'NO CREQ'}</div>
+                <div><strong>AzulOrderId:</strong> {azulOrderId}</div>
+              </div>
+              
               <Button 
                 onClick={() => challengeFormRef.current?.submit()}
                 className="w-full"
+                disabled={!challengeUrl || !challengeCreq}
                 data-testid="button-go-to-challenge"
               >
                 <Lock className="mr-2 h-4 w-4" />
                 Ir al Challenge (Redireccion)
               </Button>
-              
-              <div className="text-sm text-muted-foreground text-center">
-                AzulOrderId: {azulOrderId}
-              </div>
               
               <div className="space-y-3">
                 <div className="space-y-2">

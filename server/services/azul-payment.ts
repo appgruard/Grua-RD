@@ -368,7 +368,8 @@ export class AzulPaymentService {
       const url = `https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedsmethod`;
       
       const jsonPayload = JSON.stringify(requestData);
-      const authKey = config.authKey || 'splitit';
+      // 3DS endpoints MUST use '3dsecure' auth, NOT 'splitit'
+      const authKey = '3dsecure';
       
       const options: https.RequestOptions = {
         method: 'POST',
@@ -450,7 +451,8 @@ export class AzulPaymentService {
       const url = `https://pruebas.azul.com.do/webservices/JSON/Default.aspx?processthreedschallenge`;
       
       const jsonPayload = JSON.stringify(requestData);
-      const authKey = config.authKey || 'splitit';
+      // 3DS endpoints MUST use '3dsecure' auth, NOT 'splitit'
+      const authKey = '3dsecure';
       
       const options: https.RequestOptions = {
         method: 'POST',
