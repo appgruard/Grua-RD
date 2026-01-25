@@ -1474,8 +1474,8 @@ export class DatabaseStorage implements IStorage {
     if (hasCommissionColumn) {
       // Column exists, use optimized query
       const results = await db.execute(sql`
-        SELECT id, cliente_id, conductor_id, estado, metodo_pago, costo_total, 
-               commission_processed
+        SELECT id, cliente_id as "clienteId", conductor_id as "conductorId", estado, metodo_pago as "metodoPago", costo_total as "costoTotal", 
+               commission_processed as "commissionProcessed"
         FROM servicios 
         WHERE estado = 'completado' 
           AND (commission_processed IS NULL OR commission_processed = false)
@@ -1484,15 +1484,7 @@ export class DatabaseStorage implements IStorage {
           AND costo_total IS NOT NULL
       `);
       
-      return (results.rows || []).map((row: any) => ({
-        id: row.id,
-        clienteId: row.cliente_id,
-        conductorId: row.conductor_id,
-        estado: row.estado,
-        metodoPago: row.metodo_pago,
-        costoTotal: row.costo_total,
-        commissionProcessed: row.commission_processed ?? false,
-      })) as unknown as Servicio[];
+      return (results.rows || []) as unknown as Servicio[];
     } else {
       // Column doesn't exist - return empty array to skip processing
       // This indicates schema needs migration
