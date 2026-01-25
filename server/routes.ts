@@ -505,8 +505,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await AzulPaymentService.init3DSecureWithCard(
         testCard,
         {
-          amount: 100,
-          itbis: 18,
+          amount: 11800, // Usar 11800 (RD$118.00)
+          itbis: 1800,
           customOrderId: "TEST-3DS-" + transactionId,
           orderDescription: "Prueba 3DS Challenge Card 0129",
           browserInfo: {

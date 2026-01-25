@@ -892,7 +892,7 @@ export class AzulPaymentService {
         CardNumber: cardData.cardNumber,
         Expiration: cardData.expiration,
         CVC: cardData.cvc,
-        Amount: payment.amount.toString(),
+        Amount: (payment.amount || 0).toString(),
         Itbis: (payment.itbis || 0).toString(),
         OrderNumber: orderNumber,
         CustomOrderId: payment.customOrderId || orderNumber,
@@ -901,8 +901,9 @@ export class AzulPaymentService {
         ThreeDSAuth: {
           TermUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-callback`,
           MethodNotificationUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-method-notification`,
-          RequestorChallengeIndicator: payment.browserInfo?.requestorChallengeIndicator || '01', // Use provided indicator or default to 01
+          RequestorChallengeIndicator: payment.browserInfo?.requestorChallengeIndicator || '04', // Default to 04 for testing if not provided
         },
+        ThreeDSAuthMethod: '02',
         CardHolderInfo: {
           Name: cardData.cardHolderName || 'Juan Perez',
           Email: payment.cardHolderInfo?.email || 'test@gruard.com',
@@ -914,15 +915,15 @@ export class AzulPaymentService {
           BillingAddressZip: payment.cardHolderInfo?.billingAddressZip || '10101',
         },
         BrowserInfo: {
-          AcceptHeader: browserInfo.acceptHeader,
-          IPAddress: browserInfo.ipAddress,
-          Language: browserInfo.language,
-          ColorDepth: browserInfo.colorDepth.toString(),
-          ScreenWidth: browserInfo.screenWidth.toString(),
-          ScreenHeight: browserInfo.screenHeight.toString(),
-          TimeZone: browserInfo.timeZone,
-          UserAgent: browserInfo.userAgent,
-          JavaScriptEnabled: browserInfo.javaScriptEnabled,
+          AcceptHeader: browserInfo.acceptHeader || 'text/html',
+          IPAddress: browserInfo.ipAddress || '127.0.0.1',
+          Language: browserInfo.language || 'es-DO',
+          ColorDepth: (browserInfo.colorDepth || 24).toString(),
+          ScreenWidth: (browserInfo.screenWidth || 1920).toString(),
+          ScreenHeight: (browserInfo.screenHeight || 1080).toString(),
+          TimeZone: browserInfo.timeZone || '240',
+          UserAgent: browserInfo.userAgent || 'Mozilla/5.0',
+          JavaScriptEnabled: browserInfo.javaScriptEnabled || 'true',
         },
       };
 
