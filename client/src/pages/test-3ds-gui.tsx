@@ -23,12 +23,12 @@ export default function Test3DSPage() {
       return res.json();
     },
     onSuccess: (data) => {
-      if (data.result?.requires3DS) {
+      if (data.result?.requires3DS || data.result?.isoCode === '3D' || data.result?.isoCode === '3D2METHOD') {
         setAzulOrderId(data.result.azulOrderId);
         setPaymentResult(data.result);
         if (data.result.acsUrl && data.result.creq) {
           setStep(3); // Salto directo a desafío si tiene URL y CReq
-        } else if (data.result.methodForm) {
+        } else if (data.result.threeDSMethodURL || data.result.methodForm) {
           setStep(2); // Requiere 3DS Method (Paso 4 del script)
         }
         toast({ title: "3DS Iniciado", description: "La tarjeta requiere autenticación." });

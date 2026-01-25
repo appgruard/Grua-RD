@@ -94,6 +94,7 @@ export default function Test3DS() {
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     userAgent: navigator.userAgent,
     javaScriptEnabled: 'true',
+    requestorChallengeIndicator: cardNumber === '4005520000000129' ? '04' : '01',
   });
 
   const pollSessionStatus = async (sessionId: string) => {
