@@ -712,6 +712,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para iniciar flujo 3DS con friccion (para pruebas GUI)
+  app.post("/api/payments/azul/init-3ds-friction-test", async (req, res) => {
+    try {
+      logSystem.info("Initiating 3DS friction test from GUI", { path: req.path });
+      const transactionId = Date.now().toString();
+      
+      const browserInfo = {
+        acceptHeader: req.get('Accept') || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ipAddress: req.ip || req.socket.remoteAddress || "127.0.0.1",
+        language: req.get('Accept-Language')?.split(',')[0] || "es-DO",
+        colorDepth: 24,
+        screenWidth: 1920,
+        screenHeight: 1080,
+        timeZone: "-240",
+        userAgent: req.get('User-Agent') || "Mozilla/5.0",
+        javaScriptEnabled: "true",
+      };
+
+      // Tarjeta de prueba para 3DS Challenge con friccion
+      const testCard = {
+        cardNumber: "4005520000000129",
+        expiration: "202812",
+        cvc: "123",
+        cardHolderName: "Test Challenge User"
+      };
+
+      const result = await AzulPaymentService.init3DSecureWithCard(
+        testCard,
+        {
+          amount: 11800,
+          itbis: 1800,
+          customOrderId: "GUI-3DS-" + transactionId,
+          orderDescription: "Prueba 3DS Challenge GUI",
+          browserInfo: {
+            ...browserInfo,
+            requestorChallengeIndicator: '04' // Forzar challenge con friccion
+          }
+        },
+        browserInfo
+      );
+
+      // Incluir el MethodForm si existe
+      const response: any = {
+        ...result,
+        methodForm: result.rawResponse?.MethodForm,
+        acsUrl: result.acsUrl || result.rawResponse?.ThreeDSChallenge?.RedirectPostUrl,
+        creq: result.creq || result.rawResponse?.ThreeDSChallenge?.CReq,
+      };
+
+      logSystem.info("3DS friction test result", { 
+        isoCode: result.isoCode,
+        azulOrderId: result.azulOrderId,
+        has3DSMethod: !!response.methodForm,
+        hasChallenge: !!(response.acsUrl && response.creq)
+      });
+
+      res.json(response);
+    } catch (error: any) {
+      logSystem.error("Error in 3DS friction test", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Test endpoint to process 3DS Challenge response (CRes)
   app.post("/api/payments/azul/process-challenge", async (req, res) => {
     try {
