@@ -9384,6 +9384,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 3DS Method notification callback (alternate URL for friction test)
+  app.post("/api/payments/azul/3ds-method-notification", async (req: Request, res: Response) => {
+    logSystem.info('3DS Method notification received (friction test)', { body: req.body });
+    // Just return success - the method completed
+    res.status(200).send('OK');
+  });
+
   // 3DS Method notification callback (called by Azul iframe)
   app.post("/api/azul/3ds/method-notification", async (req: Request, res: Response) => {
     const sessionId = req.query.sid as string;
