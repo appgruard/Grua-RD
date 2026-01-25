@@ -467,64 +467,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Test endpoint for AZUL 3DS Challenge (Card 0129)
+  // Test endpoint for AZUL 3DS Challenge with Friction (Card 0129)
+  // This endpoint executes the full 3DS flow and returns HTML to display the challenge
   app.get("/api/test/azul-3ds-challenge", async (req, res) => {
     try {
-      logSystem.info("Testing 3DS Challenge endpoint", { path: req.path });
-      const orderNumber = AzulPaymentService.generateOrderNumber();
+      logSystem.info("Testing 3DS Challenge with friction endpoint", { path: req.path });
       const transactionId = Date.now().toString();
+      const baseUrl = process.env.APP_BASE_URL || `https://${req.get('host')}`;
       
-      const paymentData = {
-        amount: 10000, // RD$100.00
-        customOrderId: "TEST-3DS-" + transactionId,
-        orderDescription: "Prueba 3DS Challenge Card 0129",
-      };
-
       const browserInfo = {
-        acceptHeader: "text/html,application/xhtml+xml,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        ipAddress: "200.88.232.119",
-        language: "es-DO",
+        acceptHeader: req.get('Accept') || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ipAddress: req.ip || req.socket.remoteAddress || "127.0.0.1",
+        language: req.get('Accept-Language')?.split(',')[0] || "es-DO",
         colorDepth: 24,
         screenWidth: 1920,
         screenHeight: 1080,
-        timeZone: "240",
-        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        timeZone: "-240",
+        userAgent: req.get('User-Agent') || "Mozilla/5.0",
         javaScriptEnabled: "true",
       };
 
-      // Tarjeta de prueba para 3DS Challenge según documentación de Azul
+      // Tarjeta de prueba para 3DS Challenge con fricción según documentación de Azul
       const testCard = {
         cardNumber: "4005520000000129",
         expiration: "202812",
-        cvc: "123", // Card 0129 uses 123 for challenge
+        cvc: "123",
         cardHolderName: "Juan Perez Challenge"
       };
 
-      // Iniciar el pago 3DS directamente con la tarjeta de prueba
-      // El monto total es 118 (100 + 18 de ITBIS) según script de prueba exitoso
-      const result = await AzulPaymentService.init3DSecureWithCard(
+      // Paso 2-3: Iniciar el pago 3DS con RequestorChallengeIndicator=04 para forzar challenge
+      const initResult = await AzulPaymentService.init3DSecureWithCard(
         testCard,
         {
-          amount: 11800, // Usar 11800 (RD$118.00)
+          amount: 11800,
           itbis: 1800,
           customOrderId: "TEST-3DS-" + transactionId,
-          orderDescription: "Prueba 3DS Challenge Card 0129",
+          orderDescription: "Prueba 3DS Challenge con Friccion",
           browserInfo: {
             ...browserInfo,
-            requestorChallengeIndicator: '04' // Force challenge
+            requestorChallengeIndicator: '04'
           }
         },
         browserInfo
       );
 
-      res.json({
-        message: "Proceso 3DS iniciado",
-        orderNumber,
-        result
+      logSystem.info("3DS Init result", { 
+        isoCode: initResult.isoCode, 
+        responseMessage: initResult.responseMessage,
+        azulOrderId: initResult.azulOrderId,
+        requires3DS: initResult.requires3DS,
+        hasMethodURL: !!initResult.threeDSMethodURL,
+        hasAcsUrl: !!initResult.acsUrl
       });
+
+      // Si recibimos 3D2METHOD, necesitamos ejecutar el MethodForm primero
+      if (initResult.isoCode === '3D2METHOD' && initResult.rawResponse?.MethodForm) {
+        const methodHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3DS Method - Azul</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #1a365d; }
+    .info { background: #e2e8f0; padding: 15px; border-radius: 4px; margin: 20px 0; }
+    .step { margin: 10px 0; padding: 10px; background: #edf2f7; border-left: 4px solid #3182ce; }
+    pre { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+    #methodFrame { width: 100%; height: 400px; border: 1px solid #e2e8f0; }
+    button { background: #3182ce; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+    button:hover { background: #2c5282; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Paso 4: 3DS Method Form</h1>
+    <div class="info">
+      <p><strong>AzulOrderId:</strong> ${initResult.azulOrderId}</p>
+      <p><strong>Estado:</strong> Se requiere ejecutar el MethodForm para continuar con el challenge</p>
+    </div>
+    
+    <div class="step">
+      <strong>Paso 4:</strong> El MethodForm se ejecuta en el iframe oculto abajo. Una vez completado, hacer clic en "Continuar al Challenge".
+    </div>
+    
+    <div id="methodContainer">
+      ${initResult.rawResponse.MethodForm}
+    </div>
+    
+    <div style="margin-top: 20px;">
+      <button onclick="continueToChallenge()">Continuar al Challenge (Paso 5-6)</button>
+    </div>
+    
+    <div id="result" style="margin-top: 20px;"></div>
+    
+    <script>
+      async function continueToChallenge() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = '<p>Procesando paso 5-6...</p>';
+        
+        try {
+          const response = await fetch('/api/test/azul-3ds-continue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              azulOrderId: '${initResult.azulOrderId}',
+              status: 'RECEIVED'
+            })
+          });
+          const data = await response.json();
+          
+          if (data.acsUrl && data.creq) {
+            resultDiv.innerHTML = '<p>Redirigiendo al ACS para el challenge...</p>';
+            
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = data.acsUrl;
+            
+            const creqInput = document.createElement('input');
+            creqInput.type = 'hidden';
+            creqInput.name = 'creq';
+            creqInput.value = data.creq;
+            form.appendChild(creqInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+          } else {
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+          }
+        } catch (error) {
+          resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+        }
+      }
+    </script>
+  </div>
+</body>
+</html>`;
+        return res.send(methodHtml);
+      }
+
+      // Si recibimos 3D directamente con challenge data
+      if ((initResult.isoCode === '3D' || initResult.requires3DS) && initResult.acsUrl && initResult.creq) {
+        const challengeHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3DS Challenge - Azul</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #1a365d; }
+    .info { background: #e2e8f0; padding: 15px; border-radius: 4px; margin: 20px 0; }
+    .step { margin: 10px 0; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; }
+    pre { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+    button { background: #3182ce; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #2c5282; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Paso 7: 3DS Challenge con Friccion</h1>
+    <div class="info">
+      <p><strong>AzulOrderId:</strong> ${initResult.azulOrderId}</p>
+      <p><strong>ACS URL:</strong> ${initResult.acsUrl}</p>
+    </div>
+    
+    <div class="step">
+      <strong>Paso 7:</strong> Al hacer clic en el boton, seras redirigido al servidor ACS del emisor para completar la autenticacion.
+      El codigo OTP de prueba para sandbox es: <strong>123456</strong>
+    </div>
+    
+    <form id="challengeForm" method="POST" action="${initResult.acsUrl}">
+      <input type="hidden" name="creq" value="${initResult.creq}" />
+      <button type="submit">Iniciar Challenge de Autenticacion</button>
+    </form>
+    
+    <div style="margin-top: 20px;">
+      <h3>Datos del Challenge:</h3>
+      <pre>${JSON.stringify({ acsUrl: initResult.acsUrl, creq: initResult.creq?.substring(0, 100) + '...' }, null, 2)}</pre>
+    </div>
+  </div>
+</body>
+</html>`;
+        return res.send(challengeHtml);
+      }
+
+      // Si fue aprobado sin challenge o hubo un error
+      const resultHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3DS Result - Azul</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: ${initResult.success ? '#38a169' : '#e53e3e'}; }
+    pre { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px; overflow-x: auto; }
+    .info { background: #e2e8f0; padding: 15px; border-radius: 4px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${initResult.success ? 'Transaccion Aprobada' : 'Resultado de 3DS'}</h1>
+    <div class="info">
+      <p><strong>ISO Code:</strong> ${initResult.isoCode}</p>
+      <p><strong>Mensaje:</strong> ${initResult.responseMessage}</p>
+      ${initResult.authorizationCode ? `<p><strong>Codigo de Autorizacion:</strong> ${initResult.authorizationCode}</p>` : ''}
+      ${initResult.azulOrderId ? `<p><strong>AzulOrderId:</strong> ${initResult.azulOrderId}</p>` : ''}
+    </div>
+    <h3>Respuesta Completa:</h3>
+    <pre>${JSON.stringify(initResult, null, 2)}</pre>
+  </div>
+</body>
+</html>`;
+      return res.send(resultHtml);
+      
     } catch (error: any) {
       logSystem.error("Error in 3DS challenge test endpoint", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).send(`
+<!DOCTYPE html>
+<html>
+<head><title>Error 3DS</title></head>
+<body style="font-family: Arial; padding: 20px;">
+  <h1 style="color: #e53e3e;">Error en prueba 3DS</h1>
+  <pre style="background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px;">${error.message}</pre>
+</body>
+</html>`);
     }
   });
 
