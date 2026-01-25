@@ -267,11 +267,12 @@ export class AzulPaymentService {
 
     const jsonPayload = JSON.stringify(requestData);
     
-    const authKey = config.authKey || 'splitit';
+    // Para 3DS usar auth3DS ('3dsecure'), para otras transacciones usar authKey ('splitit')
+    const authValue = has3DSAuth ? (config.auth3DS || '3dsecure') : (config.authKey || 'splitit');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Auth1': authKey,
-      'Auth2': authKey,
+      'Auth1': authValue,
+      'Auth2': authValue,
       'Content-Length': Buffer.byteLength(jsonPayload).toString(),
       'User-Agent': 'GruaRD-App/1.0',
       'Host': url.hostname
@@ -905,8 +906,8 @@ export class AzulPaymentService {
         OrderNumber: orderNumber,
         CustomOrderId: payment.customOrderId || orderNumber,
         ThreeDSAuth: {
-          TermUrl: 'https://www.google.com',
-          MethodNotificationUrl: 'https://www.google.com',
+          TermUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-callback`,
+          MethodNotificationUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-method-notification`,
           RequestorChallengeIndicator: '01',
         },
         CardHolderInfo: {
