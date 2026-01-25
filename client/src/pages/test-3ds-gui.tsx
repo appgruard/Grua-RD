@@ -139,15 +139,8 @@ export default function Test3DSPage() {
     }
   }, [step, methodFormHtml]);
 
-  // Efecto para enviar el formulario del challenge automaticamente
-  useEffect(() => {
-    if (step === 3 && challengeUrl && challengeCreq && challengeFormRef.current) {
-      // Enviar el formulario automaticamente al iframe
-      setTimeout(() => {
-        challengeFormRef.current?.submit();
-      }, 500);
-    }
-  }, [step, challengeUrl, challengeCreq]);
+  // El challenge ahora requiere click manual para redirigir (no iframe)
+  // Esto evita problemas con X-Frame-Options del ACS
 
   const resetTest = () => {
     setStep(1);
@@ -281,35 +274,38 @@ export default function Test3DSPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Formulario oculto para enviar al ACS */}
+              {/* Formulario para redirigir al ACS (pagina completa, no iframe) */}
               <form 
                 ref={challengeFormRef}
                 method="POST" 
                 action={challengeUrl}
-                target="challengeFrame"
+                target="_self"
                 style={{ display: 'none' }}
               >
                 <input type="hidden" name="creq" value={challengeCreq} />
               </form>
               
-              {/* Iframe visible para el challenge */}
-              <div className="border rounded-lg overflow-hidden bg-white">
-                <iframe 
-                  name="challengeFrame"
-                  className="w-full h-[500px]"
-                  title="3DS Challenge Frame"
-                  sandbox="allow-scripts allow-forms allow-same-origin allow-top-navigation"
-                />
-              </div>
-              
-              <Alert>
-                <ShieldCheck className="h-4 w-4" />
-                <AlertTitle>Instrucciones</AlertTitle>
+              <Alert className="bg-blue-50 border-blue-200">
+                <ShieldCheck className="h-4 w-4 text-blue-600" />
+                <AlertTitle>Challenge Listo</AlertTitle>
                 <AlertDescription>
-                  Ingresa el codigo OTP <strong>123456</strong> en el formulario del emisor.
-                  Si el iframe no carga, usa el enlace directo abajo.
+                  Haz clic en "Ir al Challenge" para autenticarte. Usa el OTP <strong>123456</strong>.
+                  Seras redirigido al servidor del emisor y luego volveras automaticamente.
                 </AlertDescription>
               </Alert>
+              
+              <Button 
+                onClick={() => challengeFormRef.current?.submit()}
+                className="w-full"
+                data-testid="button-go-to-challenge"
+              >
+                <Lock className="mr-2 h-4 w-4" />
+                Ir al Challenge (Redireccion)
+              </Button>
+              
+              <div className="text-sm text-muted-foreground text-center">
+                AzulOrderId: {azulOrderId}
+              </div>
               
               <div className="space-y-3">
                 <div className="space-y-2">
