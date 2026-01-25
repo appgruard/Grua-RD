@@ -251,13 +251,17 @@ export class AzulPaymentService {
     const url = new URL(apiUrl);
     
     // Prepare standardized request data according to Azul documentation
+    // Si hay ThreeDSAuth, no agregar ForceNo3DS para permitir el flujo 3DS
+    const has3DSAuth = data.ThreeDSAuth !== undefined;
     const requestData: Record<string, any> = {
       Channel: config.channel,
       Store: config.merchantId,
-      PosInputMode: config.posInputMode,
-      CurrencyPosCode: '$', // Según documentación Azul: usar "$"
-      AcquirerRefData: '1', // Campo requerido por documentación
-      ForceNo3DS: '1', // Desactivar 3DS por defecto para mTLS según recomendación de Azul
+      ...(has3DSAuth ? {} : { 
+        PosInputMode: config.posInputMode,
+        CurrencyPosCode: '$',
+        AcquirerRefData: '1',
+        ForceNo3DS: '1',
+      }),
       ...data,
     };
 
@@ -887,25 +891,24 @@ export class AzulPaymentService {
 
     try {
       const orderNumber = this.generateOrderNumber();
+      // Request exactamente igual al script test-3dsecure.cjs
       const requestData = {
-        TrxType: 'Sale',
         CardNumber: cardData.cardNumber,
         Expiration: cardData.expiration,
         CVC: cardData.cvc,
+        PosInputMode: 'E-Commerce',
+        TrxType: 'Sale',
         Amount: (payment.amount || 0).toString(),
         Itbis: (payment.itbis || 0).toString(),
         OrderNumber: orderNumber,
         CustomOrderId: payment.customOrderId || orderNumber,
-        CustomerServicePhone: payment.customerServicePhone || '8090000000',
-        OrderDescription: payment.orderDescription || 'Pago 3DS Gruas RD',
-        ForceNo3DS: '', // Habilitar 3DS - sobrescribir el valor por defecto
         ThreeDSAuth: {
           TermUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-callback`,
           MethodNotificationUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-method-notification`,
-          RequestorChallengeIndicator: payment.browserInfo?.requestorChallengeIndicator || '04',
+          RequestorChallengeIndicator: '01',
         },
         CardHolderInfo: {
-          Name: cardData.cardHolderName || 'Juan Perez',
+          Name: cardData.cardHolderName || 'Juan Perez Prueba',
           Email: payment.cardHolderInfo?.email || 'test@gruard.com',
           PhoneHome: payment.cardHolderInfo?.phoneHome || '8095551234',
           PhoneMobile: payment.cardHolderInfo?.phoneMobile || '8295551234',
@@ -915,15 +918,15 @@ export class AzulPaymentService {
           BillingAddressZip: payment.cardHolderInfo?.billingAddressZip || '10101',
         },
         BrowserInfo: {
-          AcceptHeader: browserInfo.acceptHeader || 'text/html',
-          IPAddress: browserInfo.ipAddress || '127.0.0.1',
-          Language: browserInfo.language || 'es-DO',
-          ColorDepth: (browserInfo.colorDepth || 24).toString(),
-          ScreenWidth: (browserInfo.screenWidth || 1920).toString(),
-          ScreenHeight: (browserInfo.screenHeight || 1080).toString(),
-          TimeZone: browserInfo.timeZone || '240',
-          UserAgent: browserInfo.userAgent || 'Mozilla/5.0',
-          JavaScriptEnabled: browserInfo.javaScriptEnabled || 'true',
+          AcceptHeader: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+          IPAddress: browserInfo.ipAddress || '200.88.232.119',
+          Language: 'es-DO',
+          ColorDepth: '24',
+          ScreenWidth: '1920',
+          ScreenHeight: '1080',
+          TimeZone: '240',
+          UserAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+          JavaScriptEnabled: 'true',
         },
       };
 
