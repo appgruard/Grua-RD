@@ -930,7 +930,9 @@ export class AzulPaymentService {
         },
       };
 
+      logSystem.info('=== INIT 3DS REQUEST ===', { payload: JSON.stringify(requestData, null, 2) });
       const response = await this.makeRequest(requestData);
+      logSystem.info('=== INIT 3DS RESPONSE ===', { response: JSON.stringify(response, null, 2) });
       const parsed = this.parseResponse(response);
 
       return {
