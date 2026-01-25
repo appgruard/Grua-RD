@@ -516,7 +516,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Si recibimos 3D2METHOD, necesitamos ejecutar el MethodForm primero
-      if (initResult.isoCode === '3D2METHOD' && initResult.rawResponse?.MethodForm) {
+      const methodForm = initResult.rawResponse?.ThreeDSMethod?.MethodForm || initResult.rawResponse?.MethodForm;
+      if (initResult.isoCode === '3D2METHOD' && methodForm) {
         const methodHtml = `
 <!DOCTYPE html>
 <html>
@@ -547,7 +548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     </div>
     
     <div id="methodContainer">
-      ${initResult.rawResponse.MethodForm}
+      ${methodForm}
     </div>
     
     <div style="margin-top: 20px;">
@@ -744,10 +745,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         browserInfo
       );
 
-      // Incluir el MethodForm si existe
+      // Incluir el MethodForm si existe (puede estar en ThreeDSMethod.MethodForm o MethodForm)
       const response: any = {
         ...result,
-        methodForm: result.rawResponse?.MethodForm,
+        methodForm: result.rawResponse?.ThreeDSMethod?.MethodForm || result.rawResponse?.MethodForm,
         acsUrl: result.acsUrl || result.rawResponse?.ThreeDSChallenge?.RedirectPostUrl,
         creq: result.creq || result.rawResponse?.ThreeDSChallenge?.CReq,
       };
