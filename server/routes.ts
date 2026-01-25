@@ -863,6 +863,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         creq: result.creq || result.rawResponse?.ThreeDSChallenge?.CReq,
       };
 
+      // Guardar azulOrderId para el callback
+      if (result.azulOrderId) {
+        lastFrictionTestAzulOrderId = result.azulOrderId;
+      }
+
       logSystem.info("3DS friction test result", { 
         isoCode: result.isoCode,
         azulOrderId: result.azulOrderId,
@@ -9226,6 +9231,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AZUL 3D SECURE 2.0 PAYMENT ENDPOINTS
   // ========================================
 
+  // Almacenar último azulOrderId del friction test para el callback
+  let lastFrictionTestAzulOrderId: string = '';
+
   // In-memory store for 3DS sessions (use Redis/DB in production)
   const threeDSSessions = new Map<string, {
     azulOrderId: string;
@@ -9459,11 +9467,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 3DS Challenge callback for friction test (alternate URL)
   app.post("/api/payments/azul/3ds-callback", async (req: Request, res: Response) => {
     const cres = req.body.cres || req.body.CRes;
-    logSystem.info('3DS Challenge callback received (friction test)', { hasCres: !!cres, body: req.body });
+    const azulOrderId = lastFrictionTestAzulOrderId;
+    logSystem.info('3DS Challenge callback received (friction test)', { 
+      hasCres: !!cres, 
+      azulOrderId,
+      body: req.body 
+    });
     
     try {
       // Process the challenge response
-      const result = await AzulPaymentService.processThreeDSChallenge('', cres);
+      const result = await AzulPaymentService.processThreeDSChallenge(azulOrderId, cres);
       logSystem.info('3DS Challenge result', result);
       
       // Return HTML page with result
