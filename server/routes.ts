@@ -802,6 +802,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
 </html>`);
   });
 
+  // Endpoint para generar PDF con resultado de prueba 3DS
+  app.get("/api/test/3ds-result-pdf", async (req, res) => {
+    try {
+      const dataParam = req.query.data as string;
+      if (!dataParam) {
+        return res.status(400).send('Datos no proporcionados');
+      }
+      
+      const data = JSON.parse(decodeURIComponent(dataParam));
+      const PDFDocument = (await import('pdfkit')).default;
+      
+      const doc = new PDFDocument({ margin: 50 });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=resultado-3ds-' + (data.azulOrderId || 'test') + '.pdf');
+      
+      doc.pipe(res);
+      
+      // Encabezado
+      doc.fontSize(20).text('Reporte de Prueba 3D Secure 2.0', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(12).text('GruaRD - Sistema de Pagos Azul', { align: 'center' });
+      doc.moveDown(2);
+      
+      // Linea separadora
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown();
+      
+      // Resultado
+      doc.fontSize(16).text('Resultado: ' + (data.success ? 'APROBADO' : 'RECHAZADO'), { 
+        align: 'center'
+      });
+      doc.moveDown(2);
+      
+      // Detalles de la transaccion
+      doc.fontSize(14).text('Detalles de la Transaccion', { underline: true });
+      doc.moveDown();
+      
+      doc.fontSize(11);
+      doc.text('Codigo ISO: ' + data.isoCode);
+      doc.text('Codigo de Autorizacion: ' + data.authorizationCode);
+      doc.text('AzulOrderId: ' + data.azulOrderId);
+      doc.text('RRN: ' + data.rrn);
+      doc.text('Fecha/Hora: ' + data.dateTime);
+      doc.text('Mensaje: ' + data.responseMessage);
+      doc.moveDown(2);
+      
+      // Respuesta completa
+      doc.fontSize(14).text('Respuesta Completa del Servidor', { underline: true });
+      doc.moveDown();
+      doc.fontSize(9).text(JSON.stringify(data.rawResponse || data, null, 2), {
+        width: 500
+      });
+      doc.moveDown(2);
+      
+      // Enlace de pruebas
+      doc.fontSize(14).text('Endpoint de Pruebas', { underline: true });
+      doc.moveDown();
+      doc.fontSize(10).text('URL: https://app.gruard.com/api/test/3ds-simple');
+      doc.moveDown();
+      doc.fontSize(9).text('Tarjeta de prueba: 4005520000000129');
+      doc.text('Expiracion: 12/2028');
+      doc.text('CVV: 123');
+      doc.text('OTP: 123456');
+      doc.moveDown(2);
+      
+      // Pie de pagina
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown();
+      doc.fontSize(8).text('Documento generado automaticamente - ' + new Date().toLocaleString('es-DO'), { align: 'center' });
+      doc.text('GruaRD - Servicios de Grua y Asistencia Vial', { align: 'center' });
+      
+      doc.end();
+    } catch (error: any) {
+      logSystem.error('Error generating PDF', error);
+      res.status(500).send('Error generando PDF: ' + error.message);
+    }
+  });
+
   // Test endpoint to continue 3DS authentication after Method (Paso 5-6)
   app.post("/api/test/azul-3ds-continue", async (req, res) => {
     try {
@@ -9483,13 +9562,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await AzulPaymentService.processThreeDSChallenge(azulOrderId, cres);
       
+      // Guardar resultado para descarga de PDF
+      const resultData = {
+        success: result.success,
+        isoCode: result.isoCode,
+        authorizationCode: result.authorizationCode || 'N/A',
+        azulOrderId: result.azulOrderId || azulOrderId,
+        dateTime: result.dateTime || new Date().toISOString(),
+        rrn: result.rrn || 'N/A',
+        responseMessage: result.responseMessage || '',
+        rawResponse: result.rawResponse
+      };
+      
+      // Codificar datos para URL
+      const encodedData = encodeURIComponent(JSON.stringify(resultData));
+      
       const html = '<html><body style="font-family:Arial;padding:40px;text-align:center;">' +
-        '<h1 style="color:' + (result.success ? 'green' : 'red') + '">' + (result.success ? 'Pago Aprobado!' : 'Pago Rechazado') + '</h1>' +
+        '<h1 style="color:' + (result.success ? 'green' : 'red') + '">' + (result.success ? 'Pago Aprobado' : 'Pago Rechazado') + '</h1>' +
         '<p>IsoCode: ' + result.isoCode + '</p>' +
         '<p>Authorization: ' + (result.authorizationCode || 'N/A') + '</p>' +
         '<p>AzulOrderId: ' + (result.azulOrderId || azulOrderId) + '</p>' +
-        '<pre style="text-align:left;background:#f5f5f5;padding:20px;">' + JSON.stringify(result, null, 2) + '</pre>' +
-        '<p><a href="/api/test/3ds-simple">Probar de nuevo</a></p>' +
+        '<pre style="text-align:left;background:#f5f5f5;padding:20px;max-width:600px;margin:20px auto;overflow:auto;">' + JSON.stringify(result, null, 2) + '</pre>' +
+        '<div style="margin-top:30px;">' +
+        '<a href="/api/test/3ds-result-pdf?data=' + encodedData + '" style="display:inline-block;padding:12px 24px;background:#333;color:white;text-decoration:none;border-radius:4px;margin-right:10px;">Descargar PDF</a>' +
+        '<a href="/api/test/3ds-simple" style="display:inline-block;padding:12px 24px;background:#666;color:white;text-decoration:none;border-radius:4px;">Probar de nuevo</a>' +
+        '</div>' +
         '</body></html>';
       
       res.send(html);
