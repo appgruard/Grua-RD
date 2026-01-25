@@ -9394,9 +9394,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 3DS Method notification callback (alternate URL for friction test)
   app.post("/api/payments/azul/3ds-method-notification", async (req: Request, res: Response) => {
-    logSystem.info('3DS Method notification received (friction test)', { body: req.body });
-    // Just return success - the method completed
-    res.status(200).send('OK');
+    try {
+      logSystem.info('3DS Method notification received (friction test)', { body: req.body });
+      // Just return success - the method completed
+      res.status(200).send('OK');
+    } catch (error: any) {
+      logSystem.error('3DS Method notification error', error);
+      res.status(200).send('OK'); // Siempre devolver OK para que el flujo continue
+    }
   });
 
   // 3DS Method notification callback (called by Azul iframe)
@@ -9466,53 +9471,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 3DS Challenge callback for friction test (alternate URL)
   app.post("/api/payments/azul/3ds-callback", async (req: Request, res: Response) => {
-    const cres = req.body.cres || req.body.CRes;
-    const azulOrderId = lastFrictionTestAzulOrderId;
-    logSystem.info('3DS Challenge callback received (friction test)', { 
-      hasCres: !!cres, 
-      azulOrderId,
-      body: req.body 
-    });
-    
     try {
-      // Process the challenge response
-      const result = await AzulPaymentService.processThreeDSChallenge(azulOrderId, cres);
-      logSystem.info('3DS Challenge result', result);
+      const cres = req.body?.cres || req.body?.CRes || '';
+      const azulOrderId = lastFrictionTestAzulOrderId || '';
       
-      // Return HTML page with result
-      res.send(`<!DOCTYPE html>
-<html>
-<head>
-  <title>3DS Result</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 40px; text-align: center; }
-    .success { color: green; }
-    .error { color: red; }
-    pre { text-align: left; background: #f5f5f5; padding: 20px; border-radius: 8px; overflow: auto; }
-  </style>
-</head>
-<body>
-  <h1 class="${result.success ? 'success' : 'error'}">${result.success ? 'Pago Aprobado!' : 'Pago Rechazado'}</h1>
-  <p>IsoCode: ${result.isoCode}</p>
-  <p>Authorization: ${result.authorizationCode || 'N/A'}</p>
-  <p>AzulOrderId: ${result.azulOrderId || 'N/A'}</p>
-  <h3>Respuesta Completa:</h3>
-  <pre>${JSON.stringify(result, null, 2)}</pre>
-  <p><a href="/api/test/3ds-simple">Probar de nuevo</a></p>
-</body>
-</html>`);
+      logSystem.info('3DS callback friction test', { azulOrderId, hasCres: !!cres });
+      
+      if (!azulOrderId || !cres) {
+        return res.send('<html><body><h1>Datos recibidos</h1><p>AzulOrderId: ' + azulOrderId + '</p><p>CRes: ' + (cres ? 'presente' : 'ausente') + '</p><pre>' + JSON.stringify(req.body, null, 2) + '</pre></body></html>');
+      }
+      
+      const result = await AzulPaymentService.processThreeDSChallenge(azulOrderId, cres);
+      
+      const html = '<html><body style="font-family:Arial;padding:40px;text-align:center;">' +
+        '<h1 style="color:' + (result.success ? 'green' : 'red') + '">' + (result.success ? 'Pago Aprobado!' : 'Pago Rechazado') + '</h1>' +
+        '<p>IsoCode: ' + result.isoCode + '</p>' +
+        '<p>Authorization: ' + (result.authorizationCode || 'N/A') + '</p>' +
+        '<p>AzulOrderId: ' + (result.azulOrderId || azulOrderId) + '</p>' +
+        '<pre style="text-align:left;background:#f5f5f5;padding:20px;">' + JSON.stringify(result, null, 2) + '</pre>' +
+        '<p><a href="/api/test/3ds-simple">Probar de nuevo</a></p>' +
+        '</body></html>';
+      
+      res.send(html);
     } catch (error: any) {
-      logSystem.error('3DS Challenge callback error (friction test)', error);
-      res.send(`<!DOCTYPE html>
-<html>
-<head><title>3DS Error</title></head>
-<body>
-  <h1 style="color:red">Error procesando 3DS</h1>
-  <p>${error.message}</p>
-  <pre>${JSON.stringify(error, null, 2)}</pre>
-  <p><a href="/api/test/3ds-simple">Probar de nuevo</a></p>
-</body>
-</html>`);
+      logSystem.error('3DS callback error', error);
+      res.send('<html><body><h1 style="color:red">Error</h1><p>' + (error?.message || 'Unknown error') + '</p></body></html>');
     }
   });
 
