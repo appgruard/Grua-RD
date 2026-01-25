@@ -726,6 +726,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
     
     async function startTest() {
+      alert('Función startTest ejecutada!');
       const btn = document.getElementById('startBtn');
       btn.disabled = true;
       btn.textContent = 'Procesando...';
