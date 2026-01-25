@@ -190,18 +190,20 @@ const openCorsRoutes = [
   '/api/azul/3ds/method-notification'
 ];
 
-// Middleware para rutas abiertas ANTES del CORS principal
+// Middleware para rutas abiertas ANTES del CORS principal - bypassa CORS completamente
 app.use((req, res, next) => {
-  if (openCorsRoutes.some(route => req.path.startsWith(route))) {
-    res.header('Access-Control-Allow-Origin', '*');
+  const isOpenRoute = openCorsRoutes.some(route => req.path.startsWith(route));
+  if (isOpenRoute) {
+    // Estas rutas son callbacks de servicios externos - permitir cualquier origen incluido null
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     res.header('Access-Control-Allow-Credentials', 'true');
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
     }
-    // Saltar el middleware CORS principal para estas rutas
-    return next('route');
+    // Marcar la request para que el CORS principal la ignore
+    (req as any).skipCors = true;
   }
   next();
 });
@@ -210,7 +212,13 @@ const allowedOrigins = isDevelopment
   ? ["http://localhost:5000", "http://127.0.0.1:5000"]
   : process.env.ALLOWED_ORIGINS?.split(",").map(o => o.trim()) || [];
 
-app.use(
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Si la ruta ya fue marcada como abierta, saltar CORS
+  if ((req as any).skipCors) {
+    return next();
+  }
+  
+  // Aplicar CORS normalmente
   cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // En desarrollo, permitir todo
@@ -254,8 +262,8 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  })
-);
+  })(req, res, next);
+});
 
 
 app.get("/debug/env", (_req: Request, res: Response) => {
