@@ -694,6 +694,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Página de prueba simple para 3DS - todo el flujo en una página HTML
   app.get("/api/test/3ds-simple", async (req, res) => {
+    // Agregar headers CSP permisivos para dominios de Azul 3DS
+    res.setHeader('Content-Security-Policy', 
+      "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "frame-src 'self' https://*.modirum.com https://*.azul.com.do https://3ds-acs.test.modirum.com; " +
+      "form-action 'self' https://*.modirum.com https://*.azul.com.do https://3ds-acs.test.modirum.com; " +
+      "connect-src 'self' https://*.azul.com.do https://*.modirum.com;"
+    );
     res.send(`<!DOCTYPE html>
 <html>
 <head>
