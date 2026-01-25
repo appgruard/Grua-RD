@@ -285,10 +285,10 @@ export default function Test3DSPage() {
                 <input type="hidden" name="creq" value={challengeCreq} />
               </form>
               
-              <Alert className="bg-blue-50 border-blue-200">
-                <ShieldCheck className="h-4 w-4 text-blue-600" />
-                <AlertTitle>Challenge Listo</AlertTitle>
-                <AlertDescription>
+              <Alert className="bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700">
+                <ShieldCheck className="h-4 w-4 text-blue-700 dark:text-blue-300" />
+                <AlertTitle className="text-blue-900 dark:text-blue-100">Challenge Listo</AlertTitle>
+                <AlertDescription className="text-blue-800 dark:text-blue-200">
                   Haz clic en "Ir al Challenge" para autenticarte. Usa el OTP <strong>123456</strong>.
                   Seras redirigido al servidor del emisor y luego volveras automaticamente.
                 </AlertDescription>
