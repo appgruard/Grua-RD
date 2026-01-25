@@ -81,8 +81,10 @@ export default function Test3DSPage() {
       return res.json();
     },
     onSuccess: (data) => {
+      console.log('=== CONTINUE RESPONSE ===', data);
       setPaymentResult(data);
       if ((data.isoCode === '3D' || data.requires3DS) && data.acsUrl && data.creq) {
+        console.log('Challenge detected, setting URL:', data.acsUrl);
         setChallengeUrl(data.acsUrl);
         setChallengeCreq(data.creq);
         setStep(3);
