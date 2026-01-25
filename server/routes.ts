@@ -808,138 +808,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const PDFDocument = (await import('pdfkit')).default;
       const fs = await import('fs');
       const path = await import('path');
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 40, size: 'LETTER' });
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'attachment; filename=GruaRD-Neon-Pricing-Estimacion.pdf');
       
       doc.pipe(res);
       
-      // Logo de la empresa
+      const pageWidth = doc.page.width;
+      const pageHeight = doc.page.height;
+      const margin = 40;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      // Colores de la marca
+      const primaryColor = '#1a1a2e';
+      const accentColor = '#e94560';
+      const lightBg = '#f8f9fa';
+      const darkText = '#2d3436';
+      const lightText = '#636e72';
+      
+      // Header con fondo de color
+      doc.rect(0, 0, pageWidth, 120).fill(primaryColor);
+      
+      // Logo
       const logoPath = path.join(process.cwd(), 'attached_assets', 'Grúa_20251124_024218_0000_1763966543810.png');
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, (doc.page.width - 120) / 2, 40, { width: 120 });
-        doc.moveDown(6);
+        doc.image(logoPath, margin, 15, { width: 70 });
       }
       
-      // Header con branding
-      doc.fontSize(24).fillColor('#1a1a2e').text('Grua RD', { align: 'center' });
-      doc.fontSize(10).fillColor('#666').text('Servicios de Grua y Asistencia Vial', { align: 'center' });
-      doc.moveDown(0.5);
-      doc.fontSize(8).text('www.gruard.com | app.gruard.com', { align: 'center' });
-      doc.moveDown(2);
+      // Titulo en header
+      doc.fillColor('#ffffff').fontSize(28).font('Helvetica-Bold');
+      doc.text('Grua RD', margin + 85, 25, { continued: false });
+      doc.fontSize(11).font('Helvetica').text('Servicios de Grua y Asistencia Vial', margin + 85, 58);
       
-      // Linea separadora
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e0e0e0').stroke();
-      doc.moveDown(1.5);
+      // Info de contacto en header derecho
+      doc.fontSize(9).text('www.gruard.com', pageWidth - 150, 30, { width: 110, align: 'right' });
+      doc.text('app.gruard.com', pageWidth - 150, 45, { width: 110, align: 'right' });
       
       // Titulo del documento
-      doc.fontSize(18).fillColor('#1a1a2e').text('Estimacion de Costos - Neon Database', { align: 'center' });
-      doc.fontSize(12).fillColor('#666').text('Plan Launch - Analisis para Produccion', { align: 'center' });
-      doc.moveDown(2);
+      doc.fillColor(accentColor).fontSize(10).font('Helvetica-Bold');
+      doc.text('INFORME DE COSTOS', margin, 85, { width: contentWidth });
+      doc.fillColor('#ffffff').fontSize(14).font('Helvetica');
+      doc.text('Estimacion Base de Datos Neon - Plan Launch', margin, 100);
       
-      // Precios del Plan
-      doc.fontSize(14).fillColor('#1a1a2e').text('Precios del Plan Launch', { underline: true });
-      doc.moveDown(0.8);
-      doc.fontSize(10).fillColor('#333');
-      doc.text('Minimo mensual: $5/mes');
-      doc.text('Compute: $0.106 por CU-hora');
-      doc.text('Storage: $0.35 por GB-mes');
-      doc.text('Branches extra: $0.002/hora (incluye 10)');
-      doc.text('PITR: $0.20 por GB-mes de cambios retenidos');
-      doc.moveDown(1.5);
+      // Contenido principal
+      let y = 140;
       
-      // Tabla de escenarios
-      doc.fontSize(14).fillColor('#1a1a2e').text('Escenarios de Uso Estimados', { underline: true });
-      doc.moveDown(1);
+      // Seccion: Resumen Ejecutivo
+      doc.rect(margin, y, contentWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold');
+      doc.text('RESUMEN EJECUTIVO', margin + 12, y + 8);
+      y += 40;
       
-      doc.fontSize(10).fillColor('#333');
+      doc.fillColor(darkText).fontSize(10).font('Helvetica');
+      doc.text('Este documento presenta una estimacion de costos para la infraestructura de base de datos de Grua RD utilizando Neon Database con el Plan Launch, optimizado para aplicaciones en crecimiento.', margin, y, { width: contentWidth, lineGap: 3 });
+      y += 45;
       
-      // Encabezados de tabla
-      const tableTop = doc.y;
-      doc.font('Helvetica-Bold');
-      doc.text('Escenario', 50, tableTop, { width: 80 });
-      doc.text('Usuarios', 130, tableTop, { width: 80 });
-      doc.text('Servicios/mes', 210, tableTop, { width: 90 });
-      doc.text('Storage', 300, tableTop, { width: 60 });
-      doc.text('Compute', 360, tableTop, { width: 80 });
-      doc.text('Costo Est.', 440, tableTop, { width: 80 });
-      doc.font('Helvetica');
+      // Seccion: Precios del Plan
+      doc.rect(margin, y, contentWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold');
+      doc.text('ESTRUCTURA DE PRECIOS - PLAN LAUNCH', margin + 12, y + 8);
+      y += 38;
       
-      doc.moveDown(0.3);
-      doc.moveTo(50, doc.y).lineTo(520, doc.y).strokeColor('#ccc').stroke();
-      doc.moveDown(0.5);
+      // Grid de precios (2 columnas)
+      const priceItems = [
+        { label: 'Minimo Mensual', value: '$5/mes' },
+        { label: 'Compute', value: '$0.106/CU-hora' },
+        { label: 'Storage', value: '$0.35/GB-mes' },
+        { label: 'Branches Extra', value: '$0.002/hora' },
+        { label: 'PITR', value: '$0.20/GB-mes' },
+        { label: 'Proyectos', value: 'Hasta 100' }
+      ];
       
-      // Filas
-      const row1 = doc.y;
-      doc.text('Inicio', 50, row1, { width: 80 });
-      doc.text('100-500', 130, row1, { width: 80 });
-      doc.text('200-1,000', 210, row1, { width: 90 });
-      doc.text('~2 GB', 300, row1, { width: 60 });
-      doc.text('~100 CU-hrs', 360, row1, { width: 80 });
-      doc.text('$5-15/mes', 440, row1, { width: 80 });
+      const colWidth = (contentWidth - 20) / 2;
+      priceItems.forEach((item, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const xPos = margin + (col * (colWidth + 20));
+        const yPos = y + (row * 22);
+        
+        doc.fillColor(accentColor).fontSize(9).font('Helvetica-Bold');
+        doc.text(item.label + ':', xPos, yPos, { continued: true });
+        doc.fillColor(darkText).font('Helvetica').text('  ' + item.value);
+      });
+      y += 80;
       
-      doc.moveDown(0.8);
-      const row2 = doc.y;
-      doc.text('Crecimiento', 50, row2, { width: 80 });
-      doc.text('500-2,000', 130, row2, { width: 80 });
-      doc.text('1,000-5,000', 210, row2, { width: 90 });
-      doc.text('~5 GB', 300, row2, { width: 60 });
-      doc.text('~300 CU-hrs', 360, row2, { width: 80 });
-      doc.text('$20-40/mes', 440, row2, { width: 80 });
+      // Seccion: Tabla de Escenarios
+      doc.rect(margin, y, contentWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold');
+      doc.text('PROYECCION DE COSTOS POR ESCENARIO', margin + 12, y + 8);
+      y += 38;
       
-      doc.moveDown(0.8);
-      const row3 = doc.y;
-      doc.text('Escala', 50, row3, { width: 80 });
-      doc.text('2,000-10,000', 130, row3, { width: 80 });
-      doc.text('5,000-20,000', 210, row3, { width: 90 });
-      doc.text('~15 GB', 300, row3, { width: 60 });
-      doc.text('~800 CU-hrs', 360, row3, { width: 80 });
-      doc.text('$50-100/mes', 440, row3, { width: 80 });
+      // Tabla con diseño
+      const tableX = margin;
+      const cols = [85, 80, 95, 70, 85, 80];
+      const headers = ['Escenario', 'Usuarios', 'Servicios/mes', 'Storage', 'Compute', 'Costo Est.'];
       
-      doc.moveDown(2);
+      // Header de tabla
+      doc.rect(tableX, y, contentWidth, 22).fill(primaryColor);
+      let xOffset = tableX + 8;
+      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
+      headers.forEach((h, i) => {
+        doc.text(h, xOffset, y + 6, { width: cols[i] - 10 });
+        xOffset += cols[i];
+      });
+      y += 22;
       
-      // Desglose típico
-      doc.fontSize(14).fillColor('#1a1a2e').text('Desglose Tipico (Escenario Crecimiento)', { underline: true });
-      doc.moveDown(0.8);
-      doc.fontSize(10).fillColor('#333');
-      doc.text('Compute (300 CU-hrs): ~$32');
-      doc.text('Storage (5 GB): ~$1.75');
-      doc.text('PITR 3 dias (~1 GB): ~$0.20');
-      doc.font('Helvetica-Bold').text('Total estimado: ~$34/mes');
-      doc.font('Helvetica');
-      doc.moveDown(1.5);
+      // Filas de tabla
+      const rows = [
+        ['Inicio', '100-500', '200-1,000', '~2 GB', '~100 CU-hrs', '$5-15/mes'],
+        ['Crecimiento', '500-2,000', '1,000-5,000', '~5 GB', '~300 CU-hrs', '$20-40/mes'],
+        ['Escala', '2,000-10,000', '5,000-20,000', '~15 GB', '~800 CU-hrs', '$50-100/mes']
+      ];
       
-      // Ventajas
-      doc.fontSize(14).fillColor('#1a1a2e').text('Ventajas para Grua RD', { underline: true });
-      doc.moveDown(0.8);
-      doc.fontSize(10).fillColor('#333');
-      doc.text('Scale-to-zero: En horas de baja actividad no se paga compute');
-      doc.text('Auto-scaling: Maneja picos de demanda automaticamente');
-      doc.text('Branching: Util para testing sin afectar produccion');
-      doc.moveDown(1.5);
+      rows.forEach((row, rowIndex) => {
+        const bgColor = rowIndex % 2 === 0 ? '#ffffff' : lightBg;
+        doc.rect(tableX, y, contentWidth, 20).fill(bgColor);
+        
+        xOffset = tableX + 8;
+        doc.fillColor(darkText).fontSize(9).font('Helvetica');
+        row.forEach((cell, i) => {
+          if (i === 0) doc.font('Helvetica-Bold');
+          else doc.font('Helvetica');
+          doc.text(cell, xOffset, y + 5, { width: cols[i] - 10 });
+          xOffset += cols[i];
+        });
+        y += 20;
+      });
       
-      // Recomendacion
-      doc.fontSize(14).fillColor('#1a1a2e').text('Recomendacion', { underline: true });
-      doc.moveDown(0.8);
-      doc.fontSize(10).fillColor('#333');
-      doc.text('Iniciar con el plan Launch ($5 minimo) y monitorear el uso real durante las primeras semanas de produccion. El modelo de pago por uso permite escalar sin compromisos fijos.', { width: 500 });
-      doc.moveDown(3);
+      // Borde de tabla
+      doc.rect(tableX, y - 60, contentWidth, 60).stroke(primaryColor);
+      y += 15;
       
-      // Linea separadora final
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e0e0e0').stroke();
-      doc.moveDown(1);
+      // Seccion: Desglose y Ventajas (2 columnas)
+      const halfWidth = (contentWidth - 15) / 2;
       
-      // Datos del administrador
-      doc.fontSize(10).fillColor('#1a1a2e').text('Preparado por:', { align: 'center' });
-      doc.fontSize(12).font('Helvetica-Bold').text('Jesus Garcia', { align: 'center' });
-      doc.font('Helvetica').fontSize(10).fillColor('#666').text('Administrador', { align: 'center' });
-      doc.text('admin@fourone.com.do', { align: 'center' });
-      doc.moveDown(1.5);
+      // Columna izquierda: Desglose
+      doc.rect(margin, y, halfWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
+      doc.text('DESGLOSE TIPICO', margin + 10, y + 8);
       
-      // Pie de pagina
-      doc.fontSize(8).fillColor('#999').text('Documento generado el ' + new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' }), { align: 'center' });
-      doc.text('Grua RD - Four One Development', { align: 'center' });
+      const desgloseY = y + 35;
+      doc.fillColor(darkText).fontSize(9).font('Helvetica');
+      doc.text('Compute (300 CU-hrs)', margin + 10, desgloseY);
+      doc.text('~$32.00', margin + halfWidth - 50, desgloseY);
+      doc.text('Storage (5 GB)', margin + 10, desgloseY + 15);
+      doc.text('~$1.75', margin + halfWidth - 50, desgloseY + 15);
+      doc.text('PITR (3 dias, ~1 GB)', margin + 10, desgloseY + 30);
+      doc.text('~$0.20', margin + halfWidth - 50, desgloseY + 30);
+      doc.moveTo(margin + 10, desgloseY + 48).lineTo(margin + halfWidth - 10, desgloseY + 48).stroke(lightText);
+      doc.fillColor(accentColor).font('Helvetica-Bold');
+      doc.text('TOTAL ESTIMADO', margin + 10, desgloseY + 55);
+      doc.text('~$34/mes', margin + halfWidth - 55, desgloseY + 55);
+      
+      // Columna derecha: Ventajas
+      const rightCol = margin + halfWidth + 15;
+      doc.rect(rightCol, y, halfWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
+      doc.text('VENTAJAS CLAVE', rightCol + 10, y + 8);
+      
+      doc.fillColor(darkText).fontSize(9).font('Helvetica');
+      const ventajas = [
+        'Scale-to-zero en baja actividad',
+        'Auto-scaling automatico',
+        'Branching para testing',
+        'Sin compromisos fijos'
+      ];
+      ventajas.forEach((v, i) => {
+        doc.fillColor(accentColor).text('>', rightCol + 10, desgloseY + (i * 18), { continued: true });
+        doc.fillColor(darkText).text('  ' + v);
+      });
+      
+      y += 115;
+      
+      // Seccion: Recomendacion
+      doc.rect(margin, y, contentWidth, 55).fill(accentColor).fillOpacity(0.1);
+      doc.fillOpacity(1);
+      doc.rect(margin, y, 4, 55).fill(accentColor);
+      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
+      doc.text('RECOMENDACION', margin + 15, y + 10);
+      doc.fillColor(darkText).fontSize(9).font('Helvetica');
+      doc.text('Iniciar con el Plan Launch ($5 minimo mensual) y monitorear el uso real durante las primeras semanas de produccion. El modelo de pago por uso permite escalar de forma gradual sin compromisos fijos, optimizando costos segun la demanda real del servicio.', margin + 15, y + 28, { width: contentWidth - 30, lineGap: 2 });
+      y += 70;
+      
+      // Footer
+      doc.rect(0, pageHeight - 80, pageWidth, 80).fill(primaryColor);
+      
+      doc.fillColor('#ffffff').fontSize(10).font('Helvetica-Bold');
+      doc.text('Preparado por:', margin, pageHeight - 70);
+      doc.fontSize(12).text('Jesus Garcia', margin, pageHeight - 55);
+      doc.fontSize(9).font('Helvetica').text('Administrador', margin, pageHeight - 40);
+      doc.fillColor(accentColor).text('admin@fourone.com.do', margin, pageHeight - 28);
+      
+      doc.fillColor('#ffffff').fontSize(8).font('Helvetica');
+      const dateStr = new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' });
+      doc.text('Documento generado el ' + dateStr, pageWidth - 200, pageHeight - 55, { width: 160, align: 'right' });
+      doc.text('Grua RD - Four One Development', pageWidth - 200, pageHeight - 40, { width: 160, align: 'right' });
       
       doc.end();
     } catch (error: any) {
