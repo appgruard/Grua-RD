@@ -2759,9 +2759,9 @@ export type ZonaDemanda = typeof zonasDemanada.$inferSelect;
 
 // Schemas for Cancelaciones Servicios
 export const insertCancelacionServicioSchema = createInsertSchema(cancelacionesServicios, {
-  penalizacionBase: z.number().positive().optional(),
-  penalizacionAplicada: z.number().nonnegative().default(0),
-  reembolsoMonto: z.number().nonnegative().default(0),
+  penalizacionBase: z.string().optional(),
+  penalizacionAplicada: z.string().default("0.00"),
+  reembolsoMonto: z.string().default("0.00"),
 }).omit({
   id: true,
   createdAt: true,

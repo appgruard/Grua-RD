@@ -981,11 +981,22 @@ export class DatabaseStorage implements IStorage {
       apellido: row.apellido,
       userType: row.user_type,
       fotoUrl: row.foto_url,
-      telefono: row.phone,
+      phone: row.phone,
       cedula: row.cedula,
       cedulaVerificada: row.cedula_verificada,
       telefonoVerificado: row.telefono_verificado,
       createdAt: row.created_at,
+      cedulaImageUrl: null,
+      estadoCuenta: "activo",
+      calificacionPromedio: "5.00",
+      emailVerificado: true,
+      fotoVerificada: true,
+      fotoVerificadaScore: "1.00",
+      cancelacionesTotales: 0,
+      cancelacionesUltimos7dias: 0,
+      cancelacionesUltimoMes: 0,
+      penalizacionesTotales: "0.00",
+      ultimaCancelacionTimestamp: null
     })) as User[];
   }
 
@@ -5088,7 +5099,7 @@ export class DatabaseStorage implements IStorage {
   // ==================== SYSTEM FOR CANCELLATIONS (Phase 3) ====================
 
   async createCancelacionServicio(cancelacion: InsertCancelacionServicio): Promise<CancelacionServicio> {
-    const [result] = await db.insert(cancelacionesServicios).values(cancelacion).returning();
+    const [result] = await db.insert(cancelacionesServicios).values([cancelacion]).returning();
     return result;
   }
 
