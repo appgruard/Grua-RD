@@ -182,19 +182,29 @@ app.use(
   })
 );
 
-// Permitir CORS para endpoints de callback 3DS de Azul (antes del middleware principal)
-// Estos endpoints reciben POSTs desde el ACS de Azul (dominio externo)
-app.use([
+// Rutas que permiten cualquier origen (callbacks de servicios externos como Azul 3DS)
+const openCorsRoutes = [
   '/api/payments/azul/3ds-callback',
   '/api/payments/azul/3ds-method-notification',
   '/api/azul/3ds/callback',
   '/api/azul/3ds/method-notification'
-], cors({
-  origin: true, // Permitir cualquier origen para estos endpoints
-  credentials: true,
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-}));
+];
+
+// Middleware para rutas abiertas ANTES del CORS principal
+app.use((req, res, next) => {
+  if (openCorsRoutes.some(route => req.path.startsWith(route))) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    // Saltar el middleware CORS principal para estas rutas
+    return next('route');
+  }
+  next();
+});
 
 const allowedOrigins = isDevelopment
   ? ["http://localhost:5000", "http://127.0.0.1:5000"]
@@ -203,10 +213,12 @@ const allowedOrigins = isDevelopment
 app.use(
   cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // En desarrollo, permitir todo
       if (isDevelopment) {
         return callback(null, true);
       }
       
+      // Sin origen (requests del mismo servidor o herramientas)
       if (!origin) {
         return callback(null, true);
       }
@@ -221,7 +233,7 @@ app.use(
         return callback(null, true);
       }
       
-      // Allow Azul 3DS ACS domains
+      // Allow Azul 3DS ACS domains siempre
       if (origin.includes('modirum.com') || origin.includes('azul.com.do')) {
         return callback(null, true);
       }
@@ -244,6 +256,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
+
 
 app.get("/debug/env", (_req: Request, res: Response) => {
   const envVars = [
