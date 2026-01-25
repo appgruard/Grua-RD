@@ -314,25 +314,23 @@ const filesystemProvider = new FilesystemStorageProvider();
 
 // Log de variables de entorno para depuración
 logger.info('Storage environment variables', {
-  STORAGE_PROVIDER: process.env.STORAGE_PROVIDER,
-  CAPROVER: process.env.CAPROVER,
-  STORAGE_PATH: process.env.STORAGE_PATH,
   NODE_ENV: process.env.NODE_ENV,
+  STORAGE_REPLIT: process.env.STORAGE_REPLIT,
+  STORAGE_PATH: process.env.STORAGE_PATH,
 });
 
-// Solo inicializar Replit provider si no estamos forzando filesystem
-// Soporta múltiples formatos y también detecta si CAPROVER tiene cualquier valor
-const forceFilesystem = 
-  process.env.STORAGE_PROVIDER === 'filesystem' || 
-  process.env.CAPROVER !== undefined ||
-  process.env.NODE_ENV === 'production';
+// Usar Replit Storage solo si STORAGE_REPLIT=true
+// Por defecto usa filesystem (/app/uploads)
+const useReplitStorage = process.env.STORAGE_REPLIT === 'true';
 
-logger.info('Force filesystem decision', { forceFilesystem });
+logger.info('Storage provider selection', { useReplitStorage });
 
-const replitProvider = forceFilesystem ? null : new ReplitStorageProvider();
+const replitProvider = useReplitStorage ? new ReplitStorageProvider() : null;
 
-if (forceFilesystem) {
-  logger.info('Filesystem storage forced via environment variable (CapRover deployment)');
+if (useReplitStorage) {
+  logger.info('Replit Object Storage enabled via STORAGE_REPLIT=true');
+} else {
+  logger.info('Using filesystem storage by default (/app/uploads)');
 }
 
 function getStorageProvider(): StorageProvider {
