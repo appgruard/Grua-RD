@@ -802,6 +802,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
 </html>`);
   });
 
+  // Endpoint para generar PDF con estimación de pricing Neon
+  app.get("/api/reports/neon-pricing-pdf", async (req, res) => {
+    try {
+      const PDFDocument = (await import('pdfkit')).default;
+      const doc = new PDFDocument({ margin: 50 });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=GruaRD-Neon-Pricing-Estimacion.pdf');
+      
+      doc.pipe(res);
+      
+      // Header con branding
+      doc.fontSize(24).fillColor('#1a1a2e').text('GruaRD', { align: 'center' });
+      doc.fontSize(10).fillColor('#666').text('Servicios de Grua y Asistencia Vial', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(8).text('www.gruard.com | app.gruard.com', { align: 'center' });
+      doc.moveDown(2);
+      
+      // Linea separadora
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e0e0e0').stroke();
+      doc.moveDown(1.5);
+      
+      // Titulo del documento
+      doc.fontSize(18).fillColor('#1a1a2e').text('Estimacion de Costos - Neon Database', { align: 'center' });
+      doc.fontSize(12).fillColor('#666').text('Plan Launch - Analisis para Produccion', { align: 'center' });
+      doc.moveDown(2);
+      
+      // Precios del Plan
+      doc.fontSize(14).fillColor('#1a1a2e').text('Precios del Plan Launch', { underline: true });
+      doc.moveDown(0.8);
+      doc.fontSize(10).fillColor('#333');
+      doc.text('Minimo mensual: $5/mes');
+      doc.text('Compute: $0.106 por CU-hora');
+      doc.text('Storage: $0.35 por GB-mes');
+      doc.text('Branches extra: $0.002/hora (incluye 10)');
+      doc.text('PITR: $0.20 por GB-mes de cambios retenidos');
+      doc.moveDown(1.5);
+      
+      // Tabla de escenarios
+      doc.fontSize(14).fillColor('#1a1a2e').text('Escenarios de Uso Estimados', { underline: true });
+      doc.moveDown(1);
+      
+      doc.fontSize(10).fillColor('#333');
+      
+      // Encabezados de tabla
+      const tableTop = doc.y;
+      doc.font('Helvetica-Bold');
+      doc.text('Escenario', 50, tableTop, { width: 80 });
+      doc.text('Usuarios', 130, tableTop, { width: 80 });
+      doc.text('Servicios/mes', 210, tableTop, { width: 90 });
+      doc.text('Storage', 300, tableTop, { width: 60 });
+      doc.text('Compute', 360, tableTop, { width: 80 });
+      doc.text('Costo Est.', 440, tableTop, { width: 80 });
+      doc.font('Helvetica');
+      
+      doc.moveDown(0.3);
+      doc.moveTo(50, doc.y).lineTo(520, doc.y).strokeColor('#ccc').stroke();
+      doc.moveDown(0.5);
+      
+      // Filas
+      const row1 = doc.y;
+      doc.text('Inicio', 50, row1, { width: 80 });
+      doc.text('100-500', 130, row1, { width: 80 });
+      doc.text('200-1,000', 210, row1, { width: 90 });
+      doc.text('~2 GB', 300, row1, { width: 60 });
+      doc.text('~100 CU-hrs', 360, row1, { width: 80 });
+      doc.text('$5-15/mes', 440, row1, { width: 80 });
+      
+      doc.moveDown(0.8);
+      const row2 = doc.y;
+      doc.text('Crecimiento', 50, row2, { width: 80 });
+      doc.text('500-2,000', 130, row2, { width: 80 });
+      doc.text('1,000-5,000', 210, row2, { width: 90 });
+      doc.text('~5 GB', 300, row2, { width: 60 });
+      doc.text('~300 CU-hrs', 360, row2, { width: 80 });
+      doc.text('$20-40/mes', 440, row2, { width: 80 });
+      
+      doc.moveDown(0.8);
+      const row3 = doc.y;
+      doc.text('Escala', 50, row3, { width: 80 });
+      doc.text('2,000-10,000', 130, row3, { width: 80 });
+      doc.text('5,000-20,000', 210, row3, { width: 90 });
+      doc.text('~15 GB', 300, row3, { width: 60 });
+      doc.text('~800 CU-hrs', 360, row3, { width: 80 });
+      doc.text('$50-100/mes', 440, row3, { width: 80 });
+      
+      doc.moveDown(2);
+      
+      // Desglose típico
+      doc.fontSize(14).fillColor('#1a1a2e').text('Desglose Tipico (Escenario Crecimiento)', { underline: true });
+      doc.moveDown(0.8);
+      doc.fontSize(10).fillColor('#333');
+      doc.text('Compute (300 CU-hrs): ~$32');
+      doc.text('Storage (5 GB): ~$1.75');
+      doc.text('PITR 3 dias (~1 GB): ~$0.20');
+      doc.font('Helvetica-Bold').text('Total estimado: ~$34/mes');
+      doc.font('Helvetica');
+      doc.moveDown(1.5);
+      
+      // Ventajas
+      doc.fontSize(14).fillColor('#1a1a2e').text('Ventajas para GruaRD', { underline: true });
+      doc.moveDown(0.8);
+      doc.fontSize(10).fillColor('#333');
+      doc.text('Scale-to-zero: En horas de baja actividad no se paga compute');
+      doc.text('Auto-scaling: Maneja picos de demanda automaticamente');
+      doc.text('Branching: Util para testing sin afectar produccion');
+      doc.moveDown(1.5);
+      
+      // Recomendacion
+      doc.fontSize(14).fillColor('#1a1a2e').text('Recomendacion', { underline: true });
+      doc.moveDown(0.8);
+      doc.fontSize(10).fillColor('#333');
+      doc.text('Iniciar con el plan Launch ($5 minimo) y monitorear el uso real durante las primeras semanas de produccion. El modelo de pago por uso permite escalar sin compromisos fijos.', { width: 500 });
+      doc.moveDown(3);
+      
+      // Linea separadora final
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#e0e0e0').stroke();
+      doc.moveDown(1);
+      
+      // Datos del administrador
+      doc.fontSize(10).fillColor('#1a1a2e').text('Preparado por:', { align: 'center' });
+      doc.fontSize(12).font('Helvetica-Bold').text('Jesus Garcia', { align: 'center' });
+      doc.font('Helvetica').fontSize(10).fillColor('#666').text('Administrador', { align: 'center' });
+      doc.text('admin@fourone.com.do', { align: 'center' });
+      doc.moveDown(1.5);
+      
+      // Pie de pagina
+      doc.fontSize(8).fillColor('#999').text('Documento generado el ' + new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' }), { align: 'center' });
+      doc.text('GruaRD - Four One Development', { align: 'center' });
+      
+      doc.end();
+    } catch (error: any) {
+      logSystem.error('Error generating Neon pricing PDF', error);
+      res.status(500).send('Error generando PDF: ' + error.message);
+    }
+  });
+
   // Endpoint para generar PDF con resultado de prueba 3DS
   app.get("/api/test/3ds-result-pdf", async (req, res) => {
     try {
