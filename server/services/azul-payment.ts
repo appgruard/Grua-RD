@@ -281,7 +281,9 @@ export class AzulPaymentService {
       hostname: url.hostname,
       merchantId: config.merchantId,
       trxType: data.TrxType,
-      customOrderId: data.CustomOrderId
+      customOrderId: data.CustomOrderId,
+      has3DSAuth: has3DSAuth,
+      fullPayload: jsonPayload
     });
 
     return new Promise((resolve, reject) => {
