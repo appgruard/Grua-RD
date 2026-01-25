@@ -712,83 +712,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
   <h1>3DS Simple Test</h1>
   <p>Tarjeta: 4005520000000129 | OTP: 123456</p>
   
-  <button id="startBtn" onclick="startTest()">Iniciar Prueba 3DS</button>
+  <button id="startBtn">Iniciar Prueba 3DS</button>
   <div id="log"></div>
   
   <!-- iframe oculto para el Method -->
   <iframe id="methodFrame" style="display:none;"></iframe>
   
   <script>
-    const log = (msg, type) => {
-      const el = document.getElementById('log');
-      el.innerHTML += '<div class="' + (type || '') + '">' + new Date().toLocaleTimeString() + ' - ' + msg + '</div>';
-      el.scrollTop = el.scrollHeight;
-    };
-    
-    async function startTest() {
-      alert('Función startTest ejecutada!');
+    document.addEventListener('DOMContentLoaded', function() {
+      const logEl = document.getElementById('log');
       const btn = document.getElementById('startBtn');
-      btn.disabled = true;
-      btn.textContent = 'Procesando...';
       
-      try {
-        // Paso 1: Iniciar transacción
-        log('Paso 1: Iniciando transacción...');
-        const initRes = await fetch('/api/payments/azul/init-3ds-friction-test', { method: 'POST' });
-        const initData = await initRes.json();
-        log('Respuesta init: IsoCode=' + initData.isoCode);
-        
-        if (!initData.azulOrderId) {
-          log('ERROR: No se recibió AzulOrderId', 'error');
-          return;
-        }
-        
-        const azulOrderId = initData.azulOrderId;
-        log('AzulOrderId: ' + azulOrderId);
-        
-        // Paso 2: Ejecutar Method si es necesario
-        if (initData.methodForm) {
-          log('Paso 2: Ejecutando 3DS Method...');
-          const iframe = document.getElementById('methodFrame');
-          iframe.srcdoc = initData.methodForm;
-          await new Promise(r => setTimeout(r, 3000));
-          log('Method completado');
-        }
-        
-        // Paso 3: Continuar autenticación
-        log('Paso 3: Continuando autenticación...');
-        const contRes = await fetch('/api/test/azul-3ds-continue', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ azulOrderId, status: 'RECEIVED' })
-        });
-        const contData = await contRes.json();
-        log('Respuesta continue: IsoCode=' + contData.isoCode);
-        
-        // Verificar si hay challenge
-        if (contData.acsUrl && contData.creq) {
-          log('Paso 4: Challenge detectado!', 'success');
-          log('ACS URL: ' + contData.acsUrl);
-          log('CReq: ' + contData.creq.substring(0, 50) + '...');
-          
-          // Crear formulario y redirigir
-          log('Redirigiendo al ACS en 2 segundos...');
-          await new Promise(r => setTimeout(r, 2000));
-          
-          const form = document.createElement('form');
-          form.method = 'POST';
-          form.action = contData.acsUrl;
-          form.innerHTML = '<input type="hidden" name="creq" value="' + contData.creq + '">';
-          document.body.appendChild(form);
-          form.submit();
-        } else {
-          log('No se detectó challenge. Respuesta completa:', 'error');
-          log(JSON.stringify(contData, null, 2));
-        }
-      } catch (err) {
-        log('ERROR: ' + err.message, 'error');
+      function log(msg, type) {
+        logEl.innerHTML += '<div class="' + (type || '') + '">' + new Date().toLocaleTimeString() + ' - ' + msg + '</div>';
+        logEl.scrollTop = logEl.scrollHeight;
       }
-    }
+      
+      btn.addEventListener('click', async function() {
+        btn.disabled = true;
+        btn.textContent = 'Procesando...';
+        
+        try {
+          log('Paso 1: Iniciando transaccion...');
+          const initRes = await fetch('/api/payments/azul/init-3ds-friction-test', { method: 'POST' });
+          const initData = await initRes.json();
+          log('Respuesta init: IsoCode=' + initData.isoCode);
+          
+          if (!initData.azulOrderId) {
+            log('ERROR: No se recibio AzulOrderId', 'error');
+            return;
+          }
+          
+          const azulOrderId = initData.azulOrderId;
+          log('AzulOrderId: ' + azulOrderId);
+          
+          if (initData.methodForm) {
+            log('Paso 2: Ejecutando 3DS Method...');
+            const iframe = document.getElementById('methodFrame');
+            iframe.srcdoc = initData.methodForm;
+            await new Promise(function(r) { setTimeout(r, 3000); });
+            log('Method completado');
+          }
+          
+          log('Paso 3: Continuando autenticacion...');
+          const contRes = await fetch('/api/test/azul-3ds-continue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ azulOrderId: azulOrderId, status: 'RECEIVED' })
+          });
+          const contData = await contRes.json();
+          log('Respuesta continue: IsoCode=' + contData.isoCode);
+          
+          if (contData.acsUrl && contData.creq) {
+            log('Paso 4: Challenge detectado!', 'success');
+            log('ACS URL: ' + contData.acsUrl);
+            log('Redirigiendo al ACS en 2 segundos...');
+            await new Promise(function(r) { setTimeout(r, 2000); });
+            
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = contData.acsUrl;
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'creq';
+            input.value = contData.creq;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+          } else {
+            log('No se detecto challenge. Respuesta:', 'error');
+            log(JSON.stringify(contData, null, 2));
+          }
+        } catch (err) {
+          log('ERROR: ' + err.message, 'error');
+        }
+      });
+    });
   </script>
 </body>
 </html>`);
