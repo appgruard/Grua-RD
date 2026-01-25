@@ -905,8 +905,8 @@ export class AzulPaymentService {
         OrderNumber: orderNumber,
         CustomOrderId: payment.customOrderId || orderNumber,
         ThreeDSAuth: {
-          TermUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-callback`,
-          MethodNotificationUrl: `${getAzulConfig().baseUrl}/api/payments/azul/3ds-method-notification`,
+          TermUrl: 'https://www.google.com',
+          MethodNotificationUrl: 'https://www.google.com',
           RequestorChallengeIndicator: '01',
         },
         CardHolderInfo: {
