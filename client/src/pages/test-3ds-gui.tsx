@@ -19,7 +19,6 @@ export default function Test3DSPage() {
   const [challengeUrl, setChallengeUrl] = useState<string>("");
   const [challengeCreq, setChallengeCreq] = useState<string>("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const challengeFormRef = useRef<HTMLFormElement>(null);
 
   // Escuchar mensajes del iframe para capturar el CRes
   useEffect(() => {
@@ -274,17 +273,6 @@ export default function Test3DSPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Formulario para redirigir al ACS (pagina completa, no iframe) */}
-              <form 
-                ref={challengeFormRef}
-                method="POST" 
-                action={challengeUrl}
-                target="_self"
-                style={{ display: 'none' }}
-              >
-                <input type="hidden" name="creq" value={challengeCreq} />
-              </form>
-              
               <Alert className="bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-700">
                 <ShieldCheck className="h-4 w-4 text-blue-700 dark:text-blue-300" />
                 <AlertTitle className="text-blue-900 dark:text-blue-100">Challenge Listo</AlertTitle>
@@ -302,7 +290,23 @@ export default function Test3DSPage() {
               </div>
               
               <Button 
-                onClick={() => challengeFormRef.current?.submit()}
+                onClick={() => {
+                  if (!challengeUrl || !challengeCreq) {
+                    alert('Faltan datos del challenge');
+                    return;
+                  }
+                  // Crear y enviar formulario dinamicamente
+                  const form = document.createElement('form');
+                  form.method = 'POST';
+                  form.action = challengeUrl;
+                  const input = document.createElement('input');
+                  input.type = 'hidden';
+                  input.name = 'creq';
+                  input.value = challengeCreq;
+                  form.appendChild(input);
+                  document.body.appendChild(form);
+                  form.submit();
+                }}
                 className="w-full"
                 disabled={!challengeUrl || !challengeCreq}
                 data-testid="button-go-to-challenge"
