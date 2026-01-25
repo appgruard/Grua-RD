@@ -124,7 +124,8 @@ export class WalletService {
     newDebt?: number;
     message: string;
   }> {
-    const servicio = await storage.getServicioById(servicioId);
+    // Use simple query without relations to avoid schema mismatch errors
+    const servicio = await storage.getServicioByIdSimple(servicioId);
     if (!servicio) {
       throw new Error('Servicio no encontrado');
     }

@@ -1337,6 +1337,12 @@ export class DatabaseStorage implements IStorage {
     return result as any;
   }
 
+  // Simple version without relations for internal processing
+  async getServicioByIdSimple(id: string): Promise<Servicio | undefined> {
+    const [result] = await db.select().from(servicios).where(eq(servicios.id, id)).limit(1);
+    return result;
+  }
+
   async getServicioByPaymentToken(token: string): Promise<Servicio | undefined> {
     const result = await db.query.servicios.findFirst({
       where: eq(servicios.azulDataVaultToken, token),
