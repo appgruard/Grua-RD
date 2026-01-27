@@ -1,5 +1,5 @@
 import { Switch, Route, Redirect } from 'wouter';
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { queryClient } from './lib/queryClient';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -106,13 +106,33 @@ function ProtectedRoute({
   allowedTypes?: string[];
   allowPendingVerification?: boolean;
 }) {
-  const { user, isLoading, pendingVerificationUser } = useAuth();
+  const { user, isLoading, pendingVerificationUser, refreshUser } = useAuth();
+  const [refreshAttempted, setRefreshAttempted] = useState(false);
 
   useEffect(() => {
     if (user?.userType === 'conductor') {
       preloadDriverModules();
     }
   }, [user?.userType]);
+
+  // Auto-refresh user data once if critical fields are missing
+  useEffect(() => {
+    if (!user || isLoading || refreshAttempted) return;
+    
+    // For conductors, refresh if conductor data is missing
+    if (user.userType === 'conductor' && !(user as any).conductor) {
+      setRefreshAttempted(true);
+      refreshUser();
+      return;
+    }
+    
+    // For clients, refresh if emailVerificado is undefined (should be boolean)
+    if (user.userType === 'cliente' && (user as any).emailVerificado === undefined) {
+      setRefreshAttempted(true);
+      refreshUser();
+      return;
+    }
+  }, [user, isLoading, refreshAttempted, refreshUser]);
 
   if (isLoading) {
     return (
@@ -142,14 +162,18 @@ function ProtectedRoute({
 
   // For conductors, check if verification is complete using authoritative server data
   if (currentUser.userType === 'conductor') {
-    // If conductor data is not loaded yet, show loading state instead of redirecting
-    // This prevents the redirect loop when user data hasn't been fully fetched
+    // If conductor data is not loaded and we haven't tried refreshing yet, show brief loading
+    // After refresh attempt, if still no conductor data, redirect to verify-pending
     if (!(currentUser as any).conductor) {
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      );
+      if (!refreshAttempted) {
+        return (
+          <div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        );
+      }
+      // Refresh was attempted but no conductor data - redirect to verify-pending
+      return <Redirect to="/verify-pending" />;
     }
     
     // Either telefonoVerificado OR emailVerificado counts as contact verified
@@ -169,9 +193,12 @@ function ProtectedRoute({
   }
 
   // For clients, check basic verification
+  // Only redirect if explicitly false (not undefined, which means data hasn't loaded yet)
   if (currentUser.userType === 'cliente') {
     const emailVerificado = (currentUser as any).emailVerificado;
-    const needsVerification = !currentUser.cedulaVerificada || !emailVerificado;
+    // Only redirect to verify-pending if verification is explicitly false
+    // If undefined and refresh was already attempted, allow access (prevents infinite loop)
+    const needsVerification = currentUser.cedulaVerificada === false || emailVerificado === false;
     if (needsVerification) {
       return <Redirect to="/verify-pending" />;
     }
