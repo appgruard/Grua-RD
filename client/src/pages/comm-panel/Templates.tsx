@@ -239,9 +239,9 @@ export default function Templates() {
   return (
     <CommPanelLayout>
       <div className="w-full">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-templates">
+            <h1 className="text-xl sm:text-3xl font-bold text-foreground mb-2" data-testid="heading-templates">
               Plantillas de Correo
             </h1>
             <p className="text-muted-foreground" data-testid="text-subtitle">
@@ -251,7 +251,7 @@ export default function Templates() {
           <Button 
             onClick={handleNewTemplate}
             data-testid="button-new-template"
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             Nueva Plantilla
@@ -285,27 +285,27 @@ export default function Templates() {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-3 sm:mx-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead data-testid="header-nombre">Nombre</TableHead>
-                      <TableHead data-testid="header-categoria">Categoría</TableHead>
-                      <TableHead data-testid="header-activo">Estado</TableHead>
-                      <TableHead data-testid="header-fecha">Fecha de Creación</TableHead>
-                      <TableHead className="text-right" data-testid="header-acciones">Acciones</TableHead>
+                      <TableHead className="whitespace-nowrap" data-testid="header-nombre">Nombre</TableHead>
+                      <TableHead className="whitespace-nowrap" data-testid="header-categoria">Categoría</TableHead>
+                      <TableHead className="whitespace-nowrap" data-testid="header-activo">Estado</TableHead>
+                      <TableHead className="whitespace-nowrap" data-testid="header-fecha">Fecha de Creación</TableHead>
+                      <TableHead className="text-right whitespace-nowrap" data-testid="header-acciones">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {templates.map((template) => (
                       <TableRow key={template.id} data-testid={`row-template-${template.id}`}>
-                        <TableCell className="font-medium" data-testid={`cell-nombre-${template.id}`}>
+                        <TableCell className="font-medium whitespace-nowrap" data-testid={`cell-nombre-${template.id}`}>
                           {template.nombre}
                         </TableCell>
-                        <TableCell data-testid={`cell-categoria-${template.id}`}>
+                        <TableCell className="whitespace-nowrap" data-testid={`cell-categoria-${template.id}`}>
                           {template.categoria}
                         </TableCell>
-                        <TableCell data-testid={`cell-activo-${template.id}`}>
+                        <TableCell className="whitespace-nowrap" data-testid={`cell-activo-${template.id}`}>
                           <span
                             className={`inline-block px-2 py-1 rounded text-sm font-medium ${
                               template.activo
@@ -316,10 +316,10 @@ export default function Templates() {
                             {template.activo ? 'Activo' : 'Inactivo'}
                           </span>
                         </TableCell>
-                        <TableCell data-testid={`cell-fecha-${template.id}`}>
+                        <TableCell className="whitespace-nowrap" data-testid={`cell-fecha-${template.id}`}>
                           {format(new Date(template.createdAt), 'dd MMM yyyy', { locale: es })}
                         </TableCell>
-                        <TableCell className="text-right space-x-2" data-testid={`cell-acciones-${template.id}`}>
+                        <TableCell className="text-right space-x-2 whitespace-nowrap" data-testid={`cell-acciones-${template.id}`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -357,7 +357,7 @@ export default function Templates() {
 
         {/* Create/Edit Template Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-template-form">
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" data-testid="dialog-template-form">
             <DialogHeader>
               <DialogTitle data-testid="dialog-title">
                 {editingTemplate ? 'Editar Plantilla' : 'Nueva Plantilla'}

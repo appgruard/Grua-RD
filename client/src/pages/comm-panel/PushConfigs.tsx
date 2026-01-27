@@ -259,9 +259,9 @@ export default function PushConfigs() {
       <div className="flex-1 overflow-auto p-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
             <div>
-              <h1 className="text-4xl font-bold text-foreground" data-testid="text-page-title">
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground" data-testid="text-page-title">
                 Configuraciones de Notificaciones Push
               </h1>
               <p className="text-muted-foreground mt-2">
@@ -270,7 +270,7 @@ export default function PushConfigs() {
             </div>
             <Button
               onClick={handleNewConfig}
-              className="gap-2"
+              className="w-full sm:w-auto gap-2"
               data-testid="button-new-config"
             >
               <Plus className="w-4 h-4" />
@@ -363,7 +363,7 @@ export default function PushConfigs() {
 
       {/* Dialog for Create/Edit */}
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-config-form">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" data-testid="dialog-config-form">
           <DialogHeader>
             <DialogTitle data-testid="dialog-title">
               {editingConfig ? 'Editar Configuración' : 'Nueva Configuración'}

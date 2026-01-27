@@ -151,9 +151,9 @@ export default function Composer() {
 
   return (
     <CommPanelLayout>
-      <div className="max-w-4xl">
+      <div className="max-w-4xl p-3 sm:p-6">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-composer">
+          <h1 className="text-xl sm:text-3xl font-bold text-foreground mb-2" data-testid="heading-composer">
             Enviar Correo Electrónico
           </h1>
           <p className="text-muted-foreground" data-testid="text-subtitle">
@@ -196,81 +196,86 @@ export default function Composer() {
                 Completa los campos para enviar un correo electrónico
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6">
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" data-testid="form-composer">
-                  {/* Alias Selector */}
-                  <FormField
-                    control={form.control}
-                    name="alias"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Alias del Remitente</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger
-                              disabled={isLoadingAliases}
-                              data-testid="select-alias"
-                            >
-                              <SelectValue placeholder="Selecciona un alias..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {aliases.map((alias) => (
-                              <SelectItem
-                                key={alias.id}
-                                value={alias.id}
-                                data-testid={`option-alias-${alias.id}`}
+                <form onSubmit={form.handleSubmit(onSubmit)} data-testid="form-composer">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                    {/* Alias Selector */}
+                    <FormField
+                      control={form.control}
+                      name="alias"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Alias del Remitente</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger
+                                disabled={isLoadingAliases}
+                                data-testid="select-alias"
+                                className="w-full"
                               >
-                                {alias.label} ({alias.email})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {isLoadingAliases && (
-                          <FormDescription className="flex items-center gap-2">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Cargando alias...
-                          </FormDescription>
-                        )}
-                        <FormMessage data-testid="error-alias" />
-                      </FormItem>
-                    )}
-                  />
+                                <SelectValue placeholder="Selecciona un alias..." />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {aliases.map((alias) => (
+                                <SelectItem
+                                  key={alias.id}
+                                  value={alias.id}
+                                  data-testid={`option-alias-${alias.id}`}
+                                >
+                                  {alias.label} ({alias.email})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {isLoadingAliases && (
+                            <FormDescription className="flex items-center gap-2">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Cargando alias...
+                            </FormDescription>
+                          )}
+                          <FormMessage data-testid="error-alias" />
+                        </FormItem>
+                      )}
+                    />
 
-                  {/* Destinatarios */}
-                  <FormField
-                    control={form.control}
-                    name="destinatarios"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Destinatarios</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="correo1@example.com, correo2@example.com, correo3@example.com"
-                            data-testid="input-destinatarios"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Separa múltiples correos electrónicos con comas
-                        </FormDescription>
-                        <FormMessage data-testid="error-destinatarios" />
-                      </FormItem>
-                    )}
-                  />
+                    {/* Destinatarios */}
+                    <FormField
+                      control={form.control}
+                      name="destinatarios"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Destinatarios</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="correo1@example.com, correo2@example.com, correo3@example.com"
+                              data-testid="input-destinatarios"
+                              className="w-full"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Separa múltiples correos electrónicos con comas
+                          </FormDescription>
+                          <FormMessage data-testid="error-destinatarios" />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   {/* Asunto */}
                   <FormField
                     control={form.control}
                     name="asunto"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="mb-6">
                         <FormLabel>Asunto</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Ingresa el asunto del correo"
                             data-testid="input-asunto"
+                            className="w-full"
                             {...field}
                           />
                         </FormControl>
@@ -284,12 +289,12 @@ export default function Composer() {
                     control={form.control}
                     name="contenidoHtml"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="mb-6">
                         <FormLabel>Contenido (HTML)</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Ingresa el contenido del correo (HTML permitido)"
-                            className="font-mono text-sm"
+                            className="w-full font-mono text-sm"
                             rows={12}
                             data-testid="textarea-contenido"
                             {...field}
@@ -307,7 +312,7 @@ export default function Composer() {
                   <Button
                     type="submit"
                     disabled={sendEmailMutation.isPending || isLoadingAliases}
-                    className="w-full gap-2"
+                    className="w-full sm:w-auto gap-2"
                     data-testid="button-send-email"
                   >
                     {sendEmailMutation.isPending ? (

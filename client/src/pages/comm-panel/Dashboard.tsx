@@ -102,9 +102,9 @@ export default function Dashboard() {
     <CommPanelLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
           <div>
-            <h2 className="text-3xl font-bold text-foreground">Dashboard</h2>
+            <h2 className="text-xl sm:text-3xl font-bold text-foreground">Dashboard</h2>
             <p className="text-muted-foreground mt-1">
               Resumen de estadísticas y actividad de correos electrónicos
             </p>
@@ -112,7 +112,7 @@ export default function Dashboard() {
           <Button
             onClick={handleSendTestTemplates}
             disabled={isLoadingTestTemplates}
-            className="gap-2"
+            className="w-full sm:w-auto gap-2"
             data-testid="button-send-test-templates"
           >
             {isLoadingTestTemplates ? (
