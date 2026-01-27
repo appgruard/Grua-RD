@@ -367,12 +367,33 @@ export class CommunicationPanelService {
     textoBoton: string;
     colorFondo: string;
     colorTexto: string;
-    fechaInicio: Date;
-    fechaFin: Date;
+    fechaInicio: Date | string | null;
+    fechaFin: Date | string | null;
     prioridad: number;
   }>) {
+    // Clean up the data - convert date strings to Date objects or null
+    const cleanData: Record<string, any> = { ...data };
+    
+    // Handle fechaInicio
+    if ('fechaInicio' in cleanData) {
+      if (!cleanData.fechaInicio || cleanData.fechaInicio === '') {
+        cleanData.fechaInicio = null;
+      } else if (typeof cleanData.fechaInicio === 'string') {
+        cleanData.fechaInicio = new Date(cleanData.fechaInicio);
+      }
+    }
+    
+    // Handle fechaFin
+    if ('fechaFin' in cleanData) {
+      if (!cleanData.fechaFin || cleanData.fechaFin === '') {
+        cleanData.fechaFin = null;
+      } else if (typeof cleanData.fechaFin === 'string') {
+        cleanData.fechaFin = new Date(cleanData.fechaFin);
+      }
+    }
+    
     const [announcement] = await db.update(inAppAnnouncements)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...cleanData, updatedAt: new Date() })
       .where(eq(inAppAnnouncements.id, id))
       .returning();
     return announcement;
