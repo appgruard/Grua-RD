@@ -33,6 +33,34 @@ import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCateg
 
 type VerificationStep = 'cedula' | 'email' | 'insurance' | 'photo' | 'license' | 'categories' | 'vehicles' | 'complete';
 
+// Module-level loop detection (persists across renders)
+let moduleApiCallCount = 0;
+let moduleLastCallTime = 0;
+const MODULE_LOOP_THRESHOLD = 15;
+const MODULE_TIME_WINDOW = 3000; // 3 seconds
+
+function detectAndBreakLoop(userType?: string): boolean {
+  const now = Date.now();
+  
+  // Reset if enough time has passed
+  if (now - moduleLastCallTime > MODULE_TIME_WINDOW) {
+    moduleApiCallCount = 0;
+  }
+  
+  moduleLastCallTime = now;
+  moduleApiCallCount++;
+  
+  if (moduleApiCallCount >= MODULE_LOOP_THRESHOLD) {
+    console.warn(`Loop detected (${moduleApiCallCount} calls in ${MODULE_TIME_WINDOW}ms), forcing redirect`);
+    moduleApiCallCount = 0; // Reset to prevent infinite redirect attempts
+    const targetDashboard = userType === 'conductor' ? '/driver' : '/client';
+    window.location.href = targetDashboard;
+    return true;
+  }
+  
+  return false;
+}
+
 const insuranceCompanies = [
   'Seguros Reservas',
   'Mapfre BHD',
@@ -154,8 +182,6 @@ export default function VerifyPending() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const redirectingRef = useRef(false);
   const isRedirectingOrFetching = useRef(false);
-  const fetchCountRef = useRef(0);
-  const lastFetchTimeRef = useRef(0);
   
   // Use user from context, or pendingVerificationUser, or initializedUser from API
   const currentUser = contextUser || initializedUser;
@@ -176,35 +202,17 @@ export default function VerifyPending() {
   // Reusable function to fetch verification status from the server
   // When skipRedirects is true, only update local state without triggering redirects
   const fetchVerificationStatusFromServer = useCallback(async (signal?: AbortSignal, options?: { skipRedirects?: boolean }) => {
+    // Module-level loop detection - check before anything else
+    const checkUser = contextUser || pendingVerificationUser;
+    if (detectAndBreakLoop(checkUser?.userType)) {
+      return { success: true, redirecting: true };
+    }
+    
     // Skip if redirect is already in progress or if we're already fetching
     if (redirectingRef.current || isRedirectingOrFetching.current) {
       return { success: true, redirecting: true };
     }
     
-    // Detect rapid repeated fetches (loop detection)
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchTimeRef.current;
-    
-    if (timeSinceLastFetch < 500) {
-      // Fetches happening too fast - increment counter
-      fetchCountRef.current += 1;
-      
-      // If more than 5 rapid fetches in a row, force page reload
-      if (fetchCountRef.current > 5) {
-        console.warn('Loop detected in verify-pending, forcing page reload');
-        // Determine correct dashboard based on user type
-        const checkUser = contextUser || pendingVerificationUser;
-        const targetDashboard = checkUser?.userType === 'conductor' ? '/driver' : '/client';
-        // Force a hard reload to break the loop
-        window.location.href = targetDashboard;
-        return { success: true, redirecting: true };
-      }
-    } else {
-      // Reset counter if enough time passed
-      fetchCountRef.current = 0;
-    }
-    
-    lastFetchTimeRef.current = now;
     isRedirectingOrFetching.current = true;
     
     try {
