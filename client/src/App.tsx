@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { Loader2 } from 'lucide-react';
 import { CommPanelAuthProvider, CommPanelProtectedRoute } from '@/contexts/CommPanelAuthContext';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -141,6 +142,16 @@ function ProtectedRoute({
 
   // For conductors, check if verification is complete using authoritative server data
   if (currentUser.userType === 'conductor') {
+    // If conductor data is not loaded yet, show loading state instead of redirecting
+    // This prevents the redirect loop when user data hasn't been fully fetched
+    if (!(currentUser as any).conductor) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+    
     // Either telefonoVerificado OR emailVerificado counts as contact verified
     const contactoVerificado = currentUser.telefonoVerificado || (currentUser as any).emailVerificado;
     // Conductors also need photo verification
