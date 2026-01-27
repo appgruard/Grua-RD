@@ -723,7 +723,8 @@ export class DatabaseStorage implements IStorage {
     const conductorResults = await db.execute(sql`
       SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
              licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
-             balance_disponible, balance_pendiente
+             balance_disponible, balance_pendiente, categorias_configuradas,
+             licencia_frontal_url, licencia_trasera_url
       FROM conductores 
       WHERE user_id = ${id}
       LIMIT 1
@@ -744,6 +745,9 @@ export class DatabaseStorage implements IStorage {
         bloqueadoHasta: cRow.bloqueado_hasta,
         balanceDisponible: cRow.balance_disponible,
         balancePendiente: cRow.balance_pendiente,
+        categoriasConfiguradas: cRow.categorias_configuradas,
+        licenciaFrontalUrl: cRow.licencia_frontal_url,
+        licenciaTraseraUrl: cRow.licencia_trasera_url,
       };
     }
     
