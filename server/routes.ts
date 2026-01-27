@@ -15847,6 +15847,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Send all system email templates for testing
+  app.post("/api/comm-panel/test-all-templates", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: 'Email es requerido' });
+      }
+      
+      const emailService = await getEmailService();
+      const results: { template: string; success: boolean; error?: string }[] = [];
+      
+      const mockTicket = {
+        id: 'TEST-12345678-ABCD',
+        titulo: 'Ticket de Prueba',
+        descripcion: 'Descripción de prueba para verificar formato',
+        categoria: 'consulta_servicio',
+        prioridad: 'media',
+        estado: 'abierto'
+      };
+      
+      const templates = [
+        { name: 'OTP/Verificación', send: () => emailService.sendOTPEmail(email, '123456', 'Usuario Prueba') },
+        { name: 'Bienvenida General', send: () => emailService.sendWelcomeEmail(email, 'Usuario Prueba') },
+        { name: 'Bienvenida Cliente', send: () => emailService.sendClientWelcomeEmail(email, 'Cliente Prueba') },
+        { name: 'Bienvenida Operador', send: () => emailService.sendOperatorWelcomeEmail(email, 'Operador Prueba') },
+        { name: 'Notificación de Servicio', send: () => emailService.sendServiceNotification(email, 'Servicio Completado', 'Tu servicio SRV-12345 ha sido completado exitosamente.') },
+        { name: 'Restablecer Contraseña', send: () => emailService.sendPasswordResetEmail(email, 'https://app.gruard.com/reset?token=test123', 'Usuario Prueba') },
+        { name: 'Documento Aprobado', send: () => emailService.sendDocumentApprovalEmail(email, 'Licencia de Conducir', true) },
+        { name: 'Documento Rechazado', send: () => emailService.sendDocumentApprovalEmail(email, 'Seguro del Vehículo', false, 'El documento está vencido o ilegible') },
+        { name: 'Ticket Creado', send: () => emailService.sendTicketCreatedEmail(email, 'Usuario Prueba', mockTicket) },
+        { name: 'Ticket Estado Cambiado', send: () => emailService.sendTicketStatusChangedEmail(email, 'Usuario Prueba', mockTicket, 'abierto', 'en_proceso') },
+        { name: 'Respuesta de Soporte', send: () => emailService.sendTicketSupportResponseEmail(email, 'Usuario Prueba', mockTicket, 'Gracias por contactarnos. Estamos revisando su solicitud.') },
+        { name: 'Socio/Inversor Creado', send: () => emailService.sendSocioCreatedEmail(email, 'Inversor Prueba', 'TempPass123!', '5.00') },
+        { name: 'Socio Primer Login', send: () => emailService.sendSocioFirstLoginEmail(email, 'Inversor Prueba') },
+        { name: 'Administrador Creado', send: () => emailService.sendAdminCreatedEmail(email, 'Admin Prueba', 'AdminPass123!', ['dashboard', 'analytics', 'usuarios']) }
+      ];
+      
+      for (const tmpl of templates) {
+        try {
+          const success = await tmpl.send();
+          results.push({ template: tmpl.name, success });
+          await new Promise(resolve => setTimeout(resolve, 600));
+        } catch (error: any) {
+          results.push({ template: tmpl.name, success: false, error: error.message });
+        }
+      }
+      
+      const successCount = results.filter(r => r.success).length;
+      logSystem.info('Test templates sent from comm panel', { email, successCount, total: templates.length });
+      
+      res.json({
+        message: `Enviados ${successCount}/${templates.length} correos`,
+        email,
+        results
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
   // Push Notification Configs CRUD
   app.get("/api/comm-panel/push-configs", validateCommPanelSession, async (_req: Request, res: Response) => {
     try {
