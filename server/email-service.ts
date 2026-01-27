@@ -52,8 +52,15 @@ const SIGNATURE_CONFIG = {
   },
 };
 
-// Logo URL for emails (hosted logo)
-const LOGO_URL = 'https://app.gruard.com/api/assets/logo-email';
+// Logo URL for emails - uses environment variable or production URL
+function getLogoUrl(): string {
+  // Use APP_URL from env, or Replit dev domain, or production URL
+  const baseUrl = process.env.APP_URL || 
+    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null) ||
+    'https://app.gruard.com';
+  return `${baseUrl}/api/assets/logo-email`;
+}
+const LOGO_URL = getLogoUrl();
 
 // Brand colors
 const BRAND_COLORS = {
