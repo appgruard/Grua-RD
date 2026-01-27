@@ -81,7 +81,7 @@ const announcementSchema = z.object({
 type AnnouncementFormValues = z.infer<typeof announcementSchema>;
 
 export default function Announcements() {
-  const { apiRequest } = useCommPanelAuth();
+  const { apiRequest, token } = useCommPanelAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -222,14 +222,20 @@ export default function Announcements() {
 
   const uploadImageMutation = useMutation({
     mutationFn: async (file: File) => {
+      if (!token) throw new Error('No autenticado');
       const formData = new FormData();
       formData.append('image', file);
       const response = await fetch('/api/comm-panel/upload-image', {
         method: 'POST',
-        credentials: 'include',
+        headers: {
+          'x-comm-panel-token': token,
+        },
         body: formData,
       });
-      if (!response.ok) throw new Error('Error al subir imagen');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Error al subir imagen' }));
+        throw new Error(error.message || 'Error al subir imagen');
+      }
       return response.json() as Promise<{ url: string }>;
     },
   });
