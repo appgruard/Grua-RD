@@ -48,6 +48,7 @@ Grúa RD uses a React 18 (TypeScript, Vite) frontend, an Express.js (Node.js) ba
     - **No Rating Penalty for Customers**: Rating remains unaffected by cancellations.
     - **Status Tracking**: Justifications for penalties/exonerations stored for transparency.
     - **Data Implementation**: Schema updated to track `tiempo_espera_real`, `eta_original`, `distancia_recorrida_operador`, and `monto_total_servicio`.
+- **Communications Panel**: Dashboard for email communications with statistics (total, successful, failed emails), email history table with filtering, and test template functionality.
 - **Notifications**: Web Push API, Capacitor push notifications, email (Resend).
 - **Payment Integration**: Azul API for card payments, cash, automatic commission splitting, operator wallet with scheduled payouts and same-day withdrawals, PDF receipts.
 - **Robust UX**: Skeleton loaders, empty states, dialogs, toast notifications, form validations, responsive design.

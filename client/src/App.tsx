@@ -5,9 +5,11 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { CommPanelAuthProvider, CommPanelProtectedRoute } from '@/contexts/CommPanelAuthContext';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { EmpresaLayout } from '@/components/layout/EmpresaLayout';
+import { CommPanelLayout } from '@/components/comm-panel/CommPanelLayout';
 import { InstallPWA, UpdateAvailable, OfflineIndicator } from '@/components/InstallPWA';
 import { ThemeProvider } from '@/components/ThemeToggle';
 import { initializePreloading, preloadDriverModules } from '@/lib/preload';
@@ -75,6 +77,13 @@ const AseguradoraPerfil = lazy(() => import('@/pages/aseguradora/AseguradoraPerf
 const NotFound = lazy(() => import('@/pages/not-found'));
 const PrivacyPolicy = lazy(() => import('@/pages/privacy-policy'));
 const Test3DS = lazy(() => import('@/pages/test-3ds'));
+
+const CommPanelLogin = lazy(() => import('@/pages/comm-panel/Login'));
+const CommPanelDashboard = lazy(() => import('@/pages/comm-panel/Dashboard'));
+const CommPanelComposer = lazy(() => import('@/pages/comm-panel/Composer'));
+const CommPanelTemplates = lazy(() => import('@/pages/comm-panel/Templates'));
+const CommPanelAnnouncements = lazy(() => import('@/pages/comm-panel/Announcements'));
+const CommPanelPushConfigs = lazy(() => import('@/pages/comm-panel/PushConfigs'));
 
 function LoadingFallback() {
   return (
@@ -179,6 +188,34 @@ function Router() {
           </ProtectedRoute>
         </Route>
         <Route path="/privacy-policy" component={PrivacyPolicy} />
+
+        {/* Communications Panel Routes */}
+        <Route path="/admin/communications/login" component={CommPanelLogin} />
+        <Route path="/admin/communications/composer">
+          <CommPanelProtectedRoute>
+            <CommPanelComposer />
+          </CommPanelProtectedRoute>
+        </Route>
+        <Route path="/admin/communications/templates">
+          <CommPanelProtectedRoute>
+            <CommPanelTemplates />
+          </CommPanelProtectedRoute>
+        </Route>
+        <Route path="/admin/communications/announcements">
+          <CommPanelProtectedRoute>
+            <CommPanelAnnouncements />
+          </CommPanelProtectedRoute>
+        </Route>
+        <Route path="/admin/communications/push">
+          <CommPanelProtectedRoute>
+            <CommPanelPushConfigs />
+          </CommPanelProtectedRoute>
+        </Route>
+        <Route path="/admin/communications">
+          <CommPanelProtectedRoute>
+            <CommPanelDashboard />
+          </CommPanelProtectedRoute>
+        </Route>
       
       {/* Client Routes - Most specific first */}
       <Route path="/client/tracking/:id">
@@ -527,15 +564,17 @@ export default function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <ServiceRequestProvider>
-            <TooltipProvider>
-              <OfflineIndicator />
-              <Toaster />
-              <Router />
-              <InstallPWA />
-              <UpdateAvailable />
-            </TooltipProvider>
-          </ServiceRequestProvider>
+          <CommPanelAuthProvider>
+            <ServiceRequestProvider>
+              <TooltipProvider>
+                <OfflineIndicator />
+                <Toaster />
+                <Router />
+                <InstallPWA />
+                <UpdateAvailable />
+              </TooltipProvider>
+            </ServiceRequestProvider>
+          </CommPanelAuthProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
