@@ -112,6 +112,8 @@ export default function VerifyPending() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const redirectingRef = useRef(false);
   const isRedirectingOrFetching = useRef(false);
+  const fetchCountRef = useRef(0);
+  const lastFetchTimeRef = useRef(0);
   
   // Use user from context, or pendingVerificationUser, or initializedUser from API
   const currentUser = contextUser || initializedUser;
@@ -137,6 +139,29 @@ export default function VerifyPending() {
       return { success: true, redirecting: true };
     }
     
+    // Detect rapid repeated fetches (loop detection)
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTimeRef.current;
+    
+    if (timeSinceLastFetch < 500) {
+      // Fetches happening too fast - increment counter
+      fetchCountRef.current += 1;
+      
+      // If more than 5 rapid fetches in a row, force page reload
+      if (fetchCountRef.current > 5) {
+        console.warn('Loop detected in verify-pending, forcing page reload');
+        // Clear session storage flag to allow fresh start
+        sessionStorage.removeItem('verify-pending-loop-detected');
+        // Force a hard reload to break the loop
+        window.location.href = '/client';
+        return { success: true, redirecting: true };
+      }
+    } else {
+      // Reset counter if enough time passed
+      fetchCountRef.current = 0;
+    }
+    
+    lastFetchTimeRef.current = now;
     isRedirectingOrFetching.current = true;
     
     try {
