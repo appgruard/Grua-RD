@@ -6106,10 +6106,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const cancelaciones = await storage.getCancelacionesByUsuarioId(usuarioId, 'cliente');
+      
+      // Calculate total penalties
+      const penalizacionesTotales = cancelaciones.reduce((sum: number, c: any) => {
+        return sum + (c.penalizacionAplicada || 0);
+      }, 0);
 
       res.json({
-        totalCancelaciones: cancelaciones.length,
-        cancelaciones,
+        total_cancelaciones: cancelaciones.length,
+        ultimas_cancelaciones: cancelaciones,
+        penalizaciones_totales: penalizacionesTotales,
       });
     } catch (error: any) {
       logSystem.error('Get cancellations error', error);
@@ -6130,10 +6136,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const cancelaciones = await storage.getCancelacionesByUsuarioId(conductorId, 'conductor');
+      
+      // Calculate total penalties
+      const penalizacionesTotales = cancelaciones.reduce((sum: number, c: any) => {
+        return sum + (c.penalizacionAplicada || 0);
+      }, 0);
 
       res.json({
-        totalCancelaciones: cancelaciones.length,
-        cancelaciones,
+        total_cancelaciones: cancelaciones.length,
+        ultimas_cancelaciones: cancelaciones,
+        penalizaciones_totales: penalizacionesTotales,
       });
     } catch (error: any) {
       logSystem.error('Get driver cancellations error', error);
