@@ -111,6 +111,7 @@ export default function VerifyPending() {
   const initFetchedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const redirectingRef = useRef(false);
+  const isRedirectingOrFetching = useRef(false);
   
   // Use user from context, or pendingVerificationUser, or initializedUser from API
   const currentUser = contextUser || initializedUser;
@@ -131,10 +132,12 @@ export default function VerifyPending() {
   // Reusable function to fetch verification status from the server
   // When skipRedirects is true, only update local state without triggering redirects
   const fetchVerificationStatusFromServer = useCallback(async (signal?: AbortSignal, options?: { skipRedirects?: boolean }) => {
-    // Skip if redirect is already in progress to prevent polling loops
-    if (redirectingRef.current) {
+    // Skip if redirect is already in progress or if we're already fetching
+    if (redirectingRef.current || isRedirectingOrFetching.current) {
       return { success: true, redirecting: true };
     }
+    
+    isRedirectingOrFetching.current = true;
     
     try {
       const res = await fetch('/api/identity/verification-status', {
@@ -269,6 +272,11 @@ export default function VerifyPending() {
       if (error?.name === 'AbortError') return { success: false, aborted: true };
       console.error('Error checking verification status:', error);
       return { success: false };
+    } finally {
+      // Reset the fetching guard unless we're redirecting
+      if (!redirectingRef.current) {
+        isRedirectingOrFetching.current = false;
+      }
     }
   }, [contextUser, setLocation, clearPendingVerification, refreshUser]);
 
@@ -292,6 +300,10 @@ export default function VerifyPending() {
     const result = await fetchVerificationStatusFromServer(controller.signal, { skipRedirects: true });
     return result.success;
   }, [fetchVerificationStatusFromServer]);
+
+  // Store fetch function in ref to avoid useEffect dependency changes
+  const fetchFnRef = useRef(fetchVerificationStatusFromServer);
+  fetchFnRef.current = fetchVerificationStatusFromServer;
 
   // Single effect to fetch verification status on mount - runs once per session
   // Wait for auth loading to complete before fetching verification status
@@ -329,7 +341,8 @@ export default function VerifyPending() {
     
     const doFetch = async () => {
       // Initial fetch can do redirects (skipRedirects: false by default)
-      const result = await fetchVerificationStatusFromServer(controller.signal);
+      // Use ref to call the function without including it in dependencies
+      const result = await fetchFnRef.current(controller.signal);
       clearTimeout(timeoutId);
       if (!result.success && !result.aborted && !result.unauthorized) {
         setInitError(true);
@@ -347,7 +360,8 @@ export default function VerifyPending() {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [authLoading, contextUser, pendingVerificationUser, fetchVerificationStatusFromServer, setLocation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, contextUser, pendingVerificationUser, setLocation]);
 
   // Effect to refetch verification status when tab regains focus (handles multi-tab scenarios)
   useEffect(() => {
