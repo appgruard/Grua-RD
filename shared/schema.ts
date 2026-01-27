@@ -2904,7 +2904,15 @@ export const anuncioTipoEnum = pgEnum("anuncio_tipo", [
   "modal",
   "banner",
   "toast",
-  "fullscreen"
+  "fullscreen",
+  "imagen"
+]);
+
+// Enum para tamaños de anuncio
+export const anuncioTamanoEnum = pgEnum("anuncio_tamano", [
+  "pequeno",
+  "mediano",
+  "grande"
 ]);
 
 // Enum para estado de anuncio
@@ -2989,6 +2997,7 @@ export const inAppAnnouncements = pgTable("in_app_announcements", {
   contenido: text("contenido").notNull(),
   imagenUrl: text("imagen_url"),
   tipo: anuncioTipoEnum("tipo").default("modal").notNull(),
+  tamano: anuncioTamanoEnum("tamano").default("mediano"),
   estado: anuncioEstadoEnum("estado").default("borrador").notNull(),
   audiencia: anuncioAudienciaEnum("audiencia").default("todos").notNull(),
   enlaceAccion: text("enlace_accion"),
