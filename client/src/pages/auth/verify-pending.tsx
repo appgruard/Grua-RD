@@ -235,30 +235,8 @@ export default function VerifyPending() {
           }
         } else {
           // Client verification flow
-          // Load existing insurance documents for clients
-          try {
-            const insuranceRes = await fetch('/api/client/insurance/status', {
-              credentials: 'include',
-              signal
-            });
-            if (insuranceRes.ok) {
-              const insuranceData = await insuranceRes.json();
-              if (insuranceData.insuranceDocuments && insuranceData.insuranceDocuments.length > 0) {
-                setInsuranceDocuments(insuranceData.insuranceDocuments.map((doc: any) => ({
-                  id: doc.id,
-                  aseguradoraNombre: doc.aseguradoraNombre || doc.tipo || '',
-                  numeroPoliza: doc.numeroPoliza || '',
-                  fechaVencimiento: doc.validoHasta,
-                  estado: doc.estado || 'pendiente',
-                  createdAt: doc.createdAt || new Date().toISOString(),
-                })));
-                setInsuranceCompleted(true);
-              }
-            }
-          } catch (err) {
-            console.error('Error loading insurance documents:', err);
-          }
-
+          // For clients: if both cedula and email are verified, redirect immediately
+          // Insurance is OPTIONAL and can be managed from profile
           if (cedulaVerificada && emailVerificado) {
             // Fully verified - redirect if skipRedirects is not true
             if (!options?.skipRedirects) {
