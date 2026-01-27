@@ -1788,6 +1788,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve logo for emails
+  app.get("/api/assets/logo-email", async (_req: Request, res: Response) => {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const logoPath = path.join(process.cwd(), 'attached_assets', 'Grúa_20251124_024218_0000_1763966543810.png');
+      
+      if (fs.existsSync(logoPath)) {
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        fs.createReadStream(logoPath).pipe(res);
+      } else {
+        res.status(404).send('Logo not found');
+      }
+    } catch (error) {
+      logSystem.error('Error serving logo', error);
+      res.status(500).send('Error');
+    }
+  });
+
   app.get("/api/health", async (_req: Request, res: Response) => {
     try {
       const startTime = Date.now();
@@ -15565,6 +15585,310 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== END TEST EMAIL ENDPOINT ====================
+
+  // ==================== COMMUNICATION PANEL API ====================
+  
+  const { CommunicationPanelService } = await import('./services/communication-panel');
+  
+  // Middleware to validate communication panel session
+  const validateCommPanelSession = (req: Request, res: Response, next: Function) => {
+    const token = req.headers['x-comm-panel-token'] as string;
+    if (!token) {
+      return res.status(401).json({ message: 'Token requerido' });
+    }
+    
+    const session = CommunicationPanelService.validateSession(token);
+    if (!session) {
+      return res.status(401).json({ message: 'Sesion invalida o expirada' });
+    }
+    
+    (req as any).commPanelUser = session;
+    next();
+  };
+  
+  // Auth endpoints
+  app.post("/api/comm-panel/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: 'Email y contraseña requeridos' });
+      }
+      
+      const result = await CommunicationPanelService.authenticate(email, password);
+      
+      if (!result) {
+        return res.status(401).json({ message: 'Credenciales invalidas' });
+      }
+      
+      logSystem.info('Communication panel login', { email });
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Comm panel login error', error);
+      res.status(500).json({ message: 'Error al iniciar sesion' });
+    }
+  });
+  
+  app.post("/api/comm-panel/logout", validateCommPanelSession, (req: Request, res: Response) => {
+    const token = req.headers['x-comm-panel-token'] as string;
+    CommunicationPanelService.logout(token);
+    res.json({ message: 'Sesion cerrada' });
+  });
+  
+  // Get email aliases
+  app.get("/api/comm-panel/email-aliases", validateCommPanelSession, (_req: Request, res: Response) => {
+    const aliases = CommunicationPanelService.getEmailAliases();
+    res.json(aliases);
+  });
+  
+  // Email Templates CRUD
+  app.get("/api/comm-panel/templates", validateCommPanelSession, async (_req: Request, res: Response) => {
+    try {
+      const templates = await CommunicationPanelService.getTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.get("/api/comm-panel/templates/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const template = await CommunicationPanelService.getTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ message: 'Plantilla no encontrada' });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.post("/api/comm-panel/templates", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const template = await CommunicationPanelService.createTemplate({
+        ...req.body,
+        creadoPor: user.userId
+      });
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.put("/api/comm-panel/templates/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const template = await CommunicationPanelService.updateTemplate(req.params.id, req.body);
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.delete("/api/comm-panel/templates/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      await CommunicationPanelService.deleteTemplate(req.params.id);
+      res.json({ message: 'Plantilla eliminada' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Email Signatures CRUD
+  app.get("/api/comm-panel/signatures", validateCommPanelSession, async (_req: Request, res: Response) => {
+    try {
+      const signatures = await CommunicationPanelService.getSignatures();
+      res.json(signatures);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.post("/api/comm-panel/signatures", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const signature = await CommunicationPanelService.createSignature({
+        ...req.body,
+        creadoPor: user.userId
+      });
+      res.json(signature);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.put("/api/comm-panel/signatures/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const signature = await CommunicationPanelService.updateSignature(req.params.id, req.body);
+      res.json(signature);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.delete("/api/comm-panel/signatures/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      await CommunicationPanelService.deleteSignature(req.params.id);
+      res.json({ message: 'Firma eliminada' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Send email
+  app.post("/api/comm-panel/send-email", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const result = await CommunicationPanelService.sendEmail({
+        ...req.body,
+        enviadoPor: user.userId
+      });
+      
+      if (result.success) {
+        logSystem.info('Email sent from comm panel', { 
+          to: req.body.destinatarios,
+          subject: req.body.asunto,
+          by: user.email
+        });
+        res.json(result);
+      } else {
+        res.status(500).json(result);
+      }
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+  
+  // Email history
+  app.get("/api/comm-panel/email-history", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const history = await CommunicationPanelService.getEmailHistory(limit, offset);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // In-App Announcements CRUD
+  app.get("/api/comm-panel/announcements", validateCommPanelSession, async (_req: Request, res: Response) => {
+    try {
+      const announcements = await CommunicationPanelService.getAnnouncements();
+      res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.post("/api/comm-panel/announcements", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const announcement = await CommunicationPanelService.createAnnouncement({
+        ...req.body,
+        creadoPor: user.userId
+      });
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.put("/api/comm-panel/announcements/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const announcement = await CommunicationPanelService.updateAnnouncement(req.params.id, req.body);
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.delete("/api/comm-panel/announcements/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      await CommunicationPanelService.deleteAnnouncement(req.params.id);
+      res.json({ message: 'Anuncio eliminado' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Get active announcements for user (mobile app)
+  app.get("/api/announcements/active", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'No autenticado' });
+      }
+      
+      const announcements = await CommunicationPanelService.getActiveAnnouncements(
+        req.user!.userType,
+        req.user!.id
+      );
+      res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Mark announcement as viewed/dismissed
+  app.post("/api/announcements/:id/view", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'No autenticado' });
+      }
+      
+      await CommunicationPanelService.markAnnouncementViewed(
+        req.params.id,
+        req.user!.id,
+        req.body.descartado || false
+      );
+      res.json({ message: 'OK' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Push Notification Configs CRUD
+  app.get("/api/comm-panel/push-configs", validateCommPanelSession, async (_req: Request, res: Response) => {
+    try {
+      const configs = await CommunicationPanelService.getPushConfigs();
+      res.json(configs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.post("/api/comm-panel/push-configs", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const config = await CommunicationPanelService.createPushConfig({
+        ...req.body,
+        creadoPor: user.userId
+      });
+      res.json(config);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.put("/api/comm-panel/push-configs/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const config = await CommunicationPanelService.updatePushConfig(req.params.id, req.body);
+      res.json(config);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.delete("/api/comm-panel/push-configs/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      await CommunicationPanelService.deletePushConfig(req.params.id);
+      res.json({ message: 'Configuracion eliminada' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // ==================== END COMMUNICATION PANEL API ====================
 
   initServiceAutoCancellation(serviceSessions);
   initWalletService();

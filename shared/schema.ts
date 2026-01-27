@@ -2896,3 +2896,242 @@ export const ADMIN_PERMISO_LABELS: Record<AdminPermiso, string> = {
 };
 
 // ==================== END ADMINISTRADORES ====================
+
+// ==================== COMMUNICATION PANEL ====================
+
+// Enum para tipos de anuncio
+export const anuncioTipoEnum = pgEnum("anuncio_tipo", [
+  "modal",
+  "banner",
+  "toast",
+  "fullscreen"
+]);
+
+// Enum para estado de anuncio
+export const anuncioEstadoEnum = pgEnum("anuncio_estado", [
+  "borrador",
+  "programado",
+  "activo",
+  "pausado",
+  "expirado"
+]);
+
+// Enum para audiencia de anuncio
+export const anuncioAudienciaEnum = pgEnum("anuncio_audiencia", [
+  "todos",
+  "clientes",
+  "conductores",
+  "empresas",
+  "aseguradoras"
+]);
+
+// Usuarios del panel de comunicaciones (acceso restringido)
+export const communicationPanelUsers = pgTable("communication_panel_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  nombre: text("nombre").notNull(),
+  activo: boolean("activo").default(true).notNull(),
+  ultimoAcceso: timestamp("ultimo_acceso"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Plantillas de email
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nombre: text("nombre").notNull(),
+  asunto: text("asunto").notNull(),
+  contenidoHtml: text("contenido_html").notNull(),
+  contenidoTexto: text("contenido_texto"),
+  categoria: text("categoria").default("general"),
+  variables: text("variables").array(),
+  activo: boolean("activo").default(true).notNull(),
+  creadoPor: varchar("creado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Firmas de email
+export const emailSignatures = pgTable("email_signatures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nombre: text("nombre").notNull(),
+  departamento: text("departamento"),
+  cargo: text("cargo"),
+  telefono: text("telefono"),
+  contenidoHtml: text("contenido_html").notNull(),
+  esDefault: boolean("es_default").default(false).notNull(),
+  creadoPor: varchar("creado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Historial de emails enviados
+export const emailHistory = pgTable("email_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  destinatarios: text("destinatarios").array().notNull(),
+  asunto: text("asunto").notNull(),
+  contenidoHtml: text("contenido_html").notNull(),
+  alias: text("alias").notNull(),
+  adjuntos: text("adjuntos").array(),
+  plantillaId: varchar("plantilla_id").references(() => emailTemplates.id),
+  firmaId: varchar("firma_id").references(() => emailSignatures.id),
+  enviadoPor: varchar("enviado_por").references(() => communicationPanelUsers.id),
+  resendId: text("resend_id"),
+  estado: text("estado").default("enviado"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Anuncios in-app
+export const inAppAnnouncements = pgTable("in_app_announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  titulo: text("titulo").notNull(),
+  contenido: text("contenido").notNull(),
+  imagenUrl: text("imagen_url"),
+  tipo: anuncioTipoEnum("tipo").default("modal").notNull(),
+  estado: anuncioEstadoEnum("estado").default("borrador").notNull(),
+  audiencia: anuncioAudienciaEnum("audiencia").default("todos").notNull(),
+  enlaceAccion: text("enlace_accion"),
+  textoBoton: text("texto_boton"),
+  colorFondo: text("color_fondo").default("#1a1a2e"),
+  colorTexto: text("color_texto").default("#ffffff"),
+  fechaInicio: timestamp("fecha_inicio"),
+  fechaFin: timestamp("fecha_fin"),
+  prioridad: integer("prioridad").default(0),
+  creadoPor: varchar("creado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Registro de anuncios vistos por usuarios
+export const announcementViews = pgTable("announcement_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  anuncioId: varchar("anuncio_id").notNull().references(() => inAppAnnouncements.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  visto: boolean("visto").default(true).notNull(),
+  descartado: boolean("descartado").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Configuración de notificaciones push
+export const pushNotificationConfig = pgTable("push_notification_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nombre: text("nombre").notNull(),
+  titulo: text("titulo").notNull(),
+  cuerpo: text("cuerpo").notNull(),
+  iconoUrl: text("icono_url"),
+  imagenUrl: text("imagen_url"),
+  colorAccento: text("color_accento").default("#e94560"),
+  sonido: text("sonido").default("default"),
+  vibracion: boolean("vibracion").default(true),
+  prioridad: text("prioridad").default("high"),
+  datosExtra: text("datos_extra"),
+  creadoPor: varchar("creado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Historial de notificaciones push
+export const pushNotificationHistory = pgTable("push_notification_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  configId: varchar("config_id").references(() => pushNotificationConfig.id),
+  destinatarios: text("destinatarios").array(),
+  audiencia: anuncioAudienciaEnum("audiencia"),
+  titulo: text("titulo").notNull(),
+  cuerpo: text("cuerpo").notNull(),
+  enviados: integer("enviados").default(0),
+  fallidos: integer("fallidos").default(0),
+  enviadoPor: varchar("enviado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Relations
+export const emailTemplatesRelations = relations(emailTemplates, ({ one }) => ({
+  creadoPorUsuario: one(communicationPanelUsers, {
+    fields: [emailTemplates.creadoPor],
+    references: [communicationPanelUsers.id],
+  }),
+}));
+
+export const emailHistoryRelations = relations(emailHistory, ({ one }) => ({
+  plantilla: one(emailTemplates, {
+    fields: [emailHistory.plantillaId],
+    references: [emailTemplates.id],
+  }),
+  firma: one(emailSignatures, {
+    fields: [emailHistory.firmaId],
+    references: [emailSignatures.id],
+  }),
+  enviadoPorUsuario: one(communicationPanelUsers, {
+    fields: [emailHistory.enviadoPor],
+    references: [communicationPanelUsers.id],
+  }),
+}));
+
+export const inAppAnnouncementsRelations = relations(inAppAnnouncements, ({ one, many }) => ({
+  creadoPorUsuario: one(communicationPanelUsers, {
+    fields: [inAppAnnouncements.creadoPor],
+    references: [communicationPanelUsers.id],
+  }),
+  vistas: many(announcementViews),
+}));
+
+export const announcementViewsRelations = relations(announcementViews, ({ one }) => ({
+  anuncio: one(inAppAnnouncements, {
+    fields: [announcementViews.anuncioId],
+    references: [inAppAnnouncements.id],
+  }),
+  usuario: one(users, {
+    fields: [announcementViews.userId],
+    references: [users.id],
+  }),
+}));
+
+// Insert Schemas
+export const insertCommunicationPanelUserSchema = createInsertSchema(communicationPanelUsers).omit({
+  id: true,
+  ultimoAcceso: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailSignatureSchema = createInsertSchema(emailSignatures).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInAppAnnouncementSchema = createInsertSchema(inAppAnnouncements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPushNotificationConfigSchema = createInsertSchema(pushNotificationConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type CommunicationPanelUser = typeof communicationPanelUsers.$inferSelect;
+export type InsertCommunicationPanelUser = z.infer<typeof insertCommunicationPanelUserSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailSignature = typeof emailSignatures.$inferSelect;
+export type InsertEmailSignature = z.infer<typeof insertEmailSignatureSchema>;
+export type EmailHistoryEntry = typeof emailHistory.$inferSelect;
+export type InAppAnnouncement = typeof inAppAnnouncements.$inferSelect;
+export type InsertInAppAnnouncement = z.infer<typeof insertInAppAnnouncementSchema>;
+export type AnnouncementView = typeof announcementViews.$inferSelect;
+export type PushNotificationConfig = typeof pushNotificationConfig.$inferSelect;
+export type InsertPushNotificationConfig = z.infer<typeof insertPushNotificationConfigSchema>;
+export type PushNotificationHistoryEntry = typeof pushNotificationHistory.$inferSelect;
+
+// ==================== END COMMUNICATION PANEL ====================

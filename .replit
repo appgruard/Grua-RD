@@ -9,7 +9,7 @@ localPort = 5000
 externalPort = 80
 
 [agent]
-integrations = ["javascript_database:1.0.0"]
+integrations = ["javascript_database:1.0.0", "resend:1.0.0"]
 
 [workflows]
 
