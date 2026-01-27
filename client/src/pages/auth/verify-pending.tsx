@@ -150,10 +150,11 @@ export default function VerifyPending() {
       // If more than 5 rapid fetches in a row, force page reload
       if (fetchCountRef.current > 5) {
         console.warn('Loop detected in verify-pending, forcing page reload');
-        // Clear session storage flag to allow fresh start
-        sessionStorage.removeItem('verify-pending-loop-detected');
+        // Determine correct dashboard based on user type
+        const checkUser = contextUser || pendingVerificationUser;
+        const targetDashboard = checkUser?.userType === 'conductor' ? '/driver' : '/client';
         // Force a hard reload to break the loop
-        window.location.href = '/client';
+        window.location.href = targetDashboard;
         return { success: true, redirecting: true };
       }
     } else {
