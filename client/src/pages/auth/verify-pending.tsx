@@ -1274,13 +1274,14 @@ export default function VerifyPending() {
         setCurrentStep('photo');
       } else {
         // Client is fully verified after email verification (cedula + email)
-        // Refresh user data first, then re-fetch verification status which will handle redirect
+        // Insurance is OPTIONAL and can be added from profile later
+        // Navigate directly to client dashboard
+        redirectingRef.current = true;
         clearPendingVerification();
         await refreshUser();
-        // Add small delay to ensure React Query cache is updated before navigation
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // Re-fetch verification status which will redirect to /client if fully verified
-        await fetchVerificationStatusFromServer();
+        // Small delay to ensure React Query cache is updated
+        await new Promise(resolve => setTimeout(resolve, 150));
+        setLocation('/client');
       }
     },
     onError: (error: any) => {
