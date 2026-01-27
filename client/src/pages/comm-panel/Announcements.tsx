@@ -40,8 +40,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit2, Trash2, Loader2, Play, Pause } from 'lucide-react';
+import { Plus, Edit2, Trash2, Loader2, Play, Pause, Upload, ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { FileUpload } from '@/components/FileUpload';
 import { es } from 'date-fns/locale';
 
 interface Announcement {
@@ -85,6 +86,10 @@ export default function Announcements() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const form = useForm<AnnouncementFormValues>({
     resolver: zodResolver(announcementSchema),
@@ -215,9 +220,26 @@ export default function Announcements() {
     },
   });
 
+  const uploadImageMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await fetch('/api/comm-panel/upload-image', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!response.ok) throw new Error('Error al subir imagen');
+      return response.json() as Promise<{ url: string }>;
+    },
+  });
+
   const handleNewAnnouncement = () => {
     setEditingAnnouncement(null);
     form.reset();
+    setImageFile(null);
+    setImagePreview(null);
+    setImageMode('upload');
     setIsDialogOpen(true);
   };
 
@@ -237,6 +259,9 @@ export default function Announcements() {
       fechaInicio: announcement.fechaInicio ? announcement.fechaInicio.split('T')[0] : '',
       fechaFin: announcement.fechaFin ? announcement.fechaFin.split('T')[0] : '',
     });
+    setImageFile(null);
+    setImagePreview(announcement.imagenUrl || null);
+    setImageMode(announcement.imagenUrl ? 'url' : 'upload');
     setIsDialogOpen(true);
   };
 
@@ -252,10 +277,31 @@ export default function Announcements() {
   };
 
   const onSubmit = async (values: AnnouncementFormValues) => {
+    let finalImageUrl = values.imagenUrl;
+
+    if (imageFile) {
+      try {
+        setIsUploadingImage(true);
+        const result = await uploadImageMutation.mutateAsync(imageFile);
+        finalImageUrl = result.url;
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'No se pudo subir la imagen',
+          variant: 'destructive',
+        });
+        setIsUploadingImage(false);
+        return;
+      }
+      setIsUploadingImage(false);
+    }
+
+    const dataToSubmit = { ...values, imagenUrl: finalImageUrl };
+
     if (editingAnnouncement) {
-      await updateMutation.mutateAsync(values);
+      await updateMutation.mutateAsync(dataToSubmit);
     } else {
-      await createMutation.mutateAsync(values);
+      await createMutation.mutateAsync(dataToSubmit);
     }
   };
 
@@ -263,6 +309,9 @@ export default function Announcements() {
     setIsDialogOpen(false);
     setEditingAnnouncement(null);
     form.reset();
+    setImageFile(null);
+    setImagePreview(null);
+    setImageMode('upload');
   };
 
   const getStatusColor = (status: string) => {
@@ -703,20 +752,92 @@ export default function Announcements() {
                   )}
                 />
 
-                {/* Imagen URL Field */}
+                {/* Imagen Field with Upload/URL modes */}
                 <FormField
                   control={form.control}
                   name="imagenUrl"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel data-testid="label-imagenUrl">URL de Imagen (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Ej: https://ejemplo.com/imagen.jpg"
-                          {...field}
-                          data-testid="input-imagenUrl"
-                        />
-                      </FormControl>
+                      <FormLabel data-testid="label-imagenUrl">Imagen (Opcional)</FormLabel>
+                      <div className="space-y-4">
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant={imageMode === 'upload' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setImageMode('upload')}
+                            data-testid="button-image-mode-upload"
+                            className="gap-2"
+                          >
+                            <Upload className="h-4 w-4" />
+                            Subir Imagen
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={imageMode === 'url' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setImageMode('url')}
+                            data-testid="button-image-mode-url"
+                            className="gap-2"
+                          >
+                            <ImageIcon className="h-4 w-4" />
+                            URL Externa
+                          </Button>
+                        </div>
+
+                        {imageMode === 'upload' ? (
+                          <FileUpload
+                            onFileSelect={(file) => {
+                              setImageFile(file);
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setImagePreview(reader.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            onFileRemove={() => {
+                              setImageFile(null);
+                              setImagePreview(null);
+                            }}
+                            accept="image/jpeg,image/png,image/jpg,image/gif,image/webp"
+                            maxSizeMB={5}
+                            previewUrl={imagePreview || undefined}
+                            label=""
+                            helperText="Arrastra una imagen aquí o haz clic para seleccionar"
+                          />
+                        ) : (
+                          <FormControl>
+                            <Input
+                              placeholder="Ej: https://ejemplo.com/imagen.jpg"
+                              {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                setImagePreview(e.target.value || null);
+                              }}
+                              data-testid="input-imagenUrl"
+                            />
+                          </FormControl>
+                        )}
+
+                        {imagePreview && imageMode === 'url' && (
+                          <div className="mt-2" data-testid="image-preview-container">
+                            <p className="text-sm text-muted-foreground mb-2">Vista previa:</p>
+                            <img
+                              src={imagePreview}
+                              alt="Vista previa"
+                              className="max-w-full max-h-40 rounded object-contain"
+                              onError={() => setImagePreview(null)}
+                              data-testid="image-preview"
+                            />
+                          </div>
+                        )}
+
+                        {imageFile && (
+                          <p className="text-sm text-muted-foreground" data-testid="text-file-selected">
+                            Archivo seleccionado: {imageFile.name}
+                          </p>
+                        )}
+                      </div>
                       <FormMessage data-testid="error-imagenUrl" />
                     </FormItem>
                   )}
@@ -773,11 +894,16 @@ export default function Announcements() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
+                    disabled={createMutation.isPending || updateMutation.isPending || isUploadingImage}
                     data-testid="button-submit"
                     className="gap-2"
                   >
-                    {createMutation.isPending || updateMutation.isPending ? (
+                    {isUploadingImage ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Subiendo imagen...
+                      </>
+                    ) : createMutation.isPending || updateMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         {editingAnnouncement ? 'Actualizando...' : 'Creando...'}

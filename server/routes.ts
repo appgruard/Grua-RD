@@ -1793,15 +1793,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const fs = await import('fs');
       const path = await import('path');
-      const logoPath = path.join(process.cwd(), 'attached_assets', 'Grúa_20251124_024218_0000_1763966543810.png');
       
-      if (fs.existsSync(logoPath)) {
-        res.setHeader('Content-Type', 'image/png');
-        res.setHeader('Cache-Control', 'public, max-age=31536000');
-        fs.createReadStream(logoPath).pipe(res);
-      } else {
-        res.status(404).send('Logo not found');
+      // Try multiple possible logo locations in order of preference
+      const possiblePaths = [
+        path.join(process.cwd(), 'attached_assets', '20251126_144937_0000_1764283370962.png'),
+        path.join(process.cwd(), 'client', 'public', 'favicon.png'),
+        path.join(process.cwd(), 'attached_assets', 'Grúa_20251124_024218_0000_1763966543810.png'),
+      ];
+      
+      for (const logoPath of possiblePaths) {
+        if (fs.existsSync(logoPath)) {
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=31536000');
+          fs.createReadStream(logoPath).pipe(res);
+          return;
+        }
       }
+      
+      res.status(404).send('Logo not found');
     } catch (error) {
       logSystem.error('Error serving logo', error);
       res.status(500).send('Error');
@@ -15853,6 +15862,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: 'Anuncio eliminado' });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Multer config for announcement images
+  const announcementImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Solo se permiten imágenes'));
+      }
+    }
+  });
+  
+  // Upload image for announcement
+  app.post("/api/comm-panel/upload-image", validateCommPanelSession, announcementImageUpload.single('image'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No se proporcionó imagen' });
+      }
+      
+      const fileName = `announcement_${Date.now()}_${Math.random().toString(36).substring(7)}.${req.file.mimetype.split('/')[1]}`;
+      
+      // Try to upload to object storage first, fallback to filesystem
+      try {
+        const result = await uploadDocument(req.file.buffer, fileName, req.file.mimetype);
+        return res.json({ url: result.url });
+      } catch (storageError) {
+        // Fallback: save to local filesystem
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'announcements');
+        await fs.mkdir(uploadsDir, { recursive: true });
+        
+        const localPath = path.join(uploadsDir, fileName);
+        await fs.writeFile(localPath, req.file.buffer);
+        
+        // Return a URL that can be served
+        const baseUrl = process.env.APP_URL || 
+          (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : '') ||
+          '';
+        const url = `${baseUrl}/api/uploads/announcements/${fileName}`;
+        return res.json({ url });
+      }
+    } catch (error: any) {
+      logSystem.error('Error uploading announcement image', error);
+      res.status(500).json({ message: error.message || 'Error al subir imagen' });
+    }
+  });
+  
+  // Serve uploaded announcement images (public since announcements are shown to all users)
+  app.get("/api/uploads/announcements/:filename", async (req: Request, res: Response) => {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Sanitize filename - only allow alphanumeric, dash, underscore, and extension
+      const filename = req.params.filename;
+      const safeFilenameRegex = /^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|gif|webp)$/i;
+      if (!safeFilenameRegex.test(filename)) {
+        return res.status(400).json({ message: 'Nombre de archivo inválido' });
+      }
+      
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'announcements');
+      const filePath = path.resolve(uploadsDir, filename);
+      
+      // Ensure resolved path is within the uploads directory (prevent path traversal)
+      if (!filePath.startsWith(uploadsDir)) {
+        return res.status(400).json({ message: 'Acceso no permitido' });
+      }
+      
+      if (fs.existsSync(filePath)) {
+        const ext = path.extname(filename).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.png': 'image/png',
+          '.gif': 'image/gif',
+          '.webp': 'image/webp'
+        };
+        res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        fs.createReadStream(filePath).pipe(res);
+      } else {
+        res.status(404).json({ message: 'Imagen no encontrada' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error al servir imagen' });
     }
   });
   
