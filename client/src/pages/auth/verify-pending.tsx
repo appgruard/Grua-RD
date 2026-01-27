@@ -63,6 +63,48 @@ export default function VerifyPending() {
   // Use user from context or pendingVerificationUser immediately
   const contextUser = user || pendingVerificationUser;
   
+  // Loop detection at component mount level using sessionStorage
+  useEffect(() => {
+    const LOOP_KEY = 'verify-pending-mount-count';
+    const LOOP_TIME_KEY = 'verify-pending-mount-time';
+    const MAX_MOUNTS = 10;
+    const TIME_WINDOW = 5000; // 5 seconds
+    
+    const now = Date.now();
+    const lastMountTime = parseInt(sessionStorage.getItem(LOOP_TIME_KEY) || '0', 10);
+    let mountCount = parseInt(sessionStorage.getItem(LOOP_KEY) || '0', 10);
+    
+    // Reset counter if time window has passed
+    if (now - lastMountTime > TIME_WINDOW) {
+      mountCount = 0;
+    }
+    
+    mountCount += 1;
+    sessionStorage.setItem(LOOP_KEY, mountCount.toString());
+    sessionStorage.setItem(LOOP_TIME_KEY, now.toString());
+    
+    // If too many mounts in a short time, force redirect
+    if (mountCount >= MAX_MOUNTS) {
+      console.warn('Component loop detected, forcing redirect');
+      sessionStorage.removeItem(LOOP_KEY);
+      sessionStorage.removeItem(LOOP_TIME_KEY);
+      
+      // Determine correct dashboard based on user type
+      const checkUser = user || pendingVerificationUser;
+      const targetDashboard = checkUser?.userType === 'conductor' ? '/driver' : '/client';
+      window.location.href = targetDashboard;
+    }
+    
+    // Cleanup on unmount - reduce count
+    return () => {
+      // Clear after successful navigation away
+      const currentCount = parseInt(sessionStorage.getItem(LOOP_KEY) || '0', 10);
+      if (currentCount > 0) {
+        sessionStorage.setItem(LOOP_KEY, (currentCount - 1).toString());
+      }
+    };
+  }, [user, pendingVerificationUser]);
+  
   // State declarations - initialize with optimistic values from pendingVerification
   const [currentStep, setCurrentStep] = useState<VerificationStep>('cedula');
   const [otpCode, setOtpCode] = useState('');
