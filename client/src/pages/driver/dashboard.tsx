@@ -30,6 +30,7 @@ import { generateWazeNavigationUrl, generateGoogleMapsNavigationUrl } from '@/li
 import { getDirections } from '@/lib/mapbox-directions';
 import { cn } from '@/lib/utils';
 import { LocationService } from '@/lib/capacitor';
+import { AnnouncementsDisplay } from '@/components/AnnouncementsDisplay';
 
 interface DriverInitData {
   conductor: Conductor | null;
@@ -814,6 +815,7 @@ export default function DriverDashboard() {
 
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
+      <AnnouncementsDisplay />
       {needsVerification && (
         <Alert className="m-3 border-amber-500/50 bg-amber-500/10 z-20" data-testid="alert-verification-pending">
           <ShieldAlert className="h-4 w-4 text-amber-500" />

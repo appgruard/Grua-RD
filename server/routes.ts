@@ -2363,6 +2363,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/auth/linked-accounts", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = req.user as User;
+      const cedula = currentUser.cedula;
+
+      let hasClienteAccount = false;
+      let hasConductorAccount = false;
+
+      if (cedula) {
+        const usersWithSameCedula = await storage.getAllUsers();
+        const linkedAccounts = usersWithSameCedula.filter(
+          (u) => u.cedula === cedula && u.id !== currentUser.id
+        );
+
+        hasClienteAccount = linkedAccounts.some((u) => u.userType === "cliente");
+        hasConductorAccount = linkedAccounts.some((u) => u.userType === "conductor");
+      }
+
+      res.json({
+        hasClienteAccount,
+        hasConductorAccount,
+      });
+    } catch (error) {
+      console.error("Error checking linked accounts:", error);
+      res.status(500).json({ message: "Error checking linked accounts" });
+    }
+  });
+
   app.post("/api/auth/send-otp", async (req: Request, res: Response) => {
     try {
       const { email, tipoOperacion } = req.body;

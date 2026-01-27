@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,11 @@ export default function ClientProfile() {
   const [cedulaDialogOpen, setCedulaDialogOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: linkedAccounts } = useQuery<{ hasClienteAccount: boolean; hasConductorAccount: boolean }>({
+    queryKey: ['/api/auth/linked-accounts'],
+    enabled: !!user,
+  });
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -344,29 +349,31 @@ export default function ClientProfile() {
           </div>
         </Card>
 
-        <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-driver">
-          <div className="p-4">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <Truck className="w-6 h-6 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold mb-1">¿También quieres ser conductor?</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Crea una cuenta de conductor adicional y comienza a ganar dinero con tu vehículo. Podrás alternar entre ambas cuentas.
-                </p>
-                <Button 
-                  onClick={() => setLocation('/onboarding?tipo=conductor')}
-                  className="w-full"
-                  data-testid="button-become-driver"
-                >
-                  <Truck className="w-4 h-4 mr-2" />
-                  Crear cuenta de Conductor
-                </Button>
+        {!linkedAccounts?.hasConductorAccount && (
+          <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-driver">
+            <div className="p-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Truck className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold mb-1">¿También quieres ser conductor?</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Crea una cuenta de conductor adicional y comienza a ganar dinero con tu vehículo. Podrás alternar entre ambas cuentas.
+                  </p>
+                  <Button 
+                    onClick={() => setLocation('/onboarding?tipo=conductor')}
+                    className="w-full"
+                    data-testid="button-become-driver"
+                  >
+                    <Truck className="w-4 h-4 mr-2" />
+                    Crear cuenta de Conductor
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
           <Button
             variant="outline"
