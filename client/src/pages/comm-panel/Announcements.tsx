@@ -50,7 +50,8 @@ interface Announcement {
   titulo: string;
   contenido: string;
   imagenUrl?: string;
-  tipo: 'modal' | 'banner' | 'toast' | 'fullscreen';
+  tipo: 'modal' | 'banner' | 'toast' | 'fullscreen' | 'imagen';
+  tamano?: 'pequeno' | 'mediano' | 'grande';
   estado: 'borrador' | 'programado' | 'activo' | 'pausado' | 'expirado';
   audiencia: 'todos' | 'clientes' | 'conductores' | 'empresas' | 'aseguradoras';
   enlaceAccion?: string;
@@ -65,8 +66,9 @@ interface Announcement {
 
 const announcementSchema = z.object({
   titulo: z.string().min(1, 'El título es requerido').min(3, 'Mínimo 3 caracteres'),
-  contenido: z.string().min(1, 'El contenido es requerido').min(10, 'Mínimo 10 caracteres'),
-  tipo: z.enum(['modal', 'banner', 'toast', 'fullscreen']),
+  contenido: z.string().optional().default(''),
+  tipo: z.enum(['modal', 'banner', 'toast', 'fullscreen', 'imagen']),
+  tamano: z.enum(['pequeno', 'mediano', 'grande']).default('mediano'),
   audiencia: z.enum(['todos', 'clientes', 'conductores', 'empresas', 'aseguradoras']),
   colorFondo: z.string().default('#1a1a2e'),
   colorTexto: z.string().default('#ffffff'),
@@ -97,6 +99,7 @@ export default function Announcements() {
       titulo: '',
       contenido: '',
       tipo: 'modal',
+      tamano: 'mediano',
       audiencia: 'todos',
       colorFondo: '#1a1a2e',
       colorTexto: '#ffffff',
@@ -108,6 +111,9 @@ export default function Announcements() {
       fechaFin: '',
     },
   });
+
+  const tipoActual = form.watch('tipo');
+  const esImagenSolo = tipoActual === 'imagen';
 
   // Fetch announcements
   const { data: announcements = [], isLoading: isLoadingAnnouncements } = useQuery({
@@ -255,6 +261,7 @@ export default function Announcements() {
       titulo: announcement.titulo,
       contenido: announcement.contenido,
       tipo: announcement.tipo,
+      tamano: announcement.tamano || 'mediano',
       audiencia: announcement.audiencia,
       colorFondo: announcement.colorFondo || '#1a1a2e',
       colorTexto: announcement.colorTexto || '#ffffff',
@@ -558,28 +565,41 @@ export default function Announcements() {
                   )}
                 />
 
-                {/* Contenido Field */}
-                <FormField
-                  control={form.control}
-                  name="contenido"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel data-testid="label-contenido">Contenido</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Ej: Descripción detallada del anuncio..."
-                          rows={4}
-                          {...field}
-                          data-testid="input-contenido"
-                        />
-                      </FormControl>
-                      <FormDescription data-testid="help-contenido">
-                        Mínimo 10 caracteres
-                      </FormDescription>
-                      <FormMessage data-testid="error-contenido" />
-                    </FormItem>
-                  )}
-                />
+                {/* Note for image-only type */}
+                {esImagenSolo && (
+                  <div className="p-4 bg-muted rounded-md border border-dashed">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Anuncio de Solo Imagen:</strong> Este tipo muestra únicamente la imagen que subas. 
+                      Los usuarios pueden tocar/hacer clic en cualquier parte de la imagen para cerrar el anuncio.
+                      No se mostrarán título, texto ni botones.
+                    </p>
+                  </div>
+                )}
+
+                {/* Contenido Field - Only shown when not image-only type */}
+                {!esImagenSolo && (
+                  <FormField
+                    control={form.control}
+                    name="contenido"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel data-testid="label-contenido">Contenido</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Ej: Descripción detallada del anuncio..."
+                            rows={4}
+                            {...field}
+                            data-testid="input-contenido"
+                          />
+                        </FormControl>
+                        <FormDescription data-testid="help-contenido">
+                          Mínimo 10 caracteres
+                        </FormDescription>
+                        <FormMessage data-testid="error-contenido" />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Tipo Field */}
@@ -600,9 +620,34 @@ export default function Announcements() {
                             <SelectItem value="banner" data-testid="option-banner">Banner</SelectItem>
                             <SelectItem value="toast" data-testid="option-toast">Toast</SelectItem>
                             <SelectItem value="fullscreen" data-testid="option-fullscreen">Pantalla Completa</SelectItem>
+                            <SelectItem value="imagen" data-testid="option-imagen">Solo Imagen</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage data-testid="error-tipo" />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Tamaño Field */}
+                  <FormField
+                    control={form.control}
+                    name="tamano"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel data-testid="label-tamano">Tamaño</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-tamano">
+                              <SelectValue placeholder="Selecciona tamaño" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent data-testid="select-tamano-content">
+                            <SelectItem value="pequeno" data-testid="option-pequeno">Pequeño</SelectItem>
+                            <SelectItem value="mediano" data-testid="option-mediano">Mediano</SelectItem>
+                            <SelectItem value="grande" data-testid="option-grande">Grande</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage data-testid="error-tamano" />
                       </FormItem>
                     )}
                   />
@@ -634,67 +679,70 @@ export default function Announcements() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Color Fondo Field */}
-                  <FormField
-                    control={form.control}
-                    name="colorFondo"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel data-testid="label-colorFondo">Color de Fondo</FormLabel>
-                        <FormControl>
-                          <div className="flex gap-2">
-                            <Input
-                              type="color"
-                              {...field}
-                              data-testid="input-colorFondo"
-                              className="w-12 h-10"
-                            />
-                            <Input
-                              type="text"
-                              placeholder="#1a1a2e"
-                              value={field.value}
-                              onChange={field.onChange}
-                              data-testid="input-colorFondo-text"
-                              className="flex-1"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage data-testid="error-colorFondo" />
-                      </FormItem>
-                    )}
-                  />
+                {/* Color fields - only shown when not image-only type */}
+                {!esImagenSolo && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Color Fondo Field */}
+                    <FormField
+                      control={form.control}
+                      name="colorFondo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel data-testid="label-colorFondo">Color de Fondo</FormLabel>
+                          <FormControl>
+                            <div className="flex gap-2">
+                              <Input
+                                type="color"
+                                {...field}
+                                data-testid="input-colorFondo"
+                                className="w-12 h-10"
+                              />
+                              <Input
+                                type="text"
+                                placeholder="#1a1a2e"
+                                value={field.value}
+                                onChange={field.onChange}
+                                data-testid="input-colorFondo-text"
+                                className="flex-1"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage data-testid="error-colorFondo" />
+                        </FormItem>
+                      )}
+                    />
 
-                  {/* Color Texto Field */}
-                  <FormField
-                    control={form.control}
-                    name="colorTexto"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel data-testid="label-colorTexto">Color de Texto</FormLabel>
-                        <FormControl>
-                          <div className="flex gap-2">
-                            <Input
-                              type="color"
-                              {...field}
-                              data-testid="input-colorTexto"
-                              className="w-12 h-10"
-                            />
-                            <Input
-                              type="text"
-                              placeholder="#ffffff"
-                              value={field.value}
-                              onChange={field.onChange}
-                              data-testid="input-colorTexto-text"
-                              className="flex-1"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage data-testid="error-colorTexto" />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                    {/* Color Texto Field */}
+                    <FormField
+                      control={form.control}
+                      name="colorTexto"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel data-testid="label-colorTexto">Color de Texto</FormLabel>
+                          <FormControl>
+                            <div className="flex gap-2">
+                              <Input
+                                type="color"
+                                {...field}
+                                data-testid="input-colorTexto"
+                                className="w-12 h-10"
+                              />
+                              <Input
+                                type="text"
+                                placeholder="#ffffff"
+                                value={field.value}
+                                onChange={field.onChange}
+                                data-testid="input-colorTexto-text"
+                                className="flex-1"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage data-testid="error-colorTexto" />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
 
                 {/* Prioridad Field */}
                 <FormField
@@ -720,43 +768,46 @@ export default function Announcements() {
                   )}
                 />
 
-                {/* Enlace Accion Field */}
-                <FormField
-                  control={form.control}
-                  name="enlaceAccion"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel data-testid="label-enlaceAccion">Enlace de Acción (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Ej: https://ejemplo.com"
-                          {...field}
-                          data-testid="input-enlaceAccion"
-                        />
-                      </FormControl>
-                      <FormMessage data-testid="error-enlaceAccion" />
-                    </FormItem>
-                  )}
-                />
+                {/* Enlace y Boton Fields - only shown when not image-only type */}
+                {!esImagenSolo && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="enlaceAccion"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel data-testid="label-enlaceAccion">Enlace de Acción (Opcional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Ej: https://ejemplo.com"
+                              {...field}
+                              data-testid="input-enlaceAccion"
+                            />
+                          </FormControl>
+                          <FormMessage data-testid="error-enlaceAccion" />
+                        </FormItem>
+                      )}
+                    />
 
-                {/* Texto Boton Field */}
-                <FormField
-                  control={form.control}
-                  name="textoBoton"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel data-testid="label-textoBoton">Texto del Botón (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Ej: Ver más"
-                          {...field}
-                          data-testid="input-textoBoton"
-                        />
-                      </FormControl>
-                      <FormMessage data-testid="error-textoBoton" />
-                    </FormItem>
-                  )}
-                />
+                    <FormField
+                      control={form.control}
+                      name="textoBoton"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel data-testid="label-textoBoton">Texto del Botón (Opcional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Ej: Ver más"
+                              {...field}
+                              data-testid="input-textoBoton"
+                            />
+                          </FormControl>
+                          <FormMessage data-testid="error-textoBoton" />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
 
                 {/* Imagen Field with Upload/URL modes */}
                 <FormField

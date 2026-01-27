@@ -13,6 +13,19 @@ import type { InAppAnnouncement } from '@shared/schema';
 const DEFAULT_BG_COLOR = '#1a1a2e';
 const DEFAULT_TEXT_COLOR = '#ffffff';
 
+// Get modal size classes based on tamano field
+function getModalSizeClass(tamano?: string | null): string {
+  switch (tamano) {
+    case 'pequeno':
+      return 'max-w-sm';
+    case 'grande':
+      return 'max-w-2xl';
+    case 'mediano':
+    default:
+      return 'max-w-md';
+  }
+}
+
 // Check if a color is the default (meaning use theme-adaptive colors)
 function isDefaultColor(color: string | undefined, defaultValue: string): boolean {
   if (!color) return true;
@@ -107,7 +120,7 @@ export function AnnouncementsDisplay() {
 
   const visibleAnnouncements = announcements?.filter(a => !dismissedIds.has(a.id)) || [];
 
-  const modalAnnouncements = visibleAnnouncements.filter(a => a.tipo === 'modal');
+  const modalAnnouncements = visibleAnnouncements.filter(a => a.tipo === 'modal' || a.tipo === 'imagen');
   const bannerAnnouncements = visibleAnnouncements.filter(a => a.tipo === 'banner');
   const toastAnnouncements = visibleAnnouncements.filter(a => a.tipo === 'toast');
 
@@ -195,11 +208,37 @@ export function AnnouncementsDisplay() {
       <Dialog open={isModalOpen} onOpenChange={(open) => !open && handleModalClose()}>
         {currentModal && (() => {
           const modalStyles = getAdaptiveStyles(currentModal);
+          const isImageOnly = currentModal.tipo === 'imagen';
+          const sizeClass = getModalSizeClass(currentModal.tamano);
+          
+          // Image-only announcements: show just the image, click to dismiss
+          if (isImageOnly && currentModal.imagenUrl) {
+            return (
+              <DialogContent
+                data-testid={`modal-announcement-${currentModal.id}`}
+                className={cn(
+                  sizeClass,
+                  "p-0 overflow-hidden border-2 bg-transparent"
+                )}
+                onClick={handleModalClose}
+                style={{ cursor: 'pointer' }}
+              >
+                <img
+                  src={currentModal.imagenUrl}
+                  alt={currentModal.titulo || 'Anuncio'}
+                  className="w-full h-auto object-contain rounded-lg"
+                  data-testid={`image-announcement-${currentModal.id}`}
+                />
+              </DialogContent>
+            );
+          }
+          
+          // Regular modal announcements
           return (
             <DialogContent
               data-testid={`modal-announcement-${currentModal.id}`}
               className={cn(
-                "max-w-md",
+                sizeClass,
                 modalStyles.useThemeColors && "bg-background text-foreground"
               )}
               style={modalStyles.useThemeColors ? undefined : {
