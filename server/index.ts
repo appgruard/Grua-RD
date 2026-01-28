@@ -182,17 +182,51 @@ app.use(
   })
 );
 
+// Rutas que permiten cualquier origen (callbacks de servicios externos como Azul 3DS)
+const openCorsRoutes = [
+  '/api/payments/azul/3ds-callback',
+  '/api/payments/azul/3ds-method-notification',
+  '/api/azul/3ds/callback',
+  '/api/azul/3ds/method-notification'
+];
+
+// Middleware para rutas abiertas ANTES del CORS principal - bypassa CORS completamente
+app.use((req, res, next) => {
+  const isOpenRoute = openCorsRoutes.some(route => req.path.startsWith(route));
+  if (isOpenRoute) {
+    // Estas rutas son callbacks de servicios externos - permitir cualquier origen incluido null
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    // Marcar la request para que el CORS principal la ignore
+    (req as any).skipCors = true;
+  }
+  next();
+});
+
 const allowedOrigins = isDevelopment
   ? ["http://localhost:5000", "http://127.0.0.1:5000"]
   : process.env.ALLOWED_ORIGINS?.split(",").map(o => o.trim()) || [];
 
-app.use(
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Si la ruta ya fue marcada como abierta, saltar CORS
+  if ((req as any).skipCors) {
+    return next();
+  }
+  
+  // Aplicar CORS normalmente
   cors({
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // En desarrollo, permitir todo
       if (isDevelopment) {
         return callback(null, true);
       }
       
+      // Sin origen (requests del mismo servidor o herramientas)
       if (!origin) {
         return callback(null, true);
       }
@@ -204,6 +238,11 @@ app.use(
       
       // Allow file:// for local testing on mobile devices
       if (origin.startsWith('file://')) {
+        return callback(null, true);
+      }
+      
+      // Allow Azul 3DS ACS domains siempre
+      if (origin.includes('modirum.com') || origin.includes('azul.com.do')) {
         return callback(null, true);
       }
       
@@ -223,8 +262,9 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  })
-);
+  })(req, res, next);
+});
+
 
 app.get("/debug/env", (_req: Request, res: Response) => {
   const envVars = [

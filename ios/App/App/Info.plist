@@ -2,100 +2,89 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-        <key>CFBundleDevelopmentRegion</key>
-        <string>es-DO</string>
-        <key>CFBundleDisplayName</key>
-        <string>Grúa RD</string>
-        <key>CFBundleExecutable</key>
-        <string>$(EXECUTABLE_NAME)</string>
-        <key>CFBundleIdentifier</key>
-        <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-        <key>CFBundleInfoDictionaryVersion</key>
-        <string>6.0</string>
-        <key>CFBundleName</key>
-        <string>$(PRODUCT_NAME)</string>
-        <key>CFBundlePackageType</key>
-        <string>APPL</string>
-        <key>CFBundleShortVersionString</key>
-        <string>$(MARKETING_VERSION)</string>
-        <key>CFBundleVersion</key>
-        <string>$(CURRENT_PROJECT_VERSION)</string>
-        <key>LSRequiresIPhoneOS</key>
-        <true/>
-        <key>UILaunchStoryboardName</key>
-        <string>LaunchScreen</string>
-        <key>UIMainStoryboardFile</key>
-        <string>Main</string>
-        <key>UIRequiredDeviceCapabilities</key>
-        <array>
-                <string>armv7</string>
-                <string>location-services</string>
-                <string>gps</string>
-        </array>
-        <key>UISupportedInterfaceOrientations</key>
-        <array>
-                <string>UIInterfaceOrientationPortrait</string>
-                <string>UIInterfaceOrientationLandscapeLeft</string>
-                <string>UIInterfaceOrientationLandscapeRight</string>
-        </array>
-        <key>UISupportedInterfaceOrientations~ipad</key>
-        <array>
-                <string>UIInterfaceOrientationPortrait</string>
-                <string>UIInterfaceOrientationPortraitUpsideDown</string>
-                <string>UIInterfaceOrientationLandscapeLeft</string>
-                <string>UIInterfaceOrientationLandscapeRight</string>
-        </array>
-        <key>UIViewControllerBasedStatusBarAppearance</key>
-        <true/>
-        
-        <!-- Location Permissions -->
-        <key>NSLocationWhenInUseUsageDescription</key>
-        <string>Grúa RD necesita acceder a tu ubicación para mostrar tu posición en el mapa y conectarte con conductores cercanos.</string>
-        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-        <string>Grúa RD necesita acceso continuo a tu ubicación para el seguimiento en tiempo real del servicio de grúa, incluso cuando la app está en segundo plano.</string>
-        <key>NSLocationAlwaysUsageDescription</key>
-        <string>Grúa RD necesita acceso continuo a tu ubicación para el seguimiento en tiempo real del servicio.</string>
-        
-        <!-- Camera Permissions -->
-        <key>NSCameraUsageDescription</key>
-        <string>Grúa RD necesita acceso a la cámara para tomar fotos de vehículos y documentos durante el servicio.</string>
-        
-        <!-- Photo Library Permissions -->
-        <key>NSPhotoLibraryUsageDescription</key>
-        <string>Grúa RD necesita acceso a tu galería de fotos para seleccionar imágenes de vehículos y documentos.</string>
-        <key>NSPhotoLibraryAddUsageDescription</key>
-        <string>Grúa RD necesita guardar fotos del servicio en tu galería.</string>
-        
-        <!-- Background Modes -->
-        <key>UIBackgroundModes</key>
-        <array>
-                <string>location</string>
-                <string>fetch</string>
-                <string>remote-notification</string>
-                <string>processing</string>
-        </array>
-        
-        <!-- Push Notifications -->
-        <key>UIUserNotificationSettings</key>
-        <dict>
-                <key>UIUserNotificationTypes</key>
-                <integer>7</integer>
-        </dict>
-        
-        <!-- App Transport Security -->
-        <key>NSAppTransportSecurity</key>
-        <dict>
-                <key>NSAllowsArbitraryLoads</key>
-                <false/>
-                <key>NSExceptionDomains</key>
-                <dict>
-                        <key>localhost</key>
-                        <dict>
-                                <key>NSExceptionAllowsInsecureHTTPLoads</key>
-                                <true/>
-                        </dict>
-                </dict>
-        </dict>
-        
+	<key>CFBundleDevelopmentRegion</key>
+	<string>es</string>
+	<key>CFBundleDisplayName</key>
+	<string>Grúa RD</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Grúa RD</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleDefault</string>
+	
+	<!-- Camera permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>Grúa RD necesita acceso a la cámara para tomar fotos de documentos y vehículos</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Grúa RD necesita acceso a tus fotos para subir imágenes de documentos</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Grúa RD necesita guardar fotos en tu galería</string>
+	
+	<!-- Location permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Grúa RD necesita tu ubicación para mostrar grúas cercanas y calcular rutas</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Grúa RD necesita tu ubicación para rastrear servicios de grúa en tiempo real</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Grúa RD necesita tu ubicación para rastrear servicios de grúa en tiempo real</string>
+	
+	<!-- Push Notifications -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	
+	<!-- App Transport Security -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>gruard.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>

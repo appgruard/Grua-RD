@@ -26,8 +26,12 @@ const fullSchema = { ...schema, ...schemaExtensions };
 // Neon pooler URLs have @xxxx-pooler.us-east-1 patterns
 const isNeonServerless = process.env.DATABASE_URL.includes('@db.') && process.env.DATABASE_URL.includes('neon.tech');
 
-// SSL configuration for self-signed certificates
-const sslConfig = { rejectUnauthorized: false };
+// SSL configuration
+const sslConfig = process.env.DATABASE_URL.includes('localhost') || 
+                  process.env.DATABASE_URL.includes('127.0.0.1') ||
+                  process.env.DB_SSL === 'false'
+  ? false 
+  : { rejectUnauthorized: false };
 
 // For direct PostgreSQL connections, use pg driver
 // For Neon serverless, use the serverless driver with WebSocket

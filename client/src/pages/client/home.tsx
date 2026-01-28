@@ -24,6 +24,8 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import type { Servicio } from '@shared/schema';
 import { useServiceRequest } from '@/lib/serviceRequestContext';
+import { CancelServiceModal } from '@/components/CancelServiceModal';
+import { AnnouncementsDisplay } from '@/components/AnnouncementsDisplay';
 
 const DEFAULT_COORDINATES: Coordinates = { lat: 18.4861, lng: -69.9312 };
 
@@ -102,6 +104,8 @@ export default function ClientHome() {
   const distanceRef = useRef<number | null>(null);
   const hasInitialLocationRef = useRef(origin !== null);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [selectedServiceForCancel, setSelectedServiceForCancel] = useState<string | null>(null);
 
   const { data: insuranceStatus } = useQuery<{
     hasApprovedInsurance: boolean;
@@ -710,6 +714,7 @@ export default function ClientHome() {
 
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
+      <AnnouncementsDisplay />
       {activeService && (
         <div className="absolute top-0 left-0 right-0 z-30 p-3 safe-area-inset-top">
           <Card 
@@ -735,7 +740,20 @@ export default function ClientHome() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs bg-white/20 border-white/30 text-white hover:bg-white/30"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedServiceForCancel(activeService.id);
+                    setIsCancelModalOpen(true);
+                  }}
+                  data-testid="button-cancel-active-service"
+                >
+                  Cancelar
+                </Button>
                 <Badge variant="outline" className="text-xs bg-white/20 border-white/30 text-white">
                   Ver
                 </Badge>
@@ -1535,6 +1553,19 @@ export default function ClientHome() {
           </div>
         )}
       </div>
+
+      {selectedServiceForCancel && activeService && (
+        <CancelServiceModal
+          isOpen={isCancelModalOpen}
+          onClose={() => {
+            setIsCancelModalOpen(false);
+            setSelectedServiceForCancel(null);
+          }}
+          serviceId={selectedServiceForCancel}
+          serviceCost={activeService.costoTotal || 0}
+          userType="cliente"
+        />
+      )}
     </div>
   );
 }

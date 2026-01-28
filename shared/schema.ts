@@ -164,6 +164,34 @@ export const tipoMensajeChatEnum = pgEnum("tipo_mensaje_chat", [
   "sistema"
 ]);
 
+// Cancelaciones Enums
+export const nivelDemandaEnum = pgEnum("nivel_demanda", [
+  "bajo",
+  "medio",
+  "alto",
+  "critico"
+]);
+
+export const zonaTipoEnum = pgEnum("zona_tipo", [
+  "urbana",
+  "suburbana",
+  "periferica",
+  "rural"
+]);
+
+export const tipoCanceladorEnum = pgEnum("tipo_cancelador", [
+  "cliente",
+  "conductor"
+]);
+
+export const evaluacionPenalizacionEnum = pgEnum("evaluacion_penalizacion", [
+  "ninguna",
+  "leve",
+  "moderada",
+  "grave",
+  "critica"
+]);
+
 // Users Table
 // Note: email is not globally unique - users can have multiple accounts with different userTypes
 // A composite unique constraint on (email, userType) prevents duplicate accounts of the same type
@@ -186,6 +214,12 @@ export const users = pgTable("users", {
   fotoVerificada: boolean("foto_verificada").default(false).notNull(),
   fotoVerificadaScore: decimal("foto_verificada_score", { precision: 5, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Cancelaciones fields (for clientes only)
+  cancelacionesTotales: integer("cancelaciones_totales").default(0),
+  cancelacionesUltimos7dias: integer("cancelaciones_ultimos_7_dias").default(0),
+  cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
+  penalizacionesTotales: decimal("penalizaciones_totales", { precision: 12, scale: 2 }).default("0.00"),
+  ultimaCancelacionTimestamp: timestamp("ultima_cancelacion_timestamp"),
 }, (table) => ({
   emailUserTypeUnique: uniqueIndex("users_email_user_type_unique").on(table.email, table.userType),
 }));
@@ -213,6 +247,13 @@ export const conductores = pgTable("conductores", {
   licenciaVerificada: boolean("licencia_verificada").default(false),
   categoriasConfiguradas: boolean("categorias_configuradas").default(false),
   vehiculosRegistrados: boolean("vehiculos_registrados").default(false),
+  // Cancelaciones fields
+  cancelacionesTotales: integer("cancelaciones_totales").default(0),
+  cancelacionesUltimos7dias: integer("cancelaciones_ultimos_7_dias").default(0),
+  cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
+  penalizacionesTotales: decimal("penalizaciones_totales", { precision: 12, scale: 2 }).default("0.00"),
+  penalizacionesUltimas24h: decimal("penalizaciones_ultimas_24h", { precision: 12, scale: 2 }).default("0.00"),
+  ultimaCancelacionTimestamp: timestamp("ultima_cancelacion_timestamp"),
 });
 
 // Conductor Service Categories Table (driver can offer multiple service categories)
@@ -301,6 +342,10 @@ export const servicios = pgTable("servicios", {
   iniciadoAt: timestamp("iniciado_at"),
   completadoAt: timestamp("completado_at"),
   canceladoAt: timestamp("cancelado_at"),
+  // Cancelaciones fields
+  zonaTipo: varchar("zona_tipo"),
+  nivelDemandaEnCreacion: varchar("nivel_demanda_en_creacion"),
+  horaCreacionEsPico: boolean("hora_creacion_es_pico").default(false),
 });
 
 // Dismissed Services Table (services rejected by drivers)
@@ -2335,16 +2380,17 @@ export const errorSourceEnum = pgEnum("error_source", [
 
 // Error type enum - classification of error
 export const errorTypeEnum = pgEnum("error_type", [
-  "connection_error",
-  "timeout_error",
-  "validation_error",
-  "permission_error",
-  "not_found_error",
-  "rate_limit_error",
-  "configuration_error",
-  "integration_error",
-  "system_error",
-  "unknown_error"
+  "validation",
+  "authentication",
+  "authorization",
+  "database",
+  "network",
+  "timeout",
+  "configuration",
+  "external_api",
+  "file_system",
+  "memory",
+  "unknown"
 ]);
 
 // System Errors Table (for tracking and deduplication)
@@ -2393,7 +2439,7 @@ export const systemErrorsRelations = relations(systemErrors, ({ one }) => ({
 export const insertSystemErrorSchema = createInsertSchema(systemErrors, {
   fingerprint: z.string().min(1),
   message: z.string().min(1),
-  errorType: z.enum(["connection_error", "timeout_error", "validation_error", "permission_error", "not_found_error", "rate_limit_error", "configuration_error", "integration_error", "system_error", "unknown_error"]),
+  errorType: z.enum(["validation", "authentication", "authorization", "database", "network", "timeout", "configuration", "external_api", "file_system", "memory", "unknown"]),
   errorSource: z.enum(["database", "external_api", "internal_service", "authentication", "payment", "file_storage", "websocket", "email", "sms", "unknown"]),
   severity: z.enum(["low", "medium", "high", "critical"]),
   calculatedPriority: z.enum(["baja", "media", "alta", "urgente"]).optional(),
@@ -2573,6 +2619,166 @@ export type DocumentoWithReminderStatus = Documento & {
   conductor?: Conductor;
 };
 
+// ==================== CANCELACIONES (SERVICE CANCELLATION SYSTEM) ====================
+
+// Razones de Cancelación Table
+export const razonesCancelacion = pgTable("razones_cancelacion", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  codigo: varchar("codigo").notNull().unique(),
+  descripcion: text("descripcion").notNull(),
+  aplicaA: text("aplica_a").$type<"cliente" | "conductor" | "ambos">().default("ambos"),
+  penalizacionPredeterminada: boolean("penalizacion_predeterminada").default(true),
+  activa: boolean("activa").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Zonas de Demanda Table (for real-time demand calculation)
+export const zonasDemanada = pgTable("zonas_demanda", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  codigoZona: varchar("codigo_zona").notNull().unique(),
+  nombreZona: varchar("nombre_zona"),
+  tipoZona: zonaTipoEnum("tipo_zona"),
+  latCentro: decimal("lat_centro", { precision: 10, scale: 7 }),
+  lngCentro: decimal("lng_centro", { precision: 10, scale: 7 }),
+  radioKm: decimal("radio_km", { precision: 6, scale: 2 }),
+  // Real-time demand metrics
+  serviciosActivosSinConductor: integer("servicios_activos_sin_conductor").default(0),
+  serviciosActivosTotales: integer("servicios_activos_totales").default(0),
+  conductoresDisponibles: integer("conductores_disponibles").default(0),
+  nivelDemandaActual: nivelDemandaEnum("nivel_demanda_actual").default("bajo"),
+  porcentajeDemanda: decimal("porcentaje_demanda", { precision: 5, scale: 2 }).default("0.00"),
+  ultimoUpdateAt: timestamp("ultimo_update_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Cancelaciones Servicios Table (main cancellation record)
+export const cancelacionesServicios = pgTable("cancelaciones_servicios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  servicioId: varchar("servicio_id").notNull().references(() => servicios.id, { onDelete: "cascade" }),
+  canceladoPorId: varchar("cancelado_por_id").notNull().references(() => users.id),
+  tipoCancelador: tipoCanceladorEnum("tipo_cancelador").notNull(),
+  estadoAnterior: varchar("estado_anterior").notNull(),
+  
+  // Cancelation info
+  motivoCancelacion: text("motivo_cancelacion"),
+  razonCodigo: varchar("razon_codigo").references(() => razonesCancelacion.codigo),
+  notasUsuario: text("notas_usuario"),
+  justificacionTexto: text("justificacion_texto"),
+  
+  // Calculation data
+  distanciaRecorridaKm: decimal("distancia_recorrida_km", { precision: 6, scale: 2 }),
+  distanciaTotalServicioKm: decimal("distancia_total_servicio_km", { precision: 6, scale: 2 }),
+  tiempoDesdeAceptacionSegundos: integer("tiempo_desde_aceptacion_segundos"),
+  tiempoDesdellegadaSegundos: integer("tiempo_desde_llegada_segundos"),
+  tiempoEsperaReal: integer("tiempo_espera_real"),
+  etaOriginal: integer("eta_original"),
+  
+  // Context factors
+  nivelDemanda: nivelDemandaEnum("nivel_demanda"),
+  esHoraPico: boolean("es_hora_pico").default(false),
+  zonaTipo: zonaTipoEnum("zona_tipo"),
+  totalCancelacionesUsuario: integer("total_cancelaciones_usuario").default(0),
+  tipoServicioEspecializado: boolean("tipo_servicio_especializado").default(false),
+  
+  // Multipliers applied
+  multiplicadorDemanda: decimal("multiplicador_demanda", { precision: 3, scale: 2 }).default("1.00"),
+  multiplicadorHora: decimal("multiplicador_hora", { precision: 3, scale: 2 }).default("1.00"),
+  multiplicadorReincidencia: decimal("multiplicador_reincidencia", { precision: 3, scale: 2 }).default("1.00"),
+  
+  // Penalty and refund
+  penalizacionBase: decimal("penalizacion_base", { precision: 10, scale: 2 }),
+  penalizacionAplicada: decimal("penalizacion_aplicada", { precision: 10, scale: 2 }).default("0.00"),
+  montoTotalServicio: decimal("monto_total_servicio", { precision: 10, scale: 2 }),
+  reembolsoMonto: decimal("reembolso_monto", { precision: 10, scale: 2 }).default("0.00"),
+  cambioRating: decimal("cambio_rating", { precision: 3, scale: 2 }),
+  
+  // Processing status
+  reembolsoProcesado: boolean("reembolso_procesado").default(false),
+  penalizacionProcesada: boolean("penalizacion_procesada").default(false),
+  
+  // Admin review
+  evaluacionPenalizacion: evaluacionPenalizacionEnum("evaluacion_penalizacion"),
+  notasAdmin: text("notas_admin"),
+  revisadoPor: varchar("revisado_por").references(() => users.id),
+  fechaRevision: timestamp("fecha_revision"),
+  penalizacionAjustadaPorAdmin: decimal("penalizacion_ajustada_por_admin", { precision: 10, scale: 2 }),
+  razonAjuste: text("razon_ajuste"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Razones Cancelación Relations
+export const razonesCancelacionRelations = relations(razonesCancelacion, ({ many }) => ({
+  cancelaciones: many(cancelacionesServicios),
+}));
+
+// Zonas Demanda Relations
+export const zonasDemanadaRelations = relations(zonasDemanada, ({ many }) => ({
+  cancelaciones: many(cancelacionesServicios),
+}));
+
+// Cancelaciones Servicios Relations
+export const cancelacionesServiciosRelations = relations(cancelacionesServicios, ({ one }) => ({
+  servicio: one(servicios, {
+    fields: [cancelacionesServicios.servicioId],
+    references: [servicios.id],
+  }),
+  canceladoPor: one(users, {
+    fields: [cancelacionesServicios.canceladoPorId],
+    references: [users.id],
+  }),
+  razonCancelacion: one(razonesCancelacion, {
+    fields: [cancelacionesServicios.razonCodigo],
+    references: [razonesCancelacion.codigo],
+  }),
+  revisadoPorUsuario: one(users, {
+    fields: [cancelacionesServicios.revisadoPor],
+    references: [users.id],
+  }),
+}));
+
+// Schemas for Razones Cancelación
+export const insertRazonCancelacionSchema = createInsertSchema(razonesCancelacion).omit({
+  id: true,
+  createdAt: true,
+});
+export const selectRazonCancelacionSchema = createSelectSchema(razonesCancelacion);
+export type InsertRazonCancelacion = z.infer<typeof insertRazonCancelacionSchema>;
+export type RazonCancelacion = typeof razonesCancelacion.$inferSelect;
+
+// Schemas for Zonas Demanda
+export const insertZonaDemandaSchema = createInsertSchema(zonasDemanada).omit({
+  id: true,
+  ultimoUpdateAt: true,
+  updatedAt: true,
+});
+export const selectZonaDemandaSchema = createSelectSchema(zonasDemanada);
+export type InsertZonaDemanda = z.infer<typeof insertZonaDemandaSchema>;
+export type ZonaDemanda = typeof zonasDemanada.$inferSelect;
+
+// Schemas for Cancelaciones Servicios
+export const insertCancelacionServicioSchema = createInsertSchema(cancelacionesServicios, {
+  penalizacionBase: z.string().optional(),
+  penalizacionAplicada: z.string().default("0.00"),
+  reembolsoMonto: z.string().default("0.00"),
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const selectCancelacionServicioSchema = createSelectSchema(cancelacionesServicios);
+export type InsertCancelacionServicio = z.infer<typeof insertCancelacionServicioSchema>;
+export type CancelacionServicio = typeof cancelacionesServicios.$inferSelect;
+
+// Helper types
+export type CancelacionServicioWithDetails = CancelacionServicio & {
+  servicio?: Servicio;
+  canceladoPor?: User;
+  razonCancelacion?: RazonCancelacion;
+  revisadoPorUsuario?: User;
+};
+
 // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
 
 // Admin modules/permissions enum
@@ -2690,3 +2896,251 @@ export const ADMIN_PERMISO_LABELS: Record<AdminPermiso, string> = {
 };
 
 // ==================== END ADMINISTRADORES ====================
+
+// ==================== COMMUNICATION PANEL ====================
+
+// Enum para tipos de anuncio
+export const anuncioTipoEnum = pgEnum("anuncio_tipo", [
+  "modal",
+  "banner",
+  "toast",
+  "fullscreen",
+  "imagen"
+]);
+
+// Enum para tamaños de anuncio
+export const anuncioTamanoEnum = pgEnum("anuncio_tamano", [
+  "pequeno",
+  "mediano",
+  "grande"
+]);
+
+// Enum para estado de anuncio
+export const anuncioEstadoEnum = pgEnum("anuncio_estado", [
+  "borrador",
+  "programado",
+  "activo",
+  "pausado",
+  "expirado"
+]);
+
+// Enum para audiencia de anuncio
+export const anuncioAudienciaEnum = pgEnum("anuncio_audiencia", [
+  "todos",
+  "clientes",
+  "conductores",
+  "empresas",
+  "aseguradoras"
+]);
+
+// Usuarios del panel de comunicaciones (acceso restringido)
+export const communicationPanelUsers = pgTable("communication_panel_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  nombre: text("nombre").notNull(),
+  activo: boolean("activo").default(true).notNull(),
+  ultimoAcceso: timestamp("ultimo_acceso"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Plantillas de email
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nombre: text("nombre").notNull(),
+  asunto: text("asunto").notNull(),
+  contenidoHtml: text("contenido_html").notNull(),
+  contenidoTexto: text("contenido_texto"),
+  categoria: text("categoria").default("general"),
+  variables: text("variables").array(),
+  activo: boolean("activo").default(true).notNull(),
+  creadoPor: varchar("creado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Firmas de email
+export const emailSignatures = pgTable("email_signatures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nombre: text("nombre").notNull(),
+  departamento: text("departamento"),
+  cargo: text("cargo"),
+  telefono: text("telefono"),
+  contenidoHtml: text("contenido_html").notNull(),
+  esDefault: boolean("es_default").default(false).notNull(),
+  creadoPor: varchar("creado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Historial de emails enviados
+export const emailHistory = pgTable("email_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  destinatarios: text("destinatarios").array().notNull(),
+  asunto: text("asunto").notNull(),
+  contenidoHtml: text("contenido_html").notNull(),
+  alias: text("alias").notNull(),
+  adjuntos: text("adjuntos").array(),
+  plantillaId: varchar("plantilla_id").references(() => emailTemplates.id),
+  firmaId: varchar("firma_id").references(() => emailSignatures.id),
+  enviadoPor: varchar("enviado_por").references(() => communicationPanelUsers.id),
+  resendId: text("resend_id"),
+  estado: text("estado").default("enviado"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Anuncios in-app
+export const inAppAnnouncements = pgTable("in_app_announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  titulo: text("titulo").notNull(),
+  contenido: text("contenido").notNull(),
+  imagenUrl: text("imagen_url"),
+  tipo: anuncioTipoEnum("tipo").default("modal").notNull(),
+  tamano: anuncioTamanoEnum("tamano").default("mediano"),
+  estado: anuncioEstadoEnum("estado").default("borrador").notNull(),
+  audiencia: anuncioAudienciaEnum("audiencia").default("todos").notNull(),
+  enlaceAccion: text("enlace_accion"),
+  textoBoton: text("texto_boton"),
+  colorFondo: text("color_fondo").default("#1a1a2e"),
+  colorTexto: text("color_texto").default("#ffffff"),
+  fechaInicio: timestamp("fecha_inicio"),
+  fechaFin: timestamp("fecha_fin"),
+  prioridad: integer("prioridad").default(0),
+  creadoPor: varchar("creado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Registro de anuncios vistos por usuarios
+export const announcementViews = pgTable("announcement_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  anuncioId: varchar("anuncio_id").notNull().references(() => inAppAnnouncements.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  visto: boolean("visto").default(true).notNull(),
+  descartado: boolean("descartado").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Configuración de notificaciones push
+export const pushNotificationConfig = pgTable("push_notification_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nombre: text("nombre").notNull(),
+  titulo: text("titulo").notNull(),
+  cuerpo: text("cuerpo").notNull(),
+  iconoUrl: text("icono_url"),
+  imagenUrl: text("imagen_url"),
+  colorAccento: text("color_accento").default("#e94560"),
+  sonido: text("sonido").default("default"),
+  vibracion: boolean("vibracion").default(true),
+  prioridad: text("prioridad").default("high"),
+  datosExtra: text("datos_extra"),
+  creadoPor: varchar("creado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Historial de notificaciones push
+export const pushNotificationHistory = pgTable("push_notification_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  configId: varchar("config_id").references(() => pushNotificationConfig.id),
+  destinatarios: text("destinatarios").array(),
+  audiencia: anuncioAudienciaEnum("audiencia"),
+  titulo: text("titulo").notNull(),
+  cuerpo: text("cuerpo").notNull(),
+  enviados: integer("enviados").default(0),
+  fallidos: integer("fallidos").default(0),
+  enviadoPor: varchar("enviado_por").references(() => communicationPanelUsers.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Relations
+export const emailTemplatesRelations = relations(emailTemplates, ({ one }) => ({
+  creadoPorUsuario: one(communicationPanelUsers, {
+    fields: [emailTemplates.creadoPor],
+    references: [communicationPanelUsers.id],
+  }),
+}));
+
+export const emailHistoryRelations = relations(emailHistory, ({ one }) => ({
+  plantilla: one(emailTemplates, {
+    fields: [emailHistory.plantillaId],
+    references: [emailTemplates.id],
+  }),
+  firma: one(emailSignatures, {
+    fields: [emailHistory.firmaId],
+    references: [emailSignatures.id],
+  }),
+  enviadoPorUsuario: one(communicationPanelUsers, {
+    fields: [emailHistory.enviadoPor],
+    references: [communicationPanelUsers.id],
+  }),
+}));
+
+export const inAppAnnouncementsRelations = relations(inAppAnnouncements, ({ one, many }) => ({
+  creadoPorUsuario: one(communicationPanelUsers, {
+    fields: [inAppAnnouncements.creadoPor],
+    references: [communicationPanelUsers.id],
+  }),
+  vistas: many(announcementViews),
+}));
+
+export const announcementViewsRelations = relations(announcementViews, ({ one }) => ({
+  anuncio: one(inAppAnnouncements, {
+    fields: [announcementViews.anuncioId],
+    references: [inAppAnnouncements.id],
+  }),
+  usuario: one(users, {
+    fields: [announcementViews.userId],
+    references: [users.id],
+  }),
+}));
+
+// Insert Schemas
+export const insertCommunicationPanelUserSchema = createInsertSchema(communicationPanelUsers).omit({
+  id: true,
+  ultimoAcceso: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailSignatureSchema = createInsertSchema(emailSignatures).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInAppAnnouncementSchema = createInsertSchema(inAppAnnouncements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPushNotificationConfigSchema = createInsertSchema(pushNotificationConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type CommunicationPanelUser = typeof communicationPanelUsers.$inferSelect;
+export type InsertCommunicationPanelUser = z.infer<typeof insertCommunicationPanelUserSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailSignature = typeof emailSignatures.$inferSelect;
+export type InsertEmailSignature = z.infer<typeof insertEmailSignatureSchema>;
+export type EmailHistoryEntry = typeof emailHistory.$inferSelect;
+export type InAppAnnouncement = typeof inAppAnnouncements.$inferSelect;
+export type InsertInAppAnnouncement = z.infer<typeof insertInAppAnnouncementSchema>;
+export type AnnouncementView = typeof announcementViews.$inferSelect;
+export type PushNotificationConfig = typeof pushNotificationConfig.$inferSelect;
+export type InsertPushNotificationConfig = z.infer<typeof insertPushNotificationConfigSchema>;
+export type PushNotificationHistoryEntry = typeof pushNotificationHistory.$inferSelect;
+
+// ==================== END COMMUNICATION PANEL ====================

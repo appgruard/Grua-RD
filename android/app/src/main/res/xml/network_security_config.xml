@@ -7,16 +7,14 @@
     </base-config>
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">gruard.com</domain>
+        <domain includeSubdomains="true">app.gruard.com</domain>
         <domain includeSubdomains="true">api.mapbox.com</domain>
         <domain includeSubdomains="true">tiles.mapbox.com</domain>
         <domain includeSubdomains="true">events.mapbox.com</domain>
+        <domain includeSubdomains="true">fonts.googleapis.com</domain>
+        <domain includeSubdomains="true">fonts.gstatic.com</domain>
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
-    </domain-config>
-    <!-- Development only - remove in production -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">10.0.2.2</domain>
     </domain-config>
 </network-security-config>

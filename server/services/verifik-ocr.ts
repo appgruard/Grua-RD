@@ -205,6 +205,38 @@ export async function scanCedulaOCR(imageBase64: string): Promise<OCRScanResult>
         };
       }
       
+      if (response.status === 400) {
+        // Parse error message if possible
+        try {
+          const errorJson = JSON.parse(errorText);
+          const message = errorJson.message || errorJson.error || "Imagen no válida";
+          logger.error("Verifik OCR 400 error details", { message, errorJson });
+          return {
+            success: false,
+            error: `Error con la imagen: ${message}. Asegúrate de tomar una foto clara de tu cédula.`
+          };
+        } catch {
+          return {
+            success: false,
+            error: "La imagen no es válida. Por favor, toma una foto más clara de tu cédula."
+          };
+        }
+      }
+      
+      if (response.status === 422) {
+        return {
+          success: false,
+          error: "No se pudo detectar un documento en la imagen. Asegúrate de que la cédula esté visible y bien iluminada."
+        };
+      }
+      
+      if (response.status >= 500) {
+        return {
+          success: false,
+          error: "El servicio de verificación está temporalmente no disponible. Intenta más tarde."
+        };
+      }
+      
       return {
         success: false,
         error: "Error al procesar el documento. Intenta de nuevo."

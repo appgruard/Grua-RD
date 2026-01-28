@@ -1,5 +1,5 @@
 import { db } from './db';
-import { eq, and, desc, isNull, sql, gte, lte, lt, between, ne, or } from 'drizzle-orm';
+import { eq, and, desc, isNull, isNotNull, sql, gte, lte, lt, between, ne, or, asc } from 'drizzle-orm';
 import {
   users,
   conductores,
@@ -42,6 +42,9 @@ import {
   operatorWallets,
   walletTransactions,
   operatorDebts,
+  razonesCancelacion,
+  zonasDemanada,
+  cancelacionesServicios,
   type User,
   type InsertUser,
   type Conductor,
@@ -153,6 +156,11 @@ import {
   type SystemError,
   type InsertSystemError,
   type SystemErrorWithDetails,
+  type RazonCancelacion,
+  type ZonaDemanda,
+  type CancelacionServicio,
+  type InsertCancelacionServicio,
+  type CancelacionServicioWithDetails,
 } from '@shared/schema';
 import {
   serviceReceipts,
@@ -219,6 +227,7 @@ export interface IStorage {
   cancelExpiredServicios(timeoutMinutes: number): Promise<Servicio[]>;
   getRecentlyCancelledServices(withinMinutes: number): Promise<Servicio[]>;
   getAllServicios(): Promise<ServicioWithDetails[]>;
+  getServiciosPendingCommission(): Promise<Servicio[]>;
   updateServicio(id: string, data: Partial<Servicio>): Promise<Servicio>;
   acceptServicio(id: string, conductorId: string, vehiculoId?: string): Promise<Servicio>;
 
@@ -641,6 +650,23 @@ export interface IStorage {
   getOperatorStatement(conductorId: string, periodStart?: Date, periodEnd?: Date): Promise<OperatorStatementSummary | null>;
   recordManualPayout(walletId: string, amount: string, adminId: string, notes?: string, evidenceUrl?: string): Promise<WalletTransaction>;
 
+  // ==================== SYSTEM FOR CANCELLATIONS (Phase 3) ====================
+  
+  // Cancelaciones Servicios
+  createCancelacionServicio(cancelacion: InsertCancelacionServicio): Promise<CancelacionServicio>;
+  getCancelacionesByUsuarioId(usuarioId: string, tipo: 'cliente' | 'conductor'): Promise<CancelacionServicioWithDetails[]>;
+  getCancelacionesByServicioId(servicioId: string): Promise<CancelacionServicioWithDetails | undefined>;
+  getAllCancelaciones(limit?: number): Promise<CancelacionServicioWithDetails[]>;
+  updateCancelacion(id: string, data: Partial<CancelacionServicio>): Promise<CancelacionServicio>;
+  
+  // Razones Cancelacion
+  getAllRazonesCancelacion(): Promise<RazonCancelacion[]>;
+  getRazonCancelacionByCodigo(codigo: string): Promise<RazonCancelacion | undefined>;
+  
+  // Zonas Demanda
+  getZonaDemandaByCoords(lat: number, lng: number): Promise<ZonaDemanda | undefined>;
+  updateZonaDemanda(id: string, data: Partial<ZonaDemanda>): Promise<ZonaDemanda>;
+
   // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================
   
   // Administradores CRUD
@@ -656,48 +682,326 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // Users
   async getUserById(id: string): Promise<UserWithConductor | undefined> {
-    const result = await db.query.users.findFirst({
-      where: eq(users.id, id),
-      with: {
-        conductor: true,
-      },
-    });
-    return result;
+    // Use raw SQL to avoid schema mismatch with columns that don't exist in production
+    const userResults = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at,
+             estado_cuenta, calificacion_promedio, email_verificado, 
+             foto_verificada, foto_verificada_score, cedula_image_url
+      FROM users 
+      WHERE id = ${id}
+      LIMIT 1
+    `);
+    
+    if (!userResults.rows || userResults.rows.length === 0) {
+      return undefined;
+    }
+    
+    const row = userResults.rows[0] as any;
+    const user: any = {
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      userType: row.user_type,
+      fotoUrl: row.foto_url,
+      telefono: row.phone,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      createdAt: row.created_at,
+      estadoCuenta: row.estado_cuenta,
+      calificacionPromedio: row.calificacion_promedio,
+      emailVerificado: row.email_verificado,
+      fotoVerificada: row.foto_verificada,
+      fotoVerificadaScore: row.foto_verificada_score,
+      cedulaImageUrl: row.cedula_image_url,
+    };
+    
+    // Get conductor data if user is a conductor
+    const conductorResults = await db.execute(sql`
+      SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
+             licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
+             balance_disponible, balance_pendiente, categorias_configuradas,
+             licencia_frontal_url, licencia_trasera_url
+      FROM conductores 
+      WHERE user_id = ${id}
+      LIMIT 1
+    `);
+    
+    if (conductorResults.rows && conductorResults.rows.length > 0) {
+      const cRow = conductorResults.rows[0] as any;
+      user.conductor = {
+        id: cRow.id,
+        userId: cRow.user_id,
+        disponible: cRow.disponible,
+        ubicacionLat: cRow.ubicacion_lat,
+        ubicacionLng: cRow.ubicacion_lng,
+        vehiculosRegistrados: cRow.vehiculos_registrados,
+        licencia: cRow.licencia,
+        licenciaCategoria: cRow.licencia_categoria,
+        licenciaVerificada: cRow.licencia_verificada,
+        bloqueadoHasta: cRow.bloqueado_hasta,
+        balanceDisponible: cRow.balance_disponible,
+        balancePendiente: cRow.balance_pendiente,
+        categoriasConfiguradas: cRow.categorias_configuradas,
+        licenciaFrontalUrl: cRow.licencia_frontal_url,
+        licenciaTraseraUrl: cRow.licencia_trasera_url,
+      };
+    }
+    
+    return user as UserWithConductor;
   }
 
   async getUserByEmail(email: string): Promise<UserWithConductor | undefined> {
-    const result = await db.query.users.findFirst({
-      where: eq(users.email, email),
-      with: {
-        conductor: true,
-      },
-    });
-    return result;
+    // Use raw SQL to avoid schema mismatch with columns that don't exist in production
+    const userResults = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at,
+             estado_cuenta, calificacion_promedio, email_verificado, 
+             foto_verificada, foto_verificada_score, cedula_image_url
+      FROM users 
+      WHERE email = ${email}
+      LIMIT 1
+    `);
+    
+    if (!userResults.rows || userResults.rows.length === 0) {
+      return undefined;
+    }
+    
+    const row = userResults.rows[0] as any;
+    const user: any = {
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      userType: row.user_type,
+      fotoUrl: row.foto_url,
+      telefono: row.phone,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      createdAt: row.created_at,
+      estadoCuenta: row.estado_cuenta,
+      calificacionPromedio: row.calificacion_promedio,
+      emailVerificado: row.email_verificado,
+      fotoVerificada: row.foto_verificada,
+      fotoVerificadaScore: row.foto_verificada_score,
+      cedulaImageUrl: row.cedula_image_url,
+    };
+    
+    // Get conductor data
+    const conductorResults = await db.execute(sql`
+      SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
+             licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
+             balance_disponible, balance_pendiente
+      FROM conductores 
+      WHERE user_id = ${user.id}
+      LIMIT 1
+    `);
+    
+    if (conductorResults.rows && conductorResults.rows.length > 0) {
+      const cRow = conductorResults.rows[0] as any;
+      user.conductor = {
+        id: cRow.id,
+        userId: cRow.user_id,
+        disponible: cRow.disponible,
+        ubicacionLat: cRow.ubicacion_lat,
+        ubicacionLng: cRow.ubicacion_lng,
+        vehiculosRegistrados: cRow.vehiculos_registrados,
+        licencia: cRow.licencia,
+        licenciaCategoria: cRow.licencia_categoria,
+        licenciaVerificada: cRow.licencia_verificada,
+        bloqueadoHasta: cRow.bloqueado_hasta,
+        balanceDisponible: cRow.balance_disponible,
+        balancePendiente: cRow.balance_pendiente,
+      };
+    }
+    
+    return user as UserWithConductor;
   }
 
   async getUserByEmailAndType(email: string, userType: string): Promise<UserWithConductor | undefined> {
-    const result = await db.query.users.findFirst({
-      where: and(eq(users.email, email), eq(users.userType, userType as any)),
-      with: {
-        conductor: true,
-      },
-    });
-    return result;
+    // Use raw SQL to avoid schema mismatch with columns that don't exist in production
+    const userResults = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at,
+             estado_cuenta, calificacion_promedio, email_verificado, 
+             foto_verificada, foto_verificada_score, cedula_image_url
+      FROM users 
+      WHERE email = ${email} AND user_type = ${userType}
+      LIMIT 1
+    `);
+    
+    if (!userResults.rows || userResults.rows.length === 0) {
+      return undefined;
+    }
+    
+    const row = userResults.rows[0] as any;
+    const user: any = {
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      userType: row.user_type,
+      fotoUrl: row.foto_url,
+      telefono: row.phone,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      createdAt: row.created_at,
+      estadoCuenta: row.estado_cuenta,
+      calificacionPromedio: row.calificacion_promedio,
+      emailVerificado: row.email_verificado,
+      fotoVerificada: row.foto_verificada,
+      fotoVerificadaScore: row.foto_verificada_score,
+      cedulaImageUrl: row.cedula_image_url,
+    };
+    
+    // Get conductor data if user is a conductor
+    if (userType === 'conductor') {
+      const conductorResults = await db.execute(sql`
+        SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
+               licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
+               balance_disponible, balance_pendiente
+        FROM conductores 
+        WHERE user_id = ${user.id}
+        LIMIT 1
+      `);
+      
+      if (conductorResults.rows && conductorResults.rows.length > 0) {
+        const cRow = conductorResults.rows[0] as any;
+        user.conductor = {
+          id: cRow.id,
+          userId: cRow.user_id,
+          disponible: cRow.disponible,
+          ubicacionLat: cRow.ubicacion_lat,
+          ubicacionLng: cRow.ubicacion_lng,
+          vehiculosRegistrados: cRow.vehiculos_registrados,
+          licencia: cRow.licencia,
+          licenciaCategoria: cRow.licencia_categoria,
+          licenciaVerificada: cRow.licencia_verificada,
+          bloqueadoHasta: cRow.bloqueado_hasta,
+          balanceDisponible: cRow.balance_disponible,
+          balancePendiente: cRow.balance_pendiente,
+        };
+      }
+    }
+    
+    return user as UserWithConductor;
   }
 
   async getUsersByEmail(email: string): Promise<UserWithConductor[]> {
-    const results = await db.query.users.findMany({
-      where: eq(users.email, email),
-      with: {
-        conductor: true,
-      },
-    });
-    return results;
+    // Use raw SQL to avoid schema mismatch with columns that don't exist in production
+    const userResults = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at,
+             estado_cuenta, calificacion_promedio, email_verificado, 
+             foto_verificada, foto_verificada_score, cedula_image_url
+      FROM users 
+      WHERE email = ${email}
+    `);
+    
+    if (!userResults.rows || userResults.rows.length === 0) {
+      return [];
+    }
+    
+    const usersData: UserWithConductor[] = [];
+    
+    for (const row of userResults.rows as any[]) {
+      const user: any = {
+        id: row.id,
+        email: row.email,
+        passwordHash: row.password_hash,
+        nombre: row.nombre,
+        apellido: row.apellido,
+        userType: row.user_type,
+        fotoUrl: row.foto_url,
+        telefono: row.phone,
+        cedula: row.cedula,
+        cedulaVerificada: row.cedula_verificada,
+        telefonoVerificado: row.telefono_verificado,
+        createdAt: row.created_at,
+        estadoCuenta: row.estado_cuenta,
+        calificacionPromedio: row.calificacion_promedio,
+        emailVerificado: row.email_verificado,
+        fotoVerificada: row.foto_verificada,
+        fotoVerificadaScore: row.foto_verificada_score,
+        cedulaImageUrl: row.cedula_image_url,
+      };
+      
+      // Get conductor data if exists
+      const conductorResults = await db.execute(sql`
+        SELECT id, user_id, disponible, ubicacion_lat, ubicacion_lng, vehiculos_registrados,
+               licencia, licencia_categoria, licencia_verificada, bloqueado_hasta,
+               balance_disponible, balance_pendiente
+        FROM conductores 
+        WHERE user_id = ${user.id}
+        LIMIT 1
+      `);
+      
+      if (conductorResults.rows && conductorResults.rows.length > 0) {
+        const cRow = conductorResults.rows[0] as any;
+        user.conductor = {
+          id: cRow.id,
+          userId: cRow.user_id,
+          disponible: cRow.disponible,
+          ubicacionLat: cRow.ubicacion_lat,
+          ubicacionLng: cRow.ubicacion_lng,
+          vehiculosRegistrados: cRow.vehiculos_registrados,
+          licencia: cRow.licencia,
+          licenciaCategoria: cRow.licencia_categoria,
+          licenciaVerificada: cRow.licencia_verificada,
+          bloqueadoHasta: cRow.bloqueado_hasta,
+          balanceDisponible: cRow.balance_disponible,
+          balancePendiente: cRow.balance_pendiente,
+        };
+      }
+      
+      usersData.push(user as UserWithConductor);
+    }
+    
+    return usersData;
   }
 
   async getBasicUsersByEmail(email: string): Promise<User[]> {
-    const results = await db.select().from(users).where(eq(users.email, email));
-    return results;
+    // Select columns that exist in production database
+    // Note: production uses 'phone' not 'telefono'
+    const results = await db.execute(sql`
+      SELECT id, email, password_hash, nombre, apellido, user_type, foto_url,
+             phone, cedula, cedula_verificada, telefono_verificado, created_at
+      FROM users 
+      WHERE email = ${email}
+    `);
+    
+    return (results.rows || []).map((row: any) => ({
+      id: row.id,
+      email: row.email,
+      passwordHash: row.password_hash,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      userType: row.user_type,
+      fotoUrl: row.foto_url,
+      phone: row.phone,
+      cedula: row.cedula,
+      cedulaVerificada: row.cedula_verificada,
+      telefonoVerificado: row.telefono_verificado,
+      createdAt: row.created_at,
+      cedulaImageUrl: null,
+      estadoCuenta: "activo",
+      calificacionPromedio: "5.00",
+      emailVerificado: true,
+      fotoVerificada: true,
+      fotoVerificadaScore: "1.00",
+      cancelacionesTotales: 0,
+      cancelacionesUltimos7dias: 0,
+      cancelacionesUltimoMes: 0,
+      penalizacionesTotales: "0.00",
+      ultimaCancelacionTimestamp: null
+    })) as User[];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -1037,6 +1341,12 @@ export class DatabaseStorage implements IStorage {
     return result as any;
   }
 
+  // Simple version without relations for internal processing
+  async getServicioByIdSimple(id: string): Promise<Servicio | undefined> {
+    const [result] = await db.select().from(servicios).where(eq(servicios.id, id)).limit(1);
+    return result;
+  }
+
   async getServicioByPaymentToken(token: string): Promise<Servicio | undefined> {
     const result = await db.query.servicios.findFirst({
       where: eq(servicios.azulDataVaultToken, token),
@@ -1160,6 +1470,37 @@ export class DatabaseStorage implements IStorage {
       orderBy: desc(servicios.createdAt),
     });
     return results as any;
+  }
+
+  async getServiciosPendingCommission(): Promise<Servicio[]> {
+    // Schema-aware approach: check if commission_processed column exists first
+    const columnCheck = await db.execute(sql`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'servicios' AND column_name = 'commission_processed'
+    `);
+    
+    const hasCommissionColumn = (columnCheck.rows?.length || 0) > 0;
+    
+    if (hasCommissionColumn) {
+      // Column exists, use optimized query
+      const results = await db.execute(sql`
+        SELECT id, cliente_id as "clienteId", conductor_id as "conductorId", estado, metodo_pago as "metodoPago", costo_total as "costoTotal", 
+               commission_processed as "commissionProcessed"
+        FROM servicios 
+        WHERE estado = 'completado' 
+          AND (commission_processed IS NULL OR commission_processed = false)
+          AND conductor_id IS NOT NULL 
+          AND metodo_pago IS NOT NULL 
+          AND costo_total IS NOT NULL
+      `);
+      
+      return (results.rows || []) as unknown as Servicio[];
+    } else {
+      // Column doesn't exist - return empty array to skip processing
+      // This indicates schema needs migration
+      console.warn('commission_processed column not found in servicios table. Run database migrations.');
+      return [];
+    }
   }
 
   async updateServicio(id: string, data: Partial<Servicio>): Promise<Servicio> {
@@ -1531,18 +1872,23 @@ export class DatabaseStorage implements IStorage {
 
   // Analytics
   async getRevenueByPeriod(startDate: string, endDate: string, period: 'day' | 'week' | 'month'): Promise<Array<{ period: string; revenue: number }>> {
-    const formatMap = {
-      day: 'YYYY-MM-DD',
-      week: 'IYYY-IW',
-      month: 'YYYY-MM',
+    // Use safe SQL template literals with validated format strings
+    const getPeriodExpression = (p: 'day' | 'week' | 'month') => {
+      switch (p) {
+        case 'day':
+          return sql<string>`to_char(${servicios.createdAt}, 'YYYY-MM-DD')`;
+        case 'week':
+          return sql<string>`to_char(${servicios.createdAt}, 'IYYY-IW')`;
+        case 'month':
+          return sql<string>`to_char(${servicios.createdAt}, 'YYYY-MM')`;
+      }
     };
     
-    const format = formatMap[period];
-    const periodExpression = sql.raw(`to_char(${servicios.createdAt.name}, '${format}')`);
+    const periodExpression = getPeriodExpression(period);
     
     const results = await db
       .select({
-        period: sql<string>`${periodExpression}`.as('period'),
+        period: periodExpression.as('period'),
         revenue: sql<number>`COALESCE(SUM(CAST(${servicios.costoTotal} AS NUMERIC)), 0)`.as('revenue'),
       })
       .from(servicios)
@@ -1553,25 +1899,30 @@ export class DatabaseStorage implements IStorage {
           sql`${servicios.createdAt} <= ${endDate}::timestamp`
         )
       )
-      .groupBy(sql`${periodExpression}`)
-      .orderBy(sql`${periodExpression}`);
+      .groupBy(periodExpression)
+      .orderBy(periodExpression);
 
     return results.map(r => ({ period: r.period, revenue: Number(r.revenue) }));
   }
 
   async getServicesByPeriod(startDate: string, endDate: string, period: 'day' | 'week' | 'month'): Promise<Array<{ period: string; count: number }>> {
-    const formatMap = {
-      day: 'YYYY-MM-DD',
-      week: 'IYYY-IW',
-      month: 'YYYY-MM',
+    // Use safe SQL template literals with validated format strings
+    const getPeriodExpression = (p: 'day' | 'week' | 'month') => {
+      switch (p) {
+        case 'day':
+          return sql<string>`to_char(${servicios.createdAt}, 'YYYY-MM-DD')`;
+        case 'week':
+          return sql<string>`to_char(${servicios.createdAt}, 'IYYY-IW')`;
+        case 'month':
+          return sql<string>`to_char(${servicios.createdAt}, 'YYYY-MM')`;
+      }
     };
     
-    const format = formatMap[period];
-    const periodExpression = sql.raw(`to_char(${servicios.createdAt.name}, '${format}')`);
+    const periodExpression = getPeriodExpression(period);
     
     const results = await db
       .select({
-        period: sql<string>`${periodExpression}`.as('period'),
+        period: periodExpression.as('period'),
         count: sql<number>`COUNT(*)::int`.as('count'),
       })
       .from(servicios)
@@ -1581,8 +1932,8 @@ export class DatabaseStorage implements IStorage {
           sql`${servicios.createdAt} <= ${endDate}::timestamp`
         )
       )
-      .groupBy(sql`${periodExpression}`)
-      .orderBy(sql`${periodExpression}`);
+      .groupBy(periodExpression)
+      .orderBy(periodExpression);
 
     return results;
   }
@@ -1652,29 +2003,37 @@ export class DatabaseStorage implements IStorage {
 
   // Advanced Analytics (Module 2.3)
   async getServiceLocationsForHeatmap(startDate?: string, endDate?: string, precision: number = 3): Promise<Array<{ lat: number; lng: number; count: number; weight: number }>> {
-    // Use raw SQL to avoid Drizzle's expression issues with GROUP BY
-    let dateFilter = '';
-    if (startDate && endDate) {
-      dateFilter = `AND created_at >= '${startDate}'::timestamp AND created_at <= '${endDate}'::timestamp`;
-    }
-
-    const results = await db.execute(sql`
-      SELECT 
-        ROUND(CAST(origen_lat AS NUMERIC), ${precision}) as lat,
-        ROUND(CAST(origen_lng AS NUMERIC), ${precision}) as lng,
-        COUNT(*)::int as count
-      FROM servicios
-      WHERE origen_lat IS NOT NULL AND origen_lng IS NOT NULL ${sql.raw(dateFilter)}
-      GROUP BY 
-        ROUND(CAST(origen_lat AS NUMERIC), ${precision}),
-        ROUND(CAST(origen_lng AS NUMERIC), ${precision})
-      ORDER BY count DESC
-    `);
-
-    const rows = results.rows as Array<{ lat: string; lng: string; count: number }>;
-    const maxCount = Math.max(...rows.map(r => r.count), 1);
+    // Use safe parameterized query with proper Drizzle template literals
+    const baseConditions = and(
+      isNotNull(servicios.origenLat),
+      isNotNull(servicios.origenLng)
+    );
     
-    return rows.map(r => ({
+    const dateConditions = startDate && endDate 
+      ? and(
+          baseConditions,
+          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
+          sql`${servicios.createdAt} <= ${endDate}::timestamp`
+        )
+      : baseConditions;
+
+    const results = await db
+      .select({
+        lat: sql<string>`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision})`.as('lat'),
+        lng: sql<string>`ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`.as('lng'),
+        count: sql<number>`COUNT(*)::int`.as('count'),
+      })
+      .from(servicios)
+      .where(dateConditions)
+      .groupBy(
+        sql`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision})`,
+        sql`ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`
+      )
+      .orderBy(desc(sql`COUNT(*)`));
+
+    const maxCount = Math.max(...results.map(r => r.count), 1);
+    
+    return results.map(r => ({
       lat: Number(r.lat),
       lng: Number(r.lng),
       count: r.count,
@@ -2037,35 +2396,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getComisionesByEstado(estado: 'pendiente' | 'procesando' | 'pagado' | 'fallido', tipo: 'operador' | 'empresa'): Promise<ComisionWithDetails[]> {
-    if (tipo === 'operador') {
-      const results = await db.query.comisiones.findMany({
-        where: eq(comisiones.estadoPagoOperador, estado),
-        with: {
-          servicio: {
-            with: {
-              cliente: true,
-              conductor: true,
-            },
-          },
-        },
-        orderBy: desc(comisiones.createdAt),
-      });
-      return results as ComisionWithDetails[];
-    } else {
-      const results = await db.query.comisiones.findMany({
-        where: eq(comisiones.estadoPagoEmpresa, estado),
-        with: {
-          servicio: {
-            with: {
-              cliente: true,
-              conductor: true,
-            },
-          },
-        },
-        orderBy: desc(comisiones.createdAt),
-      });
-      return results as ComisionWithDetails[];
-    }
+    const whereClause = tipo === 'operador' 
+      ? eq(comisiones.estadoPagoOperador, estado)
+      : eq(comisiones.estadoPagoEmpresa, estado);
+
+    const results = await db.query.comisiones.findMany({
+      where: whereClause,
+      with: {
+        servicio: {
+          with: {
+            cliente: true,
+            conductor: true,
+          }
+        }
+      },
+      orderBy: desc(comisiones.createdAt),
+    });
+    return results as unknown as ComisionWithDetails[];
   }
 
   async getAllComisiones(): Promise<ComisionWithDetails[]> {
@@ -3749,14 +4096,12 @@ export class DatabaseStorage implements IStorage {
       return conductor;
     }
 
-    const balanceChangeStr = balanceChange.toFixed(2);
-    const pendingChangeStr = pendingChange.toFixed(2);
-
+    // Use parameterized values instead of sql.raw for security
     const [conductor] = await db
       .update(conductores)
       .set({
-        balanceDisponible: sql`(COALESCE(CAST(${conductores.balanceDisponible} AS NUMERIC), 0) + ${sql.raw(balanceChangeStr)}::numeric)::text`,
-        balancePendiente: sql`(COALESCE(CAST(${conductores.balancePendiente} AS NUMERIC), 0) + ${sql.raw(pendingChangeStr)}::numeric)::text`,
+        balanceDisponible: sql`(COALESCE(CAST(${conductores.balanceDisponible} AS NUMERIC), 0) + ${balanceChange}::numeric)::text`,
+        balancePendiente: sql`(COALESCE(CAST(${conductores.balancePendiente} AS NUMERIC), 0) + ${pendingChange}::numeric)::text`,
       })
       .where(eq(conductores.id, conductorId))
       .returning();
@@ -4751,6 +5096,90 @@ export class DatabaseStorage implements IStorage {
 
       return transaction;
     });
+  }
+
+  // ==================== SYSTEM FOR CANCELLATIONS (Phase 3) ====================
+
+  async createCancelacionServicio(cancelacion: InsertCancelacionServicio): Promise<CancelacionServicio> {
+    const [result] = await db.insert(cancelacionesServicios).values([cancelacion]).returning();
+    return result;
+  }
+
+  async getCancelacionesByUsuarioId(usuarioId: string, tipo: 'cliente' | 'conductor'): Promise<CancelacionServicioWithDetails[]> {
+    const results = await db.query.cancelacionesServicios.findMany({
+      where: and(
+        eq(cancelacionesServicios.canceladoPorId, usuarioId),
+        eq(cancelacionesServicios.tipoCancelador, tipo)
+      ),
+      with: {
+        servicio: true,
+        canceladoPor: true,
+        razonCancelacion: true,
+      },
+      orderBy: desc(cancelacionesServicios.createdAt),
+    });
+    return results as unknown as CancelacionServicioWithDetails[];
+  }
+
+  async getCancelacionesByServicioId(servicioId: string): Promise<CancelacionServicioWithDetails | undefined> {
+    const result = await db.query.cancelacionesServicios.findFirst({
+      where: eq(cancelacionesServicios.servicioId, servicioId),
+      with: {
+        servicio: true,
+        canceladoPor: true,
+        razonCancelacion: true,
+      },
+    });
+    return result as unknown as CancelacionServicioWithDetails | undefined;
+  }
+
+  async getAllCancelaciones(limit: number = 100): Promise<CancelacionServicioWithDetails[]> {
+    const results = await db.query.cancelacionesServicios.findMany({
+      with: {
+        servicio: true,
+        canceladoPor: true,
+        razonCancelacion: true,
+      },
+      orderBy: desc(cancelacionesServicios.createdAt),
+      limit,
+    });
+    return results as unknown as CancelacionServicioWithDetails[];
+  }
+
+  async updateCancelacion(id: string, data: Partial<CancelacionServicio>): Promise<CancelacionServicio> {
+    const [result] = await db.update(cancelacionesServicios)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(cancelacionesServicios.id, id))
+      .returning();
+    return result;
+  }
+
+  async getAllRazonesCancelacion(): Promise<RazonCancelacion[]> {
+    const results = await db.query.razonesCancelacion.findMany({
+      where: eq(razonesCancelacion.activa, true),
+      orderBy: asc(razonesCancelacion.codigo),
+    });
+    return results as unknown as RazonCancelacion[];
+  }
+
+  async getRazonCancelacionByCodigo(codigo: string): Promise<RazonCancelacion | undefined> {
+    const result = await db.query.razonesCancelacion.findFirst({
+      where: eq(razonesCancelacion.codigo, codigo),
+    });
+    return result as unknown as RazonCancelacion | undefined;
+  }
+
+  async getZonaDemandaByCoords(lat: number, lng: number): Promise<ZonaDemanda | undefined> {
+    const result = await db.query.zonasDemanada.findFirst();
+    return result as unknown as ZonaDemanda | undefined;
+  }
+
+  async updateZonaDemanda(id: string, data: Partial<ZonaDemanda>): Promise<ZonaDemanda> {
+    const [result] = await db.update(zonasDemanada)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(zonasDemanada.id, id))
+      .returning();
+    return result;
   }
 
   // ==================== ADMINISTRADORES (ADMIN USERS WITH PERMISSIONS) ====================

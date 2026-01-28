@@ -71,29 +71,30 @@ export interface OperatorStatementPDFData {
 }
 
 export class PDFService {
-  private readonly BRAND_PRIMARY = "#0b2545";
-  private readonly BRAND_SECONDARY = "#1e40af";
-  private readonly BRAND_ACCENT = "#f5a623";
-  private readonly TEXT_PRIMARY = "#1f2937";
-  private readonly TEXT_SECONDARY = "#64748b";
-  private readonly SUCCESS_COLOR = "#22c55e";
-  private readonly BORDER_COLOR = "#e2e8f0";
+  private readonly BRAND_PRIMARY = "#0b2545"; // Navy Blue
+  private readonly BRAND_SECONDARY = "#1e40af"; // Blue
+  private readonly BRAND_ACCENT = "#f5a623"; // Amber/Gold
+  private readonly TEXT_PRIMARY = "#111827";
+  private readonly TEXT_SECONDARY = "#4b5563";
+  private readonly TEXT_TERTIARY = "#9ca3af";
+  private readonly SUCCESS_COLOR = "#059669";
+  private readonly BORDER_COLOR = "#f3f4f6";
+  private readonly BACKGROUND_LIGHT = "#f9fafb";
   
-  private readonly COMPANY_NAME = "Grua RD";
-  private readonly COMPANY_TAGLINE = "Servicios de Grua Republica Dominicana";
-  private readonly COMPANY_PHONE = "(809) 555-1234";
-  private readonly COMPANY_EMAIL = "soporte@gruard.com";
+  private readonly COMPANY_NAME = "Grúa RD";
+  private readonly LEGAL_NAME = "GRUARD";
+  private readonly COMPANY_TAGLINE = "Tu auxilio vial de confianza";
+  private readonly COMPANY_PHONE = "829-351-9324";
+  private readonly COMPANY_EMAIL = "info@gruard.com";
   private readonly COMPANY_WEBSITE = "www.gruard.com";
   
-  private readonly BRAND_COLOR = "#2563eb";
-  private readonly SECONDARY_COLOR = "#64748b";
-
   async generateReceipt(data: ReceiptData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
         const doc = new PDFDocument({
           size: "LETTER",
-          margins: { top: 50, bottom: 50, left: 50, right: 50 },
+          margins: { top: 40, bottom: 40, left: 50, right: 50 },
+          bufferPages: true,
         });
 
         const buffers: Buffer[] = [];
@@ -106,257 +107,182 @@ export class PDFService {
 
         doc.pipe(stream);
 
+        // -- Header --
         this.addHeader(doc, data);
-        this.addReceiptInfo(doc, data);
-        this.addClientInfo(doc, data);
-        this.addDriverInfo(doc, data);
-        this.addServiceDetails(doc, data);
-        this.addCostBreakdown(doc, data);
+        
+        // -- Main Sections --
+        let currentY = 160;
+        
+        // Info Box (Receipt details)
+        this.addReceiptSummary(doc, data, currentY);
+        currentY += 80;
+
+        // Two columns: Client and Driver
+        this.addParticipantsInfo(doc, data, currentY);
+        currentY += 120;
+
+        // Service Journey
+        this.addServicePath(doc, data, currentY);
+        currentY += 160; // Incrementado para evitar que el desglose se sobreponga
+
+        // Cost Table
+        this.addModernCostBreakdown(doc, data, currentY);
+
+        // -- Footer --
         this.addFooter(doc, data);
 
         doc.end();
 
         stream.on("finish", () => {
           const pdfBuffer = Buffer.concat(buffers);
-          logger.info("PDF receipt generated successfully", {
-            receiptNumber: data.receiptNumber,
-            size: pdfBuffer.length,
-          });
           resolve(pdfBuffer);
         });
 
         stream.on("error", (error) => {
-          logger.error("Error generating PDF receipt", { error });
           reject(error);
         });
       } catch (error) {
-        logger.error("Error creating PDF document", { error });
         reject(error);
       }
     });
   }
 
   private addHeader(doc: PDFKit.PDFDocument, data: ReceiptData): void {
-    this.addBrandedHeader(doc, "RECIBO DE SERVICIO");
-  }
-
-  private addReceiptInfo(doc: PDFKit.PDFDocument, data: ReceiptData): void {
-    const startY = 130;
-
-    doc.fontSize(10).fillColor("#000000").font("Helvetica-Bold");
-    doc.text("No. Recibo:", 350, startY);
-    doc.text("Fecha:", 350, startY + 20);
-    doc.text("ID Servicio:", 350, startY + 40);
-
-    doc.font("Helvetica").fillColor(this.SECONDARY_COLOR);
-    doc.text(data.receiptNumber, 450, startY);
-    doc.text(
-      new Date(data.fecha).toLocaleDateString("es-DO", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      450,
-      startY + 20
-    );
-    doc.text(data.servicioId.substring(0, 18), 450, startY + 40);
-
+    const pageWidth = doc.page.width;
+    
+    // Top Accent Bar
+    doc.rect(0, 0, pageWidth, 5).fill(this.BRAND_PRIMARY);
+    
+    // Brand Logo/Text
     doc
-      .moveTo(50, startY + 70)
-      .lineTo(550, startY + 70)
-      .strokeColor("#e2e8f0")
-      .stroke();
-  }
-
-  private addClientInfo(doc: PDFKit.PDFDocument, data: ReceiptData): void {
-    const startY = 220;
-
-    doc
-      .fontSize(14)
-      .fillColor(this.BRAND_COLOR)
+      .fontSize(24)
+      .fillColor(this.BRAND_PRIMARY)
       .font("Helvetica-Bold")
-      .text("Información del Cliente", 50, startY);
-
+      .text(this.COMPANY_NAME, 50, 45);
+    
     doc
-      .fontSize(10)
-      .fillColor("#000000")
+      .fontSize(9)
+      .fillColor(this.BRAND_ACCENT)
       .font("Helvetica-Bold")
-      .text("Nombre:", 50, startY + 30);
-    doc.text("Email:", 50, startY + 50);
-    if (data.cliente.cedula) {
-      doc.text("Cédula:", 50, startY + 70);
-    }
-
-    doc.font("Helvetica").fillColor(this.SECONDARY_COLOR);
-    doc.text(
-      `${data.cliente.nombre} ${data.cliente.apellido}`,
-      150,
-      startY + 30
-    );
-    doc.text(data.cliente.email, 150, startY + 50);
-    if (data.cliente.cedula) {
-      doc.text(data.cliente.cedula, 150, startY + 70);
-    }
-  }
-
-  private addDriverInfo(doc: PDFKit.PDFDocument, data: ReceiptData): void {
-    const startY = 220;
-
+      .text(this.COMPANY_TAGLINE.toUpperCase(), 52, 72, { characterSpacing: 1 });
+    
+    // Document Title
     doc
-      .fontSize(14)
-      .fillColor(this.BRAND_COLOR)
+      .fontSize(16)
+      .fillColor(this.TEXT_PRIMARY)
       .font("Helvetica-Bold")
-      .text("Información del Conductor", 320, startY);
-
+      .text("RECIBO DE SERVICIO", 300, 55, { align: "right", width: 250 });
+      
     doc
-      .fontSize(10)
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .text("Conductor:", 320, startY + 30);
-    doc.text("Placa Grúa:", 320, startY + 50);
-
-    doc.font("Helvetica").fillColor(this.SECONDARY_COLOR);
-    doc.text(
-      `${data.conductor.nombre} ${data.conductor.apellido}`,
-      410,
-      startY + 30
-    );
-    doc.text(data.conductor.placaGrua, 410, startY + 50);
-
-    const lineY = data.cliente.cedula ? startY + 100 : startY + 80;
-    doc
-      .moveTo(50, lineY)
-      .lineTo(550, lineY)
-      .strokeColor("#e2e8f0")
-      .stroke();
-  }
-
-  private addServiceDetails(doc: PDFKit.PDFDocument, data: ReceiptData): void {
-    const startY = data.cliente.cedula ? 360 : 340;
-
-    doc
-      .fontSize(14)
-      .fillColor(this.BRAND_COLOR)
-      .font("Helvetica-Bold")
-      .text("Detalles del Servicio", 50, startY);
-
-    doc
-      .fontSize(10)
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .text("Origen:", 50, startY + 30);
-    doc.text("Destino:", 50, startY + 50);
-    doc.text("Distancia:", 50, startY + 70);
-
-    doc.font("Helvetica").fillColor(this.SECONDARY_COLOR);
-    doc.text(data.servicio.origenDireccion, 150, startY + 30, {
-      width: 400,
-    });
-    doc.text(data.servicio.destinoDireccion, 150, startY + 50, {
-      width: 400,
-    });
-    doc.text(`${data.servicio.distanciaKm} km`, 150, startY + 70);
-
-    doc
-      .moveTo(50, startY + 100)
-      .lineTo(550, startY + 100)
-      .strokeColor("#e2e8f0")
-      .stroke();
-  }
-
-  private addCostBreakdown(doc: PDFKit.PDFDocument, data: ReceiptData): void {
-    const startY = data.cliente.cedula ? 490 : 470;
-
-    doc
-      .fontSize(14)
-      .fillColor(this.BRAND_COLOR)
-      .font("Helvetica-Bold")
-      .text("Desglose de Costos", 50, startY);
-
-    const rowHeight = 25;
-    let currentY = startY + 35;
-
-    doc
-      .fillColor("#f8fafc")
-      .rect(50, currentY - 5, 500, rowHeight)
-      .fill();
-
-    doc
-      .fontSize(10)
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .text("Concepto", 60, currentY);
-    doc.text("Monto", 450, currentY, { align: "right" });
-
-    currentY += rowHeight;
-
-    const rows = [
-      { label: "Costo Total del Servicio", value: data.costos.costoTotal },
-      {
-        label: `Pago al Conductor (${data.costos.porcentajeOperador}%)`,
-        value: data.costos.montoOperador,
-      },
-      {
-        label: `Comisión Plataforma (${data.costos.porcentajeEmpresa}%)`,
-        value: data.costos.montoEmpresa,
-      },
-    ];
-
-    rows.forEach((row, index) => {
-      const bgColor = index % 2 === 0 ? "#ffffff" : "#f8fafc";
-      doc.fillColor(bgColor).rect(50, currentY - 5, 500, rowHeight).fill();
-
-      doc
-        .fontSize(10)
-        .fillColor(this.SECONDARY_COLOR)
-        .font("Helvetica")
-        .text(row.label, 60, currentY);
-      doc
-        .fillColor("#000000")
-        .font("Helvetica-Bold")
-        .text(`RD$ ${row.value}`, 450, currentY, { align: "right" });
-
-      currentY += rowHeight;
-    });
-
-    doc
-      .fillColor(this.SUCCESS_COLOR)
-      .rect(50, currentY - 5, 500, rowHeight + 5)
-      .fill();
-
-    doc
-      .fontSize(12)
-      .fillColor("#ffffff")
-      .font("Helvetica-Bold")
-      .text("TOTAL PAGADO", 60, currentY + 2);
-    doc.text(`RD$ ${data.costos.costoTotal}`, 450, currentY + 2, {
-      align: "right",
-    });
-
-    currentY += rowHeight + 20;
-
-    doc
-      .fontSize(10)
-      .fillColor("#000000")
-      .font("Helvetica-Bold")
-      .text("Método de Pago:", 60, currentY);
-    doc
+      .fontSize(9)
+      .fillColor(this.TEXT_SECONDARY)
       .font("Helvetica")
-      .fillColor(this.SECONDARY_COLOR)
-      .text(
-        data.metodoPago === "efectivo" ? "Efectivo" : "Tarjeta de Crédito",
-        180,
-        currentY
-      );
+      .text(`#${data.receiptNumber}`, 300, 75, { align: "right", width: 250 });
+  }
 
-    if (data.metodoPago === "tarjeta" && data.transactionId) {
-      doc
-        .fontSize(9)
-        .fillColor(this.SECONDARY_COLOR)
-        .font("Helvetica")
-        .text(`ID Transacción: ${data.transactionId}`, 60, currentY + 20);
+  private addReceiptSummary(doc: PDFKit.PDFDocument, data: ReceiptData, y: number): void {
+    doc.fillColor(this.BACKGROUND_LIGHT).roundedRect(50, y, 500, 60, 4).fill();
+    
+    const formatDate = (date: Date) => {
+      return new Date(date).toLocaleDateString("es-DO", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    };
+
+    const colWidth = 160;
+    
+    // Labels
+    doc.fontSize(8).fillColor(this.TEXT_TERTIARY).font("Helvetica-Bold");
+    doc.text("FECHA DE EMISIÓN", 70, y + 15);
+    doc.text("ID DE SERVICIO", 70 + colWidth, y + 15);
+    doc.text("MÉTODO DE PAGO", 70 + (colWidth * 2), y + 15);
+    
+    // Values
+    doc.fontSize(10).fillColor(this.TEXT_PRIMARY).font("Helvetica");
+    doc.text(formatDate(data.fecha), 70, y + 30);
+    doc.text(data.servicioId.substring(0, 15).toUpperCase(), 70 + colWidth, y + 30);
+    doc.text(data.metodoPago === "efectivo" ? "EFECTIVO" : "TARJETA BANCARIA", 70 + (colWidth * 2), y + 30);
+  }
+
+  private addParticipantsInfo(doc: PDFKit.PDFDocument, data: ReceiptData, y: number): void {
+    const colWidth = 240;
+    
+    // Client Column
+    doc.fontSize(10).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("CLIENTE", 50, y);
+    doc.rect(50, y + 15, 30, 2).fill(this.BRAND_ACCENT);
+    
+    doc.fontSize(11).fillColor(this.TEXT_PRIMARY).font("Helvetica-Bold").text(`${data.cliente.nombre} ${data.cliente.apellido}`, 50, y + 30);
+    doc.fontSize(9).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(data.cliente.email, 50, y + 45);
+    if (data.cliente.cedula) {
+      doc.fontSize(9).fillColor(this.TEXT_TERTIARY).text(`Cédula: ${data.cliente.cedula}`, 50, y + 58);
+    }
+    
+    // Driver Column
+    doc.fontSize(10).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("UNIDAD DE ASISTENCIA", 310, y);
+    doc.rect(310, y + 15, 30, 2).fill(this.BRAND_ACCENT);
+    
+    doc.fontSize(11).fillColor(this.TEXT_PRIMARY).font("Helvetica-Bold").text(`${data.conductor.nombre} ${data.conductor.apellido}`, 310, y + 30);
+    doc.fontSize(9).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`Placa: ${data.conductor.placaGrua}`, 310, y + 45);
+    doc.fontSize(9).fillColor(this.TEXT_TERTIARY).text("Estatus: Servicio Completado", 310, y + 58);
+  }
+
+  private addServicePath(doc: PDFKit.PDFDocument, data: ReceiptData, y: number): void {
+    doc.fontSize(10).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("DETALLE DEL TRAYECTO", 50, y);
+    doc.rect(50, y + 15, 30, 2).fill(this.BRAND_ACCENT);
+    
+    const journeyY = y + 35;
+    
+    // Origin
+    doc.circle(60, journeyY, 4).fill(this.BRAND_ACCENT);
+    doc.fontSize(9).fillColor(this.TEXT_TERTIARY).font("Helvetica-Bold").text("ORIGEN", 75, journeyY - 4);
+    doc.fontSize(9).fillColor(this.TEXT_PRIMARY).font("Helvetica").text(data.servicio.origenDireccion, 75, journeyY + 8, { width: 450 });
+    
+    // Vertical Line
+    doc.moveTo(60, journeyY + 8).lineTo(60, journeyY + 45).dash(2, { space: 2 }).strokeColor(this.TEXT_TERTIARY).stroke().undash();
+    
+    // Destino
+    const destY = journeyY + 55;
+    doc.circle(60, destY, 4).fill(this.BRAND_PRIMARY);
+    doc.fontSize(9).fillColor(this.TEXT_TERTIARY).font("Helvetica-Bold").text("DESTINO", 75, destY - 4);
+    doc.fontSize(9).fillColor(this.TEXT_PRIMARY).font("Helvetica").text(data.servicio.destinoDireccion, 75, destY + 8, { width: 450 });
+    
+    doc.fontSize(9).fillColor(this.TEXT_SECONDARY).font("Helvetica-Bold").text(`DISTANCIA TOTAL: ${data.servicio.distanciaKm} KM`, 50, destY + 45);
+  }
+
+  private addModernCostBreakdown(doc: PDFKit.PDFDocument, data: ReceiptData, y: number): void {
+    doc.fontSize(10).fillColor(this.BRAND_SECONDARY).font("Helvetica-Bold").text("DESGLOSE ECONÓMICO", 50, y);
+    doc.rect(50, y + 15, 30, 2).fill(this.BRAND_ACCENT);
+    
+    let currentY = y + 35;
+    
+    const addRow = (label: string, value: string, isTotal: boolean = false) => {
+      if (isTotal) {
+        doc.rect(50, currentY, 500, 35).fill(this.BRAND_PRIMARY);
+        doc.fontSize(12).fillColor("#ffffff").font("Helvetica-Bold").text(label, 70, currentY + 12);
+        doc.fontSize(14).text(`RD$ ${value}`, 400, currentY + 10, { align: "right", width: 130 });
+      } else {
+        doc.fontSize(10).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(label, 70, currentY);
+        doc.fillColor(this.TEXT_PRIMARY).font("Helvetica-Bold").text(`RD$ ${value}`, 400, currentY, { align: "right", width: 130 });
+        doc.moveTo(50, currentY + 15).lineTo(550, currentY + 15).strokeColor(this.BORDER_COLOR).lineWidth(0.5).stroke();
+      }
+      currentY += isTotal ? 45 : 25;
+    };
+    
+    addRow("Cargo por Servicio de Grúa", data.costos.costoTotal);
+    
+    if (data.metodoPago === "tarjeta") {
+      addRow("Impuestos y Tasas Transaccionales", "Incluidos");
+    }
+    
+    currentY += 10;
+    addRow("TOTAL PAGADO", data.costos.costoTotal, true);
+    
+    if (data.transactionId) {
+      doc.fontSize(8).fillColor(this.TEXT_TERTIARY).font("Helvetica-Oblique").text(`Ref. Transacción: ${data.transactionId}`, 50, currentY + 5);
     }
   }
 
@@ -366,87 +292,24 @@ export class PDFService {
 
   private addBrandedHeader(doc: PDFKit.PDFDocument, title: string): void {
     const pageWidth = doc.page.width;
-    
-    doc.rect(0, 0, pageWidth, 8).fill(this.BRAND_PRIMARY);
-    
-    doc
-      .fontSize(32)
-      .fillColor(this.BRAND_PRIMARY)
-      .font("Helvetica-Bold")
-      .text(this.COMPANY_NAME, 50, 25);
-    
-    doc
-      .moveTo(50, 65)
-      .lineTo(180, 65)
-      .strokeColor(this.BRAND_ACCENT)
-      .lineWidth(3)
-      .stroke();
-    
-    doc
-      .fontSize(10)
-      .fillColor(this.TEXT_SECONDARY)
-      .font("Helvetica")
-      .text(this.COMPANY_TAGLINE, 50, 75);
-    
-    doc
-      .fontSize(18)
-      .fillColor(this.TEXT_PRIMARY)
-      .font("Helvetica-Bold")
-      .text(title, 300, 35, { align: "right", width: 250 });
-    
-    doc
-      .moveTo(50, 100)
-      .lineTo(550, 100)
-      .strokeColor(this.BORDER_COLOR)
-      .lineWidth(1)
-      .stroke();
+    doc.rect(0, 0, pageWidth, 5).fill(this.BRAND_PRIMARY);
+    doc.fontSize(24).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text(this.COMPANY_NAME, 50, 45);
+    doc.fontSize(9).fillColor(this.BRAND_ACCENT).font("Helvetica-Bold").text(this.COMPANY_TAGLINE.toUpperCase(), 52, 72, { characterSpacing: 1 });
+    doc.fontSize(16).fillColor(this.TEXT_PRIMARY).font("Helvetica-Bold").text(title, 300, 55, { align: "right", width: 250 });
   }
 
   private addBrandedFooter(doc: PDFKit.PDFDocument): void {
     const pageHeight = doc.page.height;
-    const pageWidth = doc.page.width;
-    const footerY = pageHeight - 100;
-    
-    doc
-      .moveTo(50, footerY)
-      .lineTo(550, footerY)
-      .strokeColor(this.BORDER_COLOR)
-      .lineWidth(1)
-      .stroke();
-    
-    doc
-      .fontSize(9)
-      .fillColor(this.TEXT_SECONDARY)
-      .font("Helvetica")
-      .text(
-        `Tel: ${this.COMPANY_PHONE}  |  Email: ${this.COMPANY_EMAIL}  |  Web: ${this.COMPANY_WEBSITE}`,
-        50,
-        footerY + 15,
-        { align: "center", width: 500 }
-      );
-    
-    doc
-      .fontSize(10)
-      .fillColor(this.BRAND_PRIMARY)
-      .font("Helvetica-Bold")
-      .text("Gracias por confiar en Grua RD!", 50, footerY + 35, {
-        align: "center",
-        width: 500,
-      });
-    
-    doc
-      .fontSize(8)
-      .fillColor(this.TEXT_SECONDARY)
-      .font("Helvetica")
-      .text(
-        "Este documento es un comprobante digital valido del servicio prestado.",
-        50,
-        footerY + 55,
-        { align: "center", width: 500 }
-      );
-    
-    doc.rect(0, pageHeight - 8, pageWidth, 8).fill(this.BRAND_PRIMARY);
+    const footerY = pageHeight - 80;
+    doc.rect(50, footerY, 500, 0.5).fill(this.BORDER_COLOR);
+    doc.fontSize(8).fillColor(this.TEXT_SECONDARY).font("Helvetica").text(`GRUARD | Tel: ${this.COMPANY_PHONE}`, 50, footerY + 15, { align: "center", width: 500 });
+    doc.fontSize(9).fillColor(this.BRAND_PRIMARY).font("Helvetica-Bold").text("¡Gracias por confiar en Grúa RD!", 50, footerY + 25, { align: "center", width: 500 });
+    doc.rect(0, pageHeight - 5, doc.page.width, 5).fill(this.BRAND_PRIMARY);
   }
+
+  private readonly BRAND_COLOR = "#0b2545";
+  private readonly SECONDARY_COLOR = "#4b5563";
+
 
   generateReceiptNumber(): string {
     const timestamp = Date.now();

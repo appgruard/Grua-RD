@@ -1,0 +1,20 @@
+2026-01-25T19:36:19.123816630Z 7:36:19 PM [express] POST /api/payments/azul/3ds-method-notification 200 in 5ms
+2026-01-25T19:36:26.583182121Z 19:36:26 [info] === CONTINUE 3DS RESPONSE === {"response":"{\n \"AuthorizationCode\": \"\",\n \"AzulOrderId\": \"44874247\",\n \"CustomOrderId\": \"\",\n \"DataVaultBrand\": \"\",\n \"DataVaultExpiration\": \"\",\n \"DataVaultToken\": \"\",\n \"DateTime\": \"20260125153605\",\n \"ErrorDescription\": \"\",\n \"IsoCode\": \"3D\",\n \"LotNumber\": \"\",\n \"RRN\": \"\",\n \"ResponseCode\": \"ISO8583\",\n \"ResponseMessage\": \"3D_SECURE_CHALLENGE\",\n \"ThreeDSChallenge\": {\n \"CReq\": \"ewogICAgImFjc1RyYW5zSUQiOiAiZDU5MTBiMGUtMjNkNy00ZGUwLTg3Y2YtNmU1MDcxYWRlYzJmIiwKICAgICJjaGFsbGVuZ2VXaW5kb3dTaXplIjogIjAzIiwKICAgICJtZXNzYWdlVHlwZSI6ICJDUmVxIiwKICAgICJtZXNzYWdlVmVyc2lvbiI6ICIyLjIuMCIsCiAgICAidGhyZWVEU1NlcnZlclRyYW5zSUQiOiAiOGFjOGMzMmItYzQyNC01NmE1LTgwMDAtMDAwMDA0MDUzYWM3Igp9\",\n \"MD\": \"\",\n \"PaReq\": \"\",\n \"RedirectPostUrl\": \"https://3ds-acs.test.modirum.com/mdpayacs/creq;token=365981241.1769369785.4eJiR1ecHlwuBQq6L2jY4HGvpENRH9fNaEyfkyLpqpY\"\n },\n \"Ticket\": \"\"\n}","hasThreeDSChallenge":true,"acsUrl":"https://3ds-acs.test.modirum.com/mdpayacs/creq;token=365981241.1769369785.4eJiR1ecHlwuBQq6L2jY4HGvpENRH9fNaEyfkyLpqpY","creq":"ewogICAgImFjc1RyYW5zSUQiOiAiZDU5MTBiMGUtMjNkNy00ZG","category":"system"}
+2026-01-25T19:36:26.586363516Z 7:36:26 PM [express] POST /api/test/azul-3ds-continue 200 in 9159ms :: {"success":false,"isoCode":"3…
+2026-01-25T19:36:33.559613715Z 19:36:33 [warn] CORS blocked request from origin: null. Allowed origins: https://app.gruard.com, https://gruard.com, https://captain.gruard.com, https://captain.gruard.fourone.com.do
+2026-01-25T19:36:33.560950133Z 19:36:33 [error] Request error: Not allowed by CORS {"statusCode":500,"errorType":"system_error","errorSource":"internal_service","severity":"high","isUserError":false,"route":"/api/payments/azul/3ds-callback","method":"POST","metadata":{"query":{},"params":{},"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36","ip":"152.166.245.154"},"error":"Not allowed by CORS","category":"system"}
+2026-01-25T19:36:33.560971375Z Error: Not allowed by CORS
+2026-01-25T19:36:33.560974970Z at origin (file:///app/dist/index.js:27362:18)
+2026-01-25T19:36:33.560978295Z at /app/node_modules/cors/lib/index.js:219:13
+2026-01-25T19:36:33.560981389Z at optionsCallback (/app/node_modules/cors/lib/index.js:199:9)
+2026-01-25T19:36:33.560984273Z at corsMiddleware (/app/node_modules/cors/lib/index.js:204:7)
+2026-01-25T19:36:33.560992896Z at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+2026-01-25T19:36:33.560995590Z at trim_prefix (/app/node_modules/express/lib/router/index.js:328:13)
+2026-01-25T19:36:33.560998274Z at /app/node_modules/express/lib/router/index.js:286:9
+2026-01-25T19:36:33.561001569Z at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+2026-01-25T19:36:33.561005225Z at next (/app/node_modules/express/lib/router/index.js:280:10)
+2026-01-25T19:36:33.561008259Z at file:///app/dist/index.js:27330:12
+2026-01-25T19:36:33.618111735Z 19:36:33 [info] Using Resend email service via Replit connector
+2026-01-25T19:36:33.799319195Z 19:36:33 [info] Email sent successfully: e5b5b725-9f0e-4bdd-ba7c-100583f7e986
+2026-01-25T19:36:33.799646184Z 19:36:33 [info] Sent high priority error notification {"errorId":"324a896d-4c8b-4239-90c8-4d1be61ada60","priority":"alta","email":"admin@fourone.com.do","category":"system"}
+2026-01-25T19:36:33.799747306Z 19:36:33 [info] Incremented occurrence count for existing error {"errorId":"324a896d-4c8b-4239-90c8-4d1be61ada60","fingerprint":"6f3ea35918b79cabdea680311720d065","newCount":11,"severityEscalated":false,"effectiveSeverity":"high","calculatedPriority":"alta","priorityScore":63,"category":"system"}

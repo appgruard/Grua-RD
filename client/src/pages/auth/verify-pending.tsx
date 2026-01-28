@@ -33,6 +33,34 @@ import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCateg
 
 type VerificationStep = 'cedula' | 'email' | 'insurance' | 'photo' | 'license' | 'categories' | 'vehicles' | 'complete';
 
+// Module-level loop detection (persists across renders)
+let moduleApiCallCount = 0;
+let moduleLastCallTime = 0;
+const MODULE_LOOP_THRESHOLD = 15;
+const MODULE_TIME_WINDOW = 3000; // 3 seconds
+
+function detectAndBreakLoop(userType?: string): boolean {
+  const now = Date.now();
+  
+  // Reset if enough time has passed
+  if (now - moduleLastCallTime > MODULE_TIME_WINDOW) {
+    moduleApiCallCount = 0;
+  }
+  
+  moduleLastCallTime = now;
+  moduleApiCallCount++;
+  
+  if (moduleApiCallCount >= MODULE_LOOP_THRESHOLD) {
+    console.warn(`Loop detected (${moduleApiCallCount} calls in ${MODULE_TIME_WINDOW}ms), forcing redirect`);
+    moduleApiCallCount = 0; // Reset to prevent infinite redirect attempts
+    const targetDashboard = userType === 'conductor' ? '/driver' : '/client';
+    window.location.href = targetDashboard;
+    return true;
+  }
+  
+  return false;
+}
+
 const insuranceCompanies = [
   'Seguros Reservas',
   'Mapfre BHD',
@@ -62,6 +90,48 @@ export default function VerifyPending() {
   
   // Use user from context or pendingVerificationUser immediately
   const contextUser = user || pendingVerificationUser;
+  
+  // Loop detection at component mount level using sessionStorage
+  useEffect(() => {
+    const LOOP_KEY = 'verify-pending-mount-count';
+    const LOOP_TIME_KEY = 'verify-pending-mount-time';
+    const MAX_MOUNTS = 10;
+    const TIME_WINDOW = 5000; // 5 seconds
+    
+    const now = Date.now();
+    const lastMountTime = parseInt(sessionStorage.getItem(LOOP_TIME_KEY) || '0', 10);
+    let mountCount = parseInt(sessionStorage.getItem(LOOP_KEY) || '0', 10);
+    
+    // Reset counter if time window has passed
+    if (now - lastMountTime > TIME_WINDOW) {
+      mountCount = 0;
+    }
+    
+    mountCount += 1;
+    sessionStorage.setItem(LOOP_KEY, mountCount.toString());
+    sessionStorage.setItem(LOOP_TIME_KEY, now.toString());
+    
+    // If too many mounts in a short time, force redirect
+    if (mountCount >= MAX_MOUNTS) {
+      console.warn('Component loop detected, forcing redirect');
+      sessionStorage.removeItem(LOOP_KEY);
+      sessionStorage.removeItem(LOOP_TIME_KEY);
+      
+      // Determine correct dashboard based on user type
+      const checkUser = user || pendingVerificationUser;
+      const targetDashboard = checkUser?.userType === 'conductor' ? '/driver' : '/client';
+      window.location.href = targetDashboard;
+    }
+    
+    // Cleanup on unmount - reduce count
+    return () => {
+      // Clear after successful navigation away
+      const currentCount = parseInt(sessionStorage.getItem(LOOP_KEY) || '0', 10);
+      if (currentCount > 0) {
+        sessionStorage.setItem(LOOP_KEY, (currentCount - 1).toString());
+      }
+    };
+  }, [user, pendingVerificationUser]);
   
   // State declarations - initialize with optimistic values from pendingVerification
   const [currentStep, setCurrentStep] = useState<VerificationStep>('cedula');
@@ -111,6 +181,7 @@ export default function VerifyPending() {
   const initFetchedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const redirectingRef = useRef(false);
+  const isRedirectingOrFetching = useRef(false);
   
   // Use user from context, or pendingVerificationUser, or initializedUser from API
   const currentUser = contextUser || initializedUser;
@@ -131,10 +202,18 @@ export default function VerifyPending() {
   // Reusable function to fetch verification status from the server
   // When skipRedirects is true, only update local state without triggering redirects
   const fetchVerificationStatusFromServer = useCallback(async (signal?: AbortSignal, options?: { skipRedirects?: boolean }) => {
-    // Skip if redirect is already in progress to prevent polling loops
-    if (redirectingRef.current) {
+    // Module-level loop detection - check before anything else
+    const checkUser = contextUser || pendingVerificationUser;
+    if (detectAndBreakLoop(checkUser?.userType)) {
       return { success: true, redirecting: true };
     }
+    
+    // Skip if redirect is already in progress or if we're already fetching
+    if (redirectingRef.current || isRedirectingOrFetching.current) {
+      return { success: true, redirecting: true };
+    }
+    
+    isRedirectingOrFetching.current = true;
     
     try {
       const res = await fetch('/api/identity/verification-status', {
@@ -235,30 +314,8 @@ export default function VerifyPending() {
           }
         } else {
           // Client verification flow
-          // Load existing insurance documents for clients
-          try {
-            const insuranceRes = await fetch('/api/client/insurance/status', {
-              credentials: 'include',
-              signal
-            });
-            if (insuranceRes.ok) {
-              const insuranceData = await insuranceRes.json();
-              if (insuranceData.insuranceDocuments && insuranceData.insuranceDocuments.length > 0) {
-                setInsuranceDocuments(insuranceData.insuranceDocuments.map((doc: any) => ({
-                  id: doc.id,
-                  aseguradoraNombre: doc.aseguradoraNombre || doc.tipo || '',
-                  numeroPoliza: doc.numeroPoliza || '',
-                  fechaVencimiento: doc.validoHasta,
-                  estado: doc.estado || 'pendiente',
-                  createdAt: doc.createdAt || new Date().toISOString(),
-                })));
-                setInsuranceCompleted(true);
-              }
-            }
-          } catch (err) {
-            console.error('Error loading insurance documents:', err);
-          }
-
+          // For clients: if both cedula and email are verified, redirect immediately
+          // Insurance is OPTIONAL and can be managed from profile
           if (cedulaVerificada && emailVerificado) {
             // Fully verified - redirect if skipRedirects is not true
             if (!options?.skipRedirects) {
@@ -291,6 +348,11 @@ export default function VerifyPending() {
       if (error?.name === 'AbortError') return { success: false, aborted: true };
       console.error('Error checking verification status:', error);
       return { success: false };
+    } finally {
+      // Reset the fetching guard unless we're redirecting
+      if (!redirectingRef.current) {
+        isRedirectingOrFetching.current = false;
+      }
     }
   }, [contextUser, setLocation, clearPendingVerification, refreshUser]);
 
@@ -314,6 +376,10 @@ export default function VerifyPending() {
     const result = await fetchVerificationStatusFromServer(controller.signal, { skipRedirects: true });
     return result.success;
   }, [fetchVerificationStatusFromServer]);
+
+  // Store fetch function in ref to avoid useEffect dependency changes
+  const fetchFnRef = useRef(fetchVerificationStatusFromServer);
+  fetchFnRef.current = fetchVerificationStatusFromServer;
 
   // Single effect to fetch verification status on mount - runs once per session
   // Wait for auth loading to complete before fetching verification status
@@ -351,7 +417,8 @@ export default function VerifyPending() {
     
     const doFetch = async () => {
       // Initial fetch can do redirects (skipRedirects: false by default)
-      const result = await fetchVerificationStatusFromServer(controller.signal);
+      // Use ref to call the function without including it in dependencies
+      const result = await fetchFnRef.current(controller.signal);
       clearTimeout(timeoutId);
       if (!result.success && !result.aborted && !result.unauthorized) {
         setInitError(true);
@@ -369,7 +436,8 @@ export default function VerifyPending() {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [authLoading, contextUser, pendingVerificationUser, fetchVerificationStatusFromServer, setLocation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, contextUser, pendingVerificationUser, setLocation]);
 
   // Effect to refetch verification status when tab regains focus (handles multi-tab scenarios)
   useEffect(() => {
@@ -1274,9 +1342,13 @@ export default function VerifyPending() {
         setCurrentStep('photo');
       } else {
         // Client is fully verified after email verification (cedula + email)
-        // Redirect directly to client dashboard - insurance can be added later
+        // Insurance is OPTIONAL and can be added from profile later
+        // Navigate directly to client dashboard
+        redirectingRef.current = true;
         clearPendingVerification();
         await refreshUser();
+        // Small delay to ensure React Query cache is updated
+        await new Promise(resolve => setTimeout(resolve, 150));
         setLocation('/client');
       }
     },

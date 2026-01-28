@@ -1,6 +1,7 @@
 import express, { type Express, type Request, type Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { storageService } from "./storage-service";
 import { pushService } from "./push-service";
@@ -465,6 +466,733 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // Test endpoint for AZUL 3DS Challenge with Friction (Card 0129)
+  // This endpoint executes the full 3DS flow and returns HTML to display the challenge
+  app.get("/api/test/azul-3ds-challenge", async (req, res) => {
+    try {
+      logSystem.info("Testing 3DS Challenge with friction endpoint", { path: req.path });
+      const transactionId = Date.now().toString();
+      const baseUrl = process.env.APP_BASE_URL || `https://${req.get('host')}`;
+      
+      const browserInfo = {
+        acceptHeader: req.get('Accept') || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ipAddress: req.ip || req.socket.remoteAddress || "127.0.0.1",
+        language: req.get('Accept-Language')?.split(',')[0] || "es-DO",
+        colorDepth: 24,
+        screenWidth: 1920,
+        screenHeight: 1080,
+        timeZone: "-240",
+        userAgent: req.get('User-Agent') || "Mozilla/5.0",
+        javaScriptEnabled: "true",
+      };
+
+      // Tarjeta de prueba para 3DS Challenge con fricción según documentación de Azul
+      const testCard = {
+        cardNumber: "4005520000000129",
+        expiration: "202812",
+        cvc: "123",
+        cardHolderName: "Juan Perez Challenge"
+      };
+
+      // Paso 2-3: Iniciar el pago 3DS - EXACTAMENTE igual al script test-3dsecure.cjs
+      const initResult = await AzulPaymentService.init3DSecureWithCard(
+        testCard,
+        {
+          amount: 100,  // 1 peso = 100 centavos como en el script
+          itbis: 18,    // 18 centavos como en el script
+          customOrderId: "GRD-" + transactionId,
+        },
+        browserInfo
+      );
+
+      logSystem.info("3DS Init result", { 
+        isoCode: initResult.isoCode, 
+        responseMessage: initResult.responseMessage,
+        azulOrderId: initResult.azulOrderId,
+        requires3DS: initResult.requires3DS,
+        hasMethodURL: !!initResult.threeDSMethodURL,
+        hasAcsUrl: !!initResult.acsUrl
+      });
+
+      // Si recibimos 3D2METHOD, necesitamos ejecutar el MethodForm primero
+      const methodForm = initResult.rawResponse?.ThreeDSMethod?.MethodForm || initResult.rawResponse?.MethodForm;
+      if (initResult.isoCode === '3D2METHOD' && methodForm) {
+        const methodHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3DS Method - Azul</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #1a365d; }
+    .info { background: #e2e8f0; padding: 15px; border-radius: 4px; margin: 20px 0; }
+    .step { margin: 10px 0; padding: 10px; background: #edf2f7; border-left: 4px solid #3182ce; }
+    pre { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+    #methodFrame { width: 100%; height: 400px; border: 1px solid #e2e8f0; }
+    button { background: #3182ce; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+    button:hover { background: #2c5282; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Paso 4: 3DS Method Form</h1>
+    <div class="info">
+      <p><strong>AzulOrderId:</strong> ${initResult.azulOrderId}</p>
+      <p><strong>Estado:</strong> Se requiere ejecutar el MethodForm para continuar con el challenge</p>
+    </div>
+    
+    <div class="step">
+      <strong>Paso 4:</strong> El MethodForm se ejecuta en el iframe oculto abajo. Una vez completado, hacer clic en "Continuar al Challenge".
+    </div>
+    
+    <div id="methodContainer">
+      ${methodForm}
+    </div>
+    
+    <div style="margin-top: 20px;">
+      <button onclick="continueToChallenge()">Continuar al Challenge (Paso 5-6)</button>
+    </div>
+    
+    <div id="result" style="margin-top: 20px;"></div>
+    
+    <script>
+      async function continueToChallenge() {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = '<p>Procesando paso 5-6...</p>';
+        
+        try {
+          const response = await fetch('/api/test/azul-3ds-continue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              azulOrderId: '${initResult.azulOrderId}',
+              status: 'RECEIVED'
+            })
+          });
+          const data = await response.json();
+          
+          if (data.acsUrl && data.creq) {
+            resultDiv.innerHTML = '<p>Redirigiendo al ACS para el challenge...</p>';
+            
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = data.acsUrl;
+            
+            const creqInput = document.createElement('input');
+            creqInput.type = 'hidden';
+            creqInput.name = 'creq';
+            creqInput.value = data.creq;
+            form.appendChild(creqInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+          } else {
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+          }
+        } catch (error) {
+          resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+        }
+      }
+    </script>
+  </div>
+</body>
+</html>`;
+        return res.send(methodHtml);
+      }
+
+      // Si recibimos 3D directamente con challenge data
+      if ((initResult.isoCode === '3D' || initResult.requires3DS) && initResult.acsUrl && initResult.creq) {
+        const challengeHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3DS Challenge - Azul</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #1a365d; }
+    .info { background: #e2e8f0; padding: 15px; border-radius: 4px; margin: 20px 0; }
+    .step { margin: 10px 0; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; }
+    pre { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+    button { background: #3182ce; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #2c5282; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Paso 7: 3DS Challenge con Friccion</h1>
+    <div class="info">
+      <p><strong>AzulOrderId:</strong> ${initResult.azulOrderId}</p>
+      <p><strong>ACS URL:</strong> ${initResult.acsUrl}</p>
+    </div>
+    
+    <div class="step">
+      <strong>Paso 7:</strong> Al hacer clic en el boton, seras redirigido al servidor ACS del emisor para completar la autenticacion.
+      El codigo OTP de prueba para sandbox es: <strong>123456</strong>
+    </div>
+    
+    <form id="challengeForm" method="POST" action="${initResult.acsUrl}">
+      <input type="hidden" name="creq" value="${initResult.creq}" />
+      <button type="submit">Iniciar Challenge de Autenticacion</button>
+    </form>
+    
+    <div style="margin-top: 20px;">
+      <h3>Datos del Challenge:</h3>
+      <pre>${JSON.stringify({ acsUrl: initResult.acsUrl, creq: initResult.creq?.substring(0, 100) + '...' }, null, 2)}</pre>
+    </div>
+  </div>
+</body>
+</html>`;
+        return res.send(challengeHtml);
+      }
+
+      // Si fue aprobado sin challenge o hubo un error
+      const resultHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3DS Result - Azul</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: ${initResult.success ? '#38a169' : '#e53e3e'}; }
+    pre { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px; overflow-x: auto; }
+    .info { background: #e2e8f0; padding: 15px; border-radius: 4px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>${initResult.success ? 'Transaccion Aprobada' : 'Resultado de 3DS'}</h1>
+    <div class="info">
+      <p><strong>ISO Code:</strong> ${initResult.isoCode}</p>
+      <p><strong>Mensaje:</strong> ${initResult.responseMessage}</p>
+      ${initResult.authorizationCode ? `<p><strong>Codigo de Autorizacion:</strong> ${initResult.authorizationCode}</p>` : ''}
+      ${initResult.azulOrderId ? `<p><strong>AzulOrderId:</strong> ${initResult.azulOrderId}</p>` : ''}
+    </div>
+    <h3>Respuesta Completa:</h3>
+    <pre>${JSON.stringify(initResult, null, 2)}</pre>
+  </div>
+</body>
+</html>`;
+      return res.send(resultHtml);
+      
+    } catch (error: any) {
+      logSystem.error("Error in 3DS challenge test endpoint", error);
+      res.status(500).send(`
+<!DOCTYPE html>
+<html>
+<head><title>Error 3DS</title></head>
+<body style="font-family: Arial; padding: 20px;">
+  <h1 style="color: #e53e3e;">Error en prueba 3DS</h1>
+  <pre style="background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px;">${error.message}</pre>
+</body>
+</html>`);
+    }
+  });
+
+  // Página de prueba simple para 3DS - todo el flujo en una página HTML
+  app.get("/api/test/3ds-simple", async (req, res) => {
+    // Agregar headers CSP permisivos para dominios de Azul 3DS
+    res.setHeader('Content-Security-Policy', 
+      "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "frame-src 'self' https://*.modirum.com https://*.azul.com.do https://3ds-acs.test.modirum.com; " +
+      "form-action 'self' https://*.modirum.com https://*.azul.com.do https://3ds-acs.test.modirum.com; " +
+      "connect-src 'self' https://*.azul.com.do https://*.modirum.com;"
+    );
+    res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <title>3DS Simple Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+    button { padding: 15px 30px; font-size: 18px; background: #0066cc; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin: 10px 0; }
+    button:disabled { background: #ccc; }
+    #log { background: #f5f5f5; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>3DS Simple Test</h1>
+  <p>Tarjeta: 4005520000000129 | OTP: 123456</p>
+  
+  <button id="startBtn">Iniciar Prueba 3DS</button>
+  <div id="log"></div>
+  
+  <!-- iframe oculto para el Method -->
+  <iframe id="methodFrame" style="display:none;"></iframe>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const logEl = document.getElementById('log');
+      const btn = document.getElementById('startBtn');
+      
+      function log(msg, type) {
+        logEl.innerHTML += '<div class="' + (type || '') + '">' + new Date().toLocaleTimeString() + ' - ' + msg + '</div>';
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+      
+      btn.addEventListener('click', async function() {
+        btn.disabled = true;
+        btn.textContent = 'Procesando...';
+        
+        try {
+          log('Paso 1: Iniciando transaccion...');
+          const initRes = await fetch('/api/payments/azul/init-3ds-friction-test', { method: 'POST' });
+          const initData = await initRes.json();
+          log('Respuesta init: IsoCode=' + initData.isoCode);
+          
+          if (!initData.azulOrderId) {
+            log('ERROR: No se recibio AzulOrderId', 'error');
+            return;
+          }
+          
+          const azulOrderId = initData.azulOrderId;
+          log('AzulOrderId: ' + azulOrderId);
+          
+          if (initData.methodForm) {
+            log('Paso 2: Ejecutando 3DS Method...');
+            const iframe = document.getElementById('methodFrame');
+            iframe.srcdoc = initData.methodForm;
+            await new Promise(function(r) { setTimeout(r, 3000); });
+            log('Method completado');
+          }
+          
+          log('Paso 3: Continuando autenticacion...');
+          const contRes = await fetch('/api/test/azul-3ds-continue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ azulOrderId: azulOrderId, status: 'RECEIVED' })
+          });
+          const contData = await contRes.json();
+          log('Respuesta continue: IsoCode=' + contData.isoCode);
+          
+          if (contData.acsUrl && contData.creq) {
+            log('Paso 4: Challenge detectado!', 'success');
+            log('ACS URL: ' + contData.acsUrl);
+            log('Redirigiendo al ACS en 2 segundos...');
+            await new Promise(function(r) { setTimeout(r, 2000); });
+            
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = contData.acsUrl;
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'creq';
+            input.value = contData.creq;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+          } else {
+            log('No se detecto challenge. Respuesta:', 'error');
+            log(JSON.stringify(contData, null, 2));
+          }
+        } catch (err) {
+          log('ERROR: ' + err.message, 'error');
+        }
+      });
+    });
+  </script>
+</body>
+</html>`);
+  });
+
+  // Endpoint para generar PDF con estimación de pricing Neon
+  app.get("/api/reports/neon-pricing-pdf", async (req, res) => {
+    try {
+      const PDFDocument = (await import('pdfkit')).default;
+      const fs = await import('fs');
+      const path = await import('path');
+      const doc = new PDFDocument({ margin: 40, size: 'LETTER' });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=GruaRD-Neon-Pricing-Estimacion.pdf');
+      
+      doc.pipe(res);
+      
+      const pageWidth = doc.page.width;
+      const pageHeight = doc.page.height;
+      const margin = 40;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      // Colores de la marca
+      const primaryColor = '#1a1a2e';
+      const accentColor = '#e94560';
+      const lightBg = '#f8f9fa';
+      const darkText = '#2d3436';
+      const lightText = '#636e72';
+      
+      // Header con fondo de color
+      doc.rect(0, 0, pageWidth, 120).fill(primaryColor);
+      
+      // Logo
+      const logoPath = path.join(process.cwd(), 'attached_assets', 'Grúa_20251124_024218_0000_1763966543810.png');
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, margin, 15, { width: 70 });
+      }
+      
+      // Titulo en header
+      doc.fillColor('#ffffff').fontSize(28).font('Helvetica-Bold');
+      doc.text('Grua RD', margin + 85, 25, { continued: false });
+      doc.fontSize(11).font('Helvetica').text('Servicios de Grua y Asistencia Vial', margin + 85, 58);
+      
+      // Info de contacto en header derecho
+      doc.fontSize(9).text('www.gruard.com', pageWidth - 150, 30, { width: 110, align: 'right' });
+      doc.text('app.gruard.com', pageWidth - 150, 45, { width: 110, align: 'right' });
+      
+      // Titulo del documento
+      doc.fillColor(accentColor).fontSize(10).font('Helvetica-Bold');
+      doc.text('INFORME DE COSTOS', margin, 85, { width: contentWidth });
+      doc.fillColor('#ffffff').fontSize(14).font('Helvetica');
+      doc.text('Estimacion Base de Datos Neon - Plan Launch', margin, 100);
+      
+      // Contenido principal
+      let y = 140;
+      
+      // Seccion: Resumen Ejecutivo
+      doc.rect(margin, y, contentWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold');
+      doc.text('RESUMEN EJECUTIVO', margin + 12, y + 8);
+      y += 40;
+      
+      doc.fillColor(darkText).fontSize(10).font('Helvetica');
+      doc.text('Este documento presenta una estimacion de costos para la infraestructura de base de datos de Grua RD utilizando Neon Database con el Plan Launch, optimizado para aplicaciones en crecimiento.', margin, y, { width: contentWidth, lineGap: 3 });
+      y += 45;
+      
+      // Seccion: Precios del Plan
+      doc.rect(margin, y, contentWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold');
+      doc.text('ESTRUCTURA DE PRECIOS - PLAN LAUNCH', margin + 12, y + 8);
+      y += 38;
+      
+      // Grid de precios (2 columnas)
+      const priceItems = [
+        { label: 'Minimo Mensual', value: '$5/mes' },
+        { label: 'Compute', value: '$0.106/CU-hora' },
+        { label: 'Storage', value: '$0.35/GB-mes' },
+        { label: 'Branches Extra', value: '$0.002/hora' },
+        { label: 'PITR', value: '$0.20/GB-mes' },
+        { label: 'Proyectos', value: 'Hasta 100' }
+      ];
+      
+      const colWidth = (contentWidth - 20) / 2;
+      priceItems.forEach((item, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const xPos = margin + (col * (colWidth + 20));
+        const yPos = y + (row * 22);
+        
+        doc.fillColor(accentColor).fontSize(9).font('Helvetica-Bold');
+        doc.text(item.label + ':', xPos, yPos, { continued: true });
+        doc.fillColor(darkText).font('Helvetica').text('  ' + item.value);
+      });
+      y += 80;
+      
+      // Seccion: Tabla de Escenarios
+      doc.rect(margin, y, contentWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(12).font('Helvetica-Bold');
+      doc.text('PROYECCION DE COSTOS POR ESCENARIO', margin + 12, y + 8);
+      y += 38;
+      
+      // Tabla con diseño
+      const tableX = margin;
+      const cols = [85, 80, 95, 70, 85, 80];
+      const headers = ['Escenario', 'Usuarios', 'Servicios/mes', 'Storage', 'Compute', 'Costo Est.'];
+      
+      // Header de tabla
+      doc.rect(tableX, y, contentWidth, 22).fill(primaryColor);
+      let xOffset = tableX + 8;
+      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
+      headers.forEach((h, i) => {
+        doc.text(h, xOffset, y + 6, { width: cols[i] - 10 });
+        xOffset += cols[i];
+      });
+      y += 22;
+      
+      // Filas de tabla
+      const rows = [
+        ['Inicio', '100-500', '200-1,000', '~2 GB', '~100 CU-hrs', '$5-15/mes'],
+        ['Crecimiento', '500-2,000', '1,000-5,000', '~5 GB', '~300 CU-hrs', '$20-40/mes'],
+        ['Escala', '2,000-10,000', '5,000-20,000', '~15 GB', '~800 CU-hrs', '$50-100/mes']
+      ];
+      
+      rows.forEach((row, rowIndex) => {
+        const bgColor = rowIndex % 2 === 0 ? '#ffffff' : lightBg;
+        doc.rect(tableX, y, contentWidth, 20).fill(bgColor);
+        
+        xOffset = tableX + 8;
+        doc.fillColor(darkText).fontSize(9).font('Helvetica');
+        row.forEach((cell, i) => {
+          if (i === 0) doc.font('Helvetica-Bold');
+          else doc.font('Helvetica');
+          doc.text(cell, xOffset, y + 5, { width: cols[i] - 10 });
+          xOffset += cols[i];
+        });
+        y += 20;
+      });
+      
+      // Borde de tabla
+      doc.rect(tableX, y - 60, contentWidth, 60).stroke(primaryColor);
+      y += 15;
+      
+      // Seccion: Desglose y Ventajas (2 columnas)
+      const halfWidth = (contentWidth - 15) / 2;
+      
+      // Columna izquierda: Desglose
+      doc.rect(margin, y, halfWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
+      doc.text('DESGLOSE TIPICO', margin + 10, y + 8);
+      
+      const desgloseY = y + 35;
+      doc.fillColor(darkText).fontSize(9).font('Helvetica');
+      doc.text('Compute (300 CU-hrs)', margin + 10, desgloseY);
+      doc.text('~$32.00', margin + halfWidth - 50, desgloseY);
+      doc.text('Storage (5 GB)', margin + 10, desgloseY + 15);
+      doc.text('~$1.75', margin + halfWidth - 50, desgloseY + 15);
+      doc.text('PITR (3 dias, ~1 GB)', margin + 10, desgloseY + 30);
+      doc.text('~$0.20', margin + halfWidth - 50, desgloseY + 30);
+      doc.moveTo(margin + 10, desgloseY + 48).lineTo(margin + halfWidth - 10, desgloseY + 48).stroke(lightText);
+      doc.fillColor(accentColor).font('Helvetica-Bold');
+      doc.text('TOTAL ESTIMADO', margin + 10, desgloseY + 55);
+      doc.text('~$34/mes', margin + halfWidth - 55, desgloseY + 55);
+      
+      // Columna derecha: Ventajas
+      const rightCol = margin + halfWidth + 15;
+      doc.rect(rightCol, y, halfWidth, 28).fill(lightBg);
+      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
+      doc.text('VENTAJAS CLAVE', rightCol + 10, y + 8);
+      
+      doc.fillColor(darkText).fontSize(9).font('Helvetica');
+      const ventajas = [
+        'Scale-to-zero en baja actividad',
+        'Auto-scaling automatico',
+        'Branching para testing',
+        'Sin compromisos fijos'
+      ];
+      ventajas.forEach((v, i) => {
+        doc.fillColor(accentColor).text('>', rightCol + 10, desgloseY + (i * 18), { continued: true });
+        doc.fillColor(darkText).text('  ' + v);
+      });
+      
+      y += 115;
+      
+      // Seccion: Recomendacion
+      doc.rect(margin, y, contentWidth, 55).fill(accentColor).fillOpacity(0.1);
+      doc.fillOpacity(1);
+      doc.rect(margin, y, 4, 55).fill(accentColor);
+      doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
+      doc.text('RECOMENDACION', margin + 15, y + 10);
+      doc.fillColor(darkText).fontSize(9).font('Helvetica');
+      doc.text('Iniciar con el Plan Launch ($5 minimo mensual) y monitorear el uso real durante las primeras semanas de produccion. El modelo de pago por uso permite escalar de forma gradual sin compromisos fijos, optimizando costos segun la demanda real del servicio.', margin + 15, y + 28, { width: contentWidth - 30, lineGap: 2 });
+      y += 70;
+      
+      // Footer
+      doc.rect(0, pageHeight - 80, pageWidth, 80).fill(primaryColor);
+      
+      doc.fillColor('#ffffff').fontSize(10).font('Helvetica-Bold');
+      doc.text('Preparado por:', margin, pageHeight - 70);
+      doc.fontSize(12).text('Jesus Garcia', margin, pageHeight - 55);
+      doc.fontSize(9).font('Helvetica').text('Administrador', margin, pageHeight - 40);
+      doc.fillColor(accentColor).text('admin@fourone.com.do', margin, pageHeight - 28);
+      
+      doc.fillColor('#ffffff').fontSize(8).font('Helvetica');
+      const dateStr = new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' });
+      doc.text('Documento generado el ' + dateStr, pageWidth - 200, pageHeight - 55, { width: 160, align: 'right' });
+      doc.text('Grua RD - Four One Development', pageWidth - 200, pageHeight - 40, { width: 160, align: 'right' });
+      
+      doc.end();
+    } catch (error: any) {
+      logSystem.error('Error generating Neon pricing PDF', error);
+      res.status(500).send('Error generando PDF: ' + error.message);
+    }
+  });
+
+  // Endpoint para generar PDF con resultado de prueba 3DS
+  app.get("/api/test/3ds-result-pdf", async (req, res) => {
+    try {
+      const dataParam = req.query.data as string;
+      if (!dataParam) {
+        return res.status(400).send('Datos no proporcionados');
+      }
+      
+      const data = JSON.parse(decodeURIComponent(dataParam));
+      const PDFDocument = (await import('pdfkit')).default;
+      
+      const doc = new PDFDocument({ margin: 50 });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=resultado-3ds-' + (data.azulOrderId || 'test') + '.pdf');
+      
+      doc.pipe(res);
+      
+      // Encabezado
+      doc.fontSize(20).text('Reporte de Prueba 3D Secure 2.0', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(12).text('Grua RD - Sistema de Pagos Azul', { align: 'center' });
+      doc.moveDown(2);
+      
+      // Linea separadora
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown();
+      
+      // Resultado
+      doc.fontSize(16).text('Resultado: ' + (data.success ? 'APROBADO' : 'RECHAZADO'), { 
+        align: 'center'
+      });
+      doc.moveDown(2);
+      
+      // Detalles de la transaccion
+      doc.fontSize(14).text('Detalles de la Transaccion', { underline: true });
+      doc.moveDown();
+      
+      doc.fontSize(11);
+      doc.text('Codigo ISO: ' + data.isoCode);
+      doc.text('Codigo de Autorizacion: ' + data.authorizationCode);
+      doc.text('AzulOrderId: ' + data.azulOrderId);
+      doc.text('RRN: ' + data.rrn);
+      doc.text('Fecha/Hora: ' + data.dateTime);
+      doc.text('Mensaje: ' + data.responseMessage);
+      doc.moveDown(2);
+      
+      // Respuesta completa
+      doc.fontSize(14).text('Respuesta Completa del Servidor', { underline: true });
+      doc.moveDown();
+      doc.fontSize(9).text(JSON.stringify(data.rawResponse || data, null, 2), {
+        width: 500
+      });
+      doc.moveDown(2);
+      
+      // Enlace de pruebas
+      doc.fontSize(14).text('Endpoint de Pruebas', { underline: true });
+      doc.moveDown();
+      doc.fontSize(10).text('URL: https://app.gruard.com/api/test/3ds-simple');
+      doc.moveDown();
+      doc.fontSize(9).text('Tarjeta de prueba: 4005520000000129');
+      doc.text('Expiracion: 12/2028');
+      doc.text('CVV: 123');
+      doc.text('OTP: 123456');
+      doc.moveDown(2);
+      
+      // Pie de pagina
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown();
+      doc.fontSize(8).text('Documento generado automaticamente - ' + new Date().toLocaleString('es-DO'), { align: 'center' });
+      doc.text('Grua RD - Servicios de Grua y Asistencia Vial', { align: 'center' });
+      
+      doc.end();
+    } catch (error: any) {
+      logSystem.error('Error generating PDF', error);
+      res.status(500).send('Error generando PDF: ' + error.message);
+    }
+  });
+
+  // Test endpoint to continue 3DS authentication after Method (Paso 5-6)
+  app.post("/api/test/azul-3ds-continue", async (req, res) => {
+    try {
+      const { azulOrderId, status } = req.body;
+      if (!azulOrderId) return res.status(400).json({ error: "AzulOrderId es requerido" });
+
+      logSystem.info("Continuing 3DS authentication", { azulOrderId, status });
+      const result = await AzulPaymentService.continue3DSAuthentication(azulOrderId, status || 'RECEIVED');
+      
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error("Error continuing 3DS authentication", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Endpoint para iniciar flujo 3DS con friccion (para pruebas GUI)
+  app.post("/api/payments/azul/init-3ds-friction-test", async (req, res) => {
+    try {
+      logSystem.info("Initiating 3DS friction test from GUI", { path: req.path });
+      const transactionId = Date.now().toString();
+      
+      const browserInfo = {
+        acceptHeader: req.get('Accept') || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ipAddress: req.ip || req.socket.remoteAddress || "127.0.0.1",
+        language: req.get('Accept-Language')?.split(',')[0] || "es-DO",
+        colorDepth: 24,
+        screenWidth: 1920,
+        screenHeight: 1080,
+        timeZone: "-240",
+        userAgent: req.get('User-Agent') || "Mozilla/5.0",
+        javaScriptEnabled: "true",
+      };
+
+      // Tarjeta de prueba para 3DS Challenge con friccion
+      const testCard = {
+        cardNumber: "4005520000000129",
+        expiration: "202812",
+        cvc: "123",
+        cardHolderName: "Test Challenge User"
+      };
+
+      // EXACTAMENTE igual al script test-3dsecure.cjs
+      const result = await AzulPaymentService.init3DSecureWithCard(
+        testCard,
+        {
+          amount: 100,  // 1 peso = 100 centavos
+          itbis: 18,    // 18 centavos
+          customOrderId: "GRD-" + transactionId,
+        },
+        browserInfo
+      );
+
+      // Incluir el MethodForm si existe (puede estar en ThreeDSMethod.MethodForm o MethodForm)
+      const response: any = {
+        ...result,
+        methodForm: result.rawResponse?.ThreeDSMethod?.MethodForm || result.rawResponse?.MethodForm,
+        acsUrl: result.acsUrl || result.rawResponse?.ThreeDSChallenge?.RedirectPostUrl,
+        creq: result.creq || result.rawResponse?.ThreeDSChallenge?.CReq,
+      };
+
+      // Guardar azulOrderId para el callback
+      if (result.azulOrderId) {
+        lastFrictionTestAzulOrderId = result.azulOrderId;
+      }
+
+      logSystem.info("3DS friction test result", { 
+        isoCode: result.isoCode,
+        azulOrderId: result.azulOrderId,
+        has3DSMethod: !!response.methodForm,
+        hasChallenge: !!(response.acsUrl && response.creq)
+      });
+
+      res.json(response);
+    } catch (error: any) {
+      logSystem.error("Error in 3DS friction test", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Test endpoint to process 3DS Challenge response (CRes)
+  app.post("/api/payments/azul/process-challenge", async (req, res) => {
+    try {
+      const { azulOrderId, cres } = req.body;
+      
+      if (!azulOrderId || !cres) {
+        return res.status(400).json({ error: "AzulOrderId y CRes son requeridos" });
+      }
+
+      logSystem.info("Processing 3DS Challenge response", { azulOrderId });
+
+      const result = await AzulPaymentService.processThreeDSChallenge(
+        azulOrderId,
+        cres
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error("Error processing 3DS challenge", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Helper function to check if user needs verification
   const userNeedsVerification = async (user: any): Promise<boolean> => {
@@ -1060,6 +1788,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve logo for emails
+  app.get("/api/assets/logo-email", async (_req: Request, res: Response) => {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Try multiple possible logo locations in order of preference
+      const possiblePaths = [
+        path.join(process.cwd(), 'attached_assets', '20251126_144937_0000_1764283370962.png'),
+        path.join(process.cwd(), 'client', 'public', 'favicon.png'),
+        path.join(process.cwd(), 'attached_assets', 'Grúa_20251124_024218_0000_1763966543810.png'),
+      ];
+      
+      for (const logoPath of possiblePaths) {
+        if (fs.existsSync(logoPath)) {
+          res.setHeader('Content-Type', 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=31536000');
+          fs.createReadStream(logoPath).pipe(res);
+          return;
+        }
+      }
+      
+      res.status(404).send('Logo not found');
+    } catch (error) {
+      logSystem.error('Error serving logo', error);
+      res.status(500).send('Error');
+    }
+  });
+
   app.get("/api/health", async (_req: Request, res: Response) => {
     try {
       const startTime = Date.now();
@@ -1612,6 +2369,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(getSafeUser(req.user));
     } else {
       res.status(401).json({ message: "Not authenticated" });
+    }
+  });
+
+  app.get("/api/auth/linked-accounts", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const currentUser = req.user as User;
+      const cedula = currentUser.cedula;
+
+      let hasClienteAccount = false;
+      let hasConductorAccount = false;
+
+      if (cedula) {
+        const usersWithSameCedula = await storage.getAllUsers();
+        const linkedAccounts = usersWithSameCedula.filter(
+          (u) => u.cedula === cedula && u.id !== currentUser.id
+        );
+
+        hasClienteAccount = linkedAccounts.some((u) => u.userType === "cliente");
+        hasConductorAccount = linkedAccounts.some((u) => u.userType === "conductor");
+      }
+
+      res.json({
+        hasClienteAccount,
+        hasConductorAccount,
+      });
+    } catch (error) {
+      console.error("Error checking linked accounts:", error);
+      res.status(500).json({ message: "Error checking linked accounts" });
     }
   });
 
@@ -2995,7 +3784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "No autenticado" });
       }
 
-      const { nombre, apellido, phone, conductorData } = req.body;
+      const { nombre, apellido, phone, email, conductorData } = req.body;
       const userId = req.user!.id;
       const currentUser = await storage.getUserById(userId);
 
@@ -3004,6 +3793,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updateData: any = {};
+      
+      // Handle email change - only allowed if email is not yet verified
+      if (email !== undefined && email !== currentUser.email) {
+        // Check if email is already verified
+        if (currentUser.emailVerificado) {
+          return res.status(403).json({ 
+            message: "No puedes cambiar tu correo después de que haya sido verificado." 
+          });
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+          return res.status(400).json({ message: "Formato de correo electrónico inválido" });
+        }
+        
+        // Check if email is already in use by another user
+        const normalizedEmail = email.trim().toLowerCase();
+        const existingUser = await storage.getUserByEmail(normalizedEmail);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ message: "Este correo electrónico ya está registrado" });
+        }
+        
+        updateData.email = normalizedEmail;
+        logSystem.info('User email updated before verification', { userId, newEmail: normalizedEmail });
+      }
       
       // Block name changes for operators (conductores) with verified cédula
       if (currentUser.userType === 'conductor' && currentUser.cedulaVerificada) {
@@ -3267,13 +4082,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
     try {
-      const { telefono } = req.body;
+      const { email } = req.body;
 
-      if (!telefono) {
-        return res.status(400).json({ message: "Teléfono es requerido" });
+      if (!email) {
+        return res.status(400).json({ message: "Correo electrónico es requerido" });
       }
 
-      const user = await storage.getUserByPhone(telefono);
+      const user = await storage.getUserByEmail(email);
       if (!user) {
         return res.status(404).json({ message: "Usuario no encontrado" });
       }
@@ -3282,21 +4097,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const expiraEn = new Date(Date.now() + 10 * 60 * 1000);
 
       await storage.deleteExpiredVerificationCodes();
-      await storage.deletePriorVerificationCodes(telefono, 'recuperacion_password');
+      // We'll use email as identifier for password recovery instead of phone
+      await storage.deletePriorVerificationCodes(email, 'recuperacion_password');
 
       await storage.createVerificationCode({
-        telefono,
+        email,
         codigo,
         expiraEn,
         tipoOperacion: 'recuperacion_password',
       });
 
-      const mensaje = `Tu código de recuperación de contraseña para GruaRD es: ${codigo}. Válido por 10 minutos.`;
-      const smsService = await getSMSService();
-      await smsService.sendSMS(telefono, mensaje);
+      const emailService = await getEmailService();
+      await emailService.sendPasswordResetEmail(email, codigo);
 
       res.json({ 
-        message: "Código de recuperación enviado",
+        message: "Código de recuperación enviado al correo",
         expiresIn: 600
       });
     } catch (error: any) {
@@ -3307,9 +4122,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
     try {
-      const { telefono, codigo, nuevaPassword } = req.body;
+      const { email, codigo, nuevaPassword } = req.body;
 
-      if (!telefono || !codigo || !nuevaPassword) {
+      if (!email || !codigo || !nuevaPassword) {
         return res.status(400).json({ message: "Datos incompletos" });
       }
 
@@ -3317,7 +4132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
       }
 
-      const verificationCode = await storage.getActiveVerificationCode(telefono, 'recuperacion_password');
+      const verificationCode = await storage.getActiveVerificationCode(email, 'recuperacion_password');
 
       if (!verificationCode) {
         return res.status(400).json({ message: "Código inválido o expirado" });
@@ -3333,7 +4148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Código incorrecto" });
       }
 
-      const user = await storage.getUserByPhone(telefono);
+      const user = await storage.getUserByEmail(email);
       if (!user) {
         return res.status(404).json({ message: "Usuario no encontrado" });
       }
@@ -3346,7 +4161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Contraseña actualizada exitosamente" });
     } catch (error: any) {
-      logSystem.error('Reset password error', error, { telefono: req.body?.telefono });
+      logSystem.error('Reset password error', error, { email: req.body?.email });
       res.status(500).json({ message: "Error al resetear contraseña" });
     }
   });
@@ -5079,15 +5894,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/services/:id/cancel", async (req: Request, res: Response) => {
+  // ==================== FASE 3: API ENDPOINTS FOR CANCELLATIONS ====================
+  
+  app.post("/api/servicios/:id/cancelar", async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "No autenticado" });
     }
 
     try {
       const servicioId = req.params.id;
+      const { razonCodigo, notasUsuario } = req.body;
+
+      if (!razonCodigo) {
+        return res.status(400).json({ message: "Razón de cancelación es requerida" });
+      }
+
       const servicio = await storage.getServicioById(servicioId);
-      
       if (!servicio) {
         return res.status(404).json({ message: "Servicio no encontrado" });
       }
@@ -5097,7 +5919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAdmin = req.user!.userType === 'admin';
 
       if (!isClient && !isDriver && !isAdmin) {
-        return res.status(403).json({ message: "No autorizado para cancelar este servicio" });
+        return res.status(403).json({ message: "No autorizado para cancelar" });
       }
 
       if (servicio.estado === 'cancelado') {
@@ -5108,19 +5930,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No se puede cancelar un servicio completado" });
       }
 
-      // TODO: Implementar reembolso con Azul API si el servicio fue pagado con tarjeta
+      // Get cancellation reason to check for penalties
+      const razon = await storage.getRazonCancelacion(razonCodigo);
+      let penalizacionAplicada = 0;
+      let bloqueoDuracionMinutos = 0;
+      let deductFromBalance = false;
+      let montoPenalizacionRD = 0;
 
-      const cancelledService = await storage.updateServicio(servicioId, {
-        estado: 'cancelado',
-        canceladoAt: new Date(),
+      // New cancellation fields for audit
+      const tiempoEsperaReal = servicio.conductorEnSitioAt ? 
+        Math.floor((Date.now() - new Date(servicio.conductorEnSitioAt).getTime()) / 60000) : 0;
+      const montoTotalServicio = parseFloat(servicio.costoTotal || "0");
+      
+      // Calculate distance traveled by operator if possible
+      let distanciaRecorridaOperador = 0;
+      if (servicio.conductorId) {
+        const conductor = await storage.getConductorByUserId(servicio.conductorId);
+        if (conductor && conductor.ubicacionLat && conductor.ubicacionLng && servicio.origenLat && servicio.origenLng) {
+          distanciaRecorridaOperador = calculateHaversineDistance(
+            { lat: parseFloat(conductor.ubicacionLat), lng: parseFloat(conductor.ubicacionLng) },
+            { lat: parseFloat(servicio.origenLat), lng: parseFloat(servicio.origenLng) }
+          );
+        }
+      }
+
+      // Calculate penalty based on service state and new business rules
+      if (servicio.estado !== 'pendiente') {
+        const diasSemana = 7;
+        const fechaActual = new Date();
+        const hace7Dias = new Date(fechaActual.getTime() - (diasSemana * 24 * 60 * 60 * 1000));
+        
+        const cancelacionesRecientes = await storage.getCancelacionesByUsuarioId(req.user!.id, isClient ? 'cliente' : 'conductor');
+        const cancelacionesUltimaSemana = cancelacionesRecientes.filter((c: any) => new Date(c.fecha) > hace7Dias).length;
+
+        // Proportional penalties based on percentage of total service cost
+        let porcentajePenalizacion = 0;
+        switch (servicio.estado) {
+          case 'aceptado':
+            // If driver has traveled more than 5km, higher penalty
+            porcentajePenalizacion = distanciaRecorridaOperador > 5 ? 15 : 10;
+            porcentajePenalizacion = Math.min(porcentajePenalizacion + (cancelacionesUltimaSemana * 2), 30);
+            bloqueoDuracionMinutos = 15;
+            break;
+          case 'conductor_en_sitio':
+            // Base 25% if arrived
+            porcentajePenalizacion = Math.min(25 + (cancelacionesUltimaSemana * 3), 50);
+            bloqueoDuracionMinutos = 60;
+            deductFromBalance = true;
+            break;
+          case 'cargando':
+          case 'en_progreso':
+            porcentajePenalizacion = Math.min(50 + (cancelacionesUltimaSemana * 5), 100);
+            bloqueoDuracionMinutos = 120;
+            deductFromBalance = true;
+            break;
+          default:
+            porcentajePenalizacion = 0;
+        }
+
+        // Exoneration rule: If operator exceeds ETA by 15 mins (considering traffic/distance)
+        const etaOriginal = (servicio as any).etaMinutos || 20; // Default 20 mins if not set
+        const tiempoTranscurridoDesdeAceptacion = servicio.aceptadoAt ? 
+          Math.floor((Date.now() - new Date(servicio.aceptadoAt).getTime()) / 60000) : 0;
+        
+        if (isClient && tiempoTranscurridoDesdeAceptacion > (etaOriginal + 15)) {
+          porcentajePenalizacion = 0;
+          logSystem.info('Cancellation penalty exonerated due to ETA delay', { servicioId, etaOriginal, tiempoTranscurridoDesdeAceptacion });
+        }
+
+        // If reason excludes penalty, reset it
+        if (razon && !razon.penalizacionPredeterminada) {
+          porcentajePenalizacion = 0;
+          bloqueoDuracionMinutos = 0;
+        }
+
+        montoPenalizacionRD = (montoTotalServicio * porcentajePenalizacion) / 100;
+        penalizacionAplicada = montoPenalizacionRD;
+      }
+
+      // Create cancellation record with new audit fields
+      const cancelacion = await storage.createCancelacionServicio({
+        servicioId,
+        canceladoPorId: req.user!.id,
+        tipoCancelador: isClient ? 'cliente' : 'conductor',
+        estadoAnterior: servicio.estado,
+        razonCodigo,
+        notasUsuario: notasUsuario || null,
+        nivelDemanda: 'medio',
+        esHoraPico: false,
+        zonaTipo: servicio.zonaTipo || 'urbana',
+        totalCancelacionesUsuario: 0,
+        penalizacionAplicada,
+        reembolsoMonto: 0,
+        bloqueadoHasta: bloqueoDuracionMinutos > 0 ? new Date(Date.now() + bloqueoDuracionMinutos * 60 * 1000) : null,
+        montoTotalServicio: montoTotalServicio.toString(),
+        distanciaRecorridaOperador: distanciaRecorridaOperador.toString(),
+        tiempoEsperaReal,
+        etaOriginal: ((servicio as any).etaMinutos || 0),
+        justificacionTexto: notasUsuario || razon?.descripcion || 'Cancelación estándar',
       });
 
-      logService.cancelled(servicioId, `Cancelled by ${req.user!.userType}`);
+      // Update service to canceled
+      await storage.updateServicio(servicioId, {
+        estado: 'cancelado',
+        canceladoAt: new Date(),
+        zonaTipo: (servicio as any).zonaTipo || 'urbana', // Fix type mismatch with cast
+      });
 
+      // FASE 5: INTEGRACIÓN AZUL - Captura parcial de penalización si es cliente y pagó con tarjeta
+      if (isClient && penalizacionAplicada > 0 && servicio.metodoPago === 'tarjeta' && (servicio as any).azulOrderId) {
+        try {
+          const montoCentavos = Math.round(penalizacionAplicada * 100);
+          const azulRes = await AzulPaymentService.capturePayment((servicio as any).azulOrderId, montoCentavos);
+          
+          if (azulRes.success) {
+            logSystem.info('Partial cancellation penalty captured via Azul', { 
+              servicioId, 
+              azulOrderId: (servicio as any).azulOrderId, 
+              monto: penalizacionAplicada 
+            });
+          } else {
+            logSystem.error('Failed to capture partial penalty via Azul', { azulRes, servicioId });
+          }
+        } catch (error) {
+          logSystem.error('Error processing Azul partial capture for cancellation', { error, servicioId });
+        }
+      }
+
+      // FASE 5: INTEGRACIÓN - Deducir penalización del balance del conductor
+      if (isDriver && deductFromBalance && penalizacionAplicada > 0) {
+        try {
+          const conductor = await storage.getConductorByUserId(req.user!.id);
+          if (conductor) {
+            const wallet = await storage.getWalletByConductorId(conductor.id);
+            if (wallet) {
+              const newBalance = Math.max(0, parseFloat(wallet.balance) - penalizacionAplicada);
+              await storage.updateWallet(wallet.id, {
+                balance: newBalance.toFixed(2)
+              });
+
+              await storage.createWalletTransaction({
+                walletId: wallet.id,
+                servicioId,
+                type: 'adjustment', // Changed from cancellation_penalty to valid type adjustment
+                amount: (-penalizacionAplicada).toFixed(2),
+                description: `Penalización por cancelación de servicio: RD$${penalizacionAplicada.toFixed(2)}`
+              });
+            }
+          }
+        } catch (error) {
+          logSystem.error('Error deducting penalty from wallet', error, { servicioId });
+        }
+      }
+
+      // FASE 5: INTEGRACIÓN - Revertir comisión si conductor cancela
+      if (isDriver && servicio.commissionProcessed) {
+        try {
+          const conductor = await storage.getConductorByUserId(req.user!.id);
+          if (conductor) {
+            const wallet = await storage.getWalletByConductorId(conductor.id);
+            if (wallet) {
+              // Reverse the commission: if 20% was taken, add it back
+              const commissionAmount = WalletService.calculateCommission(servicio.precioEstimado || 0);
+              const newBalance = parseFloat(wallet.balance) + commissionAmount;
+              
+              await storage.updateWallet(wallet.id, {
+                balance: newBalance.toFixed(2)
+              });
+
+              await storage.createWalletTransaction({
+                walletId: wallet.id,
+                servicioId,
+                type: 'commission_reversal',
+                amount: commissionAmount.toFixed(2),
+                description: `Reversa de comisión por cancelación: RD$${commissionAmount.toFixed(2)}`
+              });
+            }
+          }
+        } catch (error) {
+          logSystem.error('Error reversing commission', error, { servicioId });
+        }
+      }
+
+      // FASE 5: INTEGRACIÓN - Afectar rating del conductor si cancela
+      if (isDriver && penalizacionAplicada > 0) {
+        try {
+          const conductor = await storage.getConductorByUserId(req.user!.id);
+          if (conductor) {
+            const currentRating = parseFloat(conductor.calificacionPromedio || '5') || 5;
+            const ratingDeduction = penalizacionAplicada > 50 ? 1 : penalizacionAplicada > 25 ? 0.5 : 0.25;
+            const newRating = Math.max(1, currentRating - ratingDeduction);
+            
+            await storage.updateUser(req.user!.id, {
+              calificacionPromedio: newRating.toFixed(2)
+            });
+          }
+        } catch (error) {
+          logSystem.error('Error updating driver rating', error, { servicioId });
+        }
+      }
+
+      logService.cancelled(servicioId, `Cancelled by ${isClient ? 'cliente' : isDriver ? 'conductor' : 'admin'}`);
+
+      // Send notifications
       if (isDriver && servicio.clienteId) {
         await pushService.sendToUser(servicio.clienteId, {
           title: 'Servicio cancelado',
-          body: 'El operador ha cancelado el servicio. Puedes solicitar uno nuevo.',
+          body: 'El operador ha cancelado el servicio.',
           data: { type: 'service_cancelled', servicioId }
         });
       } else if (isClient && servicio.conductorId) {
@@ -5131,10 +6147,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      res.json(cancelledService);
+      res.json({
+        success: true,
+        cancelacionId: cancelacion.id,
+        mensaje: 'Servicio cancelado exitosamente',
+        penalizacionAplicada,
+        bloqueadoHasta: bloqueoDuracionMinutos > 0 ? new Date(Date.now() + bloqueoDuracionMinutos * 60 * 1000) : null,
+      });
     } catch (error: any) {
-      logSystem.error('Cancel service error', error, { servicioId: req.params.id });
+      logSystem.error('Cancel service error', error);
       res.status(500).json({ message: "Error al cancelar el servicio" });
+    }
+  });
+
+  app.get("/api/usuarios/:id/cancelaciones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    try {
+      const usuarioId = req.params.id;
+      
+      if (req.user!.id !== usuarioId && req.user!.userType !== 'admin') {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      const cancelaciones = await storage.getCancelacionesByUsuarioId(usuarioId, 'cliente');
+      
+      // Calculate total penalties
+      const penalizacionesTotales = cancelaciones.reduce((sum: number, c: any) => {
+        return sum + (c.penalizacionAplicada || 0);
+      }, 0);
+
+      res.json({
+        total_cancelaciones: cancelaciones.length,
+        ultimas_cancelaciones: cancelaciones,
+        penalizaciones_totales: penalizacionesTotales,
+      });
+    } catch (error: any) {
+      logSystem.error('Get cancellations error', error);
+      res.status(500).json({ message: "Error al obtener cancelaciones" });
+    }
+  });
+
+  app.get("/api/conductores/:id/cancelaciones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+
+    try {
+      const conductorId = req.params.id;
+      
+      if (req.user!.id !== conductorId && req.user!.userType !== 'admin') {
+        return res.status(403).json({ message: "No autorizado" });
+      }
+
+      const cancelaciones = await storage.getCancelacionesByUsuarioId(conductorId, 'conductor');
+      
+      // Calculate total penalties
+      const penalizacionesTotales = cancelaciones.reduce((sum: number, c: any) => {
+        return sum + (c.penalizacionAplicada || 0);
+      }, 0);
+
+      res.json({
+        total_cancelaciones: cancelaciones.length,
+        ultimas_cancelaciones: cancelaciones,
+        penalizaciones_totales: penalizacionesTotales,
+      });
+    } catch (error: any) {
+      logSystem.error('Get driver cancellations error', error);
+      res.status(500).json({ message: "Error al obtener cancelaciones" });
+    }
+  });
+
+  app.get("/api/admin/cancelaciones", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const cancelaciones = await storage.getAllCancelaciones(500);
+
+      res.json({
+        total: cancelaciones.length,
+        cancelaciones,
+      });
+    } catch (error: any) {
+      logSystem.error('Get all cancellations error', error);
+      res.status(500).json({ message: "Error al obtener cancelaciones" });
+    }
+  });
+
+  app.post("/api/admin/cancelaciones/:id/revisar", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    try {
+      const cancelacionId = req.params.id;
+      const { accion, nuevaPenalizacion, notas } = req.body;
+
+      if (!accion) {
+        return res.status(400).json({ message: "Acción es requerida" });
+      }
+
+      const updated = await storage.updateCancelacion(cancelacionId, {
+        evaluacionPenalizacion: accion,
+        notasAdmin: notas || null,
+        revisadoPor: req.user!.id,
+        fechaRevision: new Date(),
+        ...(nuevaPenalizacion && { penalizacionAjustadaPorAdmin: nuevaPenalizacion }),
+      });
+
+      res.json({
+        success: true,
+        mensaje: 'Cancelación revisada exitosamente',
+        cancelacion: updated,
+      });
+    } catch (error: any) {
+      logSystem.error('Review cancellation error', error);
+      res.status(500).json({ message: "Error al revisar cancelación" });
+    }
+  });
+
+  app.get("/api/razones-cancelacion", async (req: Request, res: Response) => {
+    try {
+      const razones = await storage.getAllRazonesCancelacion();
+      res.json(razones);
+    } catch (error: any) {
+      logSystem.error('Get cancellation reasons error', error);
+      res.status(500).json({ message: "Error al obtener razones" });
     }
   });
 
@@ -8474,6 +9616,358 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // AZUL 3D SECURE 2.0 PAYMENT ENDPOINTS
+  // ========================================
+
+  // Almacenar último azulOrderId del friction test para el callback
+  let lastFrictionTestAzulOrderId: string = '';
+
+  // In-memory store for 3DS sessions (use Redis/DB in production)
+  const threeDSSessions = new Map<string, {
+    azulOrderId: string;
+    userId: string;
+    amount: number;
+    customOrderId: string;
+    createdAt: Date;
+    methodTimeout?: NodeJS.Timeout;
+    status: 'pending' | 'method_complete' | 'challenge_complete' | 'approved' | 'declined';
+    flowType?: string;
+    challengeData?: any;
+  }>();
+
+  // Clean up old sessions (older than 15 minutes)
+  setInterval(() => {
+    const now = new Date();
+    const entries = Array.from(threeDSSessions.entries());
+    for (let i = 0; i < entries.length; i++) {
+      const [sessionId, session] = entries[i];
+      if (now.getTime() - session.createdAt.getTime() > 15 * 60 * 1000) {
+        if (session.methodTimeout) clearTimeout(session.methodTimeout);
+        threeDSSessions.delete(sessionId);
+      }
+    }
+  }, 60000);
+
+  // Initiate 3DS payment
+  app.post("/api/azul/3ds/initiate", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const { cardNumber, expiration, cvc, amount, itbis, cardHolderName, browserInfo, customOrderId, saveCard } = req.body;
+
+      if (!cardNumber || !expiration || !cvc || !amount) {
+        return res.status(400).json({ message: "Missing required fields: cardNumber, expiration, cvc, amount" });
+      }
+
+      if (!browserInfo) {
+        return res.status(400).json({ message: "Browser information is required for 3DS" });
+      }
+
+      const sessionId = crypto.randomUUID();
+      const cardData = {
+        cardNumber,
+        expiration,
+        cvc,
+        cardHolderName,
+      };
+
+      const payment = {
+        amount: Math.round(amount * 100),
+        itbis: itbis ? Math.round(itbis * 100) : 0,
+        customOrderId: customOrderId || `GRD-${sessionId.substring(0, 8)}`,
+        saveToDataVault: saveCard || false,
+        cardHolderInfo: cardHolderName ? { name: cardHolderName, email: req.user?.email } : undefined,
+      };
+
+      const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0] || req.socket.remoteAddress || '0.0.0.0';
+      const browser = {
+        ...browserInfo,
+        ipAddress: clientIp,
+      };
+
+      const result = await AzulPaymentService.initiate3DSPaymentWithCard(cardData, payment, browser, sessionId);
+
+      const userId = req.user!.id;
+
+      if (result.flowType === 'APPROVED') {
+        threeDSSessions.set(sessionId, {
+          azulOrderId: result.azulOrderId!,
+          userId,
+          amount,
+          customOrderId: payment.customOrderId,
+          createdAt: new Date(),
+          status: 'approved',
+          flowType: 'APPROVED',
+        });
+
+        return res.json({
+          success: true,
+          sessionId,
+          flowType: 'APPROVED',
+          azulOrderId: result.azulOrderId,
+          authorizationCode: result.authorizationCode,
+          message: 'Pago aprobado',
+        });
+      }
+
+      if (result.flowType === '3D2METHOD') {
+        const methodTimeout = setTimeout(async () => {
+          const session = threeDSSessions.get(sessionId);
+          if (session && session.status === 'pending') {
+            logSystem.info('3DS Method timeout, sending NOT_RECEIVED', { sessionId });
+            try {
+              await AzulPaymentService.processThreeDSMethod(session.azulOrderId, 'NOT_RECEIVED');
+            } catch (e) {
+              logSystem.error('3DS Method timeout error', e);
+            }
+          }
+        }, 10000);
+
+        threeDSSessions.set(sessionId, {
+          azulOrderId: result.azulOrderId!,
+          userId,
+          amount,
+          customOrderId: payment.customOrderId,
+          createdAt: new Date(),
+          methodTimeout,
+          status: 'pending',
+          flowType: '3D2METHOD',
+        });
+
+        return res.json({
+          success: true,
+          sessionId,
+          flowType: '3D2METHOD',
+          methodForm: result.methodForm,
+          message: 'Se requiere verificacion 3DS Method',
+        });
+      }
+
+      if (result.flowType === '3D') {
+        threeDSSessions.set(sessionId, {
+          azulOrderId: result.azulOrderId!,
+          userId,
+          amount,
+          customOrderId: payment.customOrderId,
+          createdAt: new Date(),
+          status: 'pending',
+          flowType: '3D',
+          challengeData: result.challengeData,
+        });
+
+        return res.json({
+          success: true,
+          sessionId,
+          flowType: '3D',
+          challengeData: result.challengeData,
+          message: 'Se requiere autenticacion 3DS',
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        sessionId,
+        flowType: result.flowType,
+        isoCode: result.isoCode,
+        message: result.responseMessage || 'Pago rechazado',
+        errorDescription: result.errorDescription,
+      });
+    } catch (error) {
+      logSystem.error('3DS initiate error', error);
+      res.status(500).json({ message: "Error al iniciar pago 3DS" });
+    }
+  });
+
+  // 3DS Method notification callback (alternate URL for friction test)
+  app.post("/api/payments/azul/3ds-method-notification", async (req: Request, res: Response) => {
+    try {
+      logSystem.info('3DS Method notification received (friction test)', { body: req.body });
+      // Just return success - the method completed
+      res.status(200).send('OK');
+    } catch (error: any) {
+      logSystem.error('3DS Method notification error', error);
+      res.status(200).send('OK'); // Siempre devolver OK para que el flujo continue
+    }
+  });
+
+  // 3DS Method notification callback (called by Azul iframe)
+  app.post("/api/azul/3ds/method-notification", async (req: Request, res: Response) => {
+    const sessionId = req.query.sid as string;
+    
+    logSystem.info('3DS Method notification received', { sessionId, body: req.body });
+
+    if (!sessionId) {
+      return res.status(400).send('Missing session ID');
+    }
+
+    const session = threeDSSessions.get(sessionId);
+    if (!session) {
+      logSystem.warn('3DS session not found', { sessionId });
+      return res.status(404).send('Session not found');
+    }
+
+    // Clear timeout since we received the notification
+    if (session.methodTimeout) {
+      clearTimeout(session.methodTimeout);
+      session.methodTimeout = undefined;
+    }
+
+    try {
+      const result = await AzulPaymentService.processThreeDSMethod(session.azulOrderId, 'RECEIVED');
+
+      session.status = 'method_complete';
+      session.flowType = result.flowType;
+
+      if (result.flowType === 'APPROVED') {
+        session.status = 'approved';
+      } else if (result.flowType === '3D') {
+        session.challengeData = result.challengeData;
+      }
+
+      threeDSSessions.set(sessionId, session);
+
+      // Return HTML that notifies parent window
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head><title>3DS Method Complete</title></head>
+        <body>
+          <script>
+            if (window.parent) {
+              window.parent.postMessage({
+                type: '3DS_METHOD_COMPLETE',
+                sessionId: '${sessionId}',
+                flowType: '${result.flowType}',
+                success: ${result.success},
+                challengeData: ${JSON.stringify(result.challengeData || null)}
+              }, '*');
+            }
+          </script>
+          <p>Processing...</p>
+        </body>
+        </html>
+      `;
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      logSystem.error('3DS Method notification error', error);
+      res.status(500).send('Error processing 3DS Method');
+    }
+  });
+
+  // 3DS Challenge callback for friction test (alternate URL)
+  app.post("/api/payments/azul/3ds-callback", async (req: Request, res: Response) => {
+    try {
+      const cres = req.body?.cres || req.body?.CRes || '';
+      const azulOrderId = lastFrictionTestAzulOrderId || '';
+      
+      logSystem.info('3DS callback friction test', { azulOrderId, hasCres: !!cres });
+      
+      if (!azulOrderId || !cres) {
+        return res.send('<html><body><h1>Datos recibidos</h1><p>AzulOrderId: ' + azulOrderId + '</p><p>CRes: ' + (cres ? 'presente' : 'ausente') + '</p><pre>' + JSON.stringify(req.body, null, 2) + '</pre></body></html>');
+      }
+      
+      const result = await AzulPaymentService.processThreeDSChallenge(azulOrderId, cres);
+      
+      // Guardar resultado para descarga de PDF
+      const resultData = {
+        success: result.success,
+        isoCode: result.isoCode,
+        authorizationCode: result.authorizationCode || 'N/A',
+        azulOrderId: result.azulOrderId || azulOrderId,
+        dateTime: result.dateTime || new Date().toISOString(),
+        rrn: result.rrn || 'N/A',
+        responseMessage: result.responseMessage || '',
+        rawResponse: result.rawResponse
+      };
+      
+      // Codificar datos para URL
+      const encodedData = encodeURIComponent(JSON.stringify(resultData));
+      
+      const html = '<html><body style="font-family:Arial;padding:40px;text-align:center;">' +
+        '<h1 style="color:' + (result.success ? 'green' : 'red') + '">' + (result.success ? 'Pago Aprobado' : 'Pago Rechazado') + '</h1>' +
+        '<p>IsoCode: ' + result.isoCode + '</p>' +
+        '<p>Authorization: ' + (result.authorizationCode || 'N/A') + '</p>' +
+        '<p>AzulOrderId: ' + (result.azulOrderId || azulOrderId) + '</p>' +
+        '<pre style="text-align:left;background:#f5f5f5;padding:20px;max-width:600px;margin:20px auto;overflow:auto;">' + JSON.stringify(result, null, 2) + '</pre>' +
+        '<div style="margin-top:30px;">' +
+        '<a href="/api/test/3ds-result-pdf?data=' + encodedData + '" style="display:inline-block;padding:12px 24px;background:#333;color:white;text-decoration:none;border-radius:4px;margin-right:10px;">Descargar PDF</a>' +
+        '<a href="/api/test/3ds-simple" style="display:inline-block;padding:12px 24px;background:#666;color:white;text-decoration:none;border-radius:4px;">Probar de nuevo</a>' +
+        '</div>' +
+        '</body></html>';
+      
+      res.send(html);
+    } catch (error: any) {
+      logSystem.error('3DS callback error', error);
+      res.send('<html><body><h1 style="color:red">Error</h1><p>' + (error?.message || 'Unknown error') + '</p></body></html>');
+    }
+  });
+
+  // 3DS Challenge callback (redirect from ACS)
+  app.post("/api/azul/3ds/callback", async (req: Request, res: Response) => {
+    const sessionId = req.query.sid as string;
+    const cres = req.body.cres || req.body.CRes;
+
+    logSystem.info('3DS Challenge callback received', { sessionId, hasCres: !!cres });
+
+    if (!sessionId) {
+      return res.status(400).send('Missing session ID');
+    }
+
+    const session = threeDSSessions.get(sessionId);
+    if (!session) {
+      logSystem.warn('3DS session not found', { sessionId });
+      return res.status(404).send('Session not found');
+    }
+
+    try {
+      const result = await AzulPaymentService.processThreeDSChallenge(session.azulOrderId, cres);
+
+      session.status = result.success ? 'approved' : 'declined';
+      threeDSSessions.set(sessionId, session);
+
+      // Redirect back to app with result
+      const resultParams = new URLSearchParams({
+        sid: sessionId,
+        success: result.success.toString(),
+        code: result.isoCode,
+        azulOrderId: result.azulOrderId || '',
+        authCode: result.authorizationCode || '',
+      });
+
+      const redirectUrl = `/pago-resultado?${resultParams.toString()}`;
+      res.redirect(redirectUrl);
+    } catch (error) {
+      logSystem.error('3DS Challenge callback error', error);
+      res.redirect(`/pago-resultado?sid=${sessionId}&success=false&error=processing_error`);
+    }
+  });
+
+  // Get 3DS session status
+  app.get("/api/azul/3ds/status/:sessionId", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const { sessionId } = req.params;
+    const session = threeDSSessions.get(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found or expired" });
+    }
+
+    res.json({
+      sessionId,
+      status: session.status,
+      flowType: session.flowType,
+      azulOrderId: session.azulOrderId,
+      challengeData: session.status === 'method_complete' && session.flowType === '3D' ? session.challengeData : undefined,
+    });
+  });
+
+  // ========================================
   // DRIVER BANK ACCOUNT ENDPOINTS
   // TODO: Implementar con Azul API para payouts
   // ========================================
@@ -9907,45 +11401,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized" });
       }
 
-      const PDFDocument = (await import('pdfkit')).default;
-      const doc = new PDFDocument();
+      // Utilizar PDFService para generar el recibo con el formato oficial
+      const receiptData = {
+        receiptNumber: pdfService.generateReceiptNumber(),
+        servicioId: servicio.id,
+        fecha: new Date(servicio.createdAt),
+        cliente: {
+          nombre: servicio.cliente?.nombre || "N/A",
+          apellido: servicio.cliente?.apellido || "",
+          email: (servicio.cliente as any)?.email || "N/A",
+          cedula: (servicio.cliente as any)?.cedula || undefined,
+        },
+        conductor: {
+          nombre: servicio.conductor?.nombre || "N/A",
+          apellido: servicio.conductor?.apellido || "",
+          placaGrua: (servicio.conductor as any)?.placaGrua || "N/A",
+        },
+        servicio: {
+          origenDireccion: servicio.origenDireccion,
+          destinoDireccion: servicio.destinoDireccion,
+          distanciaKm: servicio.distanciaKm || "0",
+        },
+        costos: {
+          costoTotal: parseFloat(servicio.costoTotal).toFixed(2),
+          montoOperador: parseFloat((servicio as any).montoOperador || "0").toFixed(2),
+          montoEmpresa: parseFloat((servicio as any).montoEmpresa || "0").toFixed(2),
+          porcentajeOperador: (servicio as any).porcentajeOperador || "0",
+          porcentajeEmpresa: (servicio as any).porcentajeEmpresa || "0",
+        },
+        metodoPago: servicio.metodoPago as "efectivo" | "tarjeta",
+        transactionId: (servicio as any).transactionId,
+      };
+
+      const pdfBuffer = await pdfService.generateReceipt(receiptData);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=recibo-${servicio.id}.pdf`);
-
-      doc.pipe(res);
-
-      doc.fontSize(20).text('Grúa RD', { align: 'center' });
-      doc.fontSize(16).text('Recibo de Servicio', { align: 'center' });
-      doc.moveDown();
-
-      doc.fontSize(12).text(`Número de Servicio: ${servicio.id}`);
-      doc.text(`Fecha: ${new Date(servicio.createdAt).toLocaleDateString('es-DO')}`);
-      doc.moveDown();
-
-      doc.text(`Cliente: ${servicio.cliente?.nombre} ${servicio.cliente?.apellido}`);
-      if (servicio.conductor) {
-        doc.text(`Conductor: ${servicio.conductor.nombre} ${servicio.conductor.apellido}`);
-      }
-      doc.moveDown();
-
-      doc.text(`Origen: ${servicio.origenDireccion}`);
-      doc.text(`Destino: ${servicio.destinoDireccion}`);
-      doc.text(`Distancia: ${servicio.distanciaKm} km`);
-      doc.moveDown();
-
-      doc.font('Helvetica-Bold').fontSize(14).text(`Costo Total: RD$ ${parseFloat(servicio.costoTotal).toFixed(2)}`);
-      doc.font('Helvetica').fontSize(12).text(`Método de Pago: ${servicio.metodoPago === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`);
-      if ((servicio as any).transactionId) {
-        doc.text(`ID de Transacción: ${(servicio as any).transactionId}`);
-      }
-      doc.moveDown();
-
-      doc.fontSize(10).text('Información Fiscal', { underline: true });
-      doc.text('GruaRD - República Dominicana');
-      doc.text('Este documento es válido como comprobante de pago');
-
-      doc.end();
+      res.send(pdfBuffer);
     } catch (error: any) {
       logSystem.error('Generate receipt error', error);
       res.status(500).json({ message: "Failed to generate receipt" });
@@ -14172,6 +15664,461 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== END TEST EMAIL ENDPOINT ====================
+
+  // ==================== COMMUNICATION PANEL API ====================
+  
+  const { CommunicationPanelService } = await import('./services/communication-panel');
+  
+  // Middleware to validate communication panel session
+  const validateCommPanelSession = (req: Request, res: Response, next: Function) => {
+    const token = req.headers['x-comm-panel-token'] as string;
+    if (!token) {
+      return res.status(401).json({ message: 'Token requerido' });
+    }
+    
+    const session = CommunicationPanelService.validateSession(token);
+    if (!session) {
+      return res.status(401).json({ message: 'Sesion invalida o expirada' });
+    }
+    
+    (req as any).commPanelUser = session;
+    next();
+  };
+  
+  // Auth endpoints
+  app.post("/api/comm-panel/login", async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: 'Email y contraseña requeridos' });
+      }
+      
+      const result = await CommunicationPanelService.authenticate(email, password);
+      
+      if (!result) {
+        return res.status(401).json({ message: 'Credenciales invalidas' });
+      }
+      
+      logSystem.info('Communication panel login', { email });
+      res.json(result);
+    } catch (error: any) {
+      logSystem.error('Comm panel login error', error);
+      res.status(500).json({ message: 'Error al iniciar sesion' });
+    }
+  });
+  
+  app.post("/api/comm-panel/logout", validateCommPanelSession, (req: Request, res: Response) => {
+    const token = req.headers['x-comm-panel-token'] as string;
+    CommunicationPanelService.logout(token);
+    res.json({ message: 'Sesion cerrada' });
+  });
+  
+  // Get email aliases
+  app.get("/api/comm-panel/email-aliases", validateCommPanelSession, (_req: Request, res: Response) => {
+    const aliases = CommunicationPanelService.getEmailAliases();
+    res.json(aliases);
+  });
+  
+  // Email Templates CRUD
+  app.get("/api/comm-panel/templates", validateCommPanelSession, async (_req: Request, res: Response) => {
+    try {
+      const templates = await CommunicationPanelService.getTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.get("/api/comm-panel/templates/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const template = await CommunicationPanelService.getTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ message: 'Plantilla no encontrada' });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.post("/api/comm-panel/templates", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const template = await CommunicationPanelService.createTemplate({
+        ...req.body,
+        creadoPor: user.userId
+      });
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.put("/api/comm-panel/templates/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const template = await CommunicationPanelService.updateTemplate(req.params.id, req.body);
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.delete("/api/comm-panel/templates/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      await CommunicationPanelService.deleteTemplate(req.params.id);
+      res.json({ message: 'Plantilla eliminada' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Email Signatures CRUD
+  app.get("/api/comm-panel/signatures", validateCommPanelSession, async (_req: Request, res: Response) => {
+    try {
+      const signatures = await CommunicationPanelService.getSignatures();
+      res.json(signatures);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.post("/api/comm-panel/signatures", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const signature = await CommunicationPanelService.createSignature({
+        ...req.body,
+        creadoPor: user.userId
+      });
+      res.json(signature);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.put("/api/comm-panel/signatures/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const signature = await CommunicationPanelService.updateSignature(req.params.id, req.body);
+      res.json(signature);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.delete("/api/comm-panel/signatures/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      await CommunicationPanelService.deleteSignature(req.params.id);
+      res.json({ message: 'Firma eliminada' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Send email
+  app.post("/api/comm-panel/send-email", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const result = await CommunicationPanelService.sendEmail({
+        ...req.body,
+        enviadoPor: user.userId
+      });
+      
+      if (result.success) {
+        logSystem.info('Email sent from comm panel', { 
+          to: req.body.destinatarios,
+          subject: req.body.asunto,
+          by: user.email
+        });
+        res.json(result);
+      } else {
+        res.status(500).json(result);
+      }
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+  
+  // Email history
+  app.get("/api/comm-panel/email-history", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const history = await CommunicationPanelService.getEmailHistory(limit, offset);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // In-App Announcements CRUD
+  app.get("/api/comm-panel/announcements", validateCommPanelSession, async (_req: Request, res: Response) => {
+    try {
+      const announcements = await CommunicationPanelService.getAnnouncements();
+      res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.post("/api/comm-panel/announcements", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const announcement = await CommunicationPanelService.createAnnouncement({
+        ...req.body,
+        creadoPor: user.userId
+      });
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.put("/api/comm-panel/announcements/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const announcement = await CommunicationPanelService.updateAnnouncement(req.params.id, req.body);
+      res.json(announcement);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.delete("/api/comm-panel/announcements/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      await CommunicationPanelService.deleteAnnouncement(req.params.id);
+      res.json({ message: 'Anuncio eliminado' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Multer config for announcement images
+  const announcementImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Solo se permiten imágenes'));
+      }
+    }
+  });
+  
+  // Upload image for announcement
+  app.post("/api/comm-panel/upload-image", validateCommPanelSession, announcementImageUpload.single('image'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No se proporcionó imagen' });
+      }
+      
+      const fileName = `announcement_${Date.now()}_${Math.random().toString(36).substring(7)}.${req.file.mimetype.split('/')[1]}`;
+      
+      // Try to upload to object storage first, fallback to filesystem
+      try {
+        const result = await uploadDocument(req.file.buffer, fileName, req.file.mimetype);
+        return res.json({ url: result.url });
+      } catch (storageError) {
+        // Fallback: save to local filesystem
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'announcements');
+        await fs.mkdir(uploadsDir, { recursive: true });
+        
+        const localPath = path.join(uploadsDir, fileName);
+        await fs.writeFile(localPath, req.file.buffer);
+        
+        // Return a URL that can be served
+        const baseUrl = process.env.APP_URL || 
+          (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : '') ||
+          '';
+        const url = `${baseUrl}/api/uploads/announcements/${fileName}`;
+        return res.json({ url });
+      }
+    } catch (error: any) {
+      logSystem.error('Error uploading announcement image', error);
+      res.status(500).json({ message: error.message || 'Error al subir imagen' });
+    }
+  });
+  
+  // Serve uploaded announcement images (public since announcements are shown to all users)
+  app.get("/api/uploads/announcements/:filename", async (req: Request, res: Response) => {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Sanitize filename - only allow alphanumeric, dash, underscore, and extension
+      const filename = req.params.filename;
+      const safeFilenameRegex = /^[a-zA-Z0-9_-]+\.(jpg|jpeg|png|gif|webp)$/i;
+      if (!safeFilenameRegex.test(filename)) {
+        return res.status(400).json({ message: 'Nombre de archivo inválido' });
+      }
+      
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'announcements');
+      const filePath = path.resolve(uploadsDir, filename);
+      
+      // Ensure resolved path is within the uploads directory (prevent path traversal)
+      if (!filePath.startsWith(uploadsDir)) {
+        return res.status(400).json({ message: 'Acceso no permitido' });
+      }
+      
+      if (fs.existsSync(filePath)) {
+        const ext = path.extname(filename).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.png': 'image/png',
+          '.gif': 'image/gif',
+          '.webp': 'image/webp'
+        };
+        res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        fs.createReadStream(filePath).pipe(res);
+      } else {
+        res.status(404).json({ message: 'Imagen no encontrada' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error al servir imagen' });
+    }
+  });
+  
+  // Get active announcements for user (mobile app)
+  app.get("/api/announcements/active", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'No autenticado' });
+      }
+      
+      const announcements = await CommunicationPanelService.getActiveAnnouncements(
+        req.user!.userType,
+        req.user!.id
+      );
+      res.json(announcements);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Mark announcement as viewed/dismissed
+  app.post("/api/announcements/:id/view", async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'No autenticado' });
+      }
+      
+      await CommunicationPanelService.markAnnouncementViewed(
+        req.params.id,
+        req.user!.id,
+        req.body.descartado || false
+      );
+      res.json({ message: 'OK' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Send all system email templates for testing
+  app.post("/api/comm-panel/test-all-templates", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: 'Email es requerido' });
+      }
+      
+      const emailService = await getEmailService();
+      const results: { template: string; success: boolean; error?: string }[] = [];
+      
+      const mockTicket = {
+        id: 'TEST-12345678-ABCD',
+        titulo: 'Ticket de Prueba',
+        descripcion: 'Descripción de prueba para verificar formato',
+        categoria: 'consulta_servicio',
+        prioridad: 'media',
+        estado: 'abierto'
+      };
+      
+      const templates = [
+        { name: 'OTP/Verificación', send: () => emailService.sendOTPEmail(email, '123456', 'Usuario Prueba') },
+        { name: 'Bienvenida General', send: () => emailService.sendWelcomeEmail(email, 'Usuario Prueba') },
+        { name: 'Bienvenida Cliente', send: () => emailService.sendClientWelcomeEmail(email, 'Cliente Prueba') },
+        { name: 'Bienvenida Operador', send: () => emailService.sendOperatorWelcomeEmail(email, 'Operador Prueba') },
+        { name: 'Notificación de Servicio', send: () => emailService.sendServiceNotification(email, 'Servicio Completado', 'Tu servicio SRV-12345 ha sido completado exitosamente.') },
+        { name: 'Restablecer Contraseña', send: () => emailService.sendPasswordResetEmail(email, 'https://app.gruard.com/reset?token=test123', 'Usuario Prueba') },
+        { name: 'Documento Aprobado', send: () => emailService.sendDocumentApprovalEmail(email, 'Licencia de Conducir', true) },
+        { name: 'Documento Rechazado', send: () => emailService.sendDocumentApprovalEmail(email, 'Seguro del Vehículo', false, 'El documento está vencido o ilegible') },
+        { name: 'Ticket Creado', send: () => emailService.sendTicketCreatedEmail(email, 'Usuario Prueba', mockTicket) },
+        { name: 'Ticket Estado Cambiado', send: () => emailService.sendTicketStatusChangedEmail(email, 'Usuario Prueba', mockTicket, 'abierto', 'en_proceso') },
+        { name: 'Respuesta de Soporte', send: () => emailService.sendTicketSupportResponseEmail(email, 'Usuario Prueba', mockTicket, 'Gracias por contactarnos. Estamos revisando su solicitud.') },
+        { name: 'Socio/Inversor Creado', send: () => emailService.sendSocioCreatedEmail(email, 'Inversor Prueba', 'TempPass123!', '5.00') },
+        { name: 'Socio Primer Login', send: () => emailService.sendSocioFirstLoginEmail(email, 'Inversor Prueba') },
+        { name: 'Administrador Creado', send: () => emailService.sendAdminCreatedEmail(email, 'Admin Prueba', 'AdminPass123!', ['dashboard', 'analytics', 'usuarios']) }
+      ];
+      
+      for (const tmpl of templates) {
+        try {
+          const success = await tmpl.send();
+          results.push({ template: tmpl.name, success });
+          await new Promise(resolve => setTimeout(resolve, 600));
+        } catch (error: any) {
+          results.push({ template: tmpl.name, success: false, error: error.message });
+        }
+      }
+      
+      const successCount = results.filter(r => r.success).length;
+      logSystem.info('Test templates sent from comm panel', { email, successCount, total: templates.length });
+      
+      res.json({
+        message: `Enviados ${successCount}/${templates.length} correos`,
+        email,
+        results
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Push Notification Configs CRUD
+  app.get("/api/comm-panel/push-configs", validateCommPanelSession, async (_req: Request, res: Response) => {
+    try {
+      const configs = await CommunicationPanelService.getPushConfigs();
+      res.json(configs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.post("/api/comm-panel/push-configs", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).commPanelUser;
+      const config = await CommunicationPanelService.createPushConfig({
+        ...req.body,
+        creadoPor: user.userId
+      });
+      res.json(config);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.put("/api/comm-panel/push-configs/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      const config = await CommunicationPanelService.updatePushConfig(req.params.id, req.body);
+      res.json(config);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  app.delete("/api/comm-panel/push-configs/:id", validateCommPanelSession, async (req: Request, res: Response) => {
+    try {
+      await CommunicationPanelService.deletePushConfig(req.params.id);
+      res.json({ message: 'Configuracion eliminada' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // ==================== END COMMUNICATION PANEL API ====================
 
   initServiceAutoCancellation(serviceSessions);
   initWalletService();

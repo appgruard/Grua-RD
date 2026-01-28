@@ -10,14 +10,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiRequest } from '@/lib/queryClient';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
 
-type Step = 'phone' | 'otp' | 'password';
+type Step = 'email' | 'otp' | 'password';
 
 export default function ForgotPassword() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const [step, setStep] = useState<Step>('phone');
+  const [step, setStep] = useState<Step>('email');
   const [loading, setLoading] = useState(false);
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [codigo, setCodigo] = useState('');
   const [nuevaPassword, setNuevaPassword] = useState('');
   const [confirmarPassword, setConfirmarPassword] = useState('');
@@ -36,8 +36,8 @@ export default function ForgotPassword() {
     e.preventDefault();
     setErrors({});
 
-    if (!phone.trim() || !/^\d{10}$/.test(phone.replace(/\D/g, ''))) {
-      setErrors({ phone: 'Ingresa un número de teléfono válido (10 dígitos)' });
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors({ email: 'Ingresa un correo electrónico válido' });
       return;
     }
 
@@ -45,7 +45,7 @@ export default function ForgotPassword() {
 
     try {
       const res = await apiRequest('POST', '/api/auth/forgot-password', {
-        telefono: phone,
+        email: email,
       });
 
       if (!res.ok) {
@@ -55,7 +55,7 @@ export default function ForgotPassword() {
 
       toast({
         title: 'Código enviado',
-        description: 'Revisa tu teléfono para el código de recuperación',
+        description: 'Revisa tu correo para el código de recuperación',
       });
 
       setStep('otp');
@@ -108,7 +108,7 @@ export default function ForgotPassword() {
 
     try {
       const res = await apiRequest('POST', '/api/auth/reset-password', {
-        telefono: phone,
+        email: email,
         codigo,
         nuevaPassword,
       });
@@ -156,13 +156,13 @@ export default function ForgotPassword() {
           </div>
           <CardTitle className="text-2xl font-bold">Recuperar Contraseña</CardTitle>
           <CardDescription>
-            {step === 'phone' && 'Ingresa tu teléfono'}
+            {step === 'email' && 'Ingresa tu correo electrónico'}
             {step === 'otp' && 'Verifica el código enviado'}
             {step === 'password' && 'Crea una nueva contraseña'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {step === 'phone' && (
+          {step === 'email' && (
             <form onSubmit={handleRequestCode} className="space-y-4">
               {errors.general && (
                 <Alert variant="destructive">
@@ -172,29 +172,28 @@ export default function ForgotPassword() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Número de Teléfono</Label>
+                <Label htmlFor="email">Correo Electrónico</Label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="809-555-1234"
-                    className={`pl-10 ${
-                      errors.phone ? 'border-destructive focus-visible:ring-destructive' : ''
+                    id="email"
+                    type="email"
+                    placeholder="ejemplo@correo.com"
+                    className={`${
+                      errors.email ? 'border-destructive focus-visible:ring-destructive' : ''
                     }`}
-                    value={phone}
+                    value={email}
                     onChange={(e) => {
-                      setPhone(e.target.value);
-                      setErrors({ ...errors, phone: '' });
+                      setEmail(e.target.value);
+                      setErrors({ ...errors, email: '' });
                     }}
                     disabled={loading}
-                    data-testid="input-forgot-phone"
+                    data-testid="input-forgot-email"
                   />
                 </div>
-                {errors.phone && (
+                {errors.email && (
                   <p className="text-sm text-destructive flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
-                    {errors.phone}
+                    {errors.email}
                   </p>
                 )}
               </div>
@@ -212,7 +211,7 @@ export default function ForgotPassword() {
             </form>
           )}
 
-          {step === 'otp' && (
+            {step === 'otp' && (
             <form onSubmit={handleVerifyCode} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="codigo">Código de Verificación</Label>

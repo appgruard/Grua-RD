@@ -1,13 +1,16 @@
 import { Switch, Route, Redirect } from 'wouter';
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { queryClient } from './lib/queryClient';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { Loader2 } from 'lucide-react';
+import { CommPanelAuthProvider, CommPanelProtectedRoute } from '@/contexts/CommPanelAuthContext';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { EmpresaLayout } from '@/components/layout/EmpresaLayout';
+import { CommPanelLayout } from '@/components/comm-panel/CommPanelLayout';
 import { InstallPWA, UpdateAvailable, OfflineIndicator } from '@/components/InstallPWA';
 import { ThemeProvider } from '@/components/ThemeToggle';
 import { initializePreloading, preloadDriverModules } from '@/lib/preload';
@@ -74,6 +77,14 @@ const AseguradoraPerfil = lazy(() => import('@/pages/aseguradora/AseguradoraPerf
 
 const NotFound = lazy(() => import('@/pages/not-found'));
 const PrivacyPolicy = lazy(() => import('@/pages/privacy-policy'));
+const Test3DS = lazy(() => import('@/pages/test-3ds'));
+
+const CommPanelLogin = lazy(() => import('@/pages/comm-panel/Login'));
+const CommPanelDashboard = lazy(() => import('@/pages/comm-panel/Dashboard'));
+const CommPanelComposer = lazy(() => import('@/pages/comm-panel/Composer'));
+const CommPanelTemplates = lazy(() => import('@/pages/comm-panel/Templates'));
+const CommPanelAnnouncements = lazy(() => import('@/pages/comm-panel/Announcements'));
+const CommPanelPushConfigs = lazy(() => import('@/pages/comm-panel/PushConfigs'));
 
 function LoadingFallback() {
   return (
@@ -95,13 +106,33 @@ function ProtectedRoute({
   allowedTypes?: string[];
   allowPendingVerification?: boolean;
 }) {
-  const { user, isLoading, pendingVerificationUser } = useAuth();
+  const { user, isLoading, pendingVerificationUser, refreshUser } = useAuth();
+  const [refreshAttempted, setRefreshAttempted] = useState(false);
 
   useEffect(() => {
     if (user?.userType === 'conductor') {
       preloadDriverModules();
     }
   }, [user?.userType]);
+
+  // Auto-refresh user data once if critical fields are missing
+  useEffect(() => {
+    if (!user || isLoading || refreshAttempted) return;
+    
+    // For conductors, refresh if conductor data is missing
+    if (user.userType === 'conductor' && !(user as any).conductor) {
+      setRefreshAttempted(true);
+      refreshUser();
+      return;
+    }
+    
+    // For clients, refresh if emailVerificado is undefined (should be boolean)
+    if (user.userType === 'cliente' && (user as any).emailVerificado === undefined) {
+      setRefreshAttempted(true);
+      refreshUser();
+      return;
+    }
+  }, [user, isLoading, refreshAttempted, refreshUser]);
 
   if (isLoading) {
     return (
@@ -131,6 +162,20 @@ function ProtectedRoute({
 
   // For conductors, check if verification is complete using authoritative server data
   if (currentUser.userType === 'conductor') {
+    // If conductor data is not loaded and we haven't tried refreshing yet, show brief loading
+    // After refresh attempt, if still no conductor data, redirect to verify-pending
+    if (!(currentUser as any).conductor) {
+      if (!refreshAttempted) {
+        return (
+          <div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        );
+      }
+      // Refresh was attempted but no conductor data - redirect to verify-pending
+      return <Redirect to="/verify-pending" />;
+    }
+    
     // Either telefonoVerificado OR emailVerificado counts as contact verified
     const contactoVerificado = currentUser.telefonoVerificado || (currentUser as any).emailVerificado;
     // Conductors also need photo verification
@@ -148,9 +193,12 @@ function ProtectedRoute({
   }
 
   // For clients, check basic verification
+  // Only redirect if explicitly false (not undefined, which means data hasn't loaded yet)
   if (currentUser.userType === 'cliente') {
     const emailVerificado = (currentUser as any).emailVerificado;
-    const needsVerification = !currentUser.cedulaVerificada || !emailVerificado;
+    // Only redirect to verify-pending if verification is explicitly false
+    // If undefined and refresh was already attempted, allow access (prevents infinite loop)
+    const needsVerification = currentUser.cedulaVerificada === false || emailVerificado === false;
     if (needsVerification) {
       return <Redirect to="/verify-pending" />;
     }
@@ -159,12 +207,15 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
+const Test3DSGUI = lazy(() => import('@/pages/test-3ds-gui'));
+
 function Router() {
   const { user } = useAuth();
 
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Switch>
+        <Route path="/test/3ds" component={Test3DSGUI} />
         <Route path="/login" component={Login} />
         <Route path="/onboarding" component={OnboardingWizard} />
         <Route path="/verify-otp" component={VerifyOTP} />
@@ -175,6 +226,34 @@ function Router() {
           </ProtectedRoute>
         </Route>
         <Route path="/privacy-policy" component={PrivacyPolicy} />
+
+        {/* Communications Panel Routes */}
+        <Route path="/admin/communications/login" component={CommPanelLogin} />
+        <Route path="/admin/communications/composer">
+          <CommPanelProtectedRoute>
+            <CommPanelComposer />
+          </CommPanelProtectedRoute>
+        </Route>
+        <Route path="/admin/communications/templates">
+          <CommPanelProtectedRoute>
+            <CommPanelTemplates />
+          </CommPanelProtectedRoute>
+        </Route>
+        <Route path="/admin/communications/announcements">
+          <CommPanelProtectedRoute>
+            <CommPanelAnnouncements />
+          </CommPanelProtectedRoute>
+        </Route>
+        <Route path="/admin/communications/push">
+          <CommPanelProtectedRoute>
+            <CommPanelPushConfigs />
+          </CommPanelProtectedRoute>
+        </Route>
+        <Route path="/admin/communications">
+          <CommPanelProtectedRoute>
+            <CommPanelDashboard />
+          </CommPanelProtectedRoute>
+        </Route>
       
       {/* Client Routes - Most specific first */}
       <Route path="/client/tracking/:id">
@@ -487,6 +566,11 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      {/* Test Routes */}
+      <Route path="/test-3ds">
+        <Test3DS />
+      </Route>
+
       <Route path="/">
         {user ? (
           user.userType === 'admin' ? (
@@ -518,15 +602,17 @@ export default function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <ServiceRequestProvider>
-            <TooltipProvider>
-              <OfflineIndicator />
-              <Toaster />
-              <Router />
-              <InstallPWA />
-              <UpdateAvailable />
-            </TooltipProvider>
-          </ServiceRequestProvider>
+          <CommPanelAuthProvider>
+            <ServiceRequestProvider>
+              <TooltipProvider>
+                <OfflineIndicator />
+                <Toaster />
+                <Router />
+                <InstallPWA />
+                <UpdateAvailable />
+              </TooltipProvider>
+            </ServiceRequestProvider>
+          </CommPanelAuthProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

@@ -275,7 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshUser = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+    await queryClient.refetchQueries({ queryKey: ['/api/auth/me'] });
   };
 
   const clearPendingVerification = () => {

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { CedulaScanner } from '@/components/CedulaScanner';
 import { ThemeSettingsCard } from '@/components/ThemeToggle';
 import { PrivacySection } from '@/components/PrivacySection';
+import { CancellationHistory } from '@/components/cancellation/CancellationHistory';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,11 @@ export default function ClientProfile() {
   const [cedulaDialogOpen, setCedulaDialogOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: linkedAccounts } = useQuery<{ hasClienteAccount: boolean; hasConductorAccount: boolean }>({
+    queryKey: ['/api/auth/linked-accounts'],
+    enabled: !!user,
+  });
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -138,6 +144,14 @@ export default function ClientProfile() {
             Editar
           </Button>
         </div>
+        {user.bloqueadoHasta && new Date(user.bloqueadoHasta) > new Date() && (
+          <Alert className="mb-4 border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950" data-testid="alert-user-blocked">
+            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-700 dark:text-red-200">
+              Tu cuenta está bloqueada hasta {new Date(user.bloqueadoHasta).toLocaleString()} por cancelaciones previas. No puedes solicitar nuevos servicios durante este período.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex flex-col items-center text-center">
           <div className="relative">
             <Avatar className="w-24 h-24 border-4 border-background shadow-lg">
@@ -324,29 +338,42 @@ export default function ClientProfile() {
 
         <PrivacySection userType="cliente" />
 
-        <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-driver">
+        <Card className="overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Historial de Cancelaciones
+            </h3>
+          </div>
           <div className="p-4">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <Truck className="w-6 h-6 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold mb-1">¿También quieres ser conductor?</h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Crea una cuenta de conductor adicional y comienza a ganar dinero con tu vehículo. Podrás alternar entre ambas cuentas.
-                </p>
-                <Button 
-                  onClick={() => setLocation('/onboarding?tipo=conductor')}
-                  className="w-full"
-                  data-testid="button-become-driver"
-                >
-                  <Truck className="w-4 h-4 mr-2" />
-                  Crear cuenta de Conductor
-                </Button>
-              </div>
-            </div>
+            <CancellationHistory userId={user.id} userType="cliente" />
           </div>
         </Card>
+
+        {!linkedAccounts?.hasConductorAccount && (
+          <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-driver">
+            <div className="p-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Truck className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold mb-1">¿También quieres ser conductor?</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Crea una cuenta de conductor adicional y comienza a ganar dinero con tu vehículo. Podrás alternar entre ambas cuentas.
+                  </p>
+                  <Button 
+                    onClick={() => setLocation('/onboarding?tipo=conductor')}
+                    className="w-full"
+                    data-testid="button-become-driver"
+                  >
+                    <Truck className="w-4 h-4 mr-2" />
+                    Crear cuenta de Conductor
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
           <Button
             variant="outline"

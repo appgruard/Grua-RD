@@ -52,29 +52,76 @@ const SIGNATURE_CONFIG = {
   },
 };
 
-// Generate signature HTML for emails
-function generateSignatureHTML(config: { department: string; email: string }): string {
+// Logo URL for emails - uses environment variable or production URL
+function getLogoUrl(): string {
+  // Use APP_URL from env, or Replit dev domain, or production URL
+  const baseUrl = process.env.APP_URL || 
+    (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null) ||
+    'https://app.gruard.com';
+  return `${baseUrl}/api/assets/logo-email`;
+}
+const LOGO_URL = getLogoUrl();
+
+// Brand colors
+const BRAND_COLORS = {
+  primary: '#1a1a2e',
+  accent: '#e94560',
+  light: '#f8f9fa',
+  text: '#333333',
+  muted: '#6c757d',
+  border: '#e9ecef'
+};
+
+// Generate minimalist email header with centered logo
+function generateMinimalHeader(): string {
   return `
-          <div style="background: #f0f4f8; border-radius: 8px; padding: 20px; margin: 30px 0 20px 0; text-align: center;">
-            <p style="margin: 0 0 5px 0; font-weight: bold; color: #1e3a5f; font-size: 14px;">Grúa RD</p>
-            <p style="margin: 0 0 5px 0; color: #666; font-size: 13px;">${config.department}</p>
-            <p style="margin: 0 0 5px 0; color: #666; font-size: 12px;">${config.email}</p>
-            <p style="margin: 0; color: #999; font-size: 12px;">Moca, Espaillat, República Dominicana</p>
-          </div>`;
+    <div style="text-align: center; padding: 40px 20px 30px 20px;">
+      <img src="${LOGO_URL}" alt="Grua RD" style="height: 50px; margin-bottom: 10px;" />
+    </div>`;
 }
 
-// Generate footer HTML with Four One Solutions branding
+// Generate minimalist signature HTML for emails
+function generateSignatureHTML(config: { department: string; email: string }): string {
+  return `
+    <div style="text-align: center; padding: 30px 0 20px 0; border-top: 1px solid ${BRAND_COLORS.border}; margin-top: 40px;">
+      <p style="margin: 0 0 4px 0; font-size: 13px; color: ${BRAND_COLORS.muted};">${config.department}</p>
+      <p style="margin: 0; font-size: 12px; color: ${BRAND_COLORS.muted};">${config.email}</p>
+    </div>`;
+}
+
+// Generate minimalist footer HTML
 function generateFooterHTML(mainFooterContent: string): string {
   return `
-          <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-          
-          <p style="font-size: 12px; color: #999; text-align: center;">
-            ${mainFooterContent}
-          </p>
-          
-          <p style="font-size: 10px; color: #bbb; text-align: center; margin-top: 15px;">
-            con la tecnología de Four One Solutions
-          </p>`;
+    <div style="text-align: center; padding: 20px 0; background: ${BRAND_COLORS.light}; margin-top: 30px;">
+      <p style="font-size: 11px; color: ${BRAND_COLORS.muted}; margin: 0 0 8px 0;">
+        ${mainFooterContent}
+      </p>
+      <p style="font-size: 10px; color: #adb5bd; margin: 0;">
+        Desarrollado por Four One Solutions
+      </p>
+    </div>`;
+}
+
+// Generate base email template wrapper (minimalist)
+function generateEmailWrapper(content: string, signature: string, footer: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: ${BRAND_COLORS.text}; margin: 0; padding: 0; background: #ffffff;">
+      <div style="max-width: 560px; margin: 0 auto; padding: 0;">
+        ${generateMinimalHeader()}
+        <div style="padding: 0 30px;">
+          ${content}
+          ${signature}
+        </div>
+        ${footer}
+      </div>
+    </body>
+    </html>`;
 }
 
 async function getResendCredentials(): Promise<ResendCredentials | null> {
@@ -182,58 +229,46 @@ class ResendEmailService implements EmailService {
   async sendOTPEmail(email: string, code: string, userName?: string): Promise<boolean> {
     const greeting = userName ? `Hola ${userName}` : 'Hola';
     
-    // Use verification-specific email address
     const resend = await getResendClient(EMAIL_ADDRESSES.verification);
     if (!resend) {
       logger.error('Resend not configured, cannot send OTP email');
       return false;
     }
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0;">Código de Verificación</p>
+    const content = `
+      <p style="font-size: 15px; margin: 0 0 20px 0;">${greeting},</p>
+      
+      <p style="font-size: 15px; margin: 0 0 25px 0; color: ${BRAND_COLORS.muted};">
+        Tu codigo de verificacion es:
+      </p>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <div style="display: inline-block; background: ${BRAND_COLORS.light}; padding: 20px 40px; border-radius: 8px;">
+          <span style="font-size: 36px; font-weight: 600; letter-spacing: 10px; color: ${BRAND_COLORS.primary};">${code}</span>
         </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">${greeting},</p>
-          
-          <p style="font-size: 16px;">Tu código de verificación es:</p>
-          
-          <div style="background: white; border: 2px solid #1e3a5f; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
-            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1e3a5f;">${code}</span>
-          </div>
-          
-          <p style="font-size: 14px; color: #666;">
-            Este código es válido por <strong>10 minutos</strong>. No compartas este código con nadie.
-          </p>
-          
-          <p style="font-size: 14px; color: #666;">
-            Si no solicitaste este código, puedes ignorar este correo.
-          </p>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.seguridad)}
-          
-          ${generateFooterHTML('Este es un correo automático de Grúa RD. Por favor no respondas a este mensaje.')}
-        </div>
-      </body>
-      </html>
-    `;
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 25px 0 10px 0;">
+        Este codigo es valido por <strong>10 minutos</strong>.
+      </p>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0;">
+        Si no solicitaste este codigo, puedes ignorar este correo.
+      </p>`;
 
-    const text = `${greeting},\n\nTu código de verificación Grúa RD es: ${code}\n\nEste código es válido por 10 minutos.\n\nSi no solicitaste este código, puedes ignorar este correo.\n\n---\nGrúa RD\nDepartamento de Seguridad\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.seguridad),
+      generateFooterHTML('Correo automatico - No responder')
+    );
+
+    const text = `${greeting},\n\nTu codigo de verificacion Grua RD es: ${code}\n\nEste codigo es valido por 10 minutos.\n\nSi no solicitaste este codigo, puedes ignorar este correo.\n\n---\nGrua RD | Departamento de Seguridad`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `Grúa RD Verificación <${resend.fromEmail}>`,
+        from: `Grua RD <${resend.fromEmail}>`,
         to: [email],
-        subject: `Tu código de verificación Grúa RD: ${code}`,
+        subject: `${code} - Codigo de verificacion`,
         html,
         text,
       });
@@ -252,53 +287,32 @@ class ResendEmailService implements EmailService {
   }
 
   async sendWelcomeEmail(email: string, userName: string): Promise<boolean> {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">¡Bienvenido a Grúa RD!</h1>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Hola ${userName},</p>
-          
-          <p style="font-size: 16px;">
-            ¡Gracias por registrarte en Grúa RD! Estamos emocionados de tenerte con nosotros.
-          </p>
-          
-          <p style="font-size: 16px;">
-            Con Grúa RD puedes:
-          </p>
-          
-          <ul style="font-size: 14px; color: #555;">
-            <li>Solicitar servicios de grúa en tiempo real</li>
-            <li>Seguir la ubicación de tu grúa en vivo</li>
-            <li>Comunicarte directamente con el conductor</li>
-            <li>Pagar de forma segura</li>
-          </ul>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="https://gruard.com" style="background: #1e3a5f; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Comenzar</a>
-          </div>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.atencionCliente)}
-          
-          ${generateFooterHTML('¿Tienes preguntas? Contáctanos en info@gruard.com')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Bienvenido a Grua RD
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Hola ${userName},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        Gracias por unirte. Ahora puedes solicitar servicios de grua en tiempo real, seguir tu servicio en vivo y pagar de forma segura.
+      </p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="https://app.gruard.com" style="display: inline-block; background: ${BRAND_COLORS.primary}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Comenzar</a>
+      </div>`;
 
-    const text = `Hola ${userName},\n\n¡Bienvenido a Grúa RD!\n\nGracias por registrarte. Ahora puedes solicitar servicios de grúa en tiempo real, seguir la ubicación de tu grúa, y más.\n\nSi tienes preguntas, contáctanos en info@gruard.com\n\n---\nGrúa RD\nDepartamento de Atención al Cliente\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.atencionCliente),
+      generateFooterHTML('Contacto: info@gruard.com')
+    );
+
+    const text = `Hola ${userName},\n\nBienvenido a Grua RD. Gracias por unirte.\n\nContacto: info@gruard.com\n\n---\nGrua RD`;
 
     return this.sendEmail({
       to: email,
-      subject: '¡Bienvenido a Grúa RD!',
+      subject: 'Bienvenido a Grua RD',
       html,
       text,
     });
@@ -311,69 +325,44 @@ class ResendEmailService implements EmailService {
       return false;
     }
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a Grúa RD</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Tu servicio de gruas de confianza</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Hola ${userName},</p>
-          
-          <p style="font-size: 16px;">
-            Gracias por registrarte en Grúa RD. Estamos comprometidos a brindarte el mejor servicio de asistencia vial en Republica Dominicana.
-          </p>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Como solicitar un servicio:</h3>
-            <ol style="margin: 0; padding-left: 20px; color: #555;">
-              <li style="margin-bottom: 8px;">Ingresa a tu cuenta en Grúa RD</li>
-              <li style="margin-bottom: 8px;">Indica tu ubicacion actual</li>
-              <li style="margin-bottom: 8px;">Selecciona el tipo de servicio que necesitas</li>
-              <li style="margin-bottom: 8px;">Confirma y espera a tu operador</li>
-            </ol>
-          </div>
-          
-          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Metodos de pago disponibles:</h4>
-            <p style="margin: 0; font-size: 14px; color: #555;">
-              Efectivo, Tarjeta de credito/debito, Transferencia bancaria
-            </p>
-          </div>
-          
-          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #856404; margin: 0 0 10px 0;">Linea de emergencias 24/7:</h4>
-            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #1e3a5f;">
-              +1 (809) 555-GRUA
-            </p>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="https://gruard.com" style="background: #1e3a5f; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Ir a Grúa RD</a>
-          </div>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.atencionCliente)}
-          
-          ${generateFooterHTML('Grúa RD - Tu servicio de gruas de confianza')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Bienvenido a Grua RD
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Hola ${userName},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 30px 0;">
+        Tu cuenta ha sido creada exitosamente. Estamos listos para asistirte cuando lo necesites.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 12px 0;">Como solicitar un servicio:</p>
+        <ol style="margin: 0; padding-left: 18px; font-size: 13px; color: ${BRAND_COLORS.muted};">
+          <li style="margin-bottom: 6px;">Ingresa a tu cuenta</li>
+          <li style="margin-bottom: 6px;">Indica tu ubicacion</li>
+          <li style="margin-bottom: 6px;">Selecciona el servicio</li>
+          <li style="margin-bottom: 0;">Confirma y espera al operador</li>
+        </ol>
+      </div>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="https://app.gruard.com" style="display: inline-block; background: ${BRAND_COLORS.primary}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Ir a Grua RD</a>
+      </div>`;
 
-    const text = `Hola ${userName},\n\nGracias por registrarte en Grúa RD. Estamos comprometidos a brindarte el mejor servicio de asistencia vial.\n\nComo solicitar un servicio:\n1. Ingresa a tu cuenta en Grúa RD\n2. Indica tu ubicacion actual\n3. Selecciona el tipo de servicio\n4. Confirma y espera a tu operador\n\nMetodos de pago: Efectivo, Tarjeta, Transferencia\n\nLinea de emergencias 24/7: +1 (809) 555-GRUA\n\n---\nGrúa RD\nDepartamento de Atención al Cliente\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.atencionCliente),
+      generateFooterHTML('Tu servicio de gruas de confianza')
+    );
+
+    const text = `Hola ${userName},\n\nBienvenido a Grua RD. Tu cuenta ha sido creada exitosamente.\n\n---\nGrua RD`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `Grúa RD <${resend.fromEmail}>`,
+        from: `Grua RD <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido a Grúa RD - Tu servicio de gruas de confianza',
+        subject: 'Bienvenido a Grua RD',
         html,
         text,
       });
@@ -398,78 +387,52 @@ class ResendEmailService implements EmailService {
       return false;
     }
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido al Equipo Grúa RD</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Gracias por unirte como operador</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Hola ${userName},</p>
-          
-          <p style="font-size: 16px;">
-            Gracias por registrarte como operador en Grúa RD. Estamos emocionados de tenerte en nuestro equipo de profesionales.
-          </p>
-          
-          <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #155724; margin: 0 0 10px 0;">Proximos pasos:</h4>
-            <ol style="margin: 0; padding-left: 20px; color: #155724;">
-              <li style="margin-bottom: 8px;">Completa la verificacion de tus documentos</li>
-              <li style="margin-bottom: 8px;">Espera la aprobacion de nuestro equipo</li>
-              <li style="margin-bottom: 8px;">Configura tu perfil y disponibilidad</li>
-              <li style="margin-bottom: 8px;">Comienza a recibir solicitudes de servicio</li>
-            </ol>
-          </div>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Beneficios de ser operador Grúa RD:</h3>
-            <ul style="margin: 0; padding-left: 20px; color: #555;">
-              <li style="margin-bottom: 8px;"><strong>80% de comision</strong> - Tu te quedas con el 80% de cada servicio</li>
-              <li style="margin-bottom: 8px;"><strong>Flexibilidad total</strong> - Trabaja cuando quieras</li>
-              <li style="margin-bottom: 8px;"><strong>Pagos semanales</strong> - Recibe tus ganancias puntualmente</li>
-              <li style="margin-bottom: 8px;"><strong>Soporte 24/7</strong> - Siempre estamos para ayudarte</li>
-              <li style="margin-bottom: 8px;"><strong>Sin costos ocultos</strong> - Transparencia total</li>
-            </ul>
-          </div>
-          
-          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Tips para maximizar tus ingresos:</h4>
-            <ul style="margin: 0; padding-left: 20px; color: #555; font-size: 14px;">
-              <li style="margin-bottom: 6px;">Mantente disponible en horas pico (7-9am, 5-8pm)</li>
-              <li style="margin-bottom: 6px;">Responde rapidamente a las solicitudes</li>
-              <li style="margin-bottom: 6px;">Ofrece un servicio profesional y amable</li>
-              <li style="margin-bottom: 6px;">Mantiene tu equipo en optimas condiciones</li>
-            </ul>
-          </div>
-          
-          <div style="background: #f8d7da; border-left: 4px solid #dc3545; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #721c24; margin: 0 0 10px 0;">Importante:</h4>
-            <p style="margin: 0; font-size: 14px; color: #721c24;">
-              Debes completar la verificacion de documentos antes de poder recibir solicitudes. 
-              Esto incluye: licencia de conducir, seguro del vehiculo y documentos de la grua.
-            </p>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="https://gruard.com" style="background: #28a745; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Completar Verificacion</a>
-          </div>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.operadores)}
-          
-          ${generateFooterHTML('Grúa RD - Juntos hacemos la diferencia')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Bienvenido al Equipo Grua RD
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Hola ${userName},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        Gracias por registrarte como operador. Estamos emocionados de tenerte en nuestro equipo.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 12px 0;">Proximos pasos:</p>
+        <ol style="margin: 0; padding-left: 18px; font-size: 13px; color: ${BRAND_COLORS.muted};">
+          <li style="margin-bottom: 6px;">Completa la verificacion de documentos</li>
+          <li style="margin-bottom: 6px;">Espera la aprobacion del equipo</li>
+          <li style="margin-bottom: 6px;">Configura tu perfil y disponibilidad</li>
+          <li style="margin-bottom: 0;">Comienza a recibir solicitudes</li>
+        </ol>
+      </div>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 12px 0;">Beneficios:</p>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: ${BRAND_COLORS.muted};">
+          <li style="margin-bottom: 6px;"><strong>80% de comision</strong> por servicio</li>
+          <li style="margin-bottom: 6px;"><strong>Flexibilidad total</strong> - Trabaja cuando quieras</li>
+          <li style="margin-bottom: 6px;"><strong>Pagos semanales</strong> puntuales</li>
+          <li style="margin-bottom: 0;"><strong>Soporte 24/7</strong></li>
+        </ul>
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.accent}; margin: 0 0 25px 0;">
+        <strong>Importante:</strong> Debes completar la verificacion de documentos antes de recibir solicitudes.
+      </p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="https://app.gruard.com" style="display: inline-block; background: ${BRAND_COLORS.primary}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Completar Verificacion</a>
+      </div>`;
 
-    const text = `Hola ${userName},\n\nGracias por registrarte como operador en Grúa RD. Estamos emocionados de tenerte en nuestro equipo.\n\nProximos pasos:\n1. Completa la verificacion de tus documentos\n2. Espera la aprobacion de nuestro equipo\n3. Configura tu perfil y disponibilidad\n4. Comienza a recibir solicitudes\n\nBeneficios:\n- 80% de comision por servicio\n- Flexibilidad total\n- Pagos semanales\n- Soporte 24/7\n\nImportante: Debes completar la verificacion de documentos antes de poder recibir solicitudes.\n\n---\nGrúa RD\nDepartamento de Operadores\noperadores@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.operadores),
+      generateFooterHTML('Juntos hacemos la diferencia')
+    );
+
+    const text = `Hola ${userName},\n\nGracias por registrarte como operador en Grua RD.\n\nProximos pasos:\n1. Completa la verificacion de documentos\n2. Espera la aprobacion\n3. Configura tu perfil\n4. Comienza a recibir solicitudes\n\nBeneficios: 80% comision, flexibilidad, pagos semanales, soporte 24/7.\n\n---\nGrua RD | Departamento de Operadores`;
 
     try {
       const { data, error } = await resend.client.emails.send({
@@ -494,143 +457,183 @@ class ResendEmailService implements EmailService {
   }
 
   async sendServiceNotification(email: string, subject: string, message: string): Promise<boolean> {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0;">Notificación de Servicio</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">${message}</p>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.servicios)}
-          
-          ${generateFooterHTML('Este es un correo automático de Grúa RD.')}
-        </div>
-      </body>
-      </html>
-    `;
+    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    
+    const content = `
+      <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Notificacion de Servicio
+      </h1>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.text}; margin: 0 0 20px 0;">${message}</p>`;
 
-    return this.sendEmail({
-      to: email,
-      subject: `Grúa RD: ${subject}`,
-      html,
-      text: `${message}\n\n---\nGrúa RD\nDepartamento de Servicios\ninfo@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`,
-    });
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.servicios),
+      generateFooterHTML('Correo automatico - No responder')
+    );
+
+    const text = `${message}\n\n---\nGrua RD | Departamento de Servicios`;
+
+    if (!resend) {
+      return this.sendEmail({
+        to: email,
+        subject: `Grúa RD: ${subject}`,
+        html,
+        text,
+      });
+    }
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `Grúa RD Servicios <${resend.fromEmail}>`,
+        to: [email],
+        subject: `Grúa RD: ${subject}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send service notification:', error);
+        return false;
+      }
+
+      logger.info(`Service notification sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending service notification:', error);
+      return false;
+    }
   }
 
   async sendPasswordResetEmail(email: string, resetLink: string, userName?: string): Promise<boolean> {
     const greeting = userName ? `Hola ${userName}` : 'Hola';
     
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0;">Restablecer Contraseña</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">${greeting},</p>
-          
-          <p style="font-size: 16px;">
-            Recibimos una solicitud para restablecer la contraseña de tu cuenta Grúa RD.
-          </p>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${resetLink}" style="background: #1e3a5f; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Restablecer Contraseña</a>
-          </div>
-          
-          <p style="font-size: 14px; color: #666;">
-            Este enlace expirará en <strong>1 hora</strong>.
-          </p>
-          
-          <p style="font-size: 14px; color: #666;">
-            Si no solicitaste restablecer tu contraseña, puedes ignorar este correo. Tu contraseña actual permanecerá sin cambios.
-          </p>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.seguridad)}
-          
-          ${generateFooterHTML('Este es un correo automático de Grúa RD. Por favor no respondas a este mensaje.')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <p style="font-size: 15px; margin: 0 0 20px 0;">${greeting},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        Recibimos una solicitud para restablecer la contrasena de tu cuenta.
+      </p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${resetLink}" style="display: inline-block; background: ${BRAND_COLORS.primary}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Restablecer Contrasena</a>
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 25px 0 10px 0;">
+        Este enlace es valido por <strong>1 hora</strong>.
+      </p>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0;">
+        Si no solicitaste restablecer tu contrasena, ignora este correo.
+      </p>`;
 
-    const text = `${greeting},\n\nRecibimos una solicitud para restablecer tu contraseña Grúa RD.\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n${resetLink}\n\nEste enlace expirará en 1 hora.\n\nSi no solicitaste esto, ignora este correo.\n\n---\nGrúa RD\nDepartamento de Seguridad\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.seguridad),
+      generateFooterHTML('Correo automatico - No responder')
+    );
 
-    return this.sendEmail({
-      to: email,
-      subject: 'Restablecer tu contraseña de Grúa RD',
-      html,
-      text,
-    });
+    const text = `${greeting},\n\nRecibimos una solicitud para restablecer tu contrasena.\n\nEnlace: ${resetLink}\n\nEste enlace expira en 1 hora.\n\nSi no solicitaste esto, ignora este correo.\n\n---\nGrua RD | Departamento de Seguridad`;
+
+    const resend = await getResendClient(EMAIL_ADDRESSES.verification);
+    if (!resend) {
+      return this.sendEmail({
+        to: email,
+        subject: 'Restablecer tu contraseña de Grúa RD',
+        html,
+        text,
+      });
+    }
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `Grúa RD Seguridad <${resend.fromEmail}>`,
+        to: [email],
+        subject: 'Restablecer tu contraseña de Grúa RD',
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send password reset email:', error);
+        return false;
+      }
+
+      logger.info(`Password reset email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending password reset email:', error);
+      return false;
+    }
   }
 
   async sendDocumentApprovalEmail(email: string, documentType: string, approved: boolean, reason?: string): Promise<boolean> {
     const status = approved ? 'aprobado' : 'rechazado';
-    const statusColor = approved ? '#28a745' : '#dc3545';
+    const statusColor = approved ? '#28a745' : BRAND_COLORS.accent;
     
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0;">Actualización de Documento</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Tu documento <strong>${documentType}</strong> ha sido:</p>
-          
-          <div style="background: white; border-left: 4px solid ${statusColor}; padding: 15px 20px; margin: 20px 0;">
-            <span style="font-size: 18px; font-weight: bold; color: ${statusColor}; text-transform: uppercase;">${status}</span>
-          </div>
-          
-          ${reason ? `
-          <p style="font-size: 14px; color: #666;">
-            <strong>Motivo:</strong> ${reason}
-          </p>
-          ` : ''}
-          
-          ${!approved ? `
-          <p style="font-size: 14px; color: #666;">
-            Por favor, sube un nuevo documento que cumpla con los requisitos.
-          </p>
-          ` : ''}
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.verificaciones)}
-          
-          ${generateFooterHTML('Este es un correo automático de Grúa RD.')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Actualizacion de Documento
+      </h1>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.text}; margin: 0 0 20px 0;">
+        Tu documento <strong>${documentType}</strong> ha sido:
+      </p>
+      
+      <div style="text-align: center; margin: 25px 0;">
+        <span style="display: inline-block; background: ${BRAND_COLORS.light}; padding: 12px 30px; border-radius: 6px; font-size: 16px; font-weight: 600; color: ${statusColor}; text-transform: uppercase;">${status}</span>
+      </div>
+      
+      ${reason ? `
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 20px 0;">
+        <strong>Motivo:</strong> ${reason}
+      </p>
+      ` : ''}
+      
+      ${!approved ? `
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 20px 0;">
+        Por favor, sube un nuevo documento que cumpla con los requisitos.
+      </p>
+      ` : ''}`;
 
-    const text = `Tu documento ${documentType} ha sido ${status}.${reason ? `\n\nMotivo: ${reason}` : ''}${!approved ? '\n\nPor favor, sube un nuevo documento que cumpla con los requisitos.' : ''}\n\n---\nGrúa RD\nDepartamento de Verificaciones\nverification@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.verificaciones),
+      generateFooterHTML('Correo automatico - No responder')
+    );
 
-    return this.sendEmail({
-      to: email,
-      subject: `Grúa RD: Tu documento ha sido ${status}`,
-      html,
-      text,
-    });
+    const text = `Tu documento ${documentType} ha sido ${status}.${reason ? `\n\nMotivo: ${reason}` : ''}${!approved ? '\n\nPor favor, sube un nuevo documento.' : ''}\n\n---\nGrua RD | Departamento de Verificaciones`;
+
+    const resend = await getResendClient(EMAIL_ADDRESSES.verification);
+    if (!resend) {
+      return this.sendEmail({
+        to: email,
+        subject: `Grúa RD: Tu documento ha sido ${status}`,
+        html,
+        text,
+      });
+    }
+
+    try {
+      const { data, error } = await resend.client.emails.send({
+        from: `Grúa RD Verificaciones <${resend.fromEmail}>`,
+        to: [email],
+        subject: `Grúa RD: Tu documento ha sido ${status}`,
+        html,
+        text,
+      });
+
+      if (error) {
+        logger.error('Failed to send document approval email:', error);
+        return false;
+      }
+
+      logger.info(`Document approval email sent successfully: ${data?.id}`);
+      return true;
+    } catch (error) {
+      logger.error('Error sending document approval email:', error);
+      return false;
+    }
   }
 
   async sendTicketCreatedEmail(email: string, userName: string, ticket: TicketEmailData): Promise<boolean> {
@@ -656,49 +659,40 @@ class ResendEmailService implements EmailService {
       'otro': 'Otro'
     };
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD Soporte</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0;">Ticket Creado</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Hola ${userName},</p>
-          
-          <p style="font-size: 16px;">Tu ticket de soporte ha sido creado exitosamente.</p>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><strong>Numero de Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
-            <p style="margin: 5px 0;"><strong>Titulo:</strong> ${ticket.titulo}</p>
-            <p style="margin: 5px 0;"><strong>Categoria:</strong> ${categoriaTexto[ticket.categoria] || ticket.categoria}</p>
-            <p style="margin: 5px 0;"><strong>Prioridad:</strong> ${ticket.prioridad.charAt(0).toUpperCase() + ticket.prioridad.slice(1)}</p>
-            <p style="margin: 5px 0;"><strong>Estado:</strong> Abierto</p>
-          </div>
-          
-          <p style="font-size: 14px; color: #666;">
-            <strong>Tiempo estimado de respuesta:</strong> ${prioridadTexto[ticket.prioridad] || '24-48 horas'}
-          </p>
-          
-          <p style="font-size: 14px; color: #666;">
-            Te notificaremos por correo cuando haya actualizaciones en tu ticket.
-          </p>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.soporte)}
-          
-          ${generateFooterHTML('Grúa RD Soporte - Estamos para ayudarte')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Ticket Creado
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Hola ${userName},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        Tu ticket de soporte ha sido creado exitosamente.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Numero:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Titulo:</strong> ${ticket.titulo}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Categoria:</strong> ${categoriaTexto[ticket.categoria] || ticket.categoria}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Prioridad:</strong> ${ticket.prioridad.charAt(0).toUpperCase() + ticket.prioridad.slice(1)}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0;"><strong>Estado:</strong> Abierto</p>
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0 0 10px 0;">
+        <strong>Tiempo estimado:</strong> ${prioridadTexto[ticket.prioridad] || '24-48 horas'}
+      </p>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0;">
+        Te notificaremos cuando haya actualizaciones.
+      </p>`;
 
-    const text = `Hola ${userName},\n\nTu ticket de soporte ha sido creado.\n\nNumero: #${ticket.id.slice(-8).toUpperCase()}\nTitulo: ${ticket.titulo}\nCategoria: ${categoriaTexto[ticket.categoria] || ticket.categoria}\nPrioridad: ${ticket.prioridad}\n\nTiempo estimado de respuesta: ${prioridadTexto[ticket.prioridad] || '24-48 horas'}\n\n---\nGrúa RD\nDepartamento de Soporte\nsupport@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.soporte),
+      generateFooterHTML('Estamos para ayudarte')
+    );
+
+    const text = `Hola ${userName},\n\nTu ticket ha sido creado.\n\nNumero: #${ticket.id.slice(-8).toUpperCase()}\nTitulo: ${ticket.titulo}\nCategoria: ${categoriaTexto[ticket.categoria] || ticket.categoria}\nPrioridad: ${ticket.prioridad}\n\nTiempo estimado: ${prioridadTexto[ticket.prioridad] || '24-48 horas'}\n\n---\nGrua RD | Departamento de Soporte`;
 
     try {
       const { data, error } = await resend.client.emails.send({
@@ -733,46 +727,37 @@ class ResendEmailService implements EmailService {
       'abierto': { label: 'Abierto', mensaje: 'Tu ticket ha sido reabierto y sera atendido pronto.', color: '#17a2b8' },
       'en_proceso': { label: 'En Proceso', mensaje: 'Nuestro equipo esta trabajando en tu solicitud.', color: '#ffc107' },
       'resuelto': { label: 'Resuelto', mensaje: 'Tu ticket ha sido resuelto. Si necesitas mas ayuda, puedes responder a este ticket.', color: '#28a745' },
-      'cerrado': { label: 'Cerrado', mensaje: 'Tu ticket ha sido cerrado. Gracias por contactarnos.', color: '#6c757d' }
+      'cerrado': { label: 'Cerrado', mensaje: 'Tu ticket ha sido cerrado. Gracias por contactarnos.', color: BRAND_COLORS.muted }
     };
 
-    const estado = estadoTexto[newStatus] || { label: newStatus, mensaje: '', color: '#666' };
+    const estado = estadoTexto[newStatus] || { label: newStatus, mensaje: '', color: BRAND_COLORS.muted };
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD Soporte</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0;">Actualizacion de Ticket</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Hola ${userName},</p>
-          
-          <p style="font-size: 16px;">El estado de tu ticket ha sido actualizado.</p>
-          
-          <div style="background: white; border-left: 4px solid ${estado.color}; padding: 15px 20px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><strong>Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
-            <p style="margin: 5px 0;"><strong>Titulo:</strong> ${ticket.titulo}</p>
-            <p style="margin: 5px 0;"><strong>Nuevo Estado:</strong> <span style="color: ${estado.color}; font-weight: bold;">${estado.label}</span></p>
-          </div>
-          
-          <p style="font-size: 14px; color: #666;">${estado.mensaje}</p>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.soporte)}
-          
-          ${generateFooterHTML('Grúa RD Soporte - Estamos para ayudarte')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Actualizacion de Ticket
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Hola ${userName},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        El estado de tu ticket ha sido actualizado.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Titulo:</strong> ${ticket.titulo}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0;"><strong>Nuevo Estado:</strong> <span style="color: ${estado.color}; font-weight: 600;">${estado.label}</span></p>
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0;">${estado.mensaje}</p>`;
 
-    const text = `Hola ${userName},\n\nEl estado de tu ticket #${ticket.id.slice(-8).toUpperCase()} ha cambiado a: ${estado.label}\n\n${estado.mensaje}\n\n---\nGrúa RD\nDepartamento de Soporte\nsupport@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.soporte),
+      generateFooterHTML('Estamos para ayudarte')
+    );
+
+    const text = `Hola ${userName},\n\nEl estado de tu ticket #${ticket.id.slice(-8).toUpperCase()} ha cambiado a: ${estado.label}\n\n${estado.mensaje}\n\n---\nGrua RD | Departamento de Soporte`;
 
     try {
       const { data, error } = await resend.client.emails.send({
@@ -803,43 +788,35 @@ class ResendEmailService implements EmailService {
       return false;
     }
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">Grúa RD Soporte</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0;">Nueva Respuesta</p>
+    const content = `
+      <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Nueva Respuesta
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Hola ${userName},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        Nuestro equipo de soporte ha respondido a tu ticket.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 12px; color: ${BRAND_COLORS.muted}; margin: 0 0 12px 0;"><strong>Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()} - ${ticket.titulo}</p>
+        <div style="border-top: 1px solid ${BRAND_COLORS.border}; padding-top: 12px;">
+          <p style="margin: 0; font-size: 14px; color: ${BRAND_COLORS.text}; white-space: pre-wrap;">${mensaje}</p>
         </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Hola ${userName},</p>
-          
-          <p style="font-size: 16px;">Nuestro equipo de soporte ha respondido a tu ticket.</p>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 20px 0;">
-            <p style="margin: 0 0 10px 0; font-size: 12px; color: #666;"><strong>Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()} - ${ticket.titulo}</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 10px 0;">
-            <p style="margin: 0; font-size: 14px; white-space: pre-wrap;">${mensaje}</p>
-          </div>
-          
-          <p style="font-size: 14px; color: #666;">
-            Puedes responder a este ticket desde tu cuenta en Grúa RD.
-          </p>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.soporte)}
-          
-          ${generateFooterHTML('Grúa RD Soporte - Estamos para ayudarte')}
-        </div>
-      </body>
-      </html>
-    `;
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0;">
+        Puedes responder desde tu cuenta en Grua RD.
+      </p>`;
 
-    const text = `Hola ${userName},\n\nNuestro equipo de soporte ha respondido a tu ticket #${ticket.id.slice(-8).toUpperCase()}.\n\nMensaje:\n${mensaje}\n\nPuedes responder desde tu cuenta en Grúa RD.\n\n---\nGrúa RD\nDepartamento de Soporte\nsupport@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.soporte),
+      generateFooterHTML('Estamos para ayudarte')
+    );
+
+    const text = `Hola ${userName},\n\nNuestro equipo ha respondido a tu ticket #${ticket.id.slice(-8).toUpperCase()}.\n\nMensaje:\n${mensaje}\n\n---\nGrua RD | Departamento de Soporte`;
 
     try {
       const { data, error } = await resend.client.emails.send({
@@ -870,11 +847,11 @@ class ResendEmailService implements EmailService {
       return false;
     }
 
-    const prioridadColor = ticket.prioridad === 'urgente' ? '#dc3545' : '#fd7e14';
+    const prioridadColor = ticket.prioridad === 'urgente' ? BRAND_COLORS.accent : '#fd7e14';
     const prioridadLabel = ticket.prioridad === 'urgente' ? 'URGENTE' : 'ALTA';
 
     const categoriaTexto: Record<string, string> = {
-      'problema_tecnico': 'Problema Técnico',
+      'problema_tecnico': 'Problema Tecnico',
       'consulta_servicio': 'Consulta de Servicio',
       'queja': 'Queja',
       'sugerencia': 'Sugerencia',
@@ -882,53 +859,44 @@ class ResendEmailService implements EmailService {
       'otro': 'Otro'
     };
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: ${prioridadColor}; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 24px;">⚠️ TICKET ${prioridadLabel}</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0;">Requiere Atención Inmediata</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px; font-weight: bold;">Se ha creado un nuevo ticket de prioridad ${prioridadLabel.toLowerCase()}:</p>
-          
-          <div style="background: white; border-left: 4px solid ${prioridadColor}; padding: 20px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><strong>Número de Ticket:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
-            <p style="margin: 5px 0;"><strong>Título:</strong> ${ticket.titulo}</p>
-            <p style="margin: 5px 0;"><strong>Categoría:</strong> ${categoriaTexto[ticket.categoria] || ticket.categoria}</p>
-            <p style="margin: 5px 0;"><strong>Prioridad:</strong> <span style="color: ${prioridadColor}; font-weight: bold;">${prioridadLabel}</span></p>
-          </div>
-          
-          <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin: 20px 0;">
-            <p style="margin: 0 0 10px 0; font-weight: bold;">Información del Usuario:</p>
-            <p style="margin: 5px 0;"><strong>Nombre:</strong> ${userName}</p>
-            <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
-          </div>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 20px 0;">
-            <p style="margin: 0 0 10px 0; font-weight: bold;">Descripción:</p>
-            <p style="margin: 0; white-space: pre-wrap;">${ticket.descripcion}</p>
-          </div>
-          
-          <p style="font-size: 14px; color: #666; text-align: center; margin-top: 20px;">
-            Por favor, atienda este ticket lo antes posible.
-          </p>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.soporte)}
-          
-          ${generateFooterHTML('Sistema de Notificaciones - Grúa RD')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 25px 0; color: ${prioridadColor}; text-align: center;">
+        TICKET ${prioridadLabel}
+      </h1>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.text}; margin: 0 0 25px 0; text-align: center;">
+        Requiere atencion inmediata
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 20px 0;">
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Numero:</strong> #${ticket.id.slice(-8).toUpperCase()}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Titulo:</strong> ${ticket.titulo}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Categoria:</strong> ${categoriaTexto[ticket.categoria] || ticket.categoria}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0;"><strong>Prioridad:</strong> <span style="color: ${prioridadColor}; font-weight: 600;">${prioridadLabel}</span></p>
+      </div>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 20px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 10px 0;">Usuario:</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 4px 0;">${userName}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0;">${userEmail}</p>
+      </div>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 20px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 10px 0;">Descripcion:</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0; white-space: pre-wrap;">${ticket.descripcion}</p>
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.accent}; text-align: center; margin: 0;">
+        Por favor, atienda este ticket lo antes posible.
+      </p>`;
 
-    const text = `TICKET ${prioridadLabel} REQUIERE ATENCIÓN\n\nNúmero: #${ticket.id.slice(-8).toUpperCase()}\nTítulo: ${ticket.titulo}\nCategoría: ${categoriaTexto[ticket.categoria] || ticket.categoria}\nPrioridad: ${prioridadLabel}\n\nUsuario: ${userName} (${userEmail})\n\nDescripción:\n${ticket.descripcion}\n\n---\nGrúa RD - Sistema de Soporte\nsupport@gruard.com`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.soporte),
+      generateFooterHTML('Sistema de Notificaciones')
+    );
+
+    const text = `TICKET ${prioridadLabel} REQUIERE ATENCION\n\nNumero: #${ticket.id.slice(-8).toUpperCase()}\nTitulo: ${ticket.titulo}\nCategoria: ${categoriaTexto[ticket.categoria] || ticket.categoria}\nPrioridad: ${prioridadLabel}\n\nUsuario: ${userName} (${userEmail})\n\nDescripcion:\n${ticket.descripcion}\n\n---\nGrua RD | Sistema de Soporte`;
 
     try {
       const { data, error } = await resend.client.emails.send({
@@ -953,88 +921,65 @@ class ResendEmailService implements EmailService {
   }
 
   async sendSocioCreatedEmail(email: string, nombre: string, tempPassword: string, porcentaje: string): Promise<boolean> {
-    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    const resend = await getResendClient(EMAIL_ADDRESSES.socios);
     if (!resend) {
       logger.error('Resend not configured, cannot send socio created email');
       return false;
     }
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a Grúa RD</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Portal de Socios e Inversores</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Estimado/a ${nombre},</p>
-          
-          <p style="font-size: 16px;">
-            Es un placer darle la bienvenida como socio inversor de Grúa RD. Su cuenta ha sido creada exitosamente.
-          </p>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Credenciales de Acceso:</h3>
-            <p style="margin: 8px 0;"><strong>Email:</strong> ${email}</p>
-            <p style="margin: 8px 0;"><strong>Contrasena temporal:</strong> <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px;">${tempPassword}</code></p>
-          </div>
-          
-          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #856404; margin: 0 0 10px 0;">Importante:</h4>
-            <p style="margin: 0; font-size: 14px; color: #856404;">
-              Por seguridad, le recomendamos cambiar su contrasena en su primer inicio de sesion.
-            </p>
-          </div>
-          
-          <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #155724; margin: 0 0 10px 0;">Su Participacion:</h4>
-            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #155724;">
-              ${porcentaje}% de las utilidades de la empresa
-            </p>
-          </div>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">En su Dashboard podra:</h3>
-            <ul style="margin: 0; padding-left: 20px; color: #555;">
-              <li style="margin-bottom: 8px;">Ver el resumen de sus distribuciones</li>
-              <li style="margin-bottom: 8px;">Consultar el historial de pagos</li>
-              <li style="margin-bottom: 8px;">Revisar los ingresos del periodo actual</li>
-              <li style="margin-bottom: 8px;">Descargar reportes financieros</li>
-            </ul>
-          </div>
-          
-          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Calendario de Distribuciones:</h4>
-            <p style="margin: 0; font-size: 14px; color: #555;">
-              Las distribuciones se calculan mensualmente y se procesan dentro de los primeros 15 dias del mes siguiente.
-            </p>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="https://gruard.com" style="background: #1e3a5f; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Acceder al Portal</a>
-          </div>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.inversores)}
-          
-          ${generateFooterHTML('Grúa RD - Gracias por su confianza e inversión')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Bienvenido al Portal de Socios
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Estimado/a ${nombre},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        Es un placer darle la bienvenida como socio inversor de Grua RD. Su cuenta ha sido creada exitosamente.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 20px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 12px 0;">Credenciales de Acceso:</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Email:</strong> ${email}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0;"><strong>Contrasena temporal:</strong> <code style="background: white; padding: 4px 8px; border-radius: 4px;">${tempPassword}</code></p>
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.accent}; margin: 0 0 20px 0;">
+        <strong>Importante:</strong> Cambie su contrasena en su primer inicio de sesion.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 20px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 8px 0;">Su Participacion:</p>
+        <p style="font-size: 18px; font-weight: 600; color: #28a745; margin: 0;">${porcentaje}% de las utilidades</p>
+      </div>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 12px 0;">En su Dashboard podra:</p>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: ${BRAND_COLORS.muted};">
+          <li style="margin-bottom: 6px;">Ver el resumen de sus distribuciones</li>
+          <li style="margin-bottom: 6px;">Consultar el historial de pagos</li>
+          <li style="margin-bottom: 6px;">Revisar los ingresos del periodo actual</li>
+          <li style="margin-bottom: 0;">Descargar reportes financieros</li>
+        </ul>
+      </div>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="https://app.gruard.com" style="display: inline-block; background: ${BRAND_COLORS.primary}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Acceder al Portal</a>
+      </div>`;
 
-    const text = `Estimado/a ${nombre},\n\nBienvenido como socio inversor de Grúa RD.\n\nCredenciales de acceso:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nSu participacion: ${porcentaje}% de las utilidades\n\nImportante: Cambie su contrasena en el primer inicio de sesion.\n\n---\nGrúa RD\nDepartamento de Relaciones con Inversores\nsocios@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.inversores),
+      generateFooterHTML('Gracias por su confianza e inversion')
+    );
+
+    const text = `Estimado/a ${nombre},\n\nBienvenido como socio inversor de Grua RD.\n\nCredenciales:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nSu participacion: ${porcentaje}% de las utilidades\n\n---\nGrua RD | Relaciones con Inversores`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `Grúa RD <${resend.fromEmail}>`,
+        from: `Grua RD Inversores <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido al Portal de Socios Grúa RD - Credenciales de Acceso',
+        subject: 'Bienvenido al Portal de Socios Grua RD - Credenciales de Acceso',
         html,
         text,
       });
@@ -1053,71 +998,54 @@ class ResendEmailService implements EmailService {
   }
 
   async sendSocioFirstLoginEmail(email: string, nombre: string): Promise<boolean> {
-    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    const resend = await getResendClient(EMAIL_ADDRESSES.socios);
     if (!resend) {
       logger.error('Resend not configured, cannot send socio first login email');
       return false;
     }
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Grúa RD - Portal de Socios</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Primer Inicio de Sesion</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Estimado/a ${nombre},</p>
-          
-          <p style="font-size: 16px;">
-            Gracias por ser parte del equipo inversor de Grúa RD. Hemos registrado su primer inicio de sesion en el portal.
-          </p>
-          
-          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #856404; margin: 0 0 10px 0;">Recordatorio de Seguridad:</h4>
-            <p style="margin: 0; font-size: 14px; color: #856404;">
-              Si aun no ha cambiado su contrasena temporal, le recomendamos hacerlo desde la seccion "Mi Perfil" para mayor seguridad.
-            </p>
-          </div>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Guia rapida del Dashboard:</h3>
-            <ul style="margin: 0; padding-left: 20px; color: #555;">
-              <li style="margin-bottom: 10px;"><strong>Resumen:</strong> Vista general de sus distribuciones y participacion</li>
-              <li style="margin-bottom: 10px;"><strong>Distribuciones:</strong> Historial detallado de pagos recibidos</li>
-              <li style="margin-bottom: 10px;"><strong>Reportes:</strong> Descargue informes financieros en PDF</li>
-              <li style="margin-bottom: 10px;"><strong>Perfil:</strong> Actualice sus datos bancarios y contrasena</li>
-            </ul>
-          </div>
-          
-          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Proxima Distribucion:</h4>
-            <p style="margin: 0; font-size: 14px; color: #555;">
-              Las distribuciones se calculan mensualmente. Recibira una notificacion cuando su distribucion este lista.
-            </p>
-          </div>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.inversores)}
-          
-          ${generateFooterHTML('Grúa RD - Juntos construimos el futuro')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Primer Inicio de Sesion
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Estimado/a ${nombre},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        Gracias por ser parte del equipo inversor de Grua RD. Hemos registrado su primer inicio de sesion en el portal.
+      </p>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.accent}; margin: 0 0 25px 0;">
+        <strong>Recordatorio:</strong> Si aun no ha cambiado su contrasena temporal, le recomendamos hacerlo desde "Mi Perfil".
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 12px 0;">Guia del Dashboard:</p>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: ${BRAND_COLORS.muted};">
+          <li style="margin-bottom: 6px;"><strong>Resumen:</strong> Vista general de distribuciones</li>
+          <li style="margin-bottom: 6px;"><strong>Distribuciones:</strong> Historial de pagos</li>
+          <li style="margin-bottom: 6px;"><strong>Reportes:</strong> Informes financieros en PDF</li>
+          <li style="margin-bottom: 0;"><strong>Perfil:</strong> Datos bancarios y contrasena</li>
+        </ul>
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0;">
+        Las distribuciones se calculan mensualmente. Recibira una notificacion cuando su distribucion este lista.
+      </p>`;
 
-    const text = `Estimado/a ${nombre},\n\nGracias por ser parte del equipo inversor de Grúa RD. Hemos registrado su primer inicio de sesion.\n\nRecordatorio: Si no ha cambiado su contrasena temporal, le recomendamos hacerlo por seguridad.\n\nGuia del Dashboard:\n- Resumen: Vista general de distribuciones\n- Distribuciones: Historial de pagos\n- Reportes: Informes financieros\n- Perfil: Datos bancarios y contrasena\n\n---\nGrúa RD\nDepartamento de Relaciones con Inversores\nsocios@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.inversores),
+      generateFooterHTML('Juntos construimos el futuro')
+    );
+
+    const text = `Estimado/a ${nombre},\n\nGracias por ser parte del equipo inversor de Grua RD. Hemos registrado su primer inicio de sesion.\n\nRecordatorio: Si no ha cambiado su contrasena temporal, le recomendamos hacerlo.\n\n---\nGrua RD | Relaciones con Inversores`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `Grúa RD <${resend.fromEmail}>`,
+        from: `Grua RD Inversores <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido al Portal de Socios Grúa RD - Primer Inicio de Sesion',
+        subject: 'Bienvenido al Portal de Socios Grua RD - Primer Inicio de Sesion',
         html,
         text,
       });
@@ -1136,7 +1064,7 @@ class ResendEmailService implements EmailService {
   }
 
   async sendAdminCreatedEmail(email: string, nombre: string, tempPassword: string, permisos: string[]): Promise<boolean> {
-    const resend = await getResendClient(EMAIL_ADDRESSES.info);
+    const resend = await getResendClient(EMAIL_ADDRESSES.admin);
     if (!resend) {
       logger.error('Resend not configured, cannot send admin created email');
       return false;
@@ -1163,86 +1091,63 @@ class ResendEmailService implements EmailService {
     };
 
     const permisosFormatted = permisos.map(p => permisosLabels[p] || p).join(', ');
-    const permisosList = permisos.map(p => `<li style="margin-bottom: 6px;">${permisosLabels[p] || p}</li>`).join('');
+    const permisosList = permisos.map(p => `<li style="margin-bottom: 4px; font-size: 13px;">${permisosLabels[p] || p}</li>`).join('');
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      </head>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">Bienvenido a Grúa RD</h1>
-          <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Panel de Administracion</p>
-        </div>
-        
-        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
-          <p style="font-size: 16px;">Estimado/a ${nombre},</p>
-          
-          <p style="font-size: 16px;">
-            Se le ha asignado acceso al Panel de Administracion de Grúa RD. A continuacion encontrara sus credenciales de acceso.
-          </p>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Credenciales de Acceso:</h3>
-            <p style="margin: 8px 0;"><strong>Email:</strong> ${email}</p>
-            <p style="margin: 8px 0;"><strong>Contrasena temporal:</strong> <code style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px;">${tempPassword}</code></p>
-          </div>
-          
-          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #856404; margin: 0 0 10px 0;">Importante - Seguridad:</h4>
-            <p style="margin: 0; font-size: 14px; color: #856404;">
-              Por seguridad, le recomendamos cambiar su contrasena en su primer inicio de sesion. 
-              No comparta sus credenciales con nadie.
-            </p>
-          </div>
-          
-          <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #155724; margin: 0 0 10px 0;">Permisos Asignados:</h4>
-            <ul style="margin: 0; padding-left: 20px; color: #155724; font-size: 14px;">
-              ${permisosList}
-            </ul>
-          </div>
-          
-          <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="color: #1e3a5f; margin: 0 0 15px 0;">Lineamientos Internos:</h3>
-            <ul style="margin: 0; padding-left: 20px; color: #555;">
-              <li style="margin-bottom: 8px;">Maneje la informacion de usuarios con confidencialidad</li>
-              <li style="margin-bottom: 8px;">Documente cualquier accion administrativa relevante</li>
-              <li style="margin-bottom: 8px;">Reporte cualquier incidente de seguridad inmediatamente</li>
-              <li style="margin-bottom: 8px;">No realice cambios sin la debida autorizacion</li>
-              <li style="margin-bottom: 8px;">Cierre sesion cuando no este usando el sistema</li>
-            </ul>
-          </div>
-          
-          <div style="background: #e8f4fd; border-left: 4px solid #1e3a5f; padding: 15px 20px; margin: 20px 0;">
-            <h4 style="color: #1e3a5f; margin: 0 0 10px 0;">Soporte Interno:</h4>
-            <p style="margin: 0; font-size: 14px; color: #555;">
-              Si tiene alguna pregunta o necesita asistencia, contacte al administrador principal.
-            </p>
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="https://gruard.com/admin" style="background: #1e3a5f; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">Acceder al Panel</a>
-          </div>
-          
-          ${generateSignatureHTML(SIGNATURE_CONFIG.administracion)}
-          
-          ${generateFooterHTML('Grúa RD - Panel de Administración')}
-        </div>
-      </body>
-      </html>
-    `;
+    const content = `
+      <h1 style="font-size: 22px; font-weight: 600; margin: 0 0 25px 0; color: ${BRAND_COLORS.primary}; text-align: center;">
+        Panel de Administracion
+      </h1>
+      
+      <p style="font-size: 15px; margin: 0 0 20px 0;">Estimado/a ${nombre},</p>
+      
+      <p style="font-size: 14px; color: ${BRAND_COLORS.muted}; margin: 0 0 25px 0;">
+        Se le ha asignado acceso al Panel de Administracion de Grua RD.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 20px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 12px 0;">Credenciales de Acceso:</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0 0 8px 0;"><strong>Email:</strong> ${email}</p>
+        <p style="font-size: 13px; color: ${BRAND_COLORS.text}; margin: 0;"><strong>Contrasena temporal:</strong> <code style="background: white; padding: 4px 8px; border-radius: 4px;">${tempPassword}</code></p>
+      </div>
+      
+      <p style="font-size: 13px; color: ${BRAND_COLORS.accent}; margin: 0 0 20px 0;">
+        <strong>Importante:</strong> Cambie su contrasena en el primer inicio de sesion. No comparta sus credenciales.
+      </p>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 20px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 10px 0;">Permisos Asignados:</p>
+        <ul style="margin: 0; padding-left: 18px; color: ${BRAND_COLORS.text};">
+          ${permisosList}
+        </ul>
+      </div>
+      
+      <div style="background: ${BRAND_COLORS.light}; padding: 20px; border-radius: 8px; margin: 0 0 25px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: ${BRAND_COLORS.primary}; margin: 0 0 10px 0;">Lineamientos:</p>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: ${BRAND_COLORS.muted};">
+          <li style="margin-bottom: 4px;">Maneje la informacion con confidencialidad</li>
+          <li style="margin-bottom: 4px;">Documente acciones administrativas relevantes</li>
+          <li style="margin-bottom: 4px;">Reporte incidentes de seguridad</li>
+          <li style="margin-bottom: 0;">Cierre sesion cuando no use el sistema</li>
+        </ul>
+      </div>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="https://app.gruard.com/admin" style="display: inline-block; background: ${BRAND_COLORS.primary}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Acceder al Panel</a>
+      </div>`;
 
-    const text = `Estimado/a ${nombre},\n\nSe le ha asignado acceso al Panel de Administracion de Grúa RD.\n\nCredenciales de acceso:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nPermisos asignados: ${permisosFormatted}\n\nImportante: Cambie su contrasena en el primer inicio de sesion y no comparta sus credenciales.\n\nLineamientos:\n- Maneje la informacion con confidencialidad\n- Documente acciones administrativas\n- Reporte incidentes de seguridad\n- Cierre sesion cuando no use el sistema\n\n---\nGrúa RD\nDepartamento de Administración\nadmin@gruard.com\nMoca, Espaillat, República Dominicana\n\ncon la tecnología de Four One Solutions`;
+    const html = generateEmailWrapper(
+      content,
+      generateSignatureHTML(SIGNATURE_CONFIG.administracion),
+      generateFooterHTML('Panel de Administracion')
+    );
+
+    const text = `Estimado/a ${nombre},\n\nSe le ha asignado acceso al Panel de Administracion de Grua RD.\n\nCredenciales:\nEmail: ${email}\nContrasena temporal: ${tempPassword}\n\nPermisos: ${permisosFormatted}\n\n---\nGrua RD | Administracion`;
 
     try {
       const { data, error } = await resend.client.emails.send({
-        from: `Grúa RD <${resend.fromEmail}>`,
+        from: `Grua RD <${resend.fromEmail}>`,
         to: [email],
-        subject: 'Bienvenido al Panel de Administracion Grúa RD - Credenciales de Acceso',
+        subject: 'Bienvenido al Panel de Administracion Grua RD - Credenciales de Acceso',
         html,
         text,
       });

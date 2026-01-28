@@ -1,7 +1,7 @@
 # Grúa RD - Plataforma de Servicios de Grúa
 
 ## Overview
-Grúa RD is a Progressive Web App (PWA) designed for the Dominican Republic, connecting users with tow truck services and drivers in real-time. It aims to streamline service requests, enable real-time tracking, and efficiently manage operations. The platform provides distinct interfaces for Clients, Drivers, Administrators, and an enterprise portal for B2B clients, with the vision of revolutionizing the local tow truck service industry by offering advanced features and a robust user experience.
+Grúa RD is a Progressive Web App (PWA) designed for the Dominican Republic to connect users with tow truck services and drivers in real-time. It aims to streamline service requests, enable real-time tracking, and efficiently manage operations. The platform offers distinct interfaces for Clients, Drivers, Administrators, and an enterprise portal for B2B clients, with the vision of revolutionizing the local tow truck service industry.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -24,137 +24,122 @@ The system features a mobile-first, responsive PWA built with `shadcn/ui` and Ta
 ### Technical Implementations
 Grúa RD uses a React 18 (TypeScript, Vite) frontend, an Express.js (Node.js) backend, and PostgreSQL (Neon) with Drizzle ORM. Authentication is handled by Passport.js (local strategy, bcrypt). Real-time features are powered by WebSockets (`ws` library). Mapbox GL JS with react-map-gl is used for mapping, routing, and geocoding. State management is handled by TanStack Query (React Query v5). The project maintains a modular structure and integrates Capacitor for native mobile functionality.
 
+### Servicio al Cliente y Contacto
+- **Dirección Física:** CARRT. JUAN BOSCH C/ PRINCIPAL #106, CANCA LA REYNA, ESPAILLAT, República Dominicana.
+- **Contactos:**
+  - General: info@gruard.com
+  - Soporte: support@gruard.com
+  - Pagos: payments@gruard.com
+  - Celular: 8293519324
+
 ### Feature Specifications
 **Core Features:**
-- **Authentication & Security**: Role-based access with Passport.js, dual-account system.
-- **Client Features**: Map-based service requests, real-time tracking, service history, price calculation, insurance document management, draggable pins for origin/destination.
-- **Driver Features**: Request dashboard, accept/reject services, real-time GPS, availability toggle, specialized truck management, Operator Wallet System, multi-vehicle support, extended destination option.
-- **Admin Features**: Dashboard with analytics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration, document validation, support ticket system.
+- **Authentication & Security**: Role-based access, dual-account system.
+- **Client Features**: Map-based service requests, real-time tracking, service history, price calculation, insurance document management, draggable pins.
+- **Driver Features**: Request dashboard, accept/reject services, real-time GPS, availability toggle, specialized truck management, Operator Wallet System, multi-vehicle support, extended destination.
+- **Admin Features**: Dashboard with analytics, user/driver/enterprise management, real-time service monitoring, dynamic tariff configuration, document validation, support ticket system with Jira integration.
 - **Enterprise Portal (B2B)**: Business management, contract/tariff configuration, project tracking, scheduled services, invoicing.
-- **Real-time Communication**: WebSockets for location updates, chat, automatic service cancellation.
-- **Push Notifications**: Web Push API and Capacitor.
-- **PWA & Native Capabilities**: Installable PWA with Capacitor integration.
-- **Payment Integration**: Azul API for card payments, cash, automatic 80/20 commission splitting, operator wallet with scheduled payouts and same-day withdrawals, PDF receipts.
+- **Real-time Communication**: WebSockets for location updates, chat, automatic service cancellation, negotiation chat.
+- **Service Cancellation Plan (In Progress)**: 
+    - **Proportional Penalties**: Charges based on a percentage of the total service cost, not fixed amounts.
+    - **Distance-Based Calculation**: Penalties adjusted according to distance traveled by the driver (e.g., higher if >10km).
+    - **Time & Delay Justification**: Customers can cancel without penalty if the operator exceeds the Estimated Time of Arrival (ETA) by a defined margin (taking traffic into account).
+    - **Driver Compensation**: Ensures drivers are compensated for expenses incurred before cancellation.
+    - **No Rating Penalty for Customers**: Rating remains unaffected by cancellations.
+    - **Status Tracking**: Justifications for penalties/exonerations stored for transparency.
+    - **Data Implementation**: Schema updated to track `tiempo_espera_real`, `eta_original`, `distancia_recorrida_operador`, and `monto_total_servicio`.
+- **Communications Panel**: Dashboard for email communications with statistics (total, successful, failed emails), email history table with filtering, and test template functionality.
+- **Notifications**: Web Push API, Capacitor push notifications, email (Resend).
+- **Payment Integration**: Azul API for card payments, cash, automatic commission splitting, operator wallet with scheduled payouts and same-day withdrawals, PDF receipts.
 - **Robust UX**: Skeleton loaders, empty states, dialogs, toast notifications, form validations, responsive design.
-- **Monitoring & Logging**: Structured logging with Winston.
-- **Identity & Compliance**: Multi-step onboarding, Dominican ID (cédula) validation (Verifik OCR API), phone OTP/SMS verification, admin verification panel.
+- **Monitoring & Logging**: Structured logging with Winston and intelligent system error tracking, auto-ticketing, priority assignment, and noise filtering.
+- **Identity & Compliance**: Multi-step onboarding, Dominican ID (cédula) validation (Verifik OCR API), phone OTP/SMS verification (Twilio), admin verification panel, license category persistence.
 - **Document Management**: Upload system with Replit Object Storage, admin review.
 - **Insurance Integration**: Adapter pattern for multiple insurance company APIs.
 - **Intermediate Service States**: Granular service states for tracking.
-- **Support Ticket System**: Comprehensive management.
-- **Negotiation Chat System**: Dual chat for standard and extraction services with price proposals.
+- **Operator Bank Account Management**: Drivers can add/edit bank account info, visible to admins for payout processing.
 
 ### System Design Choices
-The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage uses Replit Object Storage or filesystem storage based on environment. Azul API payment integration uses server-side processing with webhook verification. Insurance API integrations use an Adapter pattern. Performance optimizations include smart location tracking, lazy loading of map components, consolidated API endpoints, self-hosted fonts, enhanced service worker, role-based preloading, React Query optimizations, and dynamic preconnect by role, with significant TTFB reductions. Session management uses a PostgreSQL session store with `connect-pg-simple`. Cedula validation allows the same cedula across multiple account types belonging to the same person.
+The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes service-specific rooms. Security includes bcrypt, HTTP-only session cookies, role-based access control, and Drizzle ORM's SQL injection protection. Document storage uses Replit Object Storage or filesystem storage. Azul API payment integration uses server-side processing with webhook verification. Insurance API integrations use an Adapter pattern. Performance optimizations include smart location tracking, lazy loading, consolidated API endpoints, self-hosted fonts, enhanced service worker, role-based preloading, React Query optimizations, and dynamic preconnect by role, with significant TTFB reductions. Session management uses a PostgreSQL session store with `connect-pg-simple`. Cedula validation allows the same cedula across multiple account types belonging to the same person.
 
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
 - **Mapbox**: Maps (Mapbox GL JS via react-map-gl), Directions API, Geocoding API.
 - **Waze**: Deep links for driver navigation.
-- **Azul API**: Payment gateway for Dominican Republic.
+- **Azul API**: Payment gateway for Dominican Republic (mTLS with digital certificates).
+  - **Estado**: 3D Secure 2.0 integrado y probado en sandbox.
+  - **Certificado**: app.gruard.com.bundle.crt (incluye CA de Azul)
+  - **Merchant ID**: 39038540035
+  - **Auth Headers**: splitit (para transacciones estandar) / 3dsecure (para 3DS 2.0)
+  - **Ruta en servidor**: /opt/certificados/gruard/ (CapRover) -> /etc/azul/certs/ (container)
+  - **3DS 2.0 Endpoints**:
+    - `POST /api/azul/3ds/initiate` - Iniciar pago con autenticacion 3DS
+    - `POST /api/azul/3ds/method-notification` - Callback del 3DS Method
+    - `POST /api/azul/3ds/callback` - Callback del desafio 3DS
+    - `GET /api/azul/3ds/status/:sessionId` - Consultar estado de sesion 3DS
+  - **Flujos 3DS soportados**:
+    - Frictionless (sin friccion): Aprobacion automatica sin intervencion del usuario
+    - 3DS Method: Recoleccion de datos del navegador antes del desafio
+    - Challenge (desafio): Redireccion a la pagina del emisor para autenticacion
+  - **OrderNumber**: Maximo 15 digitos numericos (timestamp + sufijo aleatorio)
+  - **NOTA PRODUCCION**: Las sesiones 3DS se almacenan en memoria. Para produccion, migrar a Redis o PostgreSQL para persistencia entre reinicios y soporte multi-instancia.
 - **Web Push API**: For push notifications.
-- **Replit Object Storage**: For document storage (default in Replit).
-- **Twilio**: SMS service for OTP delivery (via Replit Connector).
-- **Resend**: Email service for transactional emails and notifications (via Replit Connector).
+- **Replit Object Storage**: For document storage.
+- **Twilio**: SMS service for OTP delivery.
+- **Resend**: Email service for transactional emails and notifications.
 - **Verifik**: OCR scanning and Dominican government database verification for cédula validation.
 - **Capacitor**: For native mobile app functionalities and plugins.
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
-- **Jira REST API**: For ticket synchronization with Jira Cloud (requires manual configuration of secrets).
+- **Jira REST API**: For ticket synchronization with Jira Cloud.
 
-## Recent Changes
+## Mobile Build Configuration
 
-### December 16, 2025 - Jira REST API Integration
-- **Feature**: Full integration with Jira REST API for synchronizing support tickets.
-- **Configuration Required**: The following environment variables must be set as secrets:
-  - `JIRA_BASE_URL`: Your Jira Cloud instance URL (e.g., `https://your-domain.atlassian.net`)
-  - `JIRA_EMAIL`: The email associated with your Atlassian account
-  - `JIRA_API_TOKEN`: API token generated from https://id.atlassian.com/manage-profile/security/api-tokens
-  - `JIRA_PROJECT_KEY`: The project key where tickets will be created (e.g., `GRUA` or `SUPPORT`)
-- **API Endpoints**:
-  - `GET /api/admin/jira/status` - Check Jira connection status
-  - `POST /api/admin/tickets/:id/sync-jira` - Create Jira issue from local ticket
-  - `POST /api/admin/tickets/:id/sync-jira-status` - Pull status from Jira to local
-  - `POST /api/admin/tickets/:id/push-jira-status` - Push local status to Jira
-  - `POST /api/admin/tickets/:id/jira-comment` - Add comment to Jira issue
-  - `POST /api/admin/jira/bulk-sync` - Bulk sync multiple tickets to Jira
-- **Features**:
-  - Bidirectional status synchronization
-  - Priority mapping (baja→Low, media→Medium, alta→High, urgente→Highest)
-  - Category labels for issue classification
-  - Comment syncing with author attribution
-  - Bulk operations support
-- **Database Changes**: 
-  - New columns on `tickets` table: `jira_issue_id`, `jira_issue_key`, `jira_synced_at`
-- **Files Added/Modified**:
-  - `server/services/jira-service.ts` - Jira REST API service
-  - `server/routes.ts` - Jira integration API routes
-  - `shared/schema.ts` - Schema updates for Jira fields
-  - `migrations/0014_jira_integration.sql` - Database migration
+### Capacitor Setup
+- **App ID**: `com.fouronesolutions.gruard`
+- **App Name**: Grúa RD
+- **Web Directory**: `dist/public`
+- **Installed Plugins**: @capacitor/app, @capacitor/camera, @capacitor/filesystem, @capacitor/geolocation, @capacitor/network, @capacitor/push-notifications
 
-### December 16, 2025 - Intelligent Error Tracking and Priority Assignment
-- **Feature**: Enhanced error tracking with intelligent priority calculation and noise filtering.
-- **Priority Calculator** (`server/services/priority-calculator.ts`):
-  - Weighted scoring system (0-100 scale) considers:
-    - Module criticality (payment=100, database=90, auth=85, etc.)
-    - Error severity and type multipliers
-    - Frequency analysis (more occurrences = higher priority)
-    - Cascade indicators (stack trace depth, related errors)
-    - Critical metadata patterns (userId, serviceId, paymentId)
-  - Returns `calculatedPriority` (urgente/alta/media/baja) with reasoning
-- **Noise Filter** (`server/services/noise-filter.ts`):
-  - Detects transient errors (ECONNRESET, ETIMEDOUT, rate limits)
-  - Ignores non-critical patterns (favicon, healthcheck, bots)
-  - Groups related errors by `groupKey`
-  - Timed suppression windows prevent ticket spam
-- **Database Changes** (migration 0015):
-  - `calculatedPriority`: AI-assigned priority level
-  - `priorityScore`: Numeric score (0-100)
-  - `groupKey`: Error grouping identifier
-  - `isTransient`: Flag for transient/ignorable errors
-- **Integration**: Auto-created tickets now sync to Jira automatically with priority reasoning in description
+### Android Configuration
+- **Min SDK**: 23 (Android 6.0)
+- **Target SDK**: 35
+- **Java Version**: 17
+- **Signing**: Environment variables required for release builds:
+  - `ANDROID_KEYSTORE_PATH`
+  - `ANDROID_KEYSTORE_PASSWORD`
+  - `ANDROID_KEY_ALIAS`
+  - `ANDROID_KEY_PASSWORD`
+- **Permissions**: Internet, Network State, Location (Fine/Coarse), Camera, Storage, Push Notifications, Vibrate
 
-### December 16, 2025 - System Error Tracking and Auto-Ticketing
-- **Feature**: Comprehensive error handling system with automatic ticket creation and classification.
-- **Error Classification**: 
-  - User errors (ValidationError, AuthenticationError, NotFoundError, etc.) - No tickets created
-  - System errors (DatabaseError, ExternalApiError, PaymentError, etc.) - Automatic ticket creation
-- **Deduplication**: SHA256 fingerprinting with 1-hour window prevents duplicate tickets for same error
-- **Severity Escalation**: Uses `Math.max()` to ensure severity never downgrades (critical stays critical)
-- **Email Notifications**: High and critical errors send email notifications to admin@fourone.com.do via Resend
-- **Admin Routes**: 
-  - `POST /api/admin/tickets/manual` - Create tickets manually
-  - `GET /api/admin/system-errors` - List all system errors
-  - `GET /api/admin/system-errors/unresolved` - List unresolved errors
-  - `GET/PUT /api/admin/system-errors/:id` - View/update specific error
-- **Database Tables**: 
-  - `systemErrors` table with fingerprint, severity, source, type, occurrenceCount, status
-  - Enums: error_severity (low/medium/high/critical), error_source, error_type
-  - New columns on tickets: autoCreated, errorFingerprint, sourceComponent
-- **Files Added/Modified**:
-  - `server/errors/app-errors.ts` - Error classification hierarchy
-  - `server/services/system-error-service.ts` - Deduplication and ticket creation logic
-  - `server/middleware/error-handler.ts` - Express error handling middleware
-  - `shared/schema.ts` - Database schema for system errors
-  - `server/storage.ts` - Storage methods for system errors
-  - `server/routes.ts` - Admin API routes
-  - `server/index.ts` - Middleware integration
+### iOS Configuration
+- **Deployment Target**: iOS 14.0
+- **Bundle ID**: `com.fouronesolutions.gruard`
+- **Entitlements**: Push Notifications (development)
+- **Permissions**: Camera, Photo Library, Location (When In Use, Always)
 
-### December 12, 2025 - Operator Bank Account Management
-- **Feature**: Added bank account management for operators.
-- **Driver Profile**: Operators can now add/edit their bank account information (bank name, account type, account number, account holder name, cédula) in their profile page via a new BankAccountModal component.
-- **Admin Panel**: The admin wallets page now displays operator bank account information in the statement tab, allowing admins to see bank details when processing payouts.
-- **Security**: Account numbers are masked in the UI (only last 4 digits shown) for both operator and admin views.
-- **Files Changed**: 
-  - `client/src/pages/driver/profile.tsx` - Added bank account card and modal integration
-  - `client/src/pages/admin/wallets.tsx` - Added bank account display in statement tab
-  - `shared/schema.ts` - Updated OperatorStatementSummary type to include bankAccount
-  - `server/storage.ts` - Updated getOperatorStatement to fetch and return bank account data
-- **Database**: Uses `operatorBankAccounts` table with fields: banco, tipoCuenta, numeroCuenta, nombreTitular, cedula, estado
+### Build Commands
+```bash
+# Build web assets
+npm run build
 
-### December 11, 2025 - License Category Storage Fix
-- **Issue**: License category was not being saved after OCR scan of the back of the driver's license. This caused drivers to remain with pending validation and unable to activate services.
-- **Root Cause**: The `/api/identity/scan-license-back` endpoint was only performing OCR scan and returning results, but not persisting the extracted category to the database.
-- **Fix**: Modified the endpoint to save `licenciaCategoria`, `licenciaCategoriaVerificada`, `licenciaRestricciones`, and `licenciaFechaVencimiento` to the `conductores` table after a successful scan.
-- **Files Changed**: `server/routes.ts` (lines 2278-2316)
-- **Note**: Drivers who previously scanned their license back will need to re-scan after deploying this fix to have their category saved.
+# Sync Capacitor (after any web changes)
+npx cap sync
+
+# Build debug APK (requires Android SDK)
+./scripts/build-android.sh debug
+
+# Build release APK (requires signing config)
+./scripts/build-android.sh release
+
+# Build iOS (requires Xcode on macOS)
+./scripts/build-ios.sh debug
+./scripts/build-ios.sh release
+```
+
+### GitHub Actions Workflows
+- `.github/workflows/build-android.yml` - Builds APK on PRs, release APK/AAB on tags
+- `.github/workflows/build-ios.yml` - Builds for simulator on PRs, IPA on tags
+
+### Known Issues
+- **Capacitor CLI 7.x Template Bug**: The template.js file in `@capacitor/cli` needs patching. The patch is included in GitHub Actions workflows and should be applied after npm install in CI environments.

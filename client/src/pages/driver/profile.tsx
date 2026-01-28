@@ -22,6 +22,7 @@ import { ServiceCategoryMultiSelect, SERVICE_CATEGORIES, type ServiceSelection }
 import { VehicleCategoryForm, type VehicleData } from '@/components/VehicleCategoryForm';
 import { WalletSection, BankAccountModal } from '@/components/wallet';
 import { PrivacySection } from '@/components/PrivacySection';
+import { CancellationHistory } from '@/components/cancellation/CancellationHistory';
 import { Building2 } from 'lucide-react';
 import type { Conductor, Documento, ConductorVehiculo } from '@shared/schema';
 
@@ -131,6 +132,11 @@ export default function DriverProfile() {
   const { data: driverVehicles, isLoading: isLoadingVehicles } = useQuery<ConductorVehiculo[]>({
     queryKey: ['/api/drivers/me/vehiculos'],
     enabled: !!driverData,
+  });
+
+  const { data: linkedAccounts } = useQuery<{ hasClienteAccount: boolean; hasConductorAccount: boolean }>({
+    queryKey: ['/api/auth/linked-accounts'],
+    enabled: !!user,
   });
 
   useEffect(() => {
@@ -488,6 +494,15 @@ export default function DriverProfile() {
             Editar
           </Button>
         </div>
+
+        {user.bloqueadoHasta && new Date(user.bloqueadoHasta) > new Date() && (
+          <Alert variant="destructive" data-testid="alert-driver-blocked">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Cuenta bloqueada:</strong> Estás bloqueado hasta {new Date(user.bloqueadoHasta).toLocaleString()} por cancelaciones previas. No puedes aceptar nuevos servicios.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <DocumentExpirationAlerts onNavigateToDocuments={scrollToDocuments} />
 
@@ -1194,29 +1209,31 @@ export default function DriverProfile() {
 
           <ThemeSettingsCard />
 
-          <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-client">
-            <div className="p-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <User className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold mb-1">¿Necesitas solicitar una grúa?</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Crea una cuenta de cliente adicional para poder solicitar servicios de grúa cuando lo necesites.
-                  </p>
-                  <Button 
-                    onClick={() => setLocation('/onboarding?tipo=cliente')}
-                    className="w-full"
-                    data-testid="button-become-client"
-                  >
-                    <User className="w-4 h-4 mr-2" />
-                    Crear cuenta de Cliente
-                  </Button>
+          {!linkedAccounts?.hasClienteAccount && (
+            <Card className="overflow-hidden border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10" data-testid="card-become-client">
+              <div className="p-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <User className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold mb-1">¿Necesitas solicitar una grúa?</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Crea una cuenta de cliente adicional para poder solicitar servicios de grúa cuando lo necesites.
+                    </p>
+                    <Button 
+                      onClick={() => setLocation('/onboarding?tipo=cliente')}
+                      className="w-full"
+                      data-testid="button-become-client"
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Crear cuenta de Cliente
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          )}
 
           <Card className="overflow-hidden">
             <div className="p-4 border-b border-border">
@@ -1238,6 +1255,17 @@ export default function DriverProfile() {
           </Card>
 
           <PrivacySection userType="conductor" />
+
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Historial de Cancelaciones
+              </h3>
+            </div>
+            <div className="p-4">
+              <CancellationHistory userId={user.id} userType="conductor" />
+            </div>
+          </Card>
 
           <Button
             variant="destructive"

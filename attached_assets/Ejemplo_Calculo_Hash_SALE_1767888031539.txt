@@ -1,0 +1,77 @@
+<html lang="en">
+
+<head></head>
+
+<body>
+
+<form action="https://pruebas.azul.com.do/PaymentPage/" method="post" id="paymentForm" name="paymentForm">
+
+<input type="hidden" id="MerchantId" name="MerchantId" value="39038540035" >
+
+<input type="hidden" id="TrxType" name="TrxType" value="Sale" >
+
+<input type="hidden" id="MerchantName" name="MerchantName" value="Prueba AZUL" >
+
+<input type="hidden" id="MerchantType" name="MerchantType" value="ECommerce" >
+
+<input type="hidden" id="CurrencyCode" name="CurrencyCode" value="$" >
+
+<input type="hidden" id="OrderNumber" name="OrderNumber" value="001" >
+
+<input type="hidden" id="Amount" name="Amount" value="10000" >
+
+<input type="hidden" id="ITBIS" name="ITBIS" value="000" >
+
+<input type="hidden" id="ApprovedUrl" name="ApprovedUrl" value="https://google.com">
+
+<input type="hidden" id="DeclinedUrl" name="DeclinedUrl" value="https://google.com">
+
+<input type="hidden" id="CancelUrl" name="CancelUrl" value="https://google.com" >
+
+<input type="hidden" id="UseCustomField1" name="UseCustomField1" value="0" >
+
+<input type="hidden" id="CustomField1Label" name="CustomField1Label" value="" >
+
+<input type="hidden" id="CustomField1Value" name="CustomField1Value" value="" >
+
+<input type="hidden" id="UseCustomField2" name="UseCustomField2" value="0" >
+
+<input type="hidden" id="CustomField2Label" name="CustomField2Label" value="" >
+
+<input type="hidden" id="CustomField2Value" name="CustomField2Value" value="" >
+
+<input type="hidden" id="AuthHash" name="AuthHash" value = "6662f1e52260cf845a848845e6769ece7ef173c2809ea215f1fc8907442a21f395bdfbb8422eb4d6ce8673eb6961beb730d97842e8030668516beba717ffff5b">
+
+<input type="submit" name="submit" value="Continuar" style="font-size : 20px;">
+
+</form>
+
+<?php
+function  calculateAuthHash() {
+$hash =  "39038540035"
+."Prueba AZUL"
+."ECommerce"
+."$"
+."001"
+."10000"
+."000"
+."https://google.com"
+."https://google.com"
+."https://google.com"
+."0"
+.""
+.""
+."0"
+.""
+.""
+."asdhakjshdkjasdasmndajksdkjaskldga8odya9d8yoasyd98asdyaisdhoaisyd0a8sydoashd8oasydoiahdpiashd09ayusidhaos8dy0a8dya08syd0a8ssdsax";
+return hash_hmac('sha512',$hash,
+'asdhakjshdkjasdasmndajksdkjaskldga8odya9d8yoasyd98asdyaisdhoaisyd0a8sydoashd8oasydoiahdpiashd09ayusidhaos8dy0a8dya08syd0a8ssdsax');
+}
+
+echo calculateAuthHash()
+
+?>
+</body>
+
+</html>

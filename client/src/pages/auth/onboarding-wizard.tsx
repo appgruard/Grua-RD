@@ -97,6 +97,10 @@ export default function OnboardingWizard() {
   const [tempNombre, setTempNombre] = useState('');
   const [tempApellido, setTempApellido] = useState('');
   
+  // Email editing state (to correct email before OTP verification)
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [tempEmail, setTempEmail] = useState('');
+  
   // Track userType changes to distinguish user-initiated vs hydration changes
   const userTypeChangeCountRef = useRef(0);
   const lastSyncedUserTypeRef = useRef<string | null>(null);
@@ -611,6 +615,50 @@ export default function OnboardingWizard() {
     setIsEditingName(false);
     setTempNombre('');
     setTempApellido('');
+    setErrors({});
+  };
+
+  // Email editing mutation
+  const updateEmailMutation = useMutation({
+    mutationFn: async () => {
+      if (!tempEmail.trim()) {
+        throw new Error('El correo electrónico es requerido');
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(tempEmail.trim())) {
+        throw new Error('Ingresa un correo electrónico válido');
+      }
+      const res = await apiRequest('PATCH', '/api/users/me', {
+        email: tempEmail.trim().toLowerCase()
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Error al actualizar el correo');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      updateField('email', tempEmail.trim().toLowerCase());
+      setIsEditingEmail(false);
+      setOtpTimer(0); // Reset OTP timer so they can send a new code
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      toast({ title: 'Correo actualizado', description: 'Tu correo ha sido corregido. Ahora puedes enviar el código de verificación.' });
+    },
+    onError: (error: any) => {
+      setErrors({ email: error?.message });
+      toast({ title: 'Error', description: error?.message, variant: 'destructive' });
+    },
+  });
+
+  const startEditingEmail = () => {
+    setTempEmail(formData.email);
+    setIsEditingEmail(true);
+    setErrors({});
+  };
+
+  const cancelEditingEmail = () => {
+    setIsEditingEmail(false);
+    setTempEmail('');
     setErrors({});
   };
 
@@ -1168,55 +1216,130 @@ export default function OnboardingWizard() {
 
   const renderStep3 = () => (
     <div className="space-y-4">
-      {errors.otpCode && (
+      {(errors.otpCode || errors.email) && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{errors.otpCode}</AlertDescription>
+          <AlertDescription>{errors.otpCode || errors.email}</AlertDescription>
         </Alert>
       )}
 
       <div className="text-center mb-4">
         <Mail className="w-12 h-12 mx-auto text-primary mb-2" />
         <p className="text-sm text-muted-foreground">Verifica tu correo electrónico</p>
-        <p className="text-xs text-muted-foreground mt-1">{formData.email}</p>
+        
+        {isEditingEmail ? (
+          <div className="mt-3 space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="editEmail">Nuevo correo electrónico</Label>
+              <Input 
+                id="editEmail" 
+                type="email" 
+                placeholder="correo@ejemplo.com" 
+                value={tempEmail} 
+                onChange={(e) => setTempEmail(e.target.value)} 
+                disabled={updateEmailMutation.isPending}
+                className="text-center"
+                data-testid="input-edit-email" 
+              />
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={cancelEditingEmail} 
+                disabled={updateEmailMutation.isPending}
+                data-testid="button-cancel-edit-email"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => updateEmailMutation.mutate()} 
+                disabled={updateEmailMutation.isPending || !tempEmail.trim()}
+                data-testid="button-save-email"
+              >
+                {updateEmailMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
+                ) : (
+                  'Guardar'
+                )}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-1">
+            <p className="text-xs text-muted-foreground">{formData.email}</p>
+            {otpTimer === 0 && !(userData?.emailVerificado) && (
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="mt-1 h-auto p-0 text-xs"
+                onClick={startEditingEmail}
+                data-testid="button-change-email"
+              >
+                <Edit3 className="w-3 h-3 mr-1" />
+                Cambiar correo
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
-      {otpTimer > 0 ? (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="otpCode">Código de Verificación</Label>
-            <Input id="otpCode" placeholder="000000" value={formData.otpCode} onChange={(e) => updateField('otpCode', e.target.value.replace(/\D/g, '').slice(0, 6))} disabled={verifyOtpMutation.isPending} maxLength={6} className="text-center text-2xl tracking-widest" data-testid="input-otp-code" />
-          </div>
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Clock className="w-4 h-4" />
-            <span>Expira en {formatTime(otpTimer)}</span>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={goBack} data-testid="button-back-step3">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Atrás
-            </Button>
-            <Button className="flex-1" onClick={() => verifyOtpMutation.mutate()} disabled={verifyOtpMutation.isPending || formData.otpCode.length !== 6} data-testid="button-verify-otp">
-              {verifyOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar<ArrowRight className="w-4 h-4 ml-2" /></>)}
-            </Button>
-          </div>
-          <Button variant="ghost" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} className="w-full" data-testid="button-resend-otp">
-            Reenviar código
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <p className="text-center text-sm text-muted-foreground">Enviaremos un código de verificación a tu correo</p>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={goBack} data-testid="button-back-step3-send">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Atrás
-            </Button>
-            <Button className="flex-1" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
-              {sendOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>) : (<><Mail className="w-4 h-4 mr-2" />Enviar Código</>)}
-            </Button>
-          </div>
-        </div>
+      {!isEditingEmail && (
+        <>
+          {otpTimer > 0 ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="otpCode">Código de Verificación</Label>
+                <Input id="otpCode" placeholder="000000" value={formData.otpCode} onChange={(e) => updateField('otpCode', e.target.value.replace(/\D/g, '').slice(0, 6))} disabled={verifyOtpMutation.isPending} maxLength={6} className="text-center text-2xl tracking-widest" data-testid="input-otp-code" />
+              </div>
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                <span>Expira en {formatTime(otpTimer)}</span>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={goBack} data-testid="button-back-step3">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Atrás
+                </Button>
+                <Button className="flex-1" onClick={() => verifyOtpMutation.mutate()} disabled={verifyOtpMutation.isPending || formData.otpCode.length !== 6} data-testid="button-verify-otp">
+                  {verifyOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Verificando...</>) : (<>Verificar<ArrowRight className="w-4 h-4 ml-2" /></>)}
+                </Button>
+              </div>
+              <Button variant="ghost" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} className="w-full" data-testid="button-resend-otp">
+                Reenviar código
+              </Button>
+              {!(userData?.emailVerificado) && (
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="w-full text-xs"
+                  onClick={() => { 
+                    setOtpTimer(0); 
+                    updateField('otpCode', ''); 
+                    startEditingEmail();
+                  }}
+                  data-testid="button-change-email-after-send"
+                >
+                  ¿Correo incorrecto? Cambiar correo
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-center text-sm text-muted-foreground">Enviaremos un código de verificación a tu correo</p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={goBack} data-testid="button-back-step3-send">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Atrás
+                </Button>
+                <Button className="flex-1" onClick={() => sendOtpMutation.mutate()} disabled={sendOtpMutation.isPending} data-testid="button-send-otp">
+                  {sendOtpMutation.isPending ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</>) : (<><Mail className="w-4 h-4 mr-2" />Enviar Código</>)}
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
