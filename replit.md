@@ -92,3 +92,54 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Jest**: Unit and integration testing framework.
 - **Playwright**: E2E testing.
 - **Jira REST API**: For ticket synchronization with Jira Cloud.
+
+## Mobile Build Configuration
+
+### Capacitor Setup
+- **App ID**: `com.fouronesolutions.gruard`
+- **App Name**: Grúa RD
+- **Web Directory**: `dist/public`
+- **Installed Plugins**: @capacitor/app, @capacitor/camera, @capacitor/filesystem, @capacitor/geolocation, @capacitor/network, @capacitor/push-notifications
+
+### Android Configuration
+- **Min SDK**: 23 (Android 6.0)
+- **Target SDK**: 35
+- **Java Version**: 17
+- **Signing**: Environment variables required for release builds:
+  - `ANDROID_KEYSTORE_PATH`
+  - `ANDROID_KEYSTORE_PASSWORD`
+  - `ANDROID_KEY_ALIAS`
+  - `ANDROID_KEY_PASSWORD`
+- **Permissions**: Internet, Network State, Location (Fine/Coarse), Camera, Storage, Push Notifications, Vibrate
+
+### iOS Configuration
+- **Deployment Target**: iOS 14.0
+- **Bundle ID**: `com.fouronesolutions.gruard`
+- **Entitlements**: Push Notifications (development)
+- **Permissions**: Camera, Photo Library, Location (When In Use, Always)
+
+### Build Commands
+```bash
+# Build web assets
+npm run build
+
+# Sync Capacitor (after any web changes)
+npx cap sync
+
+# Build debug APK (requires Android SDK)
+./scripts/build-android.sh debug
+
+# Build release APK (requires signing config)
+./scripts/build-android.sh release
+
+# Build iOS (requires Xcode on macOS)
+./scripts/build-ios.sh debug
+./scripts/build-ios.sh release
+```
+
+### GitHub Actions Workflows
+- `.github/workflows/build-android.yml` - Builds APK on PRs, release APK/AAB on tags
+- `.github/workflows/build-ios.yml` - Builds for simulator on PRs, IPA on tags
+
+### Known Issues
+- **Capacitor CLI 7.x Template Bug**: The template.js file in `@capacitor/cli` needs patching. The patch is included in GitHub Actions workflows and should be applied after npm install in CI environments.
