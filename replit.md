@@ -104,7 +104,7 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 ### Android Configuration
 - **Min SDK**: 23 (Android 6.0)
 - **Target SDK**: 35
-- **Java Version**: 17
+- **Java Version**: 21
 - **Signing**: Environment variables required for release builds:
   - `ANDROID_KEYSTORE_PATH`
   - `ANDROID_KEYSTORE_PASSWORD`
