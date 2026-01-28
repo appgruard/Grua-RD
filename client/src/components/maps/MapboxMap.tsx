@@ -5,6 +5,7 @@ import { Loader2, MapPin, CircleOff } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import watermarkLogo from '@assets/20251129_191904_0001_1764458415723.png';
 import type { RouteGeometry } from '@/lib/maps';
+import { useMapboxToken } from '@/hooks/use-public-config';
 
 export interface Coordinates {
   lat: number;
@@ -402,6 +403,7 @@ export function MapboxMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const mapboxToken = useMapboxToken();
   const [viewState, setViewState] = useState({
     longitude: center.lng,
     latitude: center.lat,
@@ -598,15 +600,12 @@ export function MapboxMap({
     }
   }, [heatmapData, showHeatmap, loading]);
 
-  if (!MAPBOX_TOKEN) {
+  if (!mapboxToken) {
     return (
       <div className={`relative ${className} flex items-center justify-center bg-muted rounded-lg`}>
         <div className="text-center p-4">
-          <MapPin className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-          <p className="text-muted-foreground">Mapbox no está configurado</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Configure VITE_MAPBOX_ACCESS_TOKEN para habilitar el mapa.
-          </p>
+          <Loader2 className="w-12 h-12 mx-auto text-muted-foreground mb-2 animate-spin" />
+          <p className="text-muted-foreground">Cargando mapa...</p>
         </div>
       </div>
     );
@@ -640,7 +639,7 @@ export function MapboxMap({
           setError('Error al cargar el mapa');
           setLoading(false);
         }}
-        mapboxAccessToken={MAPBOX_TOKEN}
+        mapboxAccessToken={mapboxToken}
         style={{ width: '100%', height: '100%', minHeight: '300px' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         attributionControl={false}
@@ -749,19 +748,17 @@ export function HeatmapComponent({
   startDate: string; 
   endDate: string;
 }) {
+  const mapboxToken = useMapboxToken();
   const center = data.length > 0 
     ? { lat: data[0].lat, lng: data[0].lng }
     : { lat: 18.4861, lng: -69.9312 };
 
-  if (!MAPBOX_TOKEN) {
+  if (!mapboxToken) {
     return (
       <div className="h-80 flex items-center justify-center bg-muted rounded-lg">
         <div className="text-center p-4">
-          <MapPin className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-          <p className="text-muted-foreground">Mapbox no está configurado</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Configure VITE_MAPBOX_ACCESS_TOKEN para habilitar el mapa de calor.
-          </p>
+          <Loader2 className="w-12 h-12 mx-auto text-muted-foreground mb-2 animate-spin" />
+          <p className="text-muted-foreground">Cargando mapa de calor...</p>
         </div>
       </div>
     );

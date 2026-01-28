@@ -266,6 +266,17 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 
+// Public configuration endpoint (no auth required)
+// Used by native mobile apps to get API tokens at runtime
+app.get("/public-config", (_req: Request, res: Response) => {
+  console.log("Public config endpoint hit!");
+  res.json({
+    mapboxToken: process.env.MAPBOX_ACCESS_TOKEN || null,
+    vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null,
+    appVersion: process.env.npm_package_version || '1.0.0',
+  });
+});
+
 app.get("/debug/env", (_req: Request, res: Response) => {
   const envVars = [
     'NODE_ENV',

@@ -65,6 +65,9 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 ## External Dependencies
 - **PostgreSQL (Neon)**: Main database.
 - **Mapbox**: Maps (Mapbox GL JS via react-map-gl), Directions API, Geocoding API.
+  - **Runtime Token Endpoint**: `GET /public-config` returns MapBox token at runtime for native mobile apps (Capacitor)
+  - **Fallback Strategy**: Web apps use `VITE_MAPBOX_ACCESS_TOKEN` at build time; native apps fetch from `/public-config` endpoint
+  - **Client Hook**: `useMapboxToken()` hook in `client/src/hooks/use-public-config.ts` handles both strategies
 - **Waze**: Deep links for driver navigation.
 - **Azul API**: Payment gateway for Dominican Republic (mTLS with digital certificates).
   - **Estado**: 3D Secure 2.0 integrado y probado en sandbox.

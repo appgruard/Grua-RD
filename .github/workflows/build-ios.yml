@@ -39,6 +39,8 @@ jobs:
         run: npm ci
       
       - name: Build web assets
+        env:
+          VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.VITE_MAPBOX_ACCESS_TOKEN }}
         run: npm run build
       
       - name: Patch Capacitor CLI template.js
@@ -163,6 +165,8 @@ jobs:
         run: npm ci
       
       - name: Build web assets
+        env:
+          VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.VITE_MAPBOX_ACCESS_TOKEN }}
         run: npm run build
       
       - name: Patch Capacitor CLI template.js
