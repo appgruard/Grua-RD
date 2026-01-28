@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { X, ExternalLink, Megaphone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import { cn } from '@/lib/utils';
+import { cn, getAbsoluteUrl } from '@/lib/utils';
 import type { InAppAnnouncement } from '@shared/schema';
 
 // Default colors that represent "use theme colors"
@@ -224,7 +224,7 @@ export function AnnouncementsDisplay() {
                 style={{ cursor: 'pointer' }}
               >
                 <img
-                  src={currentModal.imagenUrl}
+                  src={getAbsoluteUrl(currentModal.imagenUrl) || ''}
                   alt={currentModal.titulo || 'Anuncio'}
                   className="w-full h-auto object-contain rounded-lg"
                   data-testid={`image-announcement-${currentModal.id}`}
@@ -249,7 +249,7 @@ export function AnnouncementsDisplay() {
               {currentModal.imagenUrl && (
                 <div className="w-full h-40 -mt-6 -mx-6 mb-4 overflow-hidden rounded-t-lg" style={{ width: 'calc(100% + 3rem)' }}>
                   <img
-                    src={currentModal.imagenUrl}
+                    src={getAbsoluteUrl(currentModal.imagenUrl) || ''}
                     alt=""
                     className="w-full h-full object-cover"
                   />

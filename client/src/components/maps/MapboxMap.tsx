@@ -405,6 +405,9 @@ export function MapboxMap({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mapboxToken = useMapboxToken();
+  
+  console.log('[MapboxMap] Token received:', mapboxToken ? `${mapboxToken.substring(0, 20)}...` : 'null');
+  
   const [viewState, setViewState] = useState({
     longitude: center.lng,
     latitude: center.lat,

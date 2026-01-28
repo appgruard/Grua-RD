@@ -25,9 +25,18 @@ export function usePublicConfig() {
     queryKey: ['/public-config'],
     queryFn: async () => {
       const url = getPublicConfigUrl();
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch public config');
-      return res.json();
+      console.log('[usePublicConfig] Fetching from:', url, 'isNative:', isNative);
+      try {
+        const res = await fetch(url);
+        console.log('[usePublicConfig] Response status:', res.status);
+        if (!res.ok) throw new Error('Failed to fetch public config');
+        const data = await res.json();
+        console.log('[usePublicConfig] Config received, has token:', !!data.mapboxToken);
+        return data;
+      } catch (error) {
+        console.error('[usePublicConfig] Fetch error:', error);
+        throw error;
+      }
     },
     staleTime: 1000 * 60 * 60,
     gcTime: 1000 * 60 * 60 * 24,
@@ -36,14 +45,19 @@ export function usePublicConfig() {
 }
 
 export function useMapboxToken(): string | null {
-  const { data } = usePublicConfig();
+  const { data, isLoading, error } = usePublicConfig();
   const isNative = Capacitor.isNativePlatform();
   
+  console.log('[useMapboxToken] isNative:', isNative, 'isLoading:', isLoading, 'hasError:', !!error, 'hasData:', !!data);
+  
   if (!isNative && VITE_MAPBOX_TOKEN) {
+    console.log('[useMapboxToken] Using VITE token');
     return VITE_MAPBOX_TOKEN;
   }
   
-  return data?.mapboxToken ?? null;
+  const token = data?.mapboxToken ?? null;
+  console.log('[useMapboxToken] Using server token, has token:', !!token);
+  return token;
 }
 
 export function getMapboxToken(): string | null {
