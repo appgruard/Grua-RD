@@ -27,10 +27,7 @@
 <p align="center">
   <a href="#características">Características</a> •
   <a href="#tecnologías">Tecnologías</a> •
-  <a href="#instalación">Instalación</a> •
-  <a href="#configuración">Configuración</a> •
-  <a href="#despliegue">Despliegue</a> •
-  <a href="#arquitectura">Arquitectura</a>
+  <a href="#contacto">Contacto</a>
 </p>
 
 ---
@@ -80,7 +77,7 @@ La plataforma ofrece interfaces especializadas para:
 - **Multiplataforma** - PWA + Apps nativas para iOS y Android con Capacitor
 - **Disponible en Tiendas** - Google Play Store y Apple App Store
 - **Notificaciones Push** - Alertas nativas en tiempo real
-- **Verificación de Identidad** - OCR de cédula dominicana con Verifik
+- **Verificación de Identidad** - OCR de cédula dominicana
 - **Geolocalización Precisa** - Tracking GPS nativo optimizado
 - **Modo Offline** - Service Worker para operación sin conexión
 - **Cámara Nativa** - Captura de documentos y fotos de servicio
@@ -119,207 +116,28 @@ PostgreSQL        →  Database
 Drizzle ORM       →  Database ORM
 Passport.js       →  Authentication
 WebSocket (ws)    →  Real-time
-Winston           →  Logging
 ```
-
-### Servicios Externos
-```
-Mapbox            →  Mapas, rutas y geocodificación
-Twilio            →  SMS y verificación OTP
-Resend            →  Emails transaccionales
-Verifik           →  OCR y validación de cédula
-Azul              →  Pasarela de pagos (RD)
-Web Push          →  Notificaciones push
-```
-
----
-
-## Instalación
-
-### Prerrequisitos
-- Node.js 20+
-- PostgreSQL 16+
-- npm o yarn
-
-### Pasos
-
-1. **Clonar el repositorio**
-```bash
-git clone https://github.com/tu-usuario/grua-rd.git
-cd grua-rd
-```
-
-2. **Instalar dependencias**
-```bash
-npm install
-```
-
-3. **Configurar base de datos**
-```bash
-npm run db:push
-```
-
-4. **Iniciar en desarrollo**
-```bash
-npm run dev
-```
-
-La aplicación estará disponible en `http://localhost:5000`
-
----
-
-## Configuración
-
-### Variables de Entorno
-
-Crea un archivo `.env` con las siguientes variables:
-
-```env
-# Base de Datos
-DATABASE_URL=postgresql://user:password@host:5432/database
-
-# Sesiones
-SESSION_SECRET=tu-secreto-seguro
-
-# Mapbox
-MAPBOX_ACCESS_TOKEN=pk.xxx
-VITE_MAPBOX_ACCESS_TOKEN=pk.xxx
-
-# Twilio (SMS)
-TWILIO_ACCOUNT_SID=ACxxx
-TWILIO_AUTH_TOKEN=xxx
-TWILIO_PHONE_NUMBER=+1xxx
-
-# Resend (Email)
-RESEND_API_KEY=re_xxx
-
-# Verifik (OCR)
-VERIFIK_API_KEY=xxx
-
-# Push Notifications
-VAPID_PUBLIC_KEY=xxx
-VAPID_PRIVATE_KEY=xxx
-
-# Almacenamiento (opcional para CapRover)
-STORAGE_PATH=/app/uploads
-```
-
----
-
-## Despliegue
-
-### CapRover
-
-1. **Crear aplicación** en CapRover
-
-2. **Configurar volumen persistente**
-   - Container Path: `/app/uploads`
-   - Activar persistencia
-
-3. **Variables de entorno**
-   - Configurar todas las variables listadas arriba
-   - Asegurar `NODE_ENV=production`
-
-4. **Desplegar**
-```bash
-# Usando CapRover CLI
-caprover deploy
-```
-
-### Docker
-
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-RUN npm run build
-EXPOSE 5000
-CMD ["npm", "start"]
-```
-
----
-
-## Arquitectura
-
-```
-grua-rd/
-├── client/                 # Frontend React
-│   ├── src/
-│   │   ├── components/     # Componentes reutilizables
-│   │   ├── pages/          # Páginas por rol
-│   │   │   ├── admin/      # Panel administrativo
-│   │   │   ├── client/     # Interfaz cliente
-│   │   │   ├── driver/     # Interfaz operador
-│   │   │   └── empresa/    # Portal empresarial
-│   │   ├── hooks/          # Custom hooks
-│   │   └── lib/            # Utilidades
-│   └── index.html
-├── server/                 # Backend Express
-│   ├── routes.ts           # API endpoints
-│   ├── storage.ts          # Capa de datos
-│   ├── services/           # Servicios externos
-│   └── index.ts            # Entry point
-├── shared/                 # Código compartido
-│   └── schema.ts           # Modelos Drizzle
-└── e2e/                    # Tests E2E Playwright
-```
-
-### Flujo de Datos
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Cliente   │────▶│   Express   │────▶│  PostgreSQL │
-│   (React)   │◀────│   (API)     │◀────│   (Neon)    │
-└─────────────┘     └─────────────┘     └─────────────┘
-       │                   │
-       │                   │
-       ▼                   ▼
-┌─────────────┐     ┌─────────────┐
-│  WebSocket  │     │  Servicios  │
-│  (Tiempo    │     │  Externos   │
-│   Real)     │     │  (Mapbox,   │
-└─────────────┘     │   Twilio)   │
-                    └─────────────┘
-```
-
----
-
-## Scripts Disponibles
-
-| Comando | Descripción |
-|---------|-------------|
-| `npm run dev` | Inicia servidor de desarrollo |
-| `npm run build` | Compila para producción |
-| `npm start` | Inicia servidor de producción |
-| `npm run db:push` | Sincroniza esquema de BD |
-| `npm run check` | Verifica tipos TypeScript |
-
----
-
-## Roles y Permisos
-
-| Rol | Acceso | Descripción |
-|-----|--------|-------------|
-| `cliente` | `/client/*` | Usuarios que solicitan servicios |
-| `conductor` | `/driver/*` | Operadores de grúa |
-| `admin` | `/admin/*` | Administradores del sistema |
-| `empresa` | `/empresa/*` | Cuentas empresariales B2B |
-| `aseguradora` | `/aseguradora/*` | Compañías de seguros |
-| `support` | `/support/*` | Soporte técnico |
 
 ---
 
 ## Seguridad
 
-- Autenticación con Passport.js y sesiones HTTP-only
+- Autenticación segura con sesiones HTTP-only
 - Contraseñas hasheadas con bcrypt
 - Control de acceso basado en roles (RBAC)
-- Protección SQL injection via Drizzle ORM
+- Protección contra SQL injection
 - Rate limiting en endpoints críticos
 - Validación de datos con Zod
-- CORS configurado para orígenes permitidos
+
+---
+
+## Contacto
+
+Para más información sobre Grúa RD:
+
+- **Email**: info@gruard.com
+- **Soporte**: support@gruard.com
+- **Teléfono**: +1 (829) 351-9324
 
 ---
 
@@ -336,6 +154,5 @@ Este software es propiedad exclusiva de Grúa RD. Queda prohibido su uso, copia,
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Made%20with-❤️-red?style=flat-square" alt="Made with love" />
   <img src="https://img.shields.io/badge/Dominican%20Republic-🇩🇴-blue?style=flat-square" alt="Dominican Republic" />
 </p>
