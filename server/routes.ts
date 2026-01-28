@@ -3784,7 +3784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "No autenticado" });
       }
 
-      const { nombre, apellido, phone, conductorData } = req.body;
+      const { nombre, apellido, phone, email, conductorData } = req.body;
       const userId = req.user!.id;
       const currentUser = await storage.getUserById(userId);
 
@@ -3793,6 +3793,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updateData: any = {};
+      
+      // Handle email change - only allowed if email is not yet verified
+      if (email !== undefined && email !== currentUser.email) {
+        // Check if email is already verified
+        if (currentUser.emailVerificado) {
+          return res.status(403).json({ 
+            message: "No puedes cambiar tu correo después de que haya sido verificado." 
+          });
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) {
+          return res.status(400).json({ message: "Formato de correo electrónico inválido" });
+        }
+        
+        // Check if email is already in use by another user
+        const normalizedEmail = email.trim().toLowerCase();
+        const existingUser = await storage.getUserByEmail(normalizedEmail);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ message: "Este correo electrónico ya está registrado" });
+        }
+        
+        updateData.email = normalizedEmail;
+        logSystem.info('User email updated before verification', { userId, newEmail: normalizedEmail });
+      }
       
       // Block name changes for operators (conductores) with verified cédula
       if (currentUser.userType === 'conductor' && currentUser.cedulaVerificada) {
