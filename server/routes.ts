@@ -1171,6 +1171,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para probar 3DS Challenge SIN Method (tarjeta 4147463011110059)
+  app.post("/api/payments/azul/init-3ds-challenge-only-test", async (req, res) => {
+    try {
+      logSystem.info("Initiating 3DS Challenge-Only test (sin Method)", { path: req.path });
+      const transactionId = Date.now().toString();
+      
+      const browserInfo = {
+        acceptHeader: req.get('Accept') || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        ipAddress: req.ip || req.socket.remoteAddress || "127.0.0.1",
+        language: req.get('Accept-Language')?.split(',')[0] || "es-DO",
+        colorDepth: 24,
+        screenWidth: 1920,
+        screenHeight: 1080,
+        timeZone: "-240",
+        userAgent: req.get('User-Agent') || "Mozilla/5.0",
+        javaScriptEnabled: "true",
+      };
+
+      // Tarjeta de prueba para 3DS Challenge SIN Method (proporcionada por Azul)
+      const testCard = {
+        cardNumber: "4147463011110059",
+        expiration: "202812",
+        cvc: "123",
+        cardHolderName: "Test Challenge Sin Method"
+      };
+
+      const result = await AzulPaymentService.init3DSecureWithCard(
+        testCard,
+        {
+          amount: 100,  // 1 peso = 100 centavos
+          itbis: 18,    // 18 centavos
+          customOrderId: "GRD-NOMETHOD-" + transactionId,
+        },
+        browserInfo
+      );
+
+      const response: any = {
+        ...result,
+        methodForm: result.rawResponse?.ThreeDSMethod?.MethodForm || result.rawResponse?.MethodForm,
+        acsUrl: result.acsUrl || result.rawResponse?.ThreeDSChallenge?.RedirectPostUrl,
+        creq: result.creq || result.rawResponse?.ThreeDSChallenge?.CReq,
+      };
+
+      if (result.azulOrderId) {
+        lastFrictionTestAzulOrderId = result.azulOrderId;
+      }
+
+      logSystem.info("3DS Challenge-Only test result", { 
+        isoCode: result.isoCode,
+        azulOrderId: result.azulOrderId,
+        has3DSMethod: !!response.methodForm,
+        hasChallenge: !!(response.acsUrl && response.creq),
+        flowType: response.methodForm ? '3D2METHOD' : (response.acsUrl ? '3D (Challenge-Only)' : 'Other')
+      });
+
+      res.json(response);
+    } catch (error: any) {
+      logSystem.error("Error in 3DS Challenge-Only test", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Test endpoint to process 3DS Challenge response (CRes)
   app.post("/api/payments/azul/process-challenge", async (req, res) => {
     try {

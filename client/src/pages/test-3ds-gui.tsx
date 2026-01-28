@@ -9,6 +9,8 @@ import { Loader2, ShieldCheck, CheckCircle2, XCircle, CreditCard, Lock } from "l
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+type TestType = 'method-challenge' | 'challenge-only';
+
 export default function Test3DSPage() {
   const { toast } = useToast();
   const [azulOrderId, setAzulOrderId] = useState<string>("");
@@ -18,6 +20,7 @@ export default function Test3DSPage() {
   const [methodFormHtml, setMethodFormHtml] = useState<string>("");
   const [challengeUrl, setChallengeUrl] = useState<string>("");
   const [challengeCreq, setChallengeCreq] = useState<string>("");
+  const [testType, setTestType] = useState<TestType>('method-challenge');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Escuchar mensajes del iframe para capturar el CRes
@@ -33,10 +36,13 @@ export default function Test3DSPage() {
     return () => window.removeEventListener('message', handleMessage);
   }, [azulOrderId]);
 
-  // Paso 1: Iniciar Pago 3DS con friccion
+  // Paso 1: Iniciar Pago 3DS
   const initMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/payments/azul/init-3ds-friction-test");
+      const endpoint = testType === 'challenge-only' 
+        ? "/api/payments/azul/init-3ds-challenge-only-test"
+        : "/api/payments/azul/init-3ds-friction-test";
+      const res = await apiRequest("POST", endpoint);
       return res.json();
     },
     onSuccess: (data) => {
@@ -151,6 +157,7 @@ export default function Test3DSPage() {
     setMethodFormHtml("");
     setChallengeUrl("");
     setChallengeCreq("");
+    setTestType('method-challenge');
   };
 
   return (
@@ -184,24 +191,51 @@ export default function Test3DSPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Paso 1: Iniciar Transaccion
+                Paso 1: Seleccionar Tipo de Prueba
               </CardTitle>
               <CardDescription>
-                Tarjeta de prueba Visa 4005520000000129 (Challenge con friccion)
+                Elige el flujo 3DS a probar
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant={testType === 'method-challenge' ? 'default' : 'outline'}
+                  onClick={() => setTestType('method-challenge')}
+                  className="h-auto py-4 flex flex-col gap-1"
+                  data-testid="button-select-method-challenge"
+                >
+                  <span className="font-medium">Method + Challenge</span>
+                  <span className="text-xs opacity-80">Tarjeta: 4005520000000129</span>
+                </Button>
+                <Button
+                  variant={testType === 'challenge-only' ? 'default' : 'outline'}
+                  onClick={() => setTestType('challenge-only')}
+                  className="h-auto py-4 flex flex-col gap-1"
+                  data-testid="button-select-challenge-only"
+                >
+                  <span className="font-medium">Challenge SIN Method</span>
+                  <span className="text-xs opacity-80">Tarjeta: 4147463011110059</span>
+                </Button>
+              </div>
+              
               <div className="p-4 bg-muted rounded-md">
                 <p className="text-sm font-medium mb-2">Datos de la transaccion:</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <span className="text-muted-foreground">Tarjeta:</span>
-                  <span className="font-mono">4005 5200 0000 0129</span>
+                  <span className="font-mono">
+                    {testType === 'challenge-only' ? '4147 4630 1111 0059' : '4005 5200 0000 0129'}
+                  </span>
+                  <span className="text-muted-foreground">Flujo:</span>
+                  <span className="font-mono text-xs">
+                    {testType === 'challenge-only' ? 'Desafio sin 3DSMethod' : 'Method + Challenge'}
+                  </span>
                   <span className="text-muted-foreground">Vencimiento:</span>
                   <span className="font-mono">12/2028</span>
                   <span className="text-muted-foreground">CVV:</span>
                   <span className="font-mono">123</span>
                   <span className="text-muted-foreground">Monto:</span>
-                  <span className="font-mono">RD$118.00</span>
+                  <span className="font-mono">RD$1.18</span>
                 </div>
               </div>
               <Button 
