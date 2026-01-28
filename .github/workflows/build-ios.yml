@@ -1,0 +1,144 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Select Xcode version
+        run: |
+          # List available Xcode versions and select the latest
+          ls /Applications/ | grep Xcode || true
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_PATH" ]; then
+            XCODE_PATH="/Applications/Xcode.app"
+          fi
+          echo "Using Xcode at: $XCODE_PATH"
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          xcodebuild -version
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build web assets
+        run: npm run build
+      
+      - name: Patch Capacitor CLI template.js
+        run: |
+          cat > node_modules/@capacitor/cli/dist/util/template.js << 'EOF'
+          "use strict";
+          Object.defineProperty(exports, "__esModule", { value: true });
+          exports.extractTemplate = void 0;
+          const fs_extra_1 = require("fs-extra");
+          const tar = require("tar");
+          const path_1 = require("path");
+          
+          async function extractTemplate(src, dir) {
+              if (!src) {
+                  const cliDir = path_1.resolve(__dirname, '..');
+                  const assetsDir = path_1.join(cliDir, 'assets');
+                  
+                  if (dir.includes('capacitor-cordova-android-plugins')) {
+                      src = path_1.join(assetsDir, 'capacitor-cordova-android-plugins.tar.gz');
+                  } else if (dir.includes('capacitor-cordova-ios-plugins')) {
+                      src = path_1.join(assetsDir, 'capacitor-cordova-ios-plugins.tar.gz');
+                  } else if (dir.includes('android')) {
+                      src = path_1.join(assetsDir, 'android-template.tar.gz');
+                  } else if (dir.includes('ios')) {
+                      src = path_1.join(assetsDir, 'ios-pods-template.tar.gz');
+                  }
+                  
+                  if (!src) {
+                      throw new Error('Template source is undefined and could not be inferred for directory: ' + dir);
+                  }
+              }
+              
+              await (0, fs_extra_1.mkdirp)(dir);
+              await tar.extract({ file: src, cwd: dir });
+          }
+          exports.extractTemplate = extractTemplate;
+          EOF
+      
+      - name: Sync Capacitor
+        run: npx cap sync ios
+      
+      - name: Install CocoaPods
+        run: |
+          cd ios/App
+          pod install
+      
+      - name: Build for Simulator (Debug)
+        if: github.event_name == 'pull_request'
+        run: |
+          cd ios/App
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            build
+      
+      - name: Build Release Archive
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          cd ios/App
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath ../../build/GruaRD.xcarchive \
+            -allowProvisioningUpdates \
+            clean archive
+      
+      - name: Export IPA
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+          
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/GruaRD.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist ExportOptions.plist \
+            -allowProvisioningUpdates
+      
+      - name: Upload IPA
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-ipa
+          path: build/ipa/*.ipa
