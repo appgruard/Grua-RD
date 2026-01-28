@@ -291,14 +291,15 @@ interface MapboxMapProps {
   focusOnOrigin?: boolean;
 }
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
-
 const MAP_STYLE_LIGHT = 'mapbox://styles/mapbox/streets-v12';
 
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
+async function reverseGeocode(lat: number, lng: number, token: string | null): Promise<string> {
+  if (!token) {
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  }
   try {
     const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}`
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}`
     );
     const data = await response.json();
     if (data.features && data.features.length > 0) {
@@ -485,10 +486,10 @@ export function MapboxMap({
     onMapClick(coords);
 
     if (onAddressChange) {
-      const address = await reverseGeocode(coords.lat, coords.lng);
+      const address = await reverseGeocode(coords.lat, coords.lng, mapboxToken);
       onAddressChange(address);
     }
-  }, [onMapClick, onAddressChange]);
+  }, [onMapClick, onAddressChange, mapboxToken]);
 
   const handleLoad = useCallback(() => {
     setLoading(false);
@@ -684,7 +685,7 @@ export function MapboxMap({
               onDragEnd={isDraggable ? async (event) => {
                 const newCoords = { lat: event.lngLat.lat, lng: event.lngLat.lng };
                 if (onMarkerDragEnd) {
-                  const address = await reverseGeocode(newCoords.lat, newCoords.lng);
+                  const address = await reverseGeocode(newCoords.lat, newCoords.lng, mapboxToken);
                   onMarkerDragEnd(markerId, newCoords, address);
                 }
               } : undefined}
