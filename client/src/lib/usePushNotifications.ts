@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { fetchVapidPublicKey } from '@/hooks/use-public-config';
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+const VITE_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -51,18 +52,21 @@ export function usePushNotifications() {
       return;
     }
 
-    if (!VAPID_PUBLIC_KEY) {
-      toast({
-        title: 'Configuración pendiente',
-        description: 'Las notificaciones push no están configuradas en el servidor',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
+      const vapidKey = VITE_VAPID_PUBLIC_KEY || await fetchVapidPublicKey();
+      
+      if (!vapidKey) {
+        toast({
+          title: 'Configuración pendiente',
+          description: 'Las notificaciones push no están configuradas en el servidor',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const permission = await Notification.requestPermission();
       
       if (permission !== 'granted') {
@@ -79,7 +83,7 @@ export function usePushNotifications() {
       
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
 
       const subscriptionData = subscription.toJSON();

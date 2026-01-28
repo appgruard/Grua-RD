@@ -1,3 +1,5 @@
+import { fetchMapboxToken } from '@/hooks/use-public-config';
+
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -75,7 +77,7 @@ export function getNavigationUrl(lat: number | string | null | undefined, lng: n
 }
 
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  const token = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+  const token = await fetchMapboxToken();
   if (!token) {
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   }

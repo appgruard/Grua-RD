@@ -1,3 +1,5 @@
+import { fetchMapboxToken } from '@/hooks/use-public-config';
+
 export interface DirectionsResult {
   duration: number;
   distance: number;
@@ -13,9 +15,9 @@ export async function getDirections(
   origin: Coordinates,
   destination: Coordinates
 ): Promise<DirectionsResult> {
-  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+  const token = await fetchMapboxToken();
   
-  if (!MAPBOX_TOKEN) {
+  if (!token) {
     console.warn('Mapbox token not configured');
     return {
       duration: estimateDuration(origin, destination),
@@ -24,7 +26,7 @@ export async function getDirections(
     };
   }
   
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full`;
+  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?access_token=${token}&geometries=geojson&overview=full`;
   
   try {
     const response = await fetch(url);

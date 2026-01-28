@@ -38,6 +38,17 @@ export function getMapboxToken(): string | null {
 }
 
 let cachedServerToken: string | null = null;
+let cachedVapidKey: string | null = null;
+let configFetchPromise: Promise<PublicConfig | null> | null = null;
+
+async function fetchPublicConfig(): Promise<PublicConfig | null> {
+  if (!configFetchPromise) {
+    configFetchPromise = fetch('/public-config')
+      .then(res => res.ok ? res.json() : null)
+      .catch(() => null);
+  }
+  return configFetchPromise;
+}
 
 export async function fetchMapboxToken(): Promise<string | null> {
   if (VITE_MAPBOX_TOKEN) {
@@ -49,11 +60,32 @@ export async function fetchMapboxToken(): Promise<string | null> {
   }
   
   try {
-    const response = await fetch('/public-config');
-    if (response.ok) {
-      const config = await response.json();
+    const config = await fetchPublicConfig();
+    if (config?.mapboxToken) {
       cachedServerToken = config.mapboxToken;
       return config.mapboxToken;
+    }
+  } catch (error) {
+    console.error('Failed to fetch public config:', error);
+  }
+  
+  return null;
+}
+
+export async function fetchVapidPublicKey(): Promise<string | null> {
+  if (VITE_VAPID_KEY) {
+    return VITE_VAPID_KEY;
+  }
+  
+  if (cachedVapidKey) {
+    return cachedVapidKey;
+  }
+  
+  try {
+    const config = await fetchPublicConfig();
+    if (config?.vapidPublicKey) {
+      cachedVapidKey = config.vapidPublicKey;
+      return config.vapidPublicKey;
     }
   } catch (error) {
     console.error('Failed to fetch public config:', error);

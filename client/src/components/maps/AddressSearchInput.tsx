@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Search, MapPin, Navigation, Loader2, X, Crosshair } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Coordinates } from '@/lib/maps';
+import { fetchMapboxToken } from '@/hooks/use-public-config';
 
 interface AddressSuggestion {
   id: string;
@@ -80,8 +81,17 @@ export function AddressSearchInput({
 
   const reverseGeocode = useCallback(async (coords: Coordinates): Promise<AddressSuggestion | null> => {
     try {
+      const token = await fetchMapboxToken();
+      if (!token) {
+        return {
+          id: `coords-${coords.lat}-${coords.lng}`,
+          placeName: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
+          text: 'Coordenadas ingresadas',
+          coordinates: coords,
+        };
+      }
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}&language=es`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`
       );
       if (response.ok) {
         const data = await response.json();
@@ -183,13 +193,20 @@ export function AddressSearchInput({
         };
         
         try {
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}&language=es`
-          );
-          const data = await response.json();
-          const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
-          setInputValue(address);
-          onAddressChange(address, coords);
+          const token = await fetchMapboxToken();
+          if (token) {
+            const response = await fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`
+            );
+            const data = await response.json();
+            const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+            setInputValue(address);
+            onAddressChange(address, coords);
+          } else {
+            const address = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+            setInputValue(address);
+            onAddressChange(address, coords);
+          }
         } catch (error) {
           const address = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
           setInputValue(address);

@@ -1,6 +1,7 @@
 import { queryClient } from './queryClient';
+import { fetchMapboxToken } from '@/hooks/use-public-config';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+const VITE_MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
 const preloadedModules = new Set<string>();
 const addedPreconnects = new Set<string>();
@@ -48,21 +49,20 @@ function addDnsPrefetch(href: string) {
   document.head.appendChild(link);
 }
 
-export function preloadMapboxResources() {
-  if (!MAPBOX_TOKEN) return;
-  
-  // Add DNS prefetch first (fastest)
+export async function preloadMapboxResources() {
+  // Add DNS prefetch and preconnect first (doesn't need token)
   addDnsPrefetch('https://api.mapbox.com');
   addDnsPrefetch('https://tiles.mapbox.com');
-  
-  // Then preconnect (establishes connection)
   addPreconnect('https://api.mapbox.com');
   addPreconnect('https://tiles.mapbox.com');
   addPreconnect('https://events.mapbox.com');
 
-  // Prefetch style JSON for faster map initialization
-  const styleUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12?access_token=${MAPBOX_TOKEN}`;
-  fetch(styleUrl, { method: 'GET', mode: 'cors', priority: 'high' as any }).catch(() => {});
+  // Fetch token and prefetch style JSON for faster map initialization
+  const token = VITE_MAPBOX_TOKEN || await fetchMapboxToken();
+  if (token) {
+    const styleUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12?access_token=${token}`;
+    fetch(styleUrl, { method: 'GET', mode: 'cors', priority: 'high' as any }).catch(() => {});
+  }
 }
 
 // Preload the Mapbox module immediately (high priority)

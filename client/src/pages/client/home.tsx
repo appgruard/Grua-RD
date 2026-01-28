@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { calculateRoute, type Coordinates } from '@/lib/maps';
+import { fetchMapboxToken } from '@/hooks/use-public-config';
 import { MapPin, Loader2, ArrowLeft, CheckCircle, Car, ChevronUp, ChevronDown, Wrench, Truck, AlertTriangle, Info, Clock, Navigation, Camera, X, Image } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -229,14 +230,23 @@ export default function ClientHome() {
         setIsLoadingLocation(false);
         
         try {
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}&language=es`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+          const token = await fetchMapboxToken();
+          if (token) {
+            const response = await fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`
+            );
+            if (response.ok) {
+              const data = await response.json();
+              const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+              setOrigin(coords);
+              setOrigenDireccion(address);
+            } else {
+              setOrigin(coords);
+              setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
+            }
+          } else {
             setOrigin(coords);
-            setOrigenDireccion(address);
+            setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
           }
         } catch (error) {
           setOrigin(coords);
@@ -1562,7 +1572,7 @@ export default function ClientHome() {
             setSelectedServiceForCancel(null);
           }}
           serviceId={selectedServiceForCancel}
-          serviceCost={activeService.costoTotal || 0}
+          serviceCost={Number(activeService.costoTotal) || 0}
           userType="cliente"
         />
       )}
