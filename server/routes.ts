@@ -710,18 +710,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
-    button { padding: 15px 30px; font-size: 18px; background: #0066cc; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin: 10px 0; }
+    button { padding: 15px 30px; font-size: 16px; background: #0066cc; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin: 10px 0; }
     button:disabled { background: #ccc; }
+    button.secondary { background: #28a745; }
+    button.secondary:disabled { background: #ccc; }
     #log { background: #f5f5f5; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
     .success { color: green; }
     .error { color: red; }
+    .test-info { background: #e3f2fd; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 14px; }
+    .test-info.challenge-only { background: #fff3e0; }
+    h2 { margin-top: 20px; font-size: 18px; }
   </style>
 </head>
 <body>
   <h1>3DS Simple Test</h1>
-  <p>Tarjeta: 4005520000000129 | OTP: 123456</p>
   
-  <button id="startBtn">Iniciar Prueba 3DS</button>
+  <h2>Flujo 1: Method + Challenge</h2>
+  <div class="test-info">
+    <strong>Tarjeta:</strong> 4005 5200 0000 0129<br>
+    <strong>OTP:</strong> 123456<br>
+    <strong>Flujo:</strong> 3DS Method -> Challenge
+  </div>
+  <button id="startBtn">Iniciar Prueba Method + Challenge</button>
+  
+  <h2>Flujo 2: Challenge SIN Method</h2>
+  <div class="test-info challenge-only">
+    <strong>Tarjeta:</strong> 4147 4630 1111 0059<br>
+    <strong>OTP:</strong> 123456<br>
+    <strong>Flujo:</strong> Directo a Challenge (sin 3DS Method)
+  </div>
+  <button id="startBtnChallengeOnly" class="secondary">Iniciar Prueba Challenge SIN Method</button>
+  
   <div id="log"></div>
   
   <!-- iframe oculto para el Method -->
@@ -731,36 +750,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     document.addEventListener('DOMContentLoaded', function() {
       const logEl = document.getElementById('log');
       const btn = document.getElementById('startBtn');
+      const btnChallengeOnly = document.getElementById('startBtnChallengeOnly');
       
       function log(msg, type) {
         logEl.innerHTML += '<div class="' + (type || '') + '">' + new Date().toLocaleTimeString() + ' - ' + msg + '</div>';
         logEl.scrollTop = logEl.scrollHeight;
       }
       
-      btn.addEventListener('click', async function() {
+      function clearLog() {
+        logEl.innerHTML = '';
+      }
+      
+      async function runTest(endpoint, testName, skipMethod) {
         btn.disabled = true;
-        btn.textContent = 'Procesando...';
+        btnChallengeOnly.disabled = true;
+        clearLog();
         
         try {
+          log('=== ' + testName + ' ===', 'success');
           log('Paso 1: Iniciando transaccion...');
-          const initRes = await fetch('/api/payments/azul/init-3ds-friction-test', { method: 'POST' });
+          const initRes = await fetch(endpoint, { method: 'POST' });
           const initData = await initRes.json();
           log('Respuesta init: IsoCode=' + initData.isoCode);
           
           if (!initData.azulOrderId) {
             log('ERROR: No se recibio AzulOrderId', 'error');
+            log('Respuesta completa: ' + JSON.stringify(initData, null, 2));
             return;
           }
           
           const azulOrderId = initData.azulOrderId;
           log('AzulOrderId: ' + azulOrderId);
           
-          if (initData.methodForm) {
+          // Si hay challenge directo (sin method), ir directo
+          if (initData.acsUrl && initData.creq) {
+            log('Challenge directo detectado (sin Method)!', 'success');
+            log('ACS URL: ' + initData.acsUrl);
+            log('Redirigiendo al ACS en 2 segundos...');
+            await new Promise(function(r) { setTimeout(r, 2000); });
+            
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = initData.acsUrl;
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'creq';
+            input.value = initData.creq;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+            return;
+          }
+          
+          if (initData.methodForm && !skipMethod) {
             log('Paso 2: Ejecutando 3DS Method...');
             const iframe = document.getElementById('methodFrame');
             iframe.srcdoc = initData.methodForm;
             await new Promise(function(r) { setTimeout(r, 3000); });
             log('Method completado');
+          } else if (!initData.methodForm) {
+            log('Sin 3DS Method requerido, continuando...');
           }
           
           log('Paso 3: Continuando autenticacion...');
@@ -788,13 +837,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             form.appendChild(input);
             document.body.appendChild(form);
             form.submit();
+          } else if (contData.isoCode === '00') {
+            log('Pago aprobado sin challenge (Frictionless)!', 'success');
+            log('AuthCode: ' + contData.authorizationCode);
           } else {
-            log('No se detecto challenge. Respuesta:', 'error');
+            log('Respuesta inesperada:', 'error');
             log(JSON.stringify(contData, null, 2));
           }
         } catch (err) {
           log('ERROR: ' + err.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btnChallengeOnly.disabled = false;
+          btn.textContent = 'Iniciar Prueba Method + Challenge';
+          btnChallengeOnly.textContent = 'Iniciar Prueba Challenge SIN Method';
         }
+      }
+      
+      btn.addEventListener('click', function() {
+        btn.textContent = 'Procesando...';
+        runTest('/api/payments/azul/init-3ds-friction-test', 'FLUJO METHOD + CHALLENGE', false);
+      });
+      
+      btnChallengeOnly.addEventListener('click', function() {
+        btnChallengeOnly.textContent = 'Procesando...';
+        runTest('/api/payments/azul/init-3ds-challenge-only-test', 'FLUJO CHALLENGE SIN METHOD', true);
       });
     });
   </script>
