@@ -184,6 +184,7 @@ app.use(
 
 // Rutas que permiten cualquier origen (callbacks de servicios externos como Azul 3DS)
 const openCorsRoutes = [
+  '/public-config',
   '/api/payments/azul/3ds-callback',
   '/api/payments/azul/3ds-method-notification',
   '/api/azul/3ds/callback',
