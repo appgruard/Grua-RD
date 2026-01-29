@@ -337,14 +337,14 @@ export default function PrivacyPolicy() {
                 <li><strong>Dirección:</strong> Carretera Juan Bosch, C/ Principal #106, Canca La Reyna, Espaillat, República Dominicana</li>
               </ul>
               <p className="mt-4 text-sm text-muted-foreground">
-                <strong>Razón Social:</strong> Four One Solutions SRL
+                <strong>Razón Social:</strong> ASSANPOS SRL - Four One Solutions SRL
               </p>
             </CardContent>
           </Card>
 
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground" data-testid="text-footer">
-              © 2026 Grúa RD - Four One Solutions SRL. Todos los derechos reservados.
+              © 2026 Grúa RD - ASSANPOS SRL - Four One Solutions SRL. Todos los derechos reservados.
             </p>
           </div>
         </div>
