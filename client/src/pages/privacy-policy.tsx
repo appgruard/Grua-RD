@@ -25,7 +25,7 @@ export default function PrivacyPolicy() {
               Grúa RD - Servicios de Grúa en República Dominicana
             </p>
             <p className="text-sm text-muted-foreground mt-2" data-testid="text-last-updated">
-              Última actualización: Noviembre 2025
+              Última actualización: Enero 2026
             </p>
           </div>
 
@@ -228,6 +228,82 @@ export default function PrivacyPolicy() {
             </CardContent>
           </Card>
 
+          <Card data-testid="card-children">
+            <CardHeader>
+              <CardTitle>Privacidad de Menores</CardTitle>
+            </CardHeader>
+            <CardContent className="prose prose-sm max-w-none dark:prose-invert">
+              <p data-testid="text-children-privacy">
+                Nuestros servicios están dirigidos exclusivamente a personas mayores de 18 años. 
+                No recopilamos intencionalmente información personal de menores de edad. Si descubrimos 
+                que hemos recopilado datos de un menor sin el consentimiento parental verificable, 
+                tomaremos medidas para eliminar esa información de nuestros servidores.
+              </p>
+              <p className="mt-4">
+                Si usted es padre o tutor y cree que su hijo nos ha proporcionado información personal, 
+                contáctenos inmediatamente para que podamos tomar las medidas necesarias.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-third-party">
+            <CardHeader>
+              <CardTitle>Servicios de Terceros</CardTitle>
+            </CardHeader>
+            <CardContent className="prose prose-sm max-w-none dark:prose-invert">
+              <p data-testid="text-third-party-intro">
+                Nuestra aplicación utiliza servicios de terceros que pueden recopilar información:
+              </p>
+              <ul data-testid="list-third-party">
+                <li><strong>Mapbox:</strong> Servicios de mapas y navegación para mostrar ubicaciones y calcular rutas.</li>
+                <li><strong>Azul:</strong> Procesamiento seguro de pagos con tarjeta de crédito/débito.</li>
+                <li><strong>Twilio:</strong> Envío de mensajes SMS para verificación de identidad.</li>
+                <li><strong>Resend:</strong> Envío de correos electrónicos transaccionales y notificaciones.</li>
+              </ul>
+              <p className="mt-4">
+                Cada uno de estos servicios tiene sus propias políticas de privacidad que regulan 
+                el uso de su información. Le recomendamos revisar las políticas de privacidad de 
+                estos terceros.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-permissions">
+            <CardHeader>
+              <CardTitle>Permisos de la Aplicación</CardTitle>
+            </CardHeader>
+            <CardContent className="prose prose-sm max-w-none dark:prose-invert">
+              <p data-testid="text-permissions-intro">
+                Nuestra aplicación solicita los siguientes permisos en su dispositivo:
+              </p>
+              <ul data-testid="list-permissions">
+                <li><strong>Ubicación (GPS):</strong> Para mostrar su posición en el mapa, calcular distancias y conectarlo con conductores cercanos. Este permiso es esencial para el funcionamiento del servicio.</li>
+                <li><strong>Cámara:</strong> Para capturar fotos de documentos de identidad, vehículos y evidencia del servicio.</li>
+                <li><strong>Almacenamiento:</strong> Para guardar documentos y fotos relacionadas con el servicio.</li>
+                <li><strong>Notificaciones Push:</strong> Para enviarle alertas sobre el estado de su servicio, actualizaciones y promociones.</li>
+                <li><strong>Internet:</strong> Para comunicarse con nuestros servidores y procesar sus solicitudes.</li>
+              </ul>
+              <p className="mt-4">
+                Puede gestionar estos permisos en la configuración de su dispositivo. Sin embargo, 
+                desactivar ciertos permisos puede afectar la funcionalidad de la aplicación.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-international">
+            <CardHeader>
+              <CardTitle>Transferencias Internacionales</CardTitle>
+            </CardHeader>
+            <CardContent className="prose prose-sm max-w-none dark:prose-invert">
+              <p data-testid="text-international">
+                Sus datos pueden ser procesados en servidores ubicados fuera de la República Dominicana. 
+                Nos aseguramos de que cualquier transferencia internacional de datos se realice de 
+                acuerdo con las leyes de protección de datos aplicables y con las medidas de seguridad 
+                adecuadas para proteger su información.
+              </p>
+            </CardContent>
+          </Card>
+
           <Card data-testid="card-changes">
             <CardHeader>
               <CardTitle>Cambios a esta Política</CardTitle>
@@ -254,16 +330,21 @@ export default function PrivacyPolicy() {
                 puede contactarnos a través de:
               </p>
               <ul data-testid="list-contact-info">
-                <li><strong>Correo Electrónico:</strong> privacidad@gruard.do</li>
-                <li><strong>Teléfono:</strong> +1 (809) 555-0100</li>
-                <li><strong>Dirección:</strong> Santo Domingo, República Dominicana</li>
+                <li><strong>Correo Electrónico General:</strong> info@gruard.com</li>
+                <li><strong>Soporte Técnico:</strong> support@gruard.com</li>
+                <li><strong>Consultas de Pagos:</strong> payments@gruard.com</li>
+                <li><strong>Teléfono:</strong> +1 (829) 351-9324</li>
+                <li><strong>Dirección:</strong> Carretera Juan Bosch, C/ Principal #106, Canca La Reyna, Espaillat, República Dominicana</li>
               </ul>
+              <p className="mt-4 text-sm text-muted-foreground">
+                <strong>Razón Social:</strong> Four One Solutions SRL
+              </p>
             </CardContent>
           </Card>
 
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground" data-testid="text-footer">
-              © 2025 Grúa RD. Todos los derechos reservados.
+              © 2026 Grúa RD - Four One Solutions SRL. Todos los derechos reservados.
             </p>
           </div>
         </div>
