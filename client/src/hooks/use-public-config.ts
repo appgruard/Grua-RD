@@ -9,7 +9,8 @@ interface PublicConfig {
 
 const VITE_MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 const VITE_VAPID_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://app.gruard.com';
+// Hardcode the production URL for native apps to ensure it's always available
+const API_BASE_URL = 'https://app.gruard.com';
 
 function getPublicConfigUrl(): string {
   if (Capacitor.isNativePlatform()) {
