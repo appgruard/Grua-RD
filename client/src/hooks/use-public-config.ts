@@ -12,6 +12,11 @@ const VITE_VAPID_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 // Hardcode the production URL for native apps to ensure it's always available
 const API_BASE_URL = 'https://app.gruard.com';
 
+// Hardcoded tokens for native apps (CapacitorHttp bug prevents fetching from server)
+// These are public tokens, safe to include in client code
+const NATIVE_MAPBOX_TOKEN = 'pk.eyJ1IjoiZm91cm9uZXNvbHV0aW9ucyIsImEiOiJjbWlpcHZ0M2gweDE5M2Vvc2c3MTJvOTIxIn0.8hmHLBnGoGNyb5vMSCMzCQ';
+const NATIVE_VAPID_KEY = 'BFNZW9v-o28GelcQ2dPvIklXdD97s15Va-9PouVgRxXm-wAUtjIyM60vhoGYLVm1ao9a0qMpLrvP_KYtK3GkdQ0';
+
 function getPublicConfigUrl(): string {
   if (Capacitor.isNativePlatform()) {
     return `${API_BASE_URL}/public-config`;
@@ -51,7 +56,13 @@ export function useMapboxToken(): string | null {
   
   console.log('[useMapboxToken] isNative:', isNative, 'isLoading:', isLoading, 'hasError:', !!error, 'hasData:', !!data);
   
-  if (!isNative && VITE_MAPBOX_TOKEN) {
+  // For native apps, use hardcoded token (CapacitorHttp bug workaround)
+  if (isNative) {
+    console.log('[useMapboxToken] Using hardcoded native token');
+    return NATIVE_MAPBOX_TOKEN;
+  }
+  
+  if (VITE_MAPBOX_TOKEN) {
     console.log('[useMapboxToken] Using VITE token');
     return VITE_MAPBOX_TOKEN;
   }
@@ -62,7 +73,10 @@ export function useMapboxToken(): string | null {
 }
 
 export function getMapboxToken(): string | null {
-  if (!Capacitor.isNativePlatform() && VITE_MAPBOX_TOKEN) {
+  if (Capacitor.isNativePlatform()) {
+    return NATIVE_MAPBOX_TOKEN;
+  }
+  if (VITE_MAPBOX_TOKEN) {
     return VITE_MAPBOX_TOKEN;
   }
   return cachedServerToken || null;
@@ -83,7 +97,12 @@ async function fetchPublicConfig(): Promise<PublicConfig | null> {
 }
 
 export async function fetchMapboxToken(): Promise<string | null> {
-  if (!Capacitor.isNativePlatform() && VITE_MAPBOX_TOKEN) {
+  // For native apps, use hardcoded token (CapacitorHttp bug workaround)
+  if (Capacitor.isNativePlatform()) {
+    return NATIVE_MAPBOX_TOKEN;
+  }
+  
+  if (VITE_MAPBOX_TOKEN) {
     return VITE_MAPBOX_TOKEN;
   }
   
@@ -105,7 +124,12 @@ export async function fetchMapboxToken(): Promise<string | null> {
 }
 
 export async function fetchVapidPublicKey(): Promise<string | null> {
-  if (!Capacitor.isNativePlatform() && VITE_VAPID_KEY) {
+  // For native apps, use hardcoded key (CapacitorHttp bug workaround)
+  if (Capacitor.isNativePlatform()) {
+    return NATIVE_VAPID_KEY;
+  }
+  
+  if (VITE_VAPID_KEY) {
     return VITE_VAPID_KEY;
   }
   
