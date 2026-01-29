@@ -1,0 +1,59 @@
+VM6:348 native CapacitorHttp.request (#125152819)
+VM6:348 native CapacitorHttp.request (#125152820)
+VM5:10 SW registered: ServiceWorkerRegistration
+VM6:328 result CapacitorHttp.request (#125152819)
+VM6:328 result CapacitorHttp.request (#125152820)
+VM6:348 native CapacitorHttp.request (#125152821)
+VM6:328 result CapacitorHttp.request (#125152821)
+VM6:348 native CapacitorHttp.request (#125152822)
+VM6:328 result CapacitorHttp.request (#125152822)
+VM6:348 native CapacitorHttp.request (#125152823)
+VM6:348 native CapacitorHttp.request (#125152824)
+VM6:348 native CapacitorHttp.request (#125152825)
+VM6:348 native CapacitorHttp.request (#125152826)
+index-BFTKk9sP.js:202 [useMapboxToken] isNative: true isLoading: true hasError: false hasData: false
+index-BFTKk9sP.js:202 [useMapboxToken] Using server token, has token: false
+MapboxMap-U-F52I5P.js:2 [MapboxMap] Token received: null
+index-BFTKk9sP.js:202 [usePublicConfig] Fetching from: https://app.gruard.com/public-config isNative: true
+index-BFTKk9sP.js:202 [usePublicConfig] Response status: 200
+index-BFTKk9sP.js:202 [usePublicConfig] Fetch error: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+queryFn @ index-BFTKk9sP.js:202
+index-BFTKk9sP.js:202 [useMapboxToken] isNative: true isLoading: false hasError: true hasData: false
+index-BFTKk9sP.js:202 [useMapboxToken] Using server token, has token: false
+MapboxMap-U-F52I5P.js:2 [MapboxMap] Token received: null
+VM6:328 result CapacitorHttp.request (#125152823)
+vendor-ui-radix-DZWsdsW8.js:68 `DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.
+
+If you want to hide the `DialogTitle`, you can wrap it with our VisuallyHidden component.
+
+For more information, see https://radix-ui.com/primitives/docs/components/dialog
+(anonymous) @ vendor-ui-radix-DZWsdsW8.js:68
+vendor-ui-radix-DZWsdsW8.js:68 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous) @ vendor-ui-radix-DZWsdsW8.js:68
+VM6:328 result CapacitorHttp.request (#125152824)
+index-BFTKk9sP.js:202 [useMapboxToken] isNative: true isLoading: false hasError: true hasData: false
+index-BFTKk9sP.js:202 [useMapboxToken] Using server token, has token: false
+MapboxMap-U-F52I5P.js:2 [MapboxMap] Token received: null
+VM6:328 result CapacitorHttp.request (#125152825)
+index-BFTKk9sP.js:202 [useMapboxToken] isNative: true isLoading: false hasError: true hasData: false
+index-BFTKk9sP.js:202 [useMapboxToken] Using server token, has token: false
+MapboxMap-U-F52I5P.js:2 [MapboxMap] Token received: null
+VM6:328 result CapacitorHttp.request (#125152826)
+VM6:348 native CapacitorHttp.request (#125152827)
+VM6:328 result CapacitorHttp.request (#125152827)
+index-BFTKk9sP.js:202 [useMapboxToken] isNative: true isLoading: false hasError: true hasData: false
+index-BFTKk9sP.js:202 [useMapboxToken] Using server token, has token: false
+MapboxMap-U-F52I5P.js:2 [MapboxMap] Token received: null
+index-BFTKk9sP.js:202 [useMapboxToken] isNative: true isLoading: false hasError: true hasData: false
+index-BFTKk9sP.js:202 [useMapboxToken] Using server token, has token: false
+MapboxMap-U-F52I5P.js:2 [MapboxMap] Token received: null
+VM6:348 native CapacitorHttp.request (#125152828)
+VM6:328 result CapacitorHttp.request (#125152828)
+VM6:348 native CapacitorHttp.request (#125152829)
+VM6:328 result CapacitorHttp.request (#125152829)
+VM6:348 native CapacitorHttp.request (#125152830)
+VM6:328 result CapacitorHttp.request (#125152830)
+VM6:348 native CapacitorHttp.request (#125152831)
+VM6:328 result CapacitorHttp.request (#125152831)
+VM6:348 native CapacitorHttp.request (#125152832)
+VM6:328 result CapacitorHttp.request (#125152832)
