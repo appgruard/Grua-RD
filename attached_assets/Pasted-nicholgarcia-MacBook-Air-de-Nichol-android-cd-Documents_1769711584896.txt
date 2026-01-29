@@ -1,0 +1,33 @@
+nicholgarcia@MacBook-Air-de-Nichol android % cd ~/Documents/Grua-RD
+npx cap sync android
+[fatal] Error: Cannot find module 'adm-zip'
+Require stack:
+- /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/util/template.js
+- /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/migrate.js
+- /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/android/update.js
+- /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js
+- /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js
+- /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/index.js
+- /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/bin/capacitor
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1504:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/util/template.js:7:16)
+    at Module._compile (node:internal/modules/cjs/loader:1761:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/util/template.js',
+    '/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/migrate.js',
+    '/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/android/update.js',
+    '/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js',
+    '/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js',
+    '/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/index.js',
+    '/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/bin/capacitor'
+  ]
+}
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % 
