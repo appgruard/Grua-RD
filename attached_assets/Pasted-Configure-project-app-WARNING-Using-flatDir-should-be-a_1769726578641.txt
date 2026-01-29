@@ -1,0 +1,65 @@
+Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Task :app:clean FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:clean'.
+> java.io.IOException: Unable to delete directory '/Users/nicholgarcia/Documents/Grua-RD/android/app/build'
+    New files were found. This might happen because a process is still writing to the target directory.
+    - /Users/nicholgarcia/Documents/Grua-RD/android/app/build/.DS_Store
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 10s
+2 actionable tasks: 2 executed
+
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Task :capacitor-android:compileReleaseJavaWithJavac
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :capacitor-camera:compileReleaseJavaWithJavac
+Note: /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/camera/android/src/main/java/com/capacitorjs/plugins/camera/CameraBottomSheetDialogFragment.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :capacitor-filesystem:compileReleaseKotlin
+w: file:///Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/FilesystemPlugin.kt:335:31 'downloadFile(PluginCall): Unit' is deprecated. Use @capacitor/file-transfer plugin instead
+w: file:///Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/LegacyFilesystemImplementation.kt:66:29 Type mismatch: inferred type is String? but String was expected
+w: file:///Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/LegacyFilesystemImplementation.kt:143:25 Unnecessary non-null assertion (!!) on a non-null receiver of type Boolean
+w: file:///Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/filesystem/android/src/main/kotlin/com/capacitorjs/plugins/filesystem/LegacyFilesystemImplementation.kt:152:21 Unnecessary non-null assertion (!!) on a non-null receiver of type Boolean
+
+> Task :app:packageRelease FAILED
+w: Detected multiple Kotlin daemon sessions at kotlin/sessions
+[Incubating] Problems report is available at: file:///Users/nicholgarcia/Documents/Grua-RD/android/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:packageRelease'.
+> A failure occurred while executing com.android.build.gradle.tasks.PackageAndroidArtifact$IncrementalSplitterRunnable
+   > com.android.ide.common.signing.KeytoolException: Failed to read key gruard from store "/Users/nicholgarcia/.android-keystore/gruard-release-key.jks": keystore password was incorrect
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 57s
+343 actionable tasks: 335 executed, 8 up-to-date
+nicholgarcia@MacBook-Air-de-Nichol android %
