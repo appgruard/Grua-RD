@@ -3975,7 +3975,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (conductorData && req.user!.userType === 'conductor') {
         const conductor = await storage.getConductorByUserId(userId);
         if (conductor) {
-          await storage.updateConductor(conductor.id, conductorData);
+          // Block license updates - license number cannot be changed after initial registration
+          if (conductorData.licencia && conductorData.licencia !== conductor.licencia) {
+            logSystem.warn('Attempted license update blocked', { userId, conductorId: conductor.id });
+            return res.status(403).json({ 
+              message: "El número de licencia no puede ser modificado. Si hay un error, contacta a soporte." 
+            });
+          }
+          // Remove license from update data to prevent any accidental updates
+          const { licencia, ...safeCondUpdateData } = conductorData;
+          if (Object.keys(safeCondUpdateData).length > 0) {
+            await storage.updateConductor(conductor.id, safeCondUpdateData);
+          }
         } else {
           await storage.createConductor({
             userId,

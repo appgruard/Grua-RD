@@ -168,6 +168,7 @@ export default function AdminWallets() {
       if (statementStartDate) params.append('startDate', statementStartDate);
       if (statementEndDate) params.append('endDate', statementEndDate);
       const res = await fetch(`/api/admin/operators/${selectedWallet?.conductorId}/statement?${params}`, {
+        credentials: 'include',
         cache: 'no-store',
       });
       if (!res.ok) throw new Error('Error al cargar estado de cuenta');

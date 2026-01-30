@@ -324,14 +324,7 @@ export function EditProfileModal({
     if (apellido !== user?.apellido) updateData.apellido = apellido;
     if (phone !== user?.phone) updateData.phone = phone;
 
-    if (isDriver) {
-      const conductorUpdates: any = {};
-      if (licencia !== conductorData?.licencia) conductorUpdates.licencia = licencia;
-      
-      if (Object.keys(conductorUpdates).length > 0) {
-        updateData.conductorData = conductorUpdates;
-      }
-    }
+    // Note: License number is no longer editable from the profile for security reasons
 
     if (Object.keys(updateData).length > 0 || selectedFile) {
       if (Object.keys(updateData).length > 0) {
@@ -564,7 +557,7 @@ export function EditProfileModal({
               />
             </div>
 
-            {isDriver && (
+            {isDriver && conductorData?.licencia && (
               <>
                 <Separator className="my-4" />
                 <div className="space-y-2">
@@ -572,13 +565,13 @@ export function EditProfileModal({
                   <Input
                     id="licencia"
                     value={licencia}
-                    onChange={(e) => setLicencia(e.target.value)}
-                    placeholder="Número de licencia de conducir"
-                    disabled={isLoading}
+                    readOnly
+                    disabled
+                    className="bg-muted cursor-not-allowed"
                     data-testid="input-licencia"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Para gestionar tus vehículos, ve a la sección "Vehículos por Categoría" en tu perfil.
+                    El número de licencia no puede ser modificado. Si hay un error, contacta a soporte.
                   </p>
                 </div>
               </>

@@ -1,0 +1,253 @@
+2026-01-29T23:46:11.104853978Z 23:46:11 [info] Storage environment variables {"NODE_ENV":"production"}
+2026-01-29T23:46:11.105627215Z 23:46:11 [info] Storage provider selection {"useReplitStorage":false}
+2026-01-29T23:46:11.105878720Z 23:46:11 [info] Using filesystem storage by default (/app/uploads)
+2026-01-29T23:46:11.106235713Z 23:46:11 [warn] VAPID keys not configured. Push notifications will not work. Generate keys with: npx web-push generate-vapid-keys {"category":"system"}
+2026-01-29T23:46:11.143633816Z 23:46:11 [info] PostgreSQL session store initialized {"category":"system"}
+2026-01-29T23:46:11.155648265Z 23:46:11 [info] Service auto-cancellation initialized {"timeoutMinutes":10,"checkIntervalMs":60000,"category":"system"}
+2026-01-29T23:46:11.156209905Z 23:46:11 [info] Wallet debt check job initialized {"category":"system"}
+2026-01-29T23:46:11.156401802Z 23:46:11 [info] Service auto-cancellation initialized (timeout: 10 minutes) {"category":"system"}
+2026-01-29T23:46:11.177384185Z 11:46:11 PM [express] Static files directory: /app/dist/public
+2026-01-29T23:46:11.178028109Z 11:46:11 PM [express] Current working directory: /app
+2026-01-29T23:46:11.178411021Z 11:46:11 PM [express] __dirname: /app/dist
+2026-01-29T23:46:11.179253521Z 11:46:11 PM [express] Files in dist directory: assets, favicon.png, fonts, index.html, manifest.json, seo-meta.js, sw.js
+2026-01-29T23:46:11.179996881Z 11:46:11 PM [express] Static file serving configured for: /app/dist/public
+2026-01-29T23:46:11.184015078Z 11:46:11 PM [express] serving on port 80
+2026-01-29T23:46:11.275123305Z (node:7) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+2026-01-29T23:46:11.275159440Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-01-29T23:46:11.562033808Z Ticket tables initialized successfully
+2026-01-29T23:46:15.090937606Z 23:46:15 [info] Using Filesystem storage provider (CapRover/local deployment)
+2026-01-29T23:46:23.369134886Z 23:46:23 [info] Web Vital metric received {"metric":"LCP","value":"1116.00","rating":"good","delta":"1116.00","metricId":"v5-1769730374262-3352257655212","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:46:23.370230222Z 11:46:23 PM [express] POST /api/analytics/web-vitals 204 in 1ms
+2026-01-29T23:46:24.072569623Z 23:46:24 [info] Web Vital metric received {"metric":"INP","value":"40.00","rating":"good","delta":"40.00","metricId":"v5-1769730374262-7192904727535","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:46:24.073951448Z 11:46:24 PM [express] POST /api/analytics/web-vitals 204 in 2ms
+2026-01-29T23:46:24.548028295Z 23:46:24 [info] Web Vital metric received {"metric":"TTFB","value":"114.80","rating":"good","delta":"114.80","metricId":"v5-1769730384460-4391596163587","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:46:24.549049382Z 11:46:24 PM [express] POST /api/analytics/web-vitals 204 in 1ms
+2026-01-29T23:46:24.552586909Z 23:46:24 [info] Web Vital metric received {"metric":"DOM_CONTENT_LOADED","value":"560.60","rating":"good","delta":"560.60","metricId":"custom-1769730384484","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:46:24.553337772Z 11:46:24 PM [express] POST /api/analytics/web-vitals 204 in 0ms
+2026-01-29T23:46:24.555524651Z 23:46:24 [info] Web Vital metric received {"metric":"LOAD_EVENT","value":"564.50","rating":"good","delta":"564.50","metricId":"custom-1769730384485","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:46:24.556255944Z 11:46:24 PM [express] POST /api/analytics/web-vitals 204 in 0ms
+2026-01-29T23:46:24.557926210Z 23:46:24 [info] Web Vital metric received {"metric":"DOM_INTERACTIVE","value":"539.40","rating":"good","delta":"539.40","metricId":"custom-1769730384485","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:46:24.558663362Z 11:46:24 PM [express] POST /api/analytics/web-vitals 204 in 1ms
+2026-01-29T23:46:24.560720878Z 11:46:24 PM [express] GET /api/auth/me 401 in 1ms :: {"message":"Not authenticated"}
+2026-01-29T23:46:24.562617282Z 11:46:24 PM [express] GET /api/drivers/me 401 in 1ms :: {"message":"Not authorized"}
+2026-01-29T23:46:24.617058690Z 23:46:24 [info] Web Vital metric received {"metric":"FCP","value":"616.00","rating":"good","delta":"616.00","metricId":"v5-1769730384460-7734534445664","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:46:24.618483660Z 11:46:24 PM [express] POST /api/analytics/web-vitals 204 in 1ms
+2026-01-29T23:46:43.072490742Z 23:46:43 [info] Web Vital metric received {"metric":"LCP","value":"764.00","rating":"good","delta":"764.00","metricId":"v5-1769730384460-1137933541157","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:46:43.073664908Z 11:46:43 PM [express] POST /api/analytics/web-vitals 204 in 2ms
+2026-01-29T23:46:57.251932826Z Check-accounts: Found accounts count: 1
+2026-01-29T23:46:57.354032103Z 11:46:57 PM [express] POST /api/auth/check-accounts 200 in 266ms :: {"requiresDisambiguation":false,"…
+2026-01-29T23:46:58.124097125Z 23:46:58 [info] Login successful {"userId":"35c787ea-fe55-457e-9655-52b81dfc2c67","email":"jesusgarcia2k19@gmail.com","category":"auth"}
+2026-01-29T23:46:58.302808971Z 11:46:58 PM [express] POST /api/auth/login 200 in 324ms :: {"user":{"id":"35c787ea-fe55-457e-9655-52b…
+2026-01-29T23:46:59.237741804Z 11:46:59 PM [express] GET /api/announcements/active 200 in 227ms :: [{"id":"05074529-09e2-474a-b56b-f…
+2026-01-29T23:46:59.490569358Z 11:46:59 PM [express] GET /api/services/my-services 200 in 473ms :: []
+2026-01-29T23:46:59.495489814Z 11:46:59 PM [express] GET /api/client/insurance/status 200 in 482ms :: {"hasApprovedInsurance":false,…
+2026-01-29T23:46:59.510249224Z 11:46:59 PM [express] GET /api/wallet 401 in 493ms :: {"message":"No autorizado"}
+2026-01-29T23:47:10.390555074Z 11:47:10 PM [express] GET /api/services/my-services 304 in 363ms :: []
+2026-01-29T23:47:13.459359080Z 11:47:13 PM [express] POST /api/announcements/05074529-09e2-474a-b56b-f0143e6f374d/view 500 in 144ms …
+2026-01-29T23:47:21.177011314Z 11:47:21 PM [express] GET /api/services/my-services 304 in 140ms :: []
+2026-01-29T23:47:28.506439803Z 11:47:28 PM [express] GET /api/client/payment-methods 200 in 87ms :: []
+2026-01-29T23:47:28.521369701Z 11:47:28 PM [express] GET /api/usuarios/35c787ea-fe55-457e-9655-52b81dfc2c67/cancelaciones 200 in 100…
+2026-01-29T23:47:28.536106829Z 11:47:28 PM [express] GET /api/auth/linked-accounts 200 in 114ms :: {"hasClienteAccount":false,"hasCo…
+2026-01-29T23:47:35.480387737Z 11:47:35 PM [express] GET /api/tickets 200 in 106ms :: []
+2026-01-29T23:47:47.900201656Z 11:47:47 PM [express] GET /api/services/my-services 304 in 243ms :: []
+2026-01-29T23:47:58.627847970Z 11:47:58 PM [express] GET /api/services/my-services 304 in 365ms :: []
+2026-01-29T23:48:09.379613951Z 11:48:09 PM [express] GET /api/services/my-services 304 in 327ms :: []
+2026-01-29T23:48:40.294614935Z 11:48:40 PM [express] GET /api/services/my-services 304 in 373ms :: []
+2026-01-29T23:48:50.916696255Z 11:48:50 PM [express] GET /api/services/my-services 304 in 224ms :: []
+2026-01-29T23:49:01.523715667Z 11:49:01 PM [express] GET /api/services/my-services 304 in 343ms :: []
+2026-01-29T23:49:12.177417236Z 11:49:12 PM [express] GET /api/services/my-services 304 in 234ms :: []
+2026-01-29T23:49:22.770764699Z 11:49:22 PM [express] GET /api/services/my-services 304 in 227ms :: []
+2026-01-29T23:49:33.507085721Z 11:49:33 PM [express] GET /api/services/my-services 304 in 337ms :: []
+2026-01-29T23:49:44.214888582Z 11:49:44 PM [express] GET /api/services/my-services 304 in 342ms :: []
+2026-01-29T23:49:49.424122454Z 23:49:49 [info] Web Vital metric received {"metric":"CLS","value":"0.00","rating":"good","delta":"0.00","metricId":"v5-1769730384519-2705896651452","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:49:49.446331562Z 11:49:49 PM [express] POST /api/analytics/web-vitals 204 in 125ms
+2026-01-29T23:49:49.479653291Z 23:49:49 [info] Web Vital metric received {"metric":"INP","value":"80.00","rating":"good","delta":"80.00","metricId":"v5-1769730384460-9035757656388","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:49:49.501594347Z 11:49:49 PM [express] POST /api/analytics/web-vitals 204 in 180ms
+2026-01-29T23:50:14.690173777Z 11:50:14 PM [express] GET /api/services/my-services 304 in 235ms :: []
+2026-01-29T23:50:45.907832378Z 11:50:45 PM [express] GET /api/services/my-services 304 in 317ms :: []
+2026-01-29T23:51:04.084630869Z 11:51:04 PM [express] GET /api/services/my-services 304 in 326ms :: []
+2026-01-29T23:51:14.607790832Z 11:51:14 PM [express] GET /api/services/my-services 304 in 250ms :: []
+2026-01-29T23:51:25.161022464Z 11:51:25 PM [express] GET /api/services/my-services 304 in 243ms :: []
+2026-01-29T23:51:35.785549720Z 11:51:35 PM [express] GET /api/services/my-services 304 in 317ms :: []
+2026-01-29T23:51:46.902790971Z 11:51:46 PM [express] GET /api/services/my-services 304 in 235ms :: []
+2026-01-29T23:51:57.685090115Z 11:51:57 PM [express] GET /api/services/my-services 304 in 335ms :: []
+2026-01-29T23:52:08.487380401Z 11:52:08 PM [express] GET /api/services/my-services 304 in 353ms :: []
+2026-01-29T23:52:19.349762283Z 11:52:19 PM [express] GET /api/services/my-services 304 in 245ms :: []
+2026-01-29T23:52:30.043299264Z 11:52:30 PM [express] GET /api/services/my-services 304 in 357ms :: []
+2026-01-29T23:52:40.669455078Z 11:52:40 PM [express] GET /api/services/my-services 304 in 328ms :: []
+2026-01-29T23:52:51.292597552Z 11:52:51 PM [express] GET /api/services/my-services 304 in 223ms :: []
+2026-01-29T23:53:01.935077000Z 11:53:01 PM [express] GET /api/services/my-services 304 in 321ms :: []
+2026-01-29T23:53:12.400129533Z 11:53:12 PM [express] GET /api/services/my-services 304 in 244ms :: []
+2026-01-29T23:53:22.865153334Z 11:53:22 PM [express] GET /api/services/my-services 304 in 224ms :: []
+2026-01-29T23:53:33.610948236Z 11:53:33 PM [express] GET /api/services/my-services 304 in 312ms :: []
+2026-01-29T23:53:41.442355697Z 11:53:41 PM [express] POST /api/auth/logout 200 in 144ms :: {"message":"Logged out"}
+2026-01-29T23:53:41.553712543Z 11:53:41 PM [express] GET /api/services/my-services 401 in 16ms :: {"message":"Not authenticated"}
+2026-01-29T23:53:41.570394780Z 11:53:41 PM [express] GET /api/wallet 401 in 15ms :: {"message":"No autorizado"}
+2026-01-29T23:53:41.738135845Z 11:53:41 PM [express] GET /api/client/insurance/status 401 in 198ms :: {"message":"Not authenticated"}
+2026-01-29T23:53:41.742330092Z 11:53:41 PM [express] GET /api/announcements/active 401 in 203ms :: {"message":"No autenticado"}
+2026-01-29T23:53:55.193281648Z Check-accounts: Found accounts count: 1
+2026-01-29T23:53:55.267897767Z 11:53:55 PM [express] POST /api/auth/check-accounts 200 in 201ms :: {"requiresDisambiguation":false,"…
+2026-01-29T23:53:55.465591930Z 23:53:55 [info] Login successful {"userId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","email":"admin@fourone.com.do","category":"auth"}
+2026-01-29T23:53:55.516715097Z 11:53:55 PM [express] POST /api/auth/login 200 in 170ms :: {"user":{"id":"01168a9d-f85f-4049-a6c7-c39…
+2026-01-29T23:53:55.939312478Z 11:53:55 PM [express] GET /api/admin/me/permissions 200 in 82ms :: {"permisos":["dashboard","analytic…
+2026-01-29T23:53:56.008020290Z 11:53:56 PM [express] GET /api/admin/dashboard 200 in 150ms :: {"totalUsers":41,"totalDrivers":13,"to…
+2026-01-29T23:53:56.051601899Z 23:53:56 [info] WebSocket authenticated {"userId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","userType":"admin","category":"system"}
+2026-01-29T23:53:56.122539744Z 11:53:56 PM [express] GET /api/admin/active-drivers 200 in 259ms :: [{"id":"8be97cdb-0288-4a84-845a-6…
+2026-01-29T23:53:56.160652611Z 11:53:56 PM [express] GET /api/admin/services 200 in 300ms :: [{"id":"9136b409-18b4-4a11-ab22-0e53e1d…
+2026-01-29T23:54:06.776978484Z 11:54:06 PM [express] GET /api/admin/services 304 in 264ms :: [{"id":"9136b409-18b4-4a11-ab22-0e53e1d…
+2026-01-29T23:54:06.936627481Z 11:54:06 PM [express] GET /api/admin/active-drivers 304 in 335ms :: [{"id":"8be97cdb-0288-4a84-845a-6…
+2026-01-29T23:54:09.090211135Z 23:54:09 [info] WebSocket disconnected {"userId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","category":"system"}
+2026-01-29T23:54:09.191666991Z 11:54:09 PM [express] GET /api/admin/analytics/revenue 200 in 74ms :: []
+2026-01-29T23:54:09.195943140Z 11:54:09 PM [express] GET /api/admin/analytics/services 200 in 77ms :: [{"period":"2026-01-28","count…
+2026-01-29T23:54:09.282042590Z 23:54:09 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-29T23:54:09.282065404Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-29T23:54:09.282069561Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-29T23:54:09.282073106Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-29T23:54:09.282076521Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-29T23:54:09.282080036Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-29T23:54:09.282083291Z at async file:///app/dist/index.js:21404:20
+2026-01-29T23:54:09.297834927Z 11:54:09 PM [express] GET /api/admin/analytics/heatmap 500 in 176ms :: {"message":"Failed to get heat…
+2026-01-29T23:54:09.308585200Z 11:54:09 PM [express] GET /api/admin/analytics/drivers 200 in 189ms :: [{"driverId":"0198df40-e1d9-4a…
+2026-01-29T23:54:09.404525153Z 11:54:09 PM [express] GET /api/admin/analytics/peak-hours 200 in 284ms :: [{"hour":3,"count":1}]
+2026-01-29T23:54:09.412252981Z 11:54:09 PM [express] GET /api/admin/analytics/kpis 200 in 289ms :: {"avgResponseMinutes":0,"avgServi…
+2026-01-29T23:54:09.414188302Z 11:54:09 PM [express] GET /api/admin/analytics/vehicles 200 in 291ms :: [{"tipoVehiculo":"no_especifi…
+2026-01-29T23:54:09.424411877Z 11:54:09 PM [express] GET /api/admin/analytics/status-breakdown 200 in 304ms :: [{"status":"cancelado…
+2026-01-29T23:54:10.441693042Z 23:54:10 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-29T23:54:10.441715426Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-29T23:54:10.441718270Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-29T23:54:10.441720663Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-29T23:54:10.441726813Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-29T23:54:10.441729046Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-29T23:54:10.441731259Z at async file:///app/dist/index.js:21404:20
+2026-01-29T23:54:10.459005650Z 11:54:10 PM [express] GET /api/admin/analytics/heatmap 500 in 83ms :: {"message":"Failed to get heatm…
+2026-01-29T23:54:11.872971251Z 23:54:11 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-29T23:54:11.873006492Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-29T23:54:11.873009376Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-29T23:54:11.873011730Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-29T23:54:11.873013994Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-29T23:54:11.873016007Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-29T23:54:11.873018019Z at async file:///app/dist/index.js:21404:20
+2026-01-29T23:54:11.890437589Z 11:54:11 PM [express] GET /api/admin/analytics/heatmap 500 in 83ms :: {"message":"Failed to get heatm…
+2026-01-29T23:54:12.820055747Z 11:54:12 PM [express] GET /api/admin/users 200 in 180ms :: [{"id":"8aadd54a-c92b-4412-9f21-39d8e307e7…
+2026-01-29T23:54:14.040864014Z 23:54:14 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-29T23:54:14.040904555Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-29T23:54:14.040909772Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-29T23:54:14.040914199Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-29T23:54:14.040918856Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-29T23:54:14.040923793Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-29T23:54:14.040947309Z at async file:///app/dist/index.js:21404:20
+2026-01-29T23:54:14.057974660Z 11:54:14 PM [express] GET /api/admin/analytics/heatmap 500 in 79ms :: {"message":"Failed to get heatm…
+2026-01-29T23:54:15.299392925Z 23:54:15 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-29T23:54:15.299442098Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-29T23:54:15.299445082Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-29T23:54:15.299447356Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-29T23:54:15.299449489Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-29T23:54:15.299451502Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-29T23:54:15.299453595Z at async file:///app/dist/index.js:21404:20
+2026-01-29T23:54:15.316580276Z 11:54:15 PM [express] GET /api/admin/analytics/heatmap 500 in 82ms :: {"message":"Failed to get heatm…
+2026-01-29T23:54:16.654040609Z 23:54:16 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-29T23:54:16.654073146Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-29T23:54:16.654076001Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-29T23:54:16.654078385Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-29T23:54:16.654080408Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-29T23:54:16.654082531Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-29T23:54:16.654084544Z at async file:///app/dist/index.js:21404:20
+2026-01-29T23:54:16.671683210Z 11:54:16 PM [express] GET /api/admin/analytics/heatmap 500 in 78ms :: {"message":"Failed to get heatm…
+2026-01-29T23:54:23.695364792Z 11:54:23 PM [express] GET /api/admin/drivers 200 in 170ms :: [{"id":"73817fa3-1cbd-4e2d-8568-d8a2bd52…
+2026-01-29T23:54:31.383078797Z 11:54:31 PM [express] GET /api/admin/wallets-stats 200 in 569ms :: {"totalOperators":13,"totalBalance…
+2026-01-29T23:54:31.385164042Z 11:54:31 PM [express] GET /api/admin/wallets 200 in 570ms :: [{"id":"ed19a8ee-24fc-4ce0-9b79-4ed7a2b8…
+2026-01-29T23:55:49.625766824Z 11:55:49 PM [express] GET /api/admin/wallets/8be97cdb-0288-4a84-845a-644bf6c423f3 200 in 293ms :: {"i…
+2026-01-29T23:55:55.558541534Z 23:55:55 [info] Admin retrieved operator statement {"adminId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","conductorId":"8be97cdb-0288-4a84-845a-644bf6c423f3","periodStart":"2025-12-01T00:00:00.000Z","periodEnd":"2026-01-31T00:00:00.000Z","category":"system"}
+2026-01-29T23:55:55.575293417Z 11:55:55 PM [express] GET /api/admin/operators/8be97cdb-0288-4a84-845a-644bf6c423f3/statement 200 in …
+2026-01-29T23:56:20.231777700Z 23:56:20 [info] Web Vital metric received {"metric":"INP","value":"112.00","rating":"good","delta":"32.00","metricId":"v5-1769730384460-9035757656388","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:56:20.247711911Z 11:56:20 PM [express] POST /api/analytics/web-vitals 204 in 60ms
+2026-01-29T23:56:20.336679364Z 11:56:20 PM [express] GET /api/auth/me 200 in 148ms :: {"id":"01168a9d-f85f-4049-a6c7-c3937a91d77a","…
+2026-01-29T23:56:20.416583666Z 23:56:20 [info] Web Vital metric received {"metric":"FCP","value":"644.00","rating":"good","delta":"644.00","metricId":"v5-1769730980064-8533490241189","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:56:20.434836390Z 11:56:20 PM [express] POST /api/analytics/web-vitals 204 in 241ms
+2026-01-29T23:56:20.449845538Z 23:56:20 [info] Web Vital metric received {"metric":"DOM_CONTENT_LOADED","value":"579.50","rating":"good","delta":"579.50","metricId":"custom-1769730980084","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:56:20.450339056Z 23:56:20 [info] Web Vital metric received {"metric":"LOAD_EVENT","value":"581.20","rating":"good","delta":"581.20","metricId":"custom-1769730980084","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:56:20.450818502Z 23:56:20 [info] Web Vital metric received {"metric":"TTFB","value":"502.40","rating":"good","delta":"502.40","metricId":"v5-1769730980064-5993893471377","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:56:20.451303276Z 23:56:20 [info] Web Vital metric received {"metric":"DOM_INTERACTIVE","value":"560.00","rating":"good","delta":"560.00","metricId":"custom-1769730980084","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:56:20.465296227Z 11:56:20 PM [express] POST /api/analytics/web-vitals 204 in 273ms
+2026-01-29T23:56:20.466599304Z 11:56:20 PM [express] POST /api/analytics/web-vitals 204 in 276ms
+2026-01-29T23:56:20.468387496Z 11:56:20 PM [express] POST /api/analytics/web-vitals 204 in 277ms
+2026-01-29T23:56:20.468936947Z 11:56:20 PM [express] GET /api/drivers/me 401 in 279ms :: {"message":"Not authorized"}
+2026-01-29T23:56:20.469695260Z 11:56:20 PM [express] POST /api/analytics/web-vitals 204 in 277ms
+2026-01-29T23:56:20.518001333Z 11:56:20 PM [express] GET /api/admin/services 304 in 90ms :: [{"id":"9136b409-18b4-4a11-ab22-0e53e1d2…
+2026-01-29T23:56:20.616719206Z 11:56:20 PM [express] GET /api/admin/me/permissions 304 in 191ms :: {"permisos":["dashboard","analyti…
+2026-01-29T23:56:20.648436692Z 11:56:20 PM [express] GET /api/admin/dashboard 304 in 221ms :: {"totalUsers":41,"totalDrivers":13,"to…
+2026-01-29T23:56:20.666101619Z 23:56:20 [info] WebSocket authenticated {"userId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","userType":"admin","category":"system"}
+2026-01-29T23:56:20.727180068Z 11:56:20 PM [express] GET /api/admin/active-drivers 304 in 296ms :: [{"id":"8be97cdb-0288-4a84-845a-6…
+2026-01-29T23:56:24.994371657Z 23:56:24 [info] Web Vital metric received {"metric":"LCP","value":"692.00","rating":"good","delta":"692.00","metricId":"v5-1769730980064-8197298371993","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-29T23:56:25.013858407Z 11:56:25 PM [express] POST /api/analytics/web-vitals 204 in 66ms
+2026-01-29T23:56:31.070567058Z 11:56:31 PM [express] GET /api/admin/active-drivers 304 in 158ms :: [{"id":"8be97cdb-0288-4a84-845a-6…
+2026-01-29T23:56:31.211339545Z 11:56:31 PM [express] GET /api/admin/services 304 in 301ms :: [{"id":"9136b409-18b4-4a11-ab22-0e53e1d…
+2026-01-29T23:56:38.107874652Z 23:56:38 [info] WebSocket disconnected {"userId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","category":"system"}
+2026-01-29T23:56:38.837072379Z 11:56:38 PM [express] GET /api/admin/wallets 304 in 557ms :: [{"id":"ed19a8ee-24fc-4ce0-9b79-4ed7a2b8…
+2026-01-29T23:56:38.918662520Z 11:56:38 PM [express] GET /api/admin/wallets-stats 304 in 639ms :: {"totalOperators":13,"totalBalance…
+2026-01-29T23:56:56.798287921Z 11:56:56 PM [express] GET /api/admin/users 304 in 284ms :: [{"id":"8aadd54a-c92b-4412-9f21-39d8e307e7…
+2026-01-29T23:57:25.288612727Z 11:57:25 PM [express] GET /api/admin/drivers 304 in 247ms :: [{"id":"73817fa3-1cbd-4e2d-8568-d8a2bd52…
+2026-01-30T00:00:15.062388882Z 00:00:15 [info] Web Vital metric received {"metric":"CLS","value":"0.01","rating":"good","delta":"0.01","metricId":"v5-1769730980136-5538066179633","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:00:15.080556352Z 12:00:15 AM [express] POST /api/analytics/web-vitals 204 in 162ms
+2026-01-30T00:00:15.204868457Z 00:00:15 [info] Web Vital metric received {"metric":"INP","value":"96.00","rating":"good","delta":"96.00","metricId":"v5-1769730980064-3805300149478","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:00:15.231738261Z 12:00:15 AM [express] POST /api/analytics/web-vitals 204 in 313ms
+2026-01-30T00:00:35.589694355Z 12:00:35 AM [express] GET /api/admin/wallets/8be97cdb-0288-4a84-845a-644bf6c423f3 304 in 420ms :: {"i…
+2026-01-30T00:00:36.908018262Z 00:00:36 [info] Admin retrieved operator statement {"adminId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","conductorId":"8be97cdb-0288-4a84-845a-644bf6c423f3","periodStart":"2025-12-01T00:00:00.000Z","periodEnd":"2026-01-31T00:00:00.000Z","category":"system"}
+2026-01-30T00:00:36.927973994Z 12:00:36 AM [express] GET /api/admin/operators/8be97cdb-0288-4a84-845a-644bf6c423f3/statement 200 in …
+2026-01-30T00:00:38.863486600Z 00:00:38 [info] Web Vital metric received {"metric":"CLS","value":"0.10","rating":"good","delta":"0.09","metricId":"v5-1769730980136-5538066179633","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:00:38.882379174Z 12:00:38 AM [express] POST /api/analytics/web-vitals 204 in 68ms
+2026-01-30T00:01:37.493619433Z 00:01:37 [info] Web Vital metric received {"metric":"TTFB","value":"1167.60","rating":"needs-improvement","delta":"1167.60","metricId":"v5-1769731297379-6171992492946","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:01:37.509564903Z 12:01:37 AM [express] POST /api/analytics/web-vitals 204 in 59ms
+2026-01-30T00:01:37.584615813Z 00:01:37 [info] Web Vital metric received {"metric":"DOM_INTERACTIVE","value":"1192.00","rating":"good","delta":"1192.00","metricId":"custom-1769731297395","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:01:37.601361179Z 12:01:37 AM [express] POST /api/analytics/web-vitals 204 in 148ms
+2026-01-30T00:01:37.622967228Z 12:01:37 AM [express] GET /api/drivers/me 401 in 147ms :: {"message":"Not authorized"}
+2026-01-30T00:01:37.649048273Z 00:01:37 [info] Web Vital metric received {"metric":"FCP","value":"1260.00","rating":"good","delta":"1260.00","metricId":"v5-1769731297379-4761733439700","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:01:37.666069892Z 12:01:37 AM [express] POST /api/analytics/web-vitals 204 in 166ms
+2026-01-30T00:01:37.678784544Z 00:01:37 [info] Web Vital metric received {"metric":"DOM_CONTENT_LOADED","value":"1211.50","rating":"good","delta":"1211.50","metricId":"custom-1769731297394","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:01:37.681949103Z 00:01:37 [info] Web Vital metric received {"metric":"LOAD_EVENT","value":"1214.30","rating":"good","delta":"1214.30","metricId":"custom-1769731297394","navigationType":"custom","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:01:37.695427956Z 12:01:37 AM [express] POST /api/analytics/web-vitals 204 in 244ms
+2026-01-30T00:01:37.699475074Z 12:01:37 AM [express] POST /api/analytics/web-vitals 204 in 247ms
+2026-01-30T00:01:37.718374949Z 12:01:37 AM [express] GET /api/auth/me 304 in 242ms :: {"id":"01168a9d-f85f-4049-a6c7-c3937a91d77a","…
+2026-01-30T00:01:37.893245235Z 12:01:37 AM [express] GET /api/admin/me/permissions 304 in 79ms :: {"permisos":["dashboard","analytic…
+2026-01-30T00:01:37.894183576Z 12:01:37 AM [express] GET /api/admin/services 304 in 77ms :: [{"id":"9136b409-18b4-4a11-ab22-0e53e1d2…
+2026-01-30T00:01:37.972237004Z 12:01:37 AM [express] GET /api/admin/dashboard 304 in 158ms :: {"totalUsers":41,"totalDrivers":13,"to…
+2026-01-30T00:01:37.975597746Z 12:01:37 AM [express] GET /api/admin/active-drivers 304 in 157ms :: [{"id":"8be97cdb-0288-4a84-845a-6…
+2026-01-30T00:01:38.126756085Z 00:01:38 [info] WebSocket authenticated {"userId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","userType":"admin","category":"system"}
+2026-01-30T00:01:39.489950571Z 00:01:39 [info] WebSocket disconnected {"userId":"01168a9d-f85f-4049-a6c7-c3937a91d77a","category":"system"}
+2026-01-30T00:01:39.550350515Z 00:01:39 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-30T00:01:39.550385087Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-30T00:01:39.550388011Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-30T00:01:39.550390115Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-30T00:01:39.550404136Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-30T00:01:39.550406439Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-30T00:01:39.550408512Z at async file:///app/dist/index.js:21404:20
+2026-01-30T00:01:39.566938535Z 12:01:39 AM [express] GET /api/admin/analytics/peak-hours 304 in 77ms :: [{"hour":3,"count":1}]
+2026-01-30T00:01:39.568621951Z 12:01:39 AM [express] GET /api/admin/analytics/services 304 in 80ms :: [{"period":"2026-01-28","count…
+2026-01-30T00:01:39.570138027Z 12:01:39 AM [express] GET /api/admin/analytics/heatmap 500 in 79ms :: {"message":"Failed to get heatm…
+2026-01-30T00:01:39.572243243Z 12:01:39 AM [express] GET /api/admin/analytics/revenue 304 in 85ms :: []
+2026-01-30T00:01:39.574212276Z 12:01:39 AM [express] GET /api/admin/analytics/status-breakdown 304 in 84ms :: [{"status":"cancelado"…
+2026-01-30T00:01:39.665885006Z 00:01:39 [info] Web Vital metric received {"metric":"LCP","value":"1296.00","rating":"good","delta":"1296.00","metricId":"v5-1769731297379-3868554708055","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:01:39.682117984Z 12:01:39 AM [express] POST /api/analytics/web-vitals 204 in 188ms
+2026-01-30T00:01:39.689878803Z 12:01:39 AM [express] GET /api/admin/analytics/vehicles 304 in 198ms :: [{"tipoVehiculo":"no_especifi…
+2026-01-30T00:01:39.691767886Z 12:01:39 AM [express] GET /api/admin/analytics/kpis 304 in 199ms :: {"avgResponseMinutes":0,"avgServi…
+2026-01-30T00:01:39.692989351Z 12:01:39 AM [express] GET /api/admin/analytics/drivers 304 in 204ms :: [{"driverId":"0198df40-e1d9-4a…
+2026-01-30T00:01:40.735228697Z 00:01:40 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-30T00:01:40.735268387Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-30T00:01:40.735272132Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-30T00:01:40.735275086Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-30T00:01:40.735278161Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-30T00:01:40.735281907Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-30T00:01:40.735284721Z at async file:///app/dist/index.js:21404:20
+2026-01-30T00:01:40.751800563Z 12:01:40 AM [express] GET /api/admin/analytics/heatmap 500 in 80ms :: {"message":"Failed to get heatm…
+2026-01-30T00:01:42.001291225Z 00:01:42 [error] Get heatmap data error {"error":"column \"servicios.origen_lat\" must appear in the GROUP BY clause or be used in an aggregate function","category":"system"}
+2026-01-30T00:01:42.001322032Z error: column "servicios.origen_lat" must appear in the GROUP BY clause or be used in an aggregate function
+2026-01-30T00:01:42.001326198Z at /app/node_modules/pg-pool/index.js:45:11
+2026-01-30T00:01:42.001329022Z at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2026-01-30T00:01:42.001331816Z at async file:///app/node_modules/drizzle-orm/node-postgres/session.js:83:22
+2026-01-30T00:01:42.001334781Z at async DatabaseStorage.getServiceLocationsForHeatmap (file:///app/dist/index.js:4408:25)
+2026-01-30T00:01:42.001337695Z at async file:///app/dist/index.js:21404:20
+2026-01-30T00:01:42.020118702Z 12:01:42 AM [express] GET /api/admin/analytics/heatmap 500 in 79ms :: {"message":"Failed to get heatm…
+2026-01-30T00:01:51.428325613Z 00:01:51 [info] Web Vital metric received {"metric":"INP","value":"64.00","rating":"good","delta":"64.00","metricId":"v5-1769731297379-2861627410420","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:01:51.450828072Z 12:01:51 AM [express] POST /api/analytics/web-vitals 204 in 67ms
+2026-01-30T00:01:51.516119277Z 00:01:51 [info] Web Vital metric received {"metric":"CLS","value":"0.00","rating":"good","delta":"0.00","metricId":"v5-1769731297435-1594114453261","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:01:51.531997215Z 12:01:51 AM [express] POST /api/analytics/web-vitals 204 in 147ms
