@@ -1,4 +1,6 @@
 import { fetchMapboxToken } from '@/hooks/use-public-config';
+import { CapacitorHttp } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 
 export interface DirectionsResult {
   duration: number;
@@ -9,6 +11,23 @@ export interface DirectionsResult {
 export interface Coordinates {
   lat: number;
   lng: number;
+}
+
+async function fetchDirections(url: string): Promise<any> {
+  if (Capacitor.isNativePlatform()) {
+    // Use CapacitorHttp for native apps to avoid CORS issues
+    const response = await CapacitorHttp.get({
+      url,
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+    return response.data;
+  } else {
+    // Use regular fetch for web
+    const response = await fetch(url);
+    return response.json();
+  }
 }
 
 export async function getDirections(
@@ -29,10 +48,10 @@ export async function getDirections(
   const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?access_token=${token}&geometries=geojson&overview=full`;
   
   try {
-    const response = await fetch(url);
-    const data = await response.json();
+    const data = await fetchDirections(url);
     
     if (!data.routes || data.routes.length === 0) {
+      console.warn('No routes found in Mapbox response');
       return {
         duration: estimateDuration(origin, destination),
         distance: estimateDistance(origin, destination),
