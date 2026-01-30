@@ -70,9 +70,9 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
   - **Client Hook**: `useMapboxToken()` hook in `client/src/hooks/use-public-config.ts` handles both strategies
 - **Waze**: Deep links for driver navigation.
 - **Azul API**: Payment gateway for Dominican Republic (mTLS with digital certificates).
-  - **Estado**: 3D Secure 2.0 integrado y probado en sandbox.
+  - **Estado**: 3D Secure 2.0 integrado y probado en sandbox. LISTO PARA PRODUCCION.
   - **Certificado**: app.gruard.com.bundle.crt (incluye CA de Azul)
-  - **Merchant ID**: 39038540035
+  - **Merchant ID Sandbox**: 39038540035
   - **Auth Headers**: splitit (para transacciones estandar) / 3dsecure (para 3DS 2.0)
   - **Ruta en servidor**: /opt/certificados/gruard/ (CapRover) -> /etc/azul/certs/ (container)
   - **3DS 2.0 Endpoints**:
@@ -85,7 +85,16 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
     - 3DS Method: Recoleccion de datos del navegador antes del desafio
     - Challenge (desafio): Redireccion a la pagina del emisor para autenticacion
   - **OrderNumber**: Maximo 15 digitos numericos (timestamp + sufijo aleatorio)
-  - **NOTA PRODUCCION**: Las sesiones 3DS se almacenan en memoria. Para produccion, migrar a Redis o PostgreSQL para persistencia entre reinicios y soporte multi-instancia.
+  - **CONFIGURACION PRODUCCION** - Secrets requeridos:
+    - `AZUL_MERCHANT_ID` - ID del comercio en produccion (diferente al sandbox)
+    - `AZUL_AUTH_KEY` - Llave de autenticacion para transacciones estandar
+    - `AZUL_AUTH_3DS` - Llave de autenticacion para 3D Secure 2.0
+    - `AZUL_ENVIRONMENT` - Cambiar a `production` (actualmente usa `sandbox`)
+    - `AZUL_CERT_PATH` - Ruta al certificado SSL (default: /etc/azul/certs/app.gruard.com.bundle.crt)
+    - `AZUL_KEY_PATH` - Ruta a la llave privada (default: /etc/azul/certs/app.gruard.com.key)
+    - `APP_BASE_URL` - URL base de la app (default: https://app.gruard.com)
+  - **PROTECCION PRODUCCION**: El sistema bloquea automáticamente los pagos si `AZUL_ENVIRONMENT=production` y faltan credenciales o certificados. Esto previene pagos accidentales con configuración incorrecta.
+  - **NOTA PRODUCCION**: Las sesiones 3DS se almacenan en memoria. Para produccion multi-instancia, migrar a Redis o PostgreSQL.
 - **Web Push API**: For push notifications.
 - **Replit Object Storage**: For document storage.
 - **Twilio**: SMS service for OTP delivery.

@@ -236,16 +236,140 @@ export class AzulPaymentService {
 
   /**
    * Check if Azul is properly configured
+   * In production mode, requires all credentials to be explicitly set
    */
   static isConfigured(): boolean {
     const config = getAzulConfig();
+    
+    // In production mode, require explicit credentials (not defaults)
+    if (config.environment === 'production') {
+      const hasExplicitMerchant = !!process.env.AZUL_MERCHANT_ID;
+      const hasExplicitAuth = !!process.env.AZUL_AUTH_KEY;
+      const hasCerts = fs.existsSync(CERT_PATH) && fs.existsSync(KEY_PATH);
+      
+      return hasExplicitMerchant && hasExplicitAuth && hasCerts;
+    }
+    
+    // In sandbox, just check if merchantId exists (even default is ok)
     return !!(config.merchantId);
+  }
+
+  /**
+   * Validate production configuration and throw if not ready
+   * Call this before any payment operations in production
+   */
+  static validateProductionConfig(): void {
+    const config = getAzulConfig();
+    
+    if (config.environment !== 'production') {
+      return; // Sandbox mode doesn't require strict validation
+    }
+    
+    const errors: string[] = [];
+    
+    if (!process.env.AZUL_MERCHANT_ID) {
+      errors.push('AZUL_MERCHANT_ID no está configurado');
+    }
+    
+    if (!process.env.AZUL_AUTH_KEY) {
+      errors.push('AZUL_AUTH_KEY no está configurado');
+    }
+    
+    if (!process.env.AZUL_AUTH_3DS) {
+      errors.push('AZUL_AUTH_3DS no está configurado (requerido para 3D Secure)');
+    }
+    
+    if (!fs.existsSync(CERT_PATH)) {
+      errors.push(`Certificado SSL no encontrado en: ${CERT_PATH}`);
+    }
+    
+    if (!fs.existsSync(KEY_PATH)) {
+      errors.push(`Llave privada SSL no encontrada en: ${KEY_PATH}`);
+    }
+    
+    if (errors.length > 0) {
+      const errorMessage = `Configuración de Azul incompleta para producción:\n${errors.join('\n')}`;
+      logSystem.error('Azul production config validation failed', { errors });
+      throw new Error(errorMessage);
+    }
+  }
+
+  /**
+   * Check if Azul is ready for production
+   * Returns detailed status for diagnostics
+   */
+  static getProductionReadiness(): {
+    ready: boolean;
+    environment: string;
+    checks: { name: string; status: 'ok' | 'missing' | 'warning'; message: string }[];
+  } {
+    const config = getAzulConfig();
+    const checks: { name: string; status: 'ok' | 'missing' | 'warning'; message: string }[] = [];
+    
+    // Check merchant ID
+    if (process.env.AZUL_MERCHANT_ID) {
+      checks.push({ name: 'AZUL_MERCHANT_ID', status: 'ok', message: 'Configurado' });
+    } else {
+      checks.push({ name: 'AZUL_MERCHANT_ID', status: 'warning', message: 'Usando valor sandbox por defecto' });
+    }
+    
+    // Check auth keys
+    if (process.env.AZUL_AUTH_KEY) {
+      checks.push({ name: 'AZUL_AUTH_KEY', status: 'ok', message: 'Configurado' });
+    } else {
+      checks.push({ name: 'AZUL_AUTH_KEY', status: 'warning', message: 'Usando valor sandbox por defecto' });
+    }
+    
+    if (process.env.AZUL_AUTH_3DS) {
+      checks.push({ name: 'AZUL_AUTH_3DS', status: 'ok', message: 'Configurado' });
+    } else {
+      checks.push({ name: 'AZUL_AUTH_3DS', status: 'warning', message: 'Usando valor sandbox por defecto' });
+    }
+    
+    // Check environment
+    if (config.environment === 'production') {
+      checks.push({ name: 'AZUL_ENVIRONMENT', status: 'ok', message: 'Produccion' });
+    } else {
+      checks.push({ name: 'AZUL_ENVIRONMENT', status: 'warning', message: 'Sandbox (cambiar a production para pagos reales)' });
+    }
+    
+    // Check certificates
+    const certExists = fs.existsSync(CERT_PATH);
+    const keyExists = fs.existsSync(KEY_PATH);
+    
+    if (certExists && keyExists) {
+      checks.push({ name: 'Certificados SSL', status: 'ok', message: 'Certificado y llave encontrados' });
+    } else if (config.environment === 'production') {
+      checks.push({ name: 'Certificados SSL', status: 'missing', message: 'Requeridos para produccion' });
+    } else {
+      checks.push({ name: 'Certificados SSL', status: 'warning', message: 'No encontrados (opcional para sandbox)' });
+    }
+    
+    // Check APP_BASE_URL
+    if (process.env.APP_BASE_URL) {
+      checks.push({ name: 'APP_BASE_URL', status: 'ok', message: process.env.APP_BASE_URL });
+    } else {
+      checks.push({ name: 'APP_BASE_URL', status: 'warning', message: 'Usando https://app.gruard.com por defecto' });
+    }
+    
+    const hasErrors = checks.some(c => c.status === 'missing');
+    const isProduction = config.environment === 'production';
+    const allConfigured = checks.every(c => c.status === 'ok');
+    
+    return {
+      ready: isProduction && !hasErrors && allConfigured,
+      environment: config.environment,
+      checks,
+    };
   }
 
   /**
    * Make a request to Azul API using https.request and digital certificates
    */
   private static async makeRequest(data: Record<string, any>): Promise<any> {
+    // Validate production configuration before making any API calls
+    this.validateProductionConfig();
+    
     const config = getAzulConfig();
     const apiUrl = getApiUrl();
     const url = new URL(apiUrl);

@@ -6900,6 +6900,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Check Azul payment configuration status
+  app.get("/api/admin/azul-status", async (req: Request, res: Response) => {
+    if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    try {
+      const status = AzulPaymentService.getProductionReadiness();
+      res.json(status);
+    } catch (error: any) {
+      logSystem.error('Get Azul status error', error);
+      res.status(500).json({ message: "Failed to get Azul status" });
+    }
+  });
+
   // TODO: Actualizar cuando se integre Azul API para calcular fees reales
   app.get("/api/admin/payment-fees", async (req: Request, res: Response) => {
     if (!req.isAuthenticated() || req.user!.userType !== 'admin') {
