@@ -4,9 +4,6 @@ modules = ["nodejs-20", "postgresql-16"]
 channel = "stable-25_05"
 packages = ["openjdk17", "android-tools", "imagemagick"]
 
-[[ports]]
-localPort = 5000
-
 [agent]
 integrations = ["javascript_database:1.0.0", "resend:1.0.0"]
 
@@ -20,3 +17,7 @@ author = 53119234
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm start"
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
