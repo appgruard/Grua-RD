@@ -2003,37 +2003,26 @@ export class DatabaseStorage implements IStorage {
 
   // Advanced Analytics (Module 2.3)
   async getServiceLocationsForHeatmap(startDate?: string, endDate?: string, precision: number = 3): Promise<Array<{ lat: number; lng: number; count: number; weight: number }>> {
-    // Use safe parameterized query with proper Drizzle template literals
-    const baseConditions = and(
-      isNotNull(servicios.origenLat),
-      isNotNull(servicios.origenLng)
-    );
+    // Use raw SQL to avoid Drizzle ORM GROUP BY issues with computed columns
+    const results = await db.execute(sql.raw(`
+      SELECT 
+        ROUND(CAST(origen_lat AS NUMERIC), ${precision}) as lat,
+        ROUND(CAST(origen_lng AS NUMERIC), ${precision}) as lng,
+        COUNT(*)::int as count
+      FROM servicios
+      WHERE origen_lat IS NOT NULL 
+        AND origen_lng IS NOT NULL
+        ${startDate && endDate ? `AND created_at >= '${startDate}'::timestamp AND created_at <= '${endDate}'::timestamp` : ''}
+      GROUP BY 
+        ROUND(CAST(origen_lat AS NUMERIC), ${precision}),
+        ROUND(CAST(origen_lng AS NUMERIC), ${precision})
+      ORDER BY COUNT(*) DESC
+    `));
     
-    const dateConditions = startDate && endDate 
-      ? and(
-          baseConditions,
-          sql`${servicios.createdAt} >= ${startDate}::timestamp`,
-          sql`${servicios.createdAt} <= ${endDate}::timestamp`
-        )
-      : baseConditions;
-
-    const results = await db
-      .select({
-        lat: sql<string>`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision})`.as('lat'),
-        lng: sql<string>`ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`.as('lng'),
-        count: sql<number>`COUNT(*)::int`.as('count'),
-      })
-      .from(servicios)
-      .where(dateConditions)
-      .groupBy(
-        sql`ROUND(CAST(${servicios.origenLat} AS NUMERIC), ${precision})`,
-        sql`ROUND(CAST(${servicios.origenLng} AS NUMERIC), ${precision})`
-      )
-      .orderBy(desc(sql`COUNT(*)`));
-
-    const maxCount = Math.max(...results.map(r => r.count), 1);
+    const rows = results.rows as Array<{ lat: string; lng: string; count: number }>;
+    const maxCount = Math.max(...rows.map(r => r.count), 1);
     
-    return results.map(r => ({
+    return rows.map(r => ({
       lat: Number(r.lat),
       lng: Number(r.lng),
       count: r.count,
