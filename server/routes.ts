@@ -16128,8 +16128,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
         res.setHeader('Cache-Control', 'public, max-age=31536000');
+        // Allow native mobile apps (Capacitor) to load this resource
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
         fs.createReadStream(filePath).pipe(res);
       } else {
+        // For 404, also set CORS headers for consistency
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
         res.status(404).json({ message: 'Imagen no encontrada' });
       }
     } catch (error: any) {

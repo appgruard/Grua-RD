@@ -125,6 +125,13 @@ app.use(compression({
 
 const isDevelopment = process.env.NODE_ENV === "development";
 
+// CORS headers for public resources BEFORE helmet (images for native mobile apps)
+app.use('/api/uploads/announcements', (_req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+});
+
 app.use(
   helmet({
     contentSecurityPolicy: isDevelopment ? false : {
@@ -174,6 +181,7 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false, // Completely disabled to allow native mobile apps (Capacitor) to load images
     hsts: {
       maxAge: 31536000,
       includeSubDomains: true,
@@ -191,9 +199,16 @@ const openCorsRoutes = [
   '/api/azul/3ds/method-notification'
 ];
 
+// Rutas de recursos estáticos que deben ser accesibles desde apps nativas
+const staticResourceRoutes = [
+  '/api/uploads/announcements'
+];
+
 // Middleware para rutas abiertas ANTES del CORS principal - bypassa CORS completamente
 app.use((req, res, next) => {
   const isOpenRoute = openCorsRoutes.some(route => req.path.startsWith(route));
+  const isStaticResource = staticResourceRoutes.some(route => req.path.startsWith(route));
+  
   if (isOpenRoute) {
     // Estas rutas son callbacks de servicios externos - permitir cualquier origen incluido null
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -206,6 +221,15 @@ app.use((req, res, next) => {
     // Marcar la request para que el CORS principal la ignore
     (req as any).skipCors = true;
   }
+  
+  if (isStaticResource) {
+    // Recursos estáticos como imágenes deben ser accesibles desde apps nativas (Capacitor)
+    // Permitir cross-origin para que las apps móviles puedan cargar las imágenes
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+    (req as any).skipCors = true;
+  }
+  
   next();
 });
 
