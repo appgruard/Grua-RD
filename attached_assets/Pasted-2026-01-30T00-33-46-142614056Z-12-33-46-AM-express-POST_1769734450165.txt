@@ -1,0 +1,24 @@
+2026-01-30T00:33:46.142614056Z 12:33:46 AM [express] POST /api/analytics/web-vitals 204 in 1ms
+2026-01-30T00:33:51.339907531Z 00:33:51 [info] Using Resend email service via Replit connector
+2026-01-30T00:33:51.658212486Z 00:33:51 [info] Password reset email sent successfully: 5be7e7d5-c691-48c9-8bb1-e1faf459497f
+2026-01-30T00:33:51.659825616Z 12:33:51 AM [express] POST /api/auth/forgot-password 200 in 585ms :: {"message":"Código de recuperaci…
+2026-01-30T00:33:52.318472256Z 12:33:52 AM [express] GET /api/assets/logo-email 404 in 1ms
+2026-01-30T00:42:31.133434949Z 00:42:31 [info] Web Vital metric received {"metric":"INP","value":"96.00","rating":"good","delta":"96.00","metricId":"v5-1769733223311-5128152851410","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:42:31.134352410Z 12:42:31 AM [express] POST /api/analytics/web-vitals 204 in 1ms
+2026-01-30T00:42:31.135278504Z 00:42:31 [info] Web Vital metric received {"metric":"CLS","value":"0.00","rating":"good","delta":"0.00","metricId":"v5-1769733223351-1076472308356","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:42:31.135880944Z 12:42:31 AM [express] POST /api/analytics/web-vitals 204 in 1ms
+2026-01-30T00:44:19.767536716Z 00:44:19 [info] Password reset email sent successfully: 1bc151ad-654a-4322-bd50-09c1d6ccd862
+2026-01-30T00:44:19.768657371Z 12:44:19 AM [express] POST /api/auth/forgot-password 200 in 425ms :: {"message":"Código de recuperaci…
+2026-01-30T00:47:30.845667524Z 12:47:30 AM [express] GET /api/assets/logo-email 404 in 2ms
+2026-01-30T00:47:41.886198865Z 12:47:41 AM [express] GET /api/assets/logo-email 404 in 1ms
+2026-01-30T00:47:59.862229031Z 12:47:59 AM [express] GET /api/assets/logo-email 404 in 1ms
+2026-01-30T00:48:39.726076349Z 12:48:39 AM [express] GET /api/assets/logo-email 404 in 1ms
+2026-01-30T00:50:27.995771153Z 12:50:27 AM [express] POST /api/auth/reset-password 400 in 108ms :: {"message":"Código inválido o exp…
+2026-01-30T00:50:45.235996855Z 00:50:45 [info] Password reset email sent successfully: 44960e80-6684-42e0-8c95-293384a319d5
+2026-01-30T00:50:45.237220894Z 12:50:45 AM [express] POST /api/auth/forgot-password 200 in 381ms :: {"message":"Código de recuperaci…
+2026-01-30T00:50:59.170001460Z 12:50:59 AM [express] GET /api/assets/logo-email 404 in 1ms
+2026-01-30T00:51:16.473555656Z 12:51:16 AM [express] POST /api/auth/reset-password 400 in 17ms :: {"message":"Código inválido o expi…
+2026-01-30T00:51:21.794924451Z 00:51:21 [info] Web Vital metric received {"metric":"INP","value":"72.00","rating":"good","delta":"-24.00","metricId":"v5-1769733223311-5128152851410","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:51:21.795733360Z 12:51:21 AM [express] POST /api/analytics/web-vitals 204 in 1ms
+2026-01-30T00:51:21.796747055Z 00:51:21 [info] Web Vital metric received {"metric":"CLS","value":"0.00","rating":"good","delta":"0.00","metricId":"v5-1769733223351-1076472308356","navigationType":"reload","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.","category":"system"}
+2026-01-30T00:51:21.797379049Z 12:51:21 AM [express] POST /api/analytics/web-vitals 204 in 0ms

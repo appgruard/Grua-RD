@@ -2130,13 +2130,16 @@ export class DatabaseStorage implements IStorage {
     return code;
   }
 
-  async getActiveVerificationCode(telefono: string, tipoOperacion: string): Promise<VerificationCode | undefined> {
+  async getActiveVerificationCode(identifier: string, tipoOperacion: string): Promise<VerificationCode | undefined> {
     const [code] = await db
       .select()
       .from(verificationCodes)
       .where(
         and(
-          eq(verificationCodes.telefono, telefono),
+          or(
+            eq(verificationCodes.telefono, identifier),
+            eq(verificationCodes.email, identifier)
+          ),
           eq(verificationCodes.tipoOperacion, tipoOperacion),
           eq(verificationCodes.verificado, false),
           sql`${verificationCodes.expiraEn} > NOW()`
@@ -2167,12 +2170,15 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${verificationCodes.expiraEn} < NOW()`);
   }
 
-  async deletePriorVerificationCodes(telefono: string, tipoOperacion: string): Promise<void> {
+  async deletePriorVerificationCodes(identifier: string, tipoOperacion: string): Promise<void> {
     await db
       .delete(verificationCodes)
       .where(
         and(
-          eq(verificationCodes.telefono, telefono),
+          or(
+            eq(verificationCodes.telefono, identifier),
+            eq(verificationCodes.email, identifier)
+          ),
           eq(verificationCodes.tipoOperacion, tipoOperacion),
           eq(verificationCodes.verificado, false)
         )

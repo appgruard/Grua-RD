@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertCircle, Clock, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { Loader2, AlertCircle, Clock, Eye, EyeOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiRequest } from '@/lib/queryClient';
 import logoUrl from '@assets/20251126_144937_0000_1764283370962.png';
@@ -238,12 +238,35 @@ export default function ForgotPassword() {
                 )}
               </div>
 
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>Código expira en: {formatTime(timeLeft)}</span>
-              </div>
+              {timeLeft > 0 ? (
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>Código expira en: {formatTime(timeLeft)}</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-sm text-destructive">El código ha expirado</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRequestCode}
+                    disabled={loading}
+                    data-testid="button-resend-code"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Reenviando...
+                      </>
+                    ) : (
+                      'Reenviar Código'
+                    )}
+                  </Button>
+                </div>
+              )}
 
-              <Button type="submit" className="w-full" disabled={loading} data-testid="button-verify-forgot-otp">
+              <Button type="submit" className="w-full" disabled={loading || timeLeft === 0} data-testid="button-verify-forgot-otp">
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -261,12 +284,11 @@ export default function ForgotPassword() {
               <div className="space-y-2">
                 <Label htmlFor="nuevaPassword">Nueva Contraseña</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="nuevaPassword"
                     type={showNewPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className={`pl-10 pr-10 ${
+                    className={`pr-10 ${
                       errors.nuevaPassword ? 'border-destructive focus-visible:ring-destructive' : ''
                     }`}
                     value={nuevaPassword}
@@ -277,16 +299,15 @@ export default function ForgotPassword() {
                     disabled={loading}
                     data-testid="input-new-password"
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     onClick={() => setShowNewPassword(!showNewPassword)}
+                    tabIndex={-1}
                     data-testid="button-toggle-new-password"
                   >
-                    {showNewPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </Button>
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
                 {errors.nuevaPassword && (
                   <p className="text-sm text-destructive flex items-center gap-1">
@@ -299,12 +320,11 @@ export default function ForgotPassword() {
               <div className="space-y-2">
                 <Label htmlFor="confirmarPassword">Confirmar Contraseña</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirmarPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className={`pl-10 pr-10 ${
+                    className={`pr-10 ${
                       errors.confirmarPassword ? 'border-destructive focus-visible:ring-destructive' : ''
                     }`}
                     value={confirmarPassword}
@@ -315,16 +335,15 @@ export default function ForgotPassword() {
                     disabled={loading}
                     data-testid="input-confirm-password"
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    tabIndex={-1}
                     data-testid="button-toggle-confirm-password"
                   >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </Button>
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
                 {errors.confirmarPassword && (
                   <p className="text-sm text-destructive flex items-center gap-1">
