@@ -155,3 +155,24 @@ npx cap sync
 
 ### Known Issues
 - **Capacitor CLI 7.x Template Bug**: The template.js file in `@capacitor/cli` needs patching. The patch is included in GitHub Actions workflows and should be applied after npm install in CI environments.
+
+## Testing Accounts (Google Play & App Store Review)
+
+### Google Play Store
+| Tipo | Email | Contraseña |
+|------|-------|------------|
+| Cliente | googleplay.cliente@gruard.test | Test123456! |
+| Conductor | googleplay.conductor@gruard.test | Test123456! |
+
+### Apple App Store
+| Tipo | Email | Contraseña |
+|------|-------|------------|
+| Cliente | appstore.cliente@gruard.test | Test123456! |
+| Conductor | appstore.conductor@gruard.test | Test123456! |
+
+### Tarjetas de Prueba (Azul Sandbox)
+- **Tarjeta 3DS:** 4005 5200 0000 0129, Exp: 12/28, CVV: 123
+- **Tarjeta Alternativa:** 4147 4630 1111 0059, Exp: 12/28, CVV: 123
+
+### Documentación Completa
+Ver `docs/TESTING_INSTRUCTIONS.md` para instrucciones detalladas de testing.
