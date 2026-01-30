@@ -74,7 +74,8 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
   - **Certificado**: app.gruard.com.bundle.crt (incluye CA de Azul)
   - **Merchant ID Sandbox**: 39038540035
   - **Auth Headers**: splitit (para transacciones estandar) / 3dsecure (para 3DS 2.0)
-  - **Ruta en servidor**: /opt/certificados/gruard/ (CapRover) -> /etc/azul/certs/ (container)
+  - **Ruta certificados desarrollo (sandbox)**: /opt/certificados/gruard.old/
+  - **Ruta certificados producción**: /opt/certificados/gruard/
   - **3DS 2.0 Endpoints**:
     - `POST /api/azul/3ds/initiate` - Iniciar pago con autenticacion 3DS
     - `POST /api/azul/3ds/method-notification` - Callback del 3DS Method

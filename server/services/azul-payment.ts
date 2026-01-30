@@ -7,9 +7,18 @@ import fs from 'fs';
 const AZUL_SANDBOX_URL = 'https://pruebas.azul.com.do/webservices/JSON/Default.aspx';
 const AZUL_PRODUCTION_URL = 'https://pagos.azul.com.do/webservices/JSON/Default.aspx';
 
-// Certificate Paths
-const CERT_PATH = process.env.AZUL_CERT_PATH || '/etc/azul/certs/app.gruard.com.bundle.crt';
-const KEY_PATH = process.env.AZUL_KEY_PATH || '/etc/azul/certs/app.gruard.com.key';
+// Certificate Paths - Different paths for development vs production
+const DEV_CERT_BASE = '/opt/certificados/gruard.old';
+const PROD_CERT_BASE = '/opt/certificados/gruard';
+
+const getCertPaths = () => {
+  const env = process.env.AZUL_ENVIRONMENT || 'sandbox';
+  const basePath = env === 'production' ? PROD_CERT_BASE : DEV_CERT_BASE;
+  return {
+    cert: process.env.AZUL_CERT_PATH || `${basePath}/app.gruard.com.bundle.crt`,
+    key: process.env.AZUL_KEY_PATH || `${basePath}/app.gruard.com.key`,
+  };
+};
 
 // Environment configuration
 const getAzulConfig = () => ({
@@ -30,16 +39,17 @@ const getApiUrl = () => {
 // Create HTTPS Agent with certificates
 const getHttpsAgent = () => {
   try {
+    const { cert: certPath, key: keyPath } = getCertPaths();
     logSystem.info('Checking Azul certificates', { 
-      certPath: CERT_PATH, 
-      keyPath: KEY_PATH,
-      certExists: fs.existsSync(CERT_PATH),
-      keyExists: fs.existsSync(KEY_PATH)
+      certPath, 
+      keyPath,
+      certExists: fs.existsSync(certPath),
+      keyExists: fs.existsSync(keyPath)
     });
     
-    if (fs.existsSync(CERT_PATH) && fs.existsSync(KEY_PATH)) {
-      const cert = fs.readFileSync(CERT_PATH);
-      const key = fs.readFileSync(KEY_PATH);
+    if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+      const cert = fs.readFileSync(certPath);
+      const key = fs.readFileSync(keyPath);
       logSystem.info('Azul certificates loaded successfully', { 
         certSize: cert.length,
         keySize: key.length
@@ -240,12 +250,13 @@ export class AzulPaymentService {
    */
   static isConfigured(): boolean {
     const config = getAzulConfig();
+    const { cert: certPath, key: keyPath } = getCertPaths();
     
     // In production mode, require explicit credentials (not defaults)
     if (config.environment === 'production') {
       const hasExplicitMerchant = !!process.env.AZUL_MERCHANT_ID;
       const hasExplicitAuth = !!process.env.AZUL_AUTH_KEY;
-      const hasCerts = fs.existsSync(CERT_PATH) && fs.existsSync(KEY_PATH);
+      const hasCerts = fs.existsSync(certPath) && fs.existsSync(keyPath);
       
       return hasExplicitMerchant && hasExplicitAuth && hasCerts;
     }
@@ -279,12 +290,13 @@ export class AzulPaymentService {
       errors.push('AZUL_AUTH_3DS no está configurado (requerido para 3D Secure)');
     }
     
-    if (!fs.existsSync(CERT_PATH)) {
-      errors.push(`Certificado SSL no encontrado en: ${CERT_PATH}`);
+    const { cert: certPath, key: keyPath } = getCertPaths();
+    if (!fs.existsSync(certPath)) {
+      errors.push(`Certificado SSL no encontrado en: ${certPath}`);
     }
     
-    if (!fs.existsSync(KEY_PATH)) {
-      errors.push(`Llave privada SSL no encontrada en: ${KEY_PATH}`);
+    if (!fs.existsSync(keyPath)) {
+      errors.push(`Llave privada SSL no encontrada en: ${keyPath}`);
     }
     
     if (errors.length > 0) {
@@ -334,8 +346,9 @@ export class AzulPaymentService {
     }
     
     // Check certificates
-    const certExists = fs.existsSync(CERT_PATH);
-    const keyExists = fs.existsSync(KEY_PATH);
+    const { cert: certPath, key: keyPath } = getCertPaths();
+    const certExists = fs.existsSync(certPath);
+    const keyExists = fs.existsSync(keyPath);
     
     if (certExists && keyExists) {
       checks.push({ name: 'Certificados SSL', status: 'ok', message: 'Certificado y llave encontrados' });
