@@ -15706,7 +15706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         {
           name: 'Restablecer Contraseña',
-          send: () => emailService.sendPasswordResetEmail(email, 'https://gruard.com/reset-password?token=test-token-12345', 'Usuario de Prueba')
+          send: () => emailService.sendPasswordResetEmail(email, '123456', 'Usuario de Prueba')
         },
         {
           name: 'Documento Aprobado',
@@ -16198,7 +16198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { name: 'Bienvenida Cliente', send: () => emailService.sendClientWelcomeEmail(email, 'Cliente Prueba') },
         { name: 'Bienvenida Operador', send: () => emailService.sendOperatorWelcomeEmail(email, 'Operador Prueba') },
         { name: 'Notificación de Servicio', send: () => emailService.sendServiceNotification(email, 'Servicio Completado', 'Tu servicio SRV-12345 ha sido completado exitosamente.') },
-        { name: 'Restablecer Contraseña', send: () => emailService.sendPasswordResetEmail(email, 'https://app.gruard.com/reset?token=test123', 'Usuario Prueba') },
+        { name: 'Restablecer Contraseña', send: () => emailService.sendPasswordResetEmail(email, '123456', 'Usuario Prueba') },
         { name: 'Documento Aprobado', send: () => emailService.sendDocumentApprovalEmail(email, 'Licencia de Conducir', true) },
         { name: 'Documento Rechazado', send: () => emailService.sendDocumentApprovalEmail(email, 'Seguro del Vehículo', false, 'El documento está vencido o ilegible') },
         { name: 'Ticket Creado', send: () => emailService.sendTicketCreatedEmail(email, 'Usuario Prueba', mockTicket) },

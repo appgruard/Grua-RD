@@ -505,7 +505,7 @@ class ResendEmailService implements EmailService {
     }
   }
 
-  async sendPasswordResetEmail(email: string, resetLink: string, userName?: string): Promise<boolean> {
+  async sendPasswordResetEmail(email: string, code: string, userName?: string): Promise<boolean> {
     const greeting = userName ? `Hola ${userName}` : 'Hola';
     
     const content = `
@@ -515,12 +515,18 @@ class ResendEmailService implements EmailService {
         Recibimos una solicitud para restablecer la contrasena de tu cuenta.
       </p>
       
-      <div style="text-align: center; margin: 35px 0;">
-        <a href="${resetLink}" style="display: inline-block; background: ${BRAND_COLORS.primary}; color: white; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Restablecer Contrasena</a>
+      <p style="font-size: 14px; color: ${BRAND_COLORS.text}; margin: 0 0 15px 0;">
+        Tu codigo de recuperacion es:
+      </p>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <div style="display: inline-block; background: ${BRAND_COLORS.light}; border: 2px solid ${BRAND_COLORS.border}; padding: 20px 40px; border-radius: 8px;">
+          <span style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: ${BRAND_COLORS.primary};">${code}</span>
+        </div>
       </div>
       
       <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 25px 0 10px 0;">
-        Este enlace es valido por <strong>1 hora</strong>.
+        Este codigo es valido por <strong>10 minutos</strong>.
       </p>
       
       <p style="font-size: 13px; color: ${BRAND_COLORS.muted}; margin: 0;">
@@ -533,7 +539,7 @@ class ResendEmailService implements EmailService {
       generateFooterHTML('Correo automatico - No responder')
     );
 
-    const text = `${greeting},\n\nRecibimos una solicitud para restablecer tu contrasena.\n\nEnlace: ${resetLink}\n\nEste enlace expira en 1 hora.\n\nSi no solicitaste esto, ignora este correo.\n\n---\nGrua RD | Departamento de Seguridad`;
+    const text = `${greeting},\n\nRecibimos una solicitud para restablecer tu contrasena.\n\nTu codigo de recuperacion es: ${code}\n\nEste codigo expira en 10 minutos.\n\nSi no solicitaste esto, ignora este correo.\n\n---\nGrua RD | Departamento de Seguridad`;
 
     const resend = await getResendClient(EMAIL_ADDRESSES.verification);
     if (!resend) {
