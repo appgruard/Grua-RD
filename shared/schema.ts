@@ -421,7 +421,8 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 // Verification Codes Table (for OTP verification)
 export const verificationCodes = pgTable("verification_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  telefono: text("telefono").notNull(),
+  telefono: text("telefono"), // Optional - used for phone verification
+  email: text("email"), // Optional - used for email verification (password reset)
   codigo: text("codigo").notNull(),
   expiraEn: timestamp("expira_en").notNull(),
   intentos: integer("intentos").default(0).notNull(),
@@ -1598,9 +1599,10 @@ export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions
 });
 
 export const insertVerificationCodeSchema = createInsertSchema(verificationCodes, {
-  telefono: z.string().min(10),
+  telefono: z.string().min(10).optional().nullable(),
+  email: z.string().email().optional().nullable(),
   codigo: z.string().length(6),
-  tipoOperacion: z.enum(["registro", "recuperacion_password"]),
+  tipoOperacion: z.enum(["registro", "recuperacion_password", "verificacion_email"]),
 }).omit({
   id: true,
   createdAt: true,
