@@ -2,7 +2,7 @@ modules = ["nodejs-20", "postgresql-16"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["openjdk17", "android-tools", "imagemagick"]
+packages = ["openjdk17", "android-tools", "imagemagick", "glib", "nspr", "nss", "dbus", "at-spi2-atk", "cups", "libxkbcommon", "at-spi2-core", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "mesa", "cairo", "pango", "alsa-lib", "libgbm"]
 
 [agent]
 integrations = ["javascript_database:1.0.0", "resend:1.0.0"]
