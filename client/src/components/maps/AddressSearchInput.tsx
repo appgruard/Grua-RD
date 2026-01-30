@@ -90,20 +90,17 @@ export function AddressSearchInput({
           coordinates: coords,
         };
       }
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        if (data.features && data.features.length > 0) {
-          const feature = data.features[0];
-          return {
-            id: `coords-${coords.lat}-${coords.lng}`,
-            placeName: feature.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
-            text: feature.text || 'Ubicación seleccionada',
-            coordinates: coords,
-          };
-        }
+      const { universalFetch } = await import('@/lib/queryClient');
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`;
+      const data = await universalFetch(url);
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        return {
+          id: `coords-${coords.lat}-${coords.lng}`,
+          placeName: feature.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
+          text: feature.text || 'Ubicación seleccionada',
+          coordinates: coords,
+        };
       }
       return {
         id: `coords-${coords.lat}-${coords.lng}`,
@@ -195,10 +192,9 @@ export function AddressSearchInput({
         try {
           const token = await fetchMapboxToken();
           if (token) {
-            const response = await fetch(
-              `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`
-            );
-            const data = await response.json();
+            const { universalFetch } = await import('@/lib/queryClient');
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`;
+            const data = await universalFetch(url);
             const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
             setInputValue(address);
             onAddressChange(address, coords);

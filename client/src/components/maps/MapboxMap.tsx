@@ -298,10 +298,9 @@ async function reverseGeocode(lat: number, lng: number, token: string | null): P
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   }
   try {
-    const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}`
-    );
-    const data = await response.json();
+    const { universalFetch } = await import('@/lib/queryClient');
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}`;
+    const data = await universalFetch(url);
     if (data.features && data.features.length > 0) {
       return data.features[0].place_name;
     }

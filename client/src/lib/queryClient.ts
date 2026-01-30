@@ -63,6 +63,23 @@ async function nativeFetch(
   };
 }
 
+/**
+ * Universal fetch that works on both web and native platforms.
+ * Use this for external API calls (Mapbox, etc.) that don't go through our backend.
+ */
+export async function universalFetch(url: string): Promise<any> {
+  if (isNativePlatform()) {
+    const response = await CapacitorHttp.get({
+      url,
+      headers: { 'Accept': 'application/json' },
+    });
+    return response.data;
+  } else {
+    const response = await fetch(url);
+    return response.json();
+  }
+}
+
 export async function apiRequest(
   method: string,
   url: string,

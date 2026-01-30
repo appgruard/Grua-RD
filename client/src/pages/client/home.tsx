@@ -232,18 +232,12 @@ export default function ClientHome() {
         try {
           const token = await fetchMapboxToken();
           if (token) {
-            const response = await fetch(
-              `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`
-            );
-            if (response.ok) {
-              const data = await response.json();
-              const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
-              setOrigin(coords);
-              setOrigenDireccion(address);
-            } else {
-              setOrigin(coords);
-              setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
-            }
+            const { universalFetch } = await import('@/lib/queryClient');
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`;
+            const data = await universalFetch(url);
+            const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+            setOrigin(coords);
+            setOrigenDireccion(address);
           } else {
             setOrigin(coords);
             setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);

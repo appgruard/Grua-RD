@@ -82,13 +82,9 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   }
   try {
-    const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&language=es`
-    );
-    if (!response.ok) {
-      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-    }
-    const data = await response.json();
+    const { universalFetch } = await import('@/lib/queryClient');
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&language=es`;
+    const data = await universalFetch(url);
     return data.features?.[0]?.place_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   } catch (error) {
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
