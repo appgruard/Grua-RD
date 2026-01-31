@@ -449,10 +449,16 @@ export class AzulPaymentService {
               reject(new Error('Azul API returned empty response'));
               return;
             }
+            logSystem.info('Azul API raw response', { 
+              statusCode: res.statusCode,
+              rawBody: responseBody.substring(0, 500)
+            });
             const responseData = JSON.parse(responseBody);
             logSystem.info('Azul API response received', { 
               isoCode: responseData.IsoCode,
-              responseMessage: responseData.ResponseMessage
+              responseMessage: responseData.ResponseMessage,
+              errorDescription: responseData.ErrorDescription,
+              rawKeys: Object.keys(responseData).join(',')
             });
             resolve(responseData);
           } catch (error) {
