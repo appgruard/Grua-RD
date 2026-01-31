@@ -1,8 +1,8 @@
-modules = ["nodejs-20", "postgresql-16"]
+modules = ["nodejs-20", "postgresql-16", "python-3.11"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["openjdk17", "android-tools", "imagemagick", "glib", "nspr", "nss", "dbus", "at-spi2-atk", "cups", "libxkbcommon", "at-spi2-core", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "mesa", "cairo", "pango", "alsa-lib", "libgbm"]
+packages = ["alsa-lib", "android-tools", "at-spi2-atk", "at-spi2-core", "cairo", "cups", "dbus", "freetype", "glib", "imagemagick", "lcms2", "libgbm", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "libxkbcommon", "mesa", "nspr", "nss", "openjdk17", "openjpeg", "pango", "tcl", "tk", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "zlib"]
 
 [agent]
 integrations = ["javascript_database:1.0.0", "resend:1.0.0"]
