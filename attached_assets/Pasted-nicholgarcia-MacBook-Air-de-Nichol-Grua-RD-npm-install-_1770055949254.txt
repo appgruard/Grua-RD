@@ -1,0 +1,52 @@
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % npm install @capacitor/cli@7.4.4
+npm error code ENOTEMPTY
+npm error syscall rename
+npm error path /Users/nicholgarcia/Documents/Grua-RD/node_modules/twilio
+npm error dest /Users/nicholgarcia/Documents/Grua-RD/node_modules/.twilio-vtEGLIZR
+npm error errno -66
+npm error ENOTEMPTY: directory not empty, rename '/Users/nicholgarcia/Documents/Grua-RD/node_modules/twilio' -> '/Users/nicholgarcia/Documents/Grua-RD/node_modules/.twilio-vtEGLIZR'
+npm error A complete log of this run can be found in: /Users/nicholgarcia/.npm/_logs/2026-02-02T17_52_11_561Z-debug-0.log
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % cd android
+./gradlew cleanBuildCache
+./gradlew --stop
+cd ..
+npx cap sync android
+
+
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+[Incubating] Problems report is available at: file:///Users/nicholgarcia/Documents/Grua-RD/android/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Task 'cleanBuildCache' not found in root project 'android' and its subprojects.
+
+* Try:
+> Run gradlew tasks to get a list of available tasks.
+> For more on name expansion, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:name_abbreviation in the Gradle documentation.
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3s
+Stopping Daemon(s)
+2 Daemons stopped
+✔ Copying web assets from public to android/app/src/main/assets/public in 69.76ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 1.82ms
+✔ copy android in 117.81ms
+✔ Updating Android plugins in 12.18ms
+[info] Found 6 Capacitor plugins for android:
+       @capacitor/app@7.1.1
+       @capacitor/camera@7.0.3
+       @capacitor/filesystem@7.1.6
+       @capacitor/geolocation@7.1.7
+       @capacitor/network@7.0.3
+       @capacitor/push-notifications@7.0.4
+✔ update android in 72.74ms
+[info] Sync finished in 0.279s
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % 
