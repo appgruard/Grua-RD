@@ -82,9 +82,11 @@ export function AddressSearchInput({
   };
 
   const reverseGeocode = useCallback(async (coords: Coordinates): Promise<AddressSuggestion | null> => {
+    console.log('[AddressSearchInput.reverseGeocode] coords:', coords);
     try {
       const token = await fetchMapboxToken();
       if (!token) {
+        console.warn('[AddressSearchInput.reverseGeocode] No token');
         return {
           id: `coords-${coords.lat}-${coords.lng}`,
           placeName: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
@@ -92,11 +94,12 @@ export function AddressSearchInput({
           coordinates: coords,
         };
       }
-      const { universalFetch } = await import('@/lib/queryClient');
       const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`;
+      console.log('[AddressSearchInput.reverseGeocode] Calling universalFetch');
       const data = await universalFetch(url);
       if (data.features && data.features.length > 0) {
         const feature = data.features[0];
+        console.log('[AddressSearchInput.reverseGeocode] Found:', feature.place_name);
         return {
           id: `coords-${coords.lat}-${coords.lng}`,
           placeName: feature.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
@@ -104,6 +107,7 @@ export function AddressSearchInput({
           coordinates: coords,
         };
       }
+      console.log('[AddressSearchInput.reverseGeocode] No features found');
       return {
         id: `coords-${coords.lat}-${coords.lng}`,
         placeName: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
@@ -111,7 +115,7 @@ export function AddressSearchInput({
         coordinates: coords,
       };
     } catch (error) {
-      console.error('Failed to reverse geocode:', error);
+      console.error('[AddressSearchInput.reverseGeocode] Error:', error);
       return {
         id: `coords-${coords.lat}-${coords.lng}`,
         placeName: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
@@ -142,18 +146,52 @@ export function AddressSearchInput({
     }
 
     setIsLoading(true);
+    const isNative = Capacitor.isNativePlatform();
+    console.log('[fetchSuggestions] isNative:', isNative, 'query:', query);
+    
     try {
-      let url = `/api/maps/autocomplete?query=${encodeURIComponent(query)}`;
-      if (currentLocation) {
-        url += `&proximity=${currentLocation.lng},${currentLocation.lat}`;
+      // For native apps, use Mapbox Geocoding API directly
+      if (isNative) {
+        const token = await fetchMapboxToken();
+        if (!token) {
+          console.warn('[fetchSuggestions] No Mapbox token');
+          setSuggestions([]);
+          return;
+        }
+        
+        let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${token}&country=DO&limit=5&types=address,poi,place,locality,neighborhood&language=es`;
+        if (currentLocation) {
+          url += `&proximity=${currentLocation.lng},${currentLocation.lat}`;
+        }
+        
+        console.log('[fetchSuggestions] Calling Mapbox directly');
+        const data = await universalFetch(url);
+        
+        const mappedSuggestions = (data.features || []).map((feature: any) => ({
+          id: feature.id,
+          placeName: feature.place_name,
+          text: feature.text,
+          coordinates: {
+            lat: feature.center[1],
+            lng: feature.center[0],
+          },
+        }));
+        
+        console.log('[fetchSuggestions] Found', mappedSuggestions.length, 'suggestions');
+        setSuggestions(mappedSuggestions);
+      } else {
+        // For web, use server endpoint
+        let url = `/api/maps/autocomplete?query=${encodeURIComponent(query)}`;
+        if (currentLocation) {
+          url += `&proximity=${currentLocation.lng},${currentLocation.lat}`;
+        }
+        
+        const response = await apiRequest('GET', url);
+        const data = await response.json();
+        setSuggestions(data.suggestions || []);
       }
-      
-      // Use apiRequest for proper native platform support
-      const response = await apiRequest('GET', url);
-      const data = await response.json();
-      setSuggestions(data.suggestions || []);
     } catch (error) {
-      console.error('Failed to fetch suggestions:', error);
+      console.error('[fetchSuggestions] Error:', error);
       setSuggestions([]);
     } finally {
       setIsLoading(false);
