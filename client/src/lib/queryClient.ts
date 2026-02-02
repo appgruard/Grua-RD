@@ -73,10 +73,38 @@ async function nativeFetch(
  */
 export async function universalFetch(url: string): Promise<any> {
   const isNative = isNativePlatform();
-  console.log('[universalFetch] URL:', url.substring(0, 100), 'isNative:', isNative);
+  const platform = Capacitor.getPlatform();
+  console.log('[universalFetch] URL:', url.substring(0, 100), 'isNative:', isNative, 'platform:', platform);
+  
+  // On iOS, use CapacitorHttp directly (fetch interception may not work reliably)
+  if (isNative && platform === 'ios') {
+    console.log('[universalFetch] Using CapacitorHttp directly for iOS');
+    try {
+      const response = await CapacitorHttp.get({
+        url,
+        headers: { 'Accept': 'application/json' },
+      });
+      console.log('[universalFetch] iOS CapacitorHttp status:', response.status);
+      
+      let data = response.data;
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (e) {
+          console.error('[universalFetch] iOS JSON parse error:', e);
+        }
+      }
+      console.log('[universalFetch] iOS data received, hasFeatures:', !!(data && data.features));
+      return data;
+    } catch (error) {
+      console.error('[universalFetch] iOS CapacitorHttp error:', error);
+      throw error;
+    }
+  }
   
   try {
-    // With CapacitorHttp enabled, fetch() is automatically intercepted on native
+    // On Android with CapacitorHttp enabled, fetch() is automatically intercepted
+    // On web, use standard fetch
     const response = await fetch(url, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
@@ -94,15 +122,15 @@ export async function universalFetch(url: string): Promise<any> {
   } catch (error) {
     console.error('[universalFetch] Fetch error:', error);
     
-    // Fallback: try using CapacitorHttp directly if fetch fails on native
-    if (isNative) {
-      console.log('[universalFetch] Trying CapacitorHttp fallback...');
+    // Fallback: try using CapacitorHttp directly if fetch fails on native Android
+    if (isNative && platform === 'android') {
+      console.log('[universalFetch] Trying CapacitorHttp fallback for Android...');
       try {
         const response = await CapacitorHttp.get({
           url,
           headers: { 'Accept': 'application/json' },
         });
-        console.log('[universalFetch] CapacitorHttp fallback status:', response.status);
+        console.log('[universalFetch] Android CapacitorHttp fallback status:', response.status);
         
         let data = response.data;
         if (typeof data === 'string') {
@@ -110,7 +138,7 @@ export async function universalFetch(url: string): Promise<any> {
         }
         return data;
       } catch (fallbackError) {
-        console.error('[universalFetch] CapacitorHttp fallback also failed:', fallbackError);
+        console.error('[universalFetch] Android CapacitorHttp fallback also failed:', fallbackError);
         throw fallbackError;
       }
     }
