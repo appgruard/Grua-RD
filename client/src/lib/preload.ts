@@ -141,11 +141,13 @@ export function preloadDriverResourcesOnLogin() {
   prefetchDriverData();
 }
 
-export function prefetchUserData() {
-  const endpoints = [
-    '/api/auth/me',
-    '/api/drivers/me',
-  ];
+export function prefetchUserData(userType?: 'cliente' | 'conductor' | 'admin' | 'empresa') {
+  const endpoints = ['/api/auth/me'];
+  
+  // Only prefetch driver data if user is a driver
+  if (userType === 'conductor') {
+    endpoints.push('/api/drivers/me');
+  }
 
   endpoints.forEach((endpoint) => {
     if (!prefetchedData.has(endpoint)) {
@@ -270,6 +272,12 @@ export function initializePreloading() {
   }, { timeout: 1000 });
 
   scheduleIdleTask(() => {
-    prefetchUserData();
+    // Get user type from localStorage to prefetch appropriate data
+    try {
+      const lastUserType = localStorage.getItem('lastUserType') as 'cliente' | 'conductor' | 'admin' | 'empresa' | null;
+      prefetchUserData(lastUserType || undefined);
+    } catch {
+      prefetchUserData();
+    }
   }, { timeout: 1500 });
 }

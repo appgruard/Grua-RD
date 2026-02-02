@@ -48,10 +48,12 @@ export function WalletAlertBanner({ className }: WalletAlertBannerProps) {
   const [, setLocation] = useLocation();
   const [dismissed, setDismissed] = useState(false);
 
+  // Only fetch wallet data - this component should only be rendered for drivers
   const { data: wallet, isLoading } = useQuery<WalletData>({
     queryKey: ['/api/wallet'],
     refetchInterval: 60000,
     staleTime: 30000,
+    retry: false,
   });
 
   if (isLoading || !wallet || dismissed) {

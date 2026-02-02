@@ -117,8 +117,8 @@ export default function ClientHome() {
 
   const { data: myServices } = useQuery<Servicio[]>({
     queryKey: ['/api/services/my-services'],
-    staleTime: 1000 * 10,
-    refetchInterval: 10000,
+    staleTime: 1000 * 15,
+    refetchInterval: 30000,
   });
 
   const activeService = myServices?.find(
