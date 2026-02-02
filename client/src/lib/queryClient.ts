@@ -68,12 +68,21 @@ async function nativeFetch(
  * Use this for external API calls (Mapbox, etc.) that don't go through our backend.
  */
 export async function universalFetch(url: string): Promise<any> {
-  if (isNativePlatform()) {
-    const response = await CapacitorHttp.get({
-      url,
-      headers: { 'Accept': 'application/json' },
-    });
-    return response.data;
+  const isNative = isNativePlatform();
+  console.log('[universalFetch] URL:', url.substring(0, 100), 'isNative:', isNative);
+  
+  if (isNative) {
+    try {
+      const response = await CapacitorHttp.get({
+        url,
+        headers: { 'Accept': 'application/json' },
+      });
+      console.log('[universalFetch] Native response status:', response.status, 'hasData:', !!response.data);
+      return response.data;
+    } catch (error) {
+      console.error('[universalFetch] Native fetch error:', error);
+      throw error;
+    }
   } else {
     const response = await fetch(url);
     return response.json();

@@ -14,17 +14,24 @@ export interface Coordinates {
 }
 
 async function fetchDirections(url: string): Promise<any> {
-  if (Capacitor.isNativePlatform()) {
-    // Use CapacitorHttp for native apps to avoid CORS issues
-    const response = await CapacitorHttp.get({
-      url,
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-    return response.data;
+  const isNative = Capacitor.isNativePlatform();
+  console.log('[fetchDirections] isNative:', isNative, 'URL:', url.substring(0, 80));
+  
+  if (isNative) {
+    try {
+      const response = await CapacitorHttp.get({
+        url,
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      console.log('[fetchDirections] Native response status:', response.status, 'hasRoutes:', !!response.data?.routes);
+      return response.data;
+    } catch (error) {
+      console.error('[fetchDirections] Native fetch error:', error);
+      throw error;
+    }
   } else {
-    // Use regular fetch for web
     const response = await fetch(url);
     return response.json();
   }
@@ -34,10 +41,12 @@ export async function getDirections(
   origin: Coordinates,
   destination: Coordinates
 ): Promise<DirectionsResult> {
+  console.log('[getDirections] Getting token...');
   const token = await fetchMapboxToken();
+  console.log('[getDirections] Token received:', token ? 'yes (length: ' + token.length + ')' : 'NO TOKEN');
   
   if (!token) {
-    console.warn('Mapbox token not configured');
+    console.warn('[getDirections] Mapbox token not configured');
     return {
       duration: estimateDuration(origin, destination),
       distance: estimateDistance(origin, destination),

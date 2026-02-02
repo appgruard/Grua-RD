@@ -9711,11 +9711,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public endpoint - no authentication required for address search
+  // This is safe because it only proxies Mapbox geocoding API
   app.get("/api/maps/autocomplete", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
     try {
       const { query, proximity } = req.query;
 

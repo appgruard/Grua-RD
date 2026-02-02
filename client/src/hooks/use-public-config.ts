@@ -97,8 +97,12 @@ async function fetchPublicConfig(): Promise<PublicConfig | null> {
 }
 
 export async function fetchMapboxToken(): Promise<string | null> {
+  const isNative = Capacitor.isNativePlatform();
+  console.log('[fetchMapboxToken] isNative:', isNative);
+  
   // For native apps, use hardcoded token (CapacitorHttp bug workaround)
-  if (Capacitor.isNativePlatform()) {
+  if (isNative) {
+    console.log('[fetchMapboxToken] Returning hardcoded native token');
     return NATIVE_MAPBOX_TOKEN;
   }
   
