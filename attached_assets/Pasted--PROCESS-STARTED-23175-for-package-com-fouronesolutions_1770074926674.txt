@@ -1,0 +1,13 @@
+---------------------------- PROCESS STARTED (23175) for package com.fouronesolutions.gruard ----------------------------
+2026-02-02 19:28:20.434  9238-9238  QtiLinkBan...stimator-0 com.android.phone                    D  handleMessage: 4
+2026-02-02 19:28:20.436  9238-9238  QtiLinkBan...stimator-1 com.android.phone                    D  handleMessage: 4
+2026-02-02 19:28:20.451 12365-12474 BugleRcsEngine          com...le.android.apps.messaging:rcs  I  handleMessage processing message:[NOTIFY_UPTIME_IGNORE_STATE_CHANGED] with [non-null]:RcsEngineImpl reference [CONTEXT log_prefix="RcsEngineImpl[DUAL_REG]:[189b213c-b7b0]>Handler" thread_id=32537 ]
+2026-02-02 19:28:21.539  3116-9444  NetworkMetricsTracker   system_server                        D  handleMessage:4
+2026-02-02 19:28:23.931  9238-9238  QtiLinkBan...stimator-0 com.android.phone                    D  handleMessage: 4
+2026-02-02 19:28:23.933  9238-9238  QtiLinkBan...stimator-1 com.android.phone                    D  handleMessage: 4
+2026-02-02 19:28:23.946 12365-12474 BugleRcsEngine          com...le.android.apps.messaging:rcs  I  handleMessage processing message:[NOTIFY_UPTIME_IGNORE_STATE_CHANGED] with [non-null]:RcsEngineImpl reference [CONTEXT log_prefix="RcsEngineImpl[DUAL_REG]:[189b213c-b7b0]>Handler" thread_id=32537 ]
+2026-02-02 19:28:24.115 23175-23175 Capacitor/Console       com.fouronesolutions.gruard          E  File: https://app.gruard.com/assets/MapboxMap-CapxQHln.js - Line 2 - Msg: Map error message: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+2026-02-02 19:28:24.193  3116-9444  NetworkMetricsTracker   system_server                        D  handleMessage:4
+2026-02-02 19:28:24.889  9305-9305  PrivacyNewController    com.android.systemui                 D  handleMessage:13
+2026-02-02 19:28:25.273  3116-9444  NetworkMetricsTracker   system_server                        D  handleMessage:4
+2026-02-02 19:28:29.790  3116-8441  ActivityManager         system_server                        I  unbindService com.android.server.am.ActiveServices@9ab8984 conn=android.app.LoadedApk$ServiceDispatcher$InnerConnection@79478a9 callingPid=3116 callers: com.android.internal.infra.ServiceConnector$Impl$$ExternalSyntheticLambda0.run:0 android.os.Handler.handleCallback:995 android.os.Handler.dispatchMessage:103 android.os.Looper.loopOnce:267 android.os.Looper.loop:360 android.os.HandlerThread.run:85 com.android.server.ServiceThread.run:49 <bottom of call stack> <bottom of call stack> <bottom of call stack> 
