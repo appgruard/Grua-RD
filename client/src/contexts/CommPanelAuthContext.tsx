@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useLocation } from 'wouter';
+import { getApiUrl } from '@/lib/queryClient';
 
 interface CommPanelUser {
   id: string;
@@ -47,7 +48,7 @@ export function CommPanelAuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch('/api/comm-panel/login', {
+      const response = await fetch(getApiUrl('/api/comm-panel/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -78,7 +79,7 @@ export function CommPanelAuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     if (token) {
       try {
-        await fetch('/api/comm-panel/logout', {
+        await fetch(getApiUrl('/api/comm-panel/logout'), {
           method: 'POST',
           headers: { 'x-comm-panel-token': token }
         });
@@ -95,7 +96,7 @@ export function CommPanelAuthProvider({ children }: { children: ReactNode }) {
       throw new Error('No autenticado');
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(getApiUrl(url), {
       ...options,
       headers: {
         ...options.headers,

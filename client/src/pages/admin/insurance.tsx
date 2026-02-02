@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest, getApiUrl } from '@/lib/queryClient';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -167,7 +167,7 @@ export default function AdminInsurance() {
 
   const handlePreviewDocument = async (doc: Documento) => {
     try {
-      const response = await fetch(`/api/documents/download/${doc.id}`, {
+      const response = await fetch(getApiUrl(`/api/documents/download/${doc.id}`), {
         credentials: 'include',
       });
       

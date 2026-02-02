@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useQuery } from '@tanstack/react-query';
+import { getApiUrl } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -99,7 +100,7 @@ export default function SocioDashboard() {
 
   const handleDownloadPDF = async (periodo: string) => {
     try {
-      const response = await fetch(`/api/socio/estado-financiero/${periodo}`, {
+      const response = await fetch(getApiUrl(`/api/socio/estado-financiero/${periodo}`), {
         credentials: 'include',
       });
       

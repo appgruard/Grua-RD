@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { getApiUrl } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AseguradoraLayout } from '@/components/layout/AseguradoraLayout';
 import { Button } from '@/components/ui/button';
@@ -61,7 +62,7 @@ function ReportesContent() {
       const params = new URLSearchParams();
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
-      const response = await fetch(`/api/aseguradora/dashboard?${params}`);
+      const response = await fetch(getApiUrl(`/api/aseguradora/dashboard?${params}`));
       if (!response.ok) throw new Error('Failed to fetch stats');
       return response.json();
     },

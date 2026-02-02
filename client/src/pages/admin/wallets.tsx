@@ -35,7 +35,7 @@ import {
   Calendar,
   Banknote
 } from 'lucide-react';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest, getApiUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -167,7 +167,7 @@ export default function AdminWallets() {
       const params = new URLSearchParams();
       if (statementStartDate) params.append('startDate', statementStartDate);
       if (statementEndDate) params.append('endDate', statementEndDate);
-      const res = await fetch(`/api/admin/operators/${selectedWallet?.conductorId}/statement?${params}`, {
+      const res = await fetch(getApiUrl(`/api/admin/operators/${selectedWallet?.conductorId}/statement?${params}`), {
         credentials: 'include',
         cache: 'no-store',
       });
@@ -316,7 +316,7 @@ export default function AdminWallets() {
       if (statementStartDate) params.append('startDate', statementStartDate);
       if (statementEndDate) params.append('endDate', statementEndDate);
       
-      const res = await fetch(`/api/admin/operators/${selectedWallet.conductorId}/statement.pdf?${params}`);
+      const res = await fetch(getApiUrl(`/api/admin/operators/${selectedWallet.conductorId}/statement.pdf?${params}`));
       if (!res.ok) throw new Error('Error al generar PDF');
       
       const blob = await res.blob();

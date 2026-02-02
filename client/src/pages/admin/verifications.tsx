@@ -46,7 +46,7 @@ import {
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest, getApiUrl } from '@/lib/queryClient';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -252,7 +252,7 @@ export default function AdminVerifications() {
   const { data: pendingPhotosData, isLoading: isPendingPhotosLoading } = useQuery<PendingPhotoResponse>({
     queryKey: ['/api/admin/pending-photo-verifications'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/pending-photo-verifications', { credentials: 'include' });
+      const res = await fetch(getApiUrl('/api/admin/pending-photo-verifications'), { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch pending photos');
       return res.json();
     },
@@ -261,7 +261,7 @@ export default function AdminVerifications() {
   const { data: pendingCedulasData, isLoading: isPendingCedulasLoading } = useQuery<PendingCedulaResponse>({
     queryKey: ['/api/admin/pending-cedula-verifications'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/pending-cedula-verifications', { credentials: 'include' });
+      const res = await fetch(getApiUrl('/api/admin/pending-cedula-verifications'), { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch pending cédulas');
       return res.json();
     },
@@ -270,7 +270,7 @@ export default function AdminVerifications() {
   const { data: pendingEmailsData, isLoading: isPendingEmailsLoading } = useQuery<PendingEmailResponse>({
     queryKey: ['/api/admin/pending-email-verifications'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/pending-email-verifications', { credentials: 'include' });
+      const res = await fetch(getApiUrl('/api/admin/pending-email-verifications'), { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch pending emails');
       return res.json();
     },
@@ -279,7 +279,7 @@ export default function AdminVerifications() {
   const { data: pendingLicensesData, isLoading: isPendingLicensesLoading } = useQuery<PendingLicenseResponse>({
     queryKey: ['/api/admin/pending-license-verifications'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/pending-license-verifications', { credentials: 'include' });
+      const res = await fetch(getApiUrl('/api/admin/pending-license-verifications'), { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch pending licenses');
       return res.json();
     },
@@ -299,7 +299,7 @@ export default function AdminVerifications() {
     queryKey: ['/api/admin/users', selectedUserId, 'verification-history'],
     queryFn: async () => {
       if (!selectedUserId) return [];
-      const res = await fetch(`/api/admin/users/${selectedUserId}/verification-history`, {
+      const res = await fetch(getApiUrl(`/api/admin/users/${selectedUserId}/verification-history`), {
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to fetch verification history');

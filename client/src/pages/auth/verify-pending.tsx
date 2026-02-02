@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getApiUrl } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -216,7 +216,7 @@ export default function VerifyPending() {
     isRedirectingOrFetching.current = true;
     
     try {
-      const res = await fetch('/api/identity/verification-status', {
+      const res = await fetch(getApiUrl('/api/identity/verification-status'), {
         credentials: 'include',
         signal
       });
@@ -266,7 +266,7 @@ export default function VerifyPending() {
           // If categories are configured, load them from the server
           if (categoriasConfiguradas) {
             try {
-              const serviciosRes = await fetch('/api/drivers/me/servicios', {
+              const serviciosRes = await fetch(getApiUrl('/api/drivers/me/servicios'), {
                 credentials: 'include',
                 signal
               });
@@ -609,7 +609,7 @@ export default function VerifyPending() {
 
     try {
       const resizedImage = await resizeImage(imageBase64);
-      const response = await fetch('/api/identity/scan-cedula', {
+      const response = await fetch(getApiUrl('/api/identity/scan-cedula'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -753,7 +753,7 @@ export default function VerifyPending() {
 
     try {
       const resizedImage = await resizeImage(imageBase64, 800, 800);
-      const response = await fetch('/api/identity/verify-profile-photo', {
+      const response = await fetch(getApiUrl('/api/identity/verify-profile-photo'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -949,7 +949,7 @@ export default function VerifyPending() {
           const formData = new FormData();
           formData.append('document', file);
           formData.append('type', type);
-          const uploadRes = await fetch('/api/driver/documents', {
+          const uploadRes = await fetch(getApiUrl('/api/driver/documents'), {
             method: 'POST',
             credentials: 'include',
             body: formData,
@@ -1042,7 +1042,7 @@ export default function VerifyPending() {
       setIsUploadingLicense(true);
       setErrors({});
       
-      const response = await fetch('/api/drivers/me/license-data', {
+      const response = await fetch(getApiUrl('/api/drivers/me/license-data'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1093,7 +1093,7 @@ export default function VerifyPending() {
     setErrors({});
 
     try {
-      const response = await fetch('/api/drivers/me/servicios', {
+      const response = await fetch(getApiUrl('/api/drivers/me/servicios'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1138,7 +1138,7 @@ export default function VerifyPending() {
 
     try {
       for (const vehicle of vehicles) {
-        const response = await fetch('/api/drivers/me/vehiculos', {
+        const response = await fetch(getApiUrl('/api/drivers/me/vehiculos'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -1153,7 +1153,7 @@ export default function VerifyPending() {
       // Poll verification status to ensure vehiculosRegistrados is set
       let verificationConfirmed = false;
       for (let attempt = 0; attempt < 5; attempt++) {
-        const statusRes = await fetch('/api/identity/verification-status', {
+        const statusRes = await fetch(getApiUrl('/api/identity/verification-status'), {
           credentials: 'include'
         });
         if (statusRes.ok) {
@@ -1214,7 +1214,7 @@ export default function VerifyPending() {
         formData.append('fechaVencimiento', insuranceFechaVencimiento);
       }
 
-      const res = await fetch('/api/client/insurance', {
+      const res = await fetch(getApiUrl('/api/client/insurance'), {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -1368,7 +1368,7 @@ export default function VerifyPending() {
     setErrors({});
 
     try {
-      const res = await fetch('/api/identity/email', {
+      const res = await fetch(getApiUrl('/api/identity/email'), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, getApiUrl } from '@/lib/queryClient';
 import { CreditCard, Shield, CheckCircle, XCircle, Clock, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 interface ThreeDSSession {
@@ -104,7 +104,7 @@ export default function Test3DS() {
     
     const poll = async () => {
       try {
-        const response = await fetch(`/api/azul/3ds/status/${sessionId}`);
+        const response = await fetch(getApiUrl(`/api/azul/3ds/status/${sessionId}`));
         const data = await response.json();
         
         setSession(prev => ({ ...prev!, ...data }));

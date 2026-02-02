@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { User, Mail, Phone, Star, LogOut, FileText, CheckCircle, XCircle, Clock, CreditCard, ArrowRight, AlertTriangle, Calendar, Pencil, Camera, Loader2, Wrench, Shield, ShieldCheck, ShieldX, ShieldAlert, Edit3, Save, X, Truck, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest, getApiUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileUpload } from '@/components/FileUpload';
 import { EditProfileModal } from '@/components/EditProfileModal';
@@ -215,7 +215,7 @@ export default function DriverProfile() {
         formData.append('fechaVencimiento', fechaVencimiento);
       }
 
-      const response = await fetch('/api/documents/upload', {
+      const response = await fetch(getApiUrl('/api/documents/upload'), {
         method: 'POST',
         credentials: 'include',
         body: formData,
@@ -326,7 +326,7 @@ export default function DriverProfile() {
       const formData = new FormData();
       formData.append('photo', file);
 
-      const response = await fetch('/api/users/profile-photo', {
+      const response = await fetch(getApiUrl('/api/users/profile-photo'), {
         method: 'POST',
         credentials: 'include',
         body: formData,

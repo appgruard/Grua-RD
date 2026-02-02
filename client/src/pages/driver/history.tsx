@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { getApiUrl } from '@/lib/queryClient';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ export default function DriverHistory() {
 
   const handleDownloadReceipt = async (serviceId: string) => {
     try {
-      const response = await fetch(`/api/servicios/${serviceId}/recibo`);
+      const response = await fetch(getApiUrl(`/api/servicios/${serviceId}/recibo`));
       
       if (!response.ok) {
         throw new Error('Error al descargar el recibo');

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient, getApiUrl } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -105,7 +105,7 @@ export function EvidenceUploader({
       }, 200);
 
       try {
-        const response = await fetch('/api/chat/send-media', {
+        const response = await fetch(getApiUrl('/api/chat/send-media'), {
           method: 'POST',
           body: formData,
           credentials: 'include',

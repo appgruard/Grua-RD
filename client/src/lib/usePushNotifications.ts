@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { fetchVapidPublicKey } from '@/hooks/use-public-config';
+import { getApiUrl } from '@/lib/queryClient';
 
 const VITE_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
@@ -88,7 +89,7 @@ export function usePushNotifications() {
 
       const subscriptionData = subscription.toJSON();
 
-      const response = await fetch('/api/push/subscribe', {
+      const response = await fetch(getApiUrl('/api/push/subscribe'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,6 +98,7 @@ export function usePushNotifications() {
           endpoint: subscriptionData.endpoint,
           keys: subscriptionData.keys,
         }),
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -130,7 +132,7 @@ export function usePushNotifications() {
       if (subscription) {
         const subscriptionData = subscription.toJSON();
 
-        await fetch('/api/push/unsubscribe', {
+        await fetch(getApiUrl('/api/push/unsubscribe'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -138,6 +140,7 @@ export function usePushNotifications() {
           body: JSON.stringify({
             endpoint: subscriptionData.endpoint,
           }),
+          credentials: 'include',
         });
 
         await subscription.unsubscribe();

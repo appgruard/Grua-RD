@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCommPanelAuth } from '@/contexts/CommPanelAuthContext';
+import { getApiUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { CommPanelLayout } from '@/components/comm-panel/CommPanelLayout';
 import {
@@ -231,7 +232,7 @@ export default function Announcements() {
       if (!token) throw new Error('No autenticado');
       const formData = new FormData();
       formData.append('image', file);
-      const response = await fetch('/api/comm-panel/upload-image', {
+      const response = await fetch(getApiUrl('/api/comm-panel/upload-image'), {
         method: 'POST',
         headers: {
           'x-comm-panel-token': token,

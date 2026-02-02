@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getApiUrl } from '@/lib/queryClient';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { VehicleTypeSelector } from '@/components/VehicleTypeSelector';
 import { ServiceCategorySelector, serviceCategories } from '@/components/ServiceCategorySelector';
@@ -616,7 +616,7 @@ export default function ClientHome() {
           formData.append('photo', fotosContexto[i]);
           formData.append('index', i.toString());
           
-          const uploadRes = await fetch('/api/services/upload-context-photo', {
+          const uploadRes = await fetch(getApiUrl('/api/services/upload-context-photo'), {
             method: 'POST',
             body: formData,
             credentials: 'include',

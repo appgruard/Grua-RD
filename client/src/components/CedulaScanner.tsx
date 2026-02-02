@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Camera, Upload, CheckCircle2, AlertCircle, RefreshCcw, IdCard, ScanLine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getApiUrl } from '@/lib/queryClient';
 
 interface CedulaScanResult {
   success: boolean;
@@ -89,7 +90,7 @@ export function CedulaScanner({
     try {
       const resizedImage = await resizeImage(imageBase64);
       
-      const response = await fetch('/api/identity/scan-cedula', {
+      const response = await fetch(getApiUrl('/api/identity/scan-cedula'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

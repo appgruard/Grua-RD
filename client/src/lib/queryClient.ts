@@ -8,7 +8,7 @@ function isNativePlatform(): boolean {
   return Capacitor.isNativePlatform();
 }
 
-function getApiUrl(path: string): string {
+export function getApiUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   if (isNativePlatform()) {
     return `${API_BASE_URL}${cleanPath}`;

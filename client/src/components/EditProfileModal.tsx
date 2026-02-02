@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { queryClient, apiRequest } from '@/lib/queryClient';
+import { queryClient, apiRequest, getApiUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
 import {
@@ -102,7 +102,7 @@ export function EditProfileModal({
       const formData = new FormData();
       formData.append('photo', file);
 
-      const response = await fetch('/api/users/profile-photo', {
+      const response = await fetch(getApiUrl('/api/users/profile-photo'), {
         method: 'POST',
         credentials: 'include',
         body: formData,
@@ -138,7 +138,7 @@ export function EditProfileModal({
 
   const validateFacePhoto = async (imageBase64: string): Promise<FaceValidationResult> => {
     try {
-      const response = await fetch('/api/identity/verify-profile-photo', {
+      const response = await fetch(getApiUrl('/api/identity/verify-profile-photo'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

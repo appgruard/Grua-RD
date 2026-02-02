@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
+import { getApiUrl } from '@/lib/queryClient';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +40,7 @@ export function PrivacySection({ userType }: PrivacySectionProps) {
 
   const deleteAccountMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/users/me', {
+      const response = await fetch(getApiUrl('/api/users/me'), {
         method: 'DELETE',
         credentials: 'include',
       });

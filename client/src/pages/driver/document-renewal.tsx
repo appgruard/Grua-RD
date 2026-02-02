@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useLocation, Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient, getApiUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { FileUpload } from '@/components/FileUpload';
 import type { Documento } from '@shared/schema';
@@ -68,7 +68,7 @@ export default function DocumentRenewal() {
         formData.append('fechaVencimiento', fechaVencimiento);
       }
 
-      const response = await fetch('/api/documents/upload', {
+      const response = await fetch(getApiUrl('/api/documents/upload'), {
         method: 'POST',
         credentials: 'include',
         body: formData,

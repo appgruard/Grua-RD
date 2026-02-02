@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getApiUrl } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -380,7 +380,7 @@ export default function OnboardingWizard() {
 
     try {
       const resizedImage = await resizeImage(imageBase64);
-      const response = await fetch('/api/identity/scan-cedula', {
+      const response = await fetch(getApiUrl('/api/identity/scan-cedula'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -673,7 +673,7 @@ export default function OnboardingWizard() {
       const formDataLicense = new FormData();
       formDataLicense.append('document', licenseFile);
       formDataLicense.append('tipoDocumento', 'licencia');
-      const licRes = await fetch('/api/documents/upload', {
+      const licRes = await fetch(getApiUrl('/api/documents/upload'), {
         method: 'POST',
         body: formDataLicense,
       });
@@ -683,7 +683,7 @@ export default function OnboardingWizard() {
       const formDataLicenseBack = new FormData();
       formDataLicenseBack.append('document', licenseBackFile);
       formDataLicenseBack.append('tipoDocumento', 'licencia_trasera');
-      const licBackRes = await fetch('/api/documents/upload', {
+      const licBackRes = await fetch(getApiUrl('/api/documents/upload'), {
         method: 'POST',
         body: formDataLicenseBack,
       });
@@ -790,7 +790,7 @@ export default function OnboardingWizard() {
 
     try {
       const resizedImage = await resizeImage(imageBase64, 800, 800);
-      const response = await fetch('/api/identity/verify-profile-photo', {
+      const response = await fetch(getApiUrl('/api/identity/verify-profile-photo'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

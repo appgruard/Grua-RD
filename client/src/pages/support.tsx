@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, getApiUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -186,7 +186,7 @@ export default function SupportPage() {
 
   const refetchTicketDetails = async (ticketId: string) => {
     try {
-      const res = await fetch(`/api/tickets/${ticketId}`, { credentials: 'include' });
+      const res = await fetch(getApiUrl(`/api/tickets/${ticketId}`), { credentials: 'include' });
       if (res.ok) {
         const ticket = await res.json();
         setSelectedTicket(ticket);

@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, Mail, Phone, Star, LogOut, Pencil, Camera, Loader2, IdCard, CheckCircle2, AlertCircle, Truck, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { queryClient } from '@/lib/queryClient';
+import { queryClient, getApiUrl } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import ClientInsuranceManager from '@/components/ClientInsuranceManager';
 import ClientPaymentMethods from '@/components/ClientPaymentMethods';
@@ -47,7 +47,7 @@ export default function ClientProfile() {
       const formData = new FormData();
       formData.append('photo', file);
 
-      const response = await fetch('/api/users/profile-photo', {
+      const response = await fetch(getApiUrl('/api/users/profile-photo'), {
         method: 'POST',
         credentials: 'include',
         body: formData,

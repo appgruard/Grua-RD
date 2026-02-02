@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getApiUrl } from '@/lib/queryClient';
 import { format, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Calendar, Download, Clock, CheckCircle, XCircle, DollarSign, FileText, MapPin, RefreshCcw, AlertCircle } from 'lucide-react';
@@ -227,7 +228,7 @@ export default function Analytics() {
     if (!startDate || !endDate) return;
     
     try {
-      const response = await fetch(`/api/admin/analytics/pdf?startDate=${startDate}&endDate=${endDate}`, {
+      const response = await fetch(getApiUrl(`/api/admin/analytics/pdf?startDate=${startDate}&endDate=${endDate}`), {
         credentials: 'include',
       });
       
