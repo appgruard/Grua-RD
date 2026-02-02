@@ -126,7 +126,7 @@ The system uses PostgreSQL with Drizzle ORM. WebSocket communication utilizes se
 - **Permissions**: Internet, Network State, Location (Fine/Coarse), Camera, Storage, Push Notifications, Vibrate
 
 ### iOS Configuration
-- **Deployment Target**: iOS 14.0
+- **Deployment Target**: iOS 15.0
 - **Bundle ID**: `com.fouronesolutions.gruard`
 - **Entitlements**: Push Notifications (development)
 - **Permissions**: Camera, Photo Library, Location (When In Use, Always)
