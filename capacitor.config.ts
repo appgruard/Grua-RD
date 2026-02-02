@@ -85,8 +85,10 @@ const config: CapacitorConfig = {
       enabled: true
     },
     
+    // Disable global HTTP interception to let Mapbox GL JS work natively
+    // We use CapacitorHttp.request() explicitly for our API calls
     CapacitorHttp: {
-      enabled: true
+      enabled: false
     }
   },
 
