@@ -1,0 +1,47 @@
+2026-02-02T20:33:53.518591614Z 8:33:53 PM [express] GET /api/auth/me 200 in 113ms :: {"id":"35c787ea-fe55-457e-9655-52b81dfc2c67","…
+2026-02-02T20:33:53.519085622Z 8:33:53 PM [express] GET /api/drivers/me 401 in 117ms :: {"message":"Not authorized"}
+2026-02-02T20:33:53.956446969Z Public config endpoint hit!
+2026-02-02T20:33:54.059204366Z 8:33:54 PM [express] GET /api/announcements/active 200 in 109ms :: [{"id":"05074529-09e2-474a-b56b-f…
+2026-02-02T20:33:54.066269665Z 8:33:54 PM [express] GET /api/client/insurance/status 200 in 116ms :: {"hasApprovedInsurance":false,…
+2026-02-02T20:33:54.242239798Z 8:33:54 PM [express] GET /api/wallet 401 in 78ms :: {"message":"No autorizado"}
+2026-02-02T20:33:54.255233986Z 8:33:54 PM [express] GET /api/services/my-services 200 in 93ms :: []
+2026-02-02T20:34:01.385769913Z 8:34:01 PM [express] GET /api/services/my-services 304 in 158ms :: []
+2026-02-02T20:34:04.489811427Z 8:34:04 PM [express] GET /api/services/my-services 200 in 141ms :: []
+2026-02-02T20:34:11.644915510Z 8:34:11 PM [express] GET /api/services/my-services 304 in 140ms :: []
+2026-02-02T20:34:14.723779841Z 8:34:14 PM [express] GET /api/services/my-services 200 in 139ms :: []
+2026-02-02T20:34:21.930324259Z 8:34:21 PM [express] GET /api/services/my-services 304 in 138ms :: []
+2026-02-02T20:34:24.967912370Z 8:34:24 PM [express] GET /api/services/my-services 200 in 146ms :: []
+2026-02-02T20:34:32.187796005Z 8:34:32 PM [express] GET /api/services/my-services 304 in 138ms :: []
+2026-02-02T20:34:42.727691891Z 8:34:42 PM [express] GET /api/services/my-services 304 in 329ms :: []
+2026-02-02T20:34:53.280811213Z 8:34:53 PM [express] GET /api/services/my-services 304 in 232ms :: []
+2026-02-02T20:35:03.741931879Z 8:35:03 PM [express] GET /api/services/my-services 304 in 325ms :: []
+2026-02-02T20:35:14.204816217Z 8:35:14 PM [express] GET /api/services/my-services 304 in 328ms :: []
+2026-02-02T20:35:24.519367383Z 8:35:24 PM [express] GET /api/services/my-services 304 in 233ms :: []
+2026-02-02T20:35:35.030054272Z 8:35:35 PM [express] GET /api/services/my-services 304 in 317ms :: []
+2026-02-02T20:35:45.638448870Z 8:35:45 PM [express] GET /api/services/my-services 304 in 324ms :: []
+2026-02-02T20:35:56.325869105Z 8:35:56 PM [express] GET /api/services/my-services 304 in 362ms :: []
+2026-02-02T20:36:05.644662166Z 8:36:05 PM [express] GET /api/auth/me 200 in 121ms :: {"id":"35c787ea-fe55-457e-9655-52b81dfc2c67","…
+2026-02-02T20:36:05.737759978Z 8:36:05 PM [express] GET /api/drivers/me 401 in 201ms :: {"message":"Not authorized"}
+2026-02-02T20:36:06.202848673Z 8:36:06 PM [express] GET /api/client/insurance/status 200 in 182ms :: {"hasApprovedInsurance":false,…
+2026-02-02T20:36:06.221811891Z 8:36:06 PM [express] GET /api/announcements/active 200 in 200ms :: [{"id":"05074529-09e2-474a-b56b-f…
+2026-02-02T20:36:06.242614889Z Public config endpoint hit!
+2026-02-02T20:36:06.334779337Z 8:36:06 PM [express] GET /api/wallet 401 in 95ms :: {"message":"No autorizado"}
+2026-02-02T20:36:06.351063040Z 8:36:06 PM [express] GET /api/services/my-services 200 in 113ms :: []
+2026-02-02T20:36:06.756761685Z 8:36:06 PM [express] GET /api/services/my-services 304 in 112ms :: []
+2026-02-02T20:36:16.591234958Z 8:36:16 PM [express] GET /api/services/my-services 200 in 130ms :: []
+2026-02-02T20:36:16.934003580Z 8:36:16 PM [express] GET /api/services/my-services 304 in 94ms :: []
+2026-02-02T20:36:27.315141670Z 8:36:27 PM [express] GET /api/services/my-services 304 in 222ms :: []
+2026-02-02T20:36:30.048372542Z 8:36:30 PM [express] GET /api/auth/me 200 in 116ms :: {"id":"35c787ea-fe55-457e-9655-52b81dfc2c67","…
+2026-02-02T20:36:30.125121143Z 8:36:30 PM [express] GET /api/drivers/me 401 in 194ms :: {"message":"Not authorized"}
+2026-02-02T20:36:30.539196516Z 8:36:30 PM [express] GET /api/announcements/active 200 in 106ms :: [{"id":"05074529-09e2-474a-b56b-f…
+2026-02-02T20:36:30.613122698Z Public config endpoint hit!
+2026-02-02T20:36:30.719601698Z 8:36:30 PM [express] GET /api/wallet 401 in 75ms :: {"message":"No autorizado"}
+2026-02-02T20:36:30.729660059Z 8:36:30 PM [express] GET /api/services/my-services 200 in 84ms :: []
+2026-02-02T20:36:30.772961297Z 8:36:30 PM [express] GET /api/client/insurance/status 200 in 340ms :: {"hasApprovedInsurance":false,…
+2026-02-02T20:36:37.525476528Z 8:36:37 PM [express] GET /api/services/my-services 304 in 132ms :: []
+2026-02-02T20:36:40.971866637Z 8:36:40 PM [express] GET /api/services/my-services 200 in 131ms :: []
+2026-02-02T20:36:41.158211065Z 8:36:41 PM [express] POST /api/pricing/calculate 200 in 95ms :: {"total":2500,"precioBase":2500,"tar…
+2026-02-02T20:36:47.839401733Z 8:36:47 PM [express] GET /api/services/my-services 304 in 132ms :: []
+2026-02-02T20:36:58.471675593Z 8:36:58 PM [express] GET /api/services/my-services 304 in 278ms :: []
+2026-02-02T20:37:09.035693246Z 8:37:09 PM [express] GET /api/services/my-services 304 in 355ms :: []
+2026-02-02T20:37:19.575808024Z 8:37:19 PM [express] GET /api/services/my-services 304 in 328ms :: []
