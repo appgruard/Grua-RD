@@ -6,6 +6,8 @@ import { Search, MapPin, Navigation, Loader2, X, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils';
 import type { Coordinates } from '@/lib/maps';
 import { fetchMapboxToken } from '@/hooks/use-public-config';
+import { apiRequest, universalFetch } from '@/lib/queryClient';
+import { Capacitor } from '@capacitor/core';
 
 interface AddressSuggestion {
   id: string;
@@ -146,13 +148,13 @@ export function AddressSearchInput({
         url += `&proximity=${currentLocation.lng},${currentLocation.lat}`;
       }
       
-      const response = await fetch(url, { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setSuggestions(data.suggestions || []);
-      }
+      // Use apiRequest for proper native platform support
+      const response = await apiRequest('GET', url);
+      const data = await response.json();
+      setSuggestions(data.suggestions || []);
     } catch (error) {
       console.error('Failed to fetch suggestions:', error);
+      setSuggestions([]);
     } finally {
       setIsLoading(false);
     }
@@ -192,7 +194,6 @@ export function AddressSearchInput({
         try {
           const token = await fetchMapboxToken();
           if (token) {
-            const { universalFetch } = await import('@/lib/queryClient');
             const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`;
             const data = await universalFetch(url);
             const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
