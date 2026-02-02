@@ -13,7 +13,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     hostname: 'app.gruard.com',
-    iosScheme: 'capacitor',
+    iosScheme: 'https',
     
     // URL to the production server for native apps
     url: isProduction ? API_URL : undefined,
