@@ -76,75 +76,60 @@ export async function universalFetch(url: string): Promise<any> {
   const platform = Capacitor.getPlatform();
   console.log('[universalFetch] URL:', url.substring(0, 100), 'isNative:', isNative, 'platform:', platform);
   
-  // On iOS, use CapacitorHttp directly (fetch interception may not work reliably)
-  if (isNative && platform === 'ios') {
-    console.log('[universalFetch] Using CapacitorHttp directly for iOS');
+  // On native platforms, use CapacitorHttp directly for reliability
+  if (isNative) {
+    console.log('[universalFetch] Using CapacitorHttp directly for', platform);
     try {
       const response = await CapacitorHttp.get({
         url,
         headers: { 'Accept': 'application/json' },
       });
-      console.log('[universalFetch] iOS CapacitorHttp status:', response.status);
+      console.log('[universalFetch] Native response status:', response.status, 'hasData:', !!response.data);
+      console.log('[universalFetch] Native data type:', typeof response.data);
       
       let data = response.data;
+      
+      // CapacitorHttp may return data as string on some platforms
       if (typeof data === 'string') {
+        console.log('[universalFetch] Parsing string data, length:', data.length);
         try {
           data = JSON.parse(data);
         } catch (e) {
-          console.error('[universalFetch] iOS JSON parse error:', e);
+          console.error('[universalFetch] JSON parse error:', e);
         }
       }
-      console.log('[universalFetch] iOS data received, hasFeatures:', !!(data && data.features));
+      
+      // Log the structure of the data for debugging
+      if (data) {
+        const keys = Object.keys(data);
+        console.log('[universalFetch] Data keys:', keys.join(', '));
+        if (data.features) {
+          console.log('[universalFetch] Features count:', data.features.length);
+        }
+      }
+      
       return data;
     } catch (error) {
-      console.error('[universalFetch] iOS CapacitorHttp error:', error);
+      console.error('[universalFetch] Native CapacitorHttp error:', error);
       throw error;
     }
   }
   
-  try {
-    // On Android with CapacitorHttp enabled, fetch() is automatically intercepted
-    // On web, use standard fetch
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-    });
-    
-    console.log('[universalFetch] Response status:', response.status, 'ok:', response.ok);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    console.log('[universalFetch] Data received, hasFeatures:', !!(data && data.features));
-    return data;
-  } catch (error) {
-    console.error('[universalFetch] Fetch error:', error);
-    
-    // Fallback: try using CapacitorHttp directly if fetch fails on native Android
-    if (isNative && platform === 'android') {
-      console.log('[universalFetch] Trying CapacitorHttp fallback for Android...');
-      try {
-        const response = await CapacitorHttp.get({
-          url,
-          headers: { 'Accept': 'application/json' },
-        });
-        console.log('[universalFetch] Android CapacitorHttp fallback status:', response.status);
-        
-        let data = response.data;
-        if (typeof data === 'string') {
-          data = JSON.parse(data);
-        }
-        return data;
-      } catch (fallbackError) {
-        console.error('[universalFetch] Android CapacitorHttp fallback also failed:', fallbackError);
-        throw fallbackError;
-      }
-    }
-    
-    throw error;
+  // On web, use standard fetch
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Accept': 'application/json' },
+  });
+  
+  console.log('[universalFetch] Web response status:', response.status, 'ok:', response.ok);
+  
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
+  
+  const data = await response.json();
+  console.log('[universalFetch] Web data received, hasFeatures:', !!(data && data.features));
+  return data;
 }
 
 export async function apiRequest(

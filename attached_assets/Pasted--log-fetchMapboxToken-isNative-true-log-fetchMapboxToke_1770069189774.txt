@@ -1,0 +1,39 @@
+ [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  [log] - [usePublicConfig] Fetching from: https://app.gruard.com/public-config isNative: true
+⚡️  [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/geocoding/v5/mapbox.places/-122.406417,37.785834.json?access_token=pk.eyJ1Ijo isNative: true
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  TO JS {"headers":{"x-permitted-cross-domain-policies":"none","vary":"Origin","x-frame-options":"SAMEORIGIN","content-type":"application\/json; charset=utf-8","strict-transport-security":"max-age=31536000; includeSubDomains; preload","x-dns-prefetch-control":"off
+⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/geocoding/v5/mapbox.places/-122.40549432009892,37.78587356897836.json?access_ isNative: true
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  [log] - [fetchSuggestions] isNative: true query: Herma
+⚡️  [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  [log] - [fetchSuggestions] Calling Mapbox directly
+⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/geocoding/v5/mapbox.places/Herma.json?access_token=pk.eyJ1IjoiZm91cm9uZXNvbHV isNative: true
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  [log] - [fetchSuggestions] Found 0 suggestions
+⚡️  [log] - [fetchSuggestions] isNative: true query: Herm
+⚡️  [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  [log] - [fetchSuggestions] Calling Mapbox directly
+⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/geocoding/v5/mapbox.places/Herm.json?access_token=pk.eyJ1IjoiZm91cm9uZXNvbHV0 isNative: true
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  [log] - [fetchSuggestions] Found 0 suggestions
+⚡️  [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/geocoding/v5/mapbox.places/-122.406417,37.785834.json?access_token=pk.eyJ1Ijo isNative: true
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  TO JS {"status":200,"headers":{"x-download-options":"noopen","content-type":"application\/json; charset=utf-8","x-frame-options":"SAMEORIGIN","date":"Mon, 02 Feb 2026 21:50:30 GMT","server":"nginx","access-control-allow-credentials":"true","x-dns-prefetch-contro
+⚡️  TO JS {"status":200,"headers":{"x-dns-prefetch-control":"off","strict-transport-security":"max-age=31536000; includeSubDomains; preload","x-content-type-options":"nosniff","origin-agent-cluster":"?1","x-response-time":"234.78ms","content-type":"application\/json
+⚡️  TO JS {"headers":{"date":"Mon, 02 Feb 2026 21:51:02 GMT","vary":"Origin","origin-agent-cluster":"?1","access-control-allow-credentials":"true","server":"nginx","x-dns-prefetch-control":"off","content-length":"2","content-security-policy":"default-src 'self';scri
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","headers":{"referrer-policy":"no-referrer","content-type":"application\/json; charset=utf-8","x-download-options":"noopen","x-dns-prefetch-control":"off","date":"Mon, 02 Feb 2026 21:51:13 GMT","
+⚡️  TO JS {"status":200,"headers":{"x-response-time":"308.45ms","x-download-options":"noopen","x-frame-options":"SAMEORIGIN","referrer-policy":"no-referrer","access-control-allow-credentials":"true","origin-agent-cluster":"?1","content-length":"2","x-dns-prefetch-co
+⚡️  TO JS {"status":200,"headers":{"referrer-policy":"no-referrer","content-type":"application\/json; charset=utf-8","content-length":"2","x-download-options":"noopen","date":"Mon, 02 Feb 2026 21:51:34 GMT","x-dns-prefetch-control":"off","strict-transport-security":
+⚡️  TO JS {"status":200,"headers":{"x-download-options":"noopen","content-type":"application\/json; charset=utf-8","x-frame-options":"SAMEORIGIN","date":"Mon, 02 Feb 2026 21:51:45 GMT","server":"nginx","access-control-allow-credentials":"true","x-dns-prefetch-contro
+⚡️  TO JS {"status":200,"headers":{"x-response-time":"316.32ms","content-type":"application\/json; charset=utf-8","x-download-options":"noopen","x-dns-prefetch-control":"off","date":"Mon, 02 Feb 2026 21:51:55 GMT","x-xss-protection":"0","content-length":"2","content
+⚡️  TO JS {"status":200,"headers":{"x-response-time":"236.61ms","content-type":"application\/json; charset=utf-8","x-download-options":"noopen","x-dns-prefetch-control":"off","date":"Mon, 02 Feb 2026 21:52:06 GMT","x-xss-protection":"0","content-length":"2","content
