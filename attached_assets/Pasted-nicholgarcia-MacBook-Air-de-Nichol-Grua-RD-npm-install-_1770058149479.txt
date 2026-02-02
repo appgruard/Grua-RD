@@ -1,0 +1,73 @@
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % npm install
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+npm warn deprecated scmp@2.1.0: Just use Node.js's crypto.timingSafeEqual()
+npm warn deprecated jpeg-exif@1.1.4: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+
+added 998 packages, and audited 999 packages in 3m
+
+123 packages are looking for funding
+  run `npm fund` for details
+
+7 vulnerabilities (5 moderate, 2 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % npx cap sync android
+npx cap sync ios
+
+✔ Copying web assets from public to android/app/src/main/assets/public in 64.53ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 2.38ms
+✔ copy android in 107.93ms
+✔ Updating Android plugins in 11.36ms
+[info] Found 6 Capacitor plugins for android:
+       @capacitor/app@7.1.1
+       @capacitor/camera@7.0.3
+       @capacitor/filesystem@7.1.6
+       @capacitor/geolocation@7.1.7
+       @capacitor/network@7.0.3
+       @capacitor/push-notifications@7.0.4
+✖ update android - failed!
+[error] TypeError: Cannot read properties of undefined (reading 'extract')
+        at extractTemplate
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/util/template.js:9:25)
+        at async removePluginsNativeFiles
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/android/update.js:294:5)
+        at async updateAndroid
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/android/update.js:27:5)
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js:69:13
+        at async runTask (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/common.js:178:23)
+        at async update (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js:63:5)
+        at async sync (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js:52:5)
+        at async syncCommand
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js:29:13)
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/index.js:70:9
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/telemetry.js:27:13
+✔ Copying web assets from public to ios/App/App/public in 50.21ms
+✔ Creating capacitor.config.json in ios/App/App in 559.96μs
+✔ copy ios in 114.83ms
+✔ Updating iOS plugins in 10.72ms
+✖ update ios - failed!
+[error] TypeError: Cannot read properties of undefined (reading 'extract')
+        at extractTemplate
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/util/template.js:9:25)
+        at async removePluginsNativeFiles
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/ios/update.js:422:5)
+        at async updatePluginFiles
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/ios/update.js:33:5)
+        at async updateIOS (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/ios/update.js:25:5)
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js:66:13
+        at async runTask (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/common.js:178:23)
+        at async update (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js:63:5)
+        at async sync (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js:52:5)
+        at async syncCommand
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js:29:13)
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/index.js:70:9
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % 
