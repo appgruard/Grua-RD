@@ -1,0 +1,56 @@
+2026-02-02 18:57:32.008  2440-2440  ANDR-PERF-TARGET        ven...qti.hardware.perf-hal-service  E  ANDR-PERF-TARGET: getPhysicalCluster() 54: Error: Invalid logical cluster id 3
+2026-02-02 18:57:32.038  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle Radius
+2026-02-02 18:57:32.038  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle SurfaceExtAlpha
+2026-02-02 18:57:32.038  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle appLeashBlurRadius
+2026-02-02 18:57:32.038  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle SurfaceExtAlpha
+2026-02-02 18:57:32.038  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle SurfaceExtAlpha
+2026-02-02 18:57:32.038  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle appLeashBlurRadius
+2026-02-02 18:57:32.068  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle SurfaceExtAlpha
+2026-02-02 18:57:32.068  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle Radius
+2026-02-02 18:57:32.068  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle appLeashBlurRadius
+2026-02-02 18:57:32.165  4317-4317  MiuiPreloadClassImpl    com.fouronesolutions.gruard          E  invoke error.
+2026-02-02 18:57:32.533  8786-8786  MultiSprin...ion6959a6c com.mi.android.globallauncher        E  ERROR Not Found Bundle Radius
+2026-02-02 18:57:32.533  8786-8786  TransitionCallback      com.mi.android.globallauncher        I  com.android.systemui.shared.recents.utilities.WindowTransitionCallbackHelper@b7f102a call finishMainCallback, wct = WindowContainerTransaction { changes= {} hops= [] errorCallbackToken=null taskFragmentOrganizer=null }, sct = android.view.SurfaceControl$Transaction@49f2594, callback = android.window.IRemoteTransitionFinishedCallback$Stub$Proxy@682de1b, mCounterRotatorList.size = 0, mInfoExposeList.size = 1
+2026-02-02 18:57:34.421  6179-6179  MiuiPreloadClassImpl    com.xiaomi.aicr:bertAlgo             E  invoke error.
+2026-02-02 18:57:34.423  6179-6179  ActivityThread          com.xiaomi.aicr:bertAlgo             D  useGrowthLimitOutExpendMethod invoke error.
+2026-02-02 18:57:34.550  3116-9421  ActivityManager         system_server                        W  pid 26985 com.xiaomi.aicr:searchService sent binder code 8 with flags 2 to frozen apps and got error -32
+2026-02-02 18:57:34.561 26985-26985 ActivityThread          com.xiaomi.aicr:searchService        D  Too many transaction errors, throttling freezer binder callback.
+2026-02-02 18:57:34.603  1384-2884  com.xiaomi...r:clipAlgo com.xiaomi.aicr:clipAlgo             E  vendor/qcom/proprietary/adsprpc/src/fastrpc_notif.c:57:Error 0xc: notif_fastrpc_thread FastRPC notification worker thread exited for domain 3 (errno Success), notif_domain_deinit started 0
+2026-02-02 18:57:34.666 26985-26985 ActivityThread          com.xiaomi.aicr:searchService        D  Too many transaction errors, throttling freezer binder callback.
+2026-02-02 18:57:34.779  4317-4317  Capacitor/Console       com.fouronesolutions.gruard          I  File: https://app.gruard.com/assets/use-public-config-DrKQFBsA.js - Line 1 - Msg: [useMapboxToken] isNative: true isLoading: true hasError: false hasData: false
+2026-02-02 18:57:34.834  9305-9305  DeviceNoti...stenerImpl com.android.systemui                 E  setStatus bundle is null or error:true,model is null or error:true
+2026-02-02 18:57:34.851  4317-4317  Capacitor/Console       com.fouronesolutions.gruard          I  File: https://app.gruard.com/assets/use-public-config-DrKQFBsA.js - Line 1 - Msg: [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+2026-02-02 18:57:35.157  4317-4317  Capacitor/Console       com.fouronesolutions.gruard          I  File: https://app.gruard.com/assets/use-public-config-DrKQFBsA.js - Line 1 - Msg: [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+2026-02-02 18:57:35.175  4317-4317  Capacitor/Console       com.fouronesolutions.gruard          I  File: https://app.gruard.com/assets/use-public-config-DrKQFBsA.js - Line 1 - Msg: [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+2026-02-02 18:57:35.471  4317-4317  Capacitor/Console       com.fouronesolutions.gruard          E  File: https://app.gruard.com/assets/MapboxMap-DzmYWnCG.js - Line 2 - Msg: Map error: [object Object]
+2026-02-02 18:57:35.472  4317-4317  Capacitor/Console       com.fouronesolutions.gruard          I  File: https://app.gruard.com/assets/use-public-config-DrKQFBsA.js - Line 1 - Msg: [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+2026-02-02 18:57:36.521  5806-5930  GoogleApiManager        com.google.android.calendar          W  Not showing notification since connectionResult is not user-facing: ConnectionResult{statusCode=DEVELOPER_ERROR, resolution=null, message=null, clientMethodKey=null}
+2026-02-02 18:57:37.723  4317-4317  Capacitor/Console       com.fouronesolutions.gruard          I  File: https://app.gruard.com/assets/use-public-config-DrKQFBsA.js - Line 1 - Msg: [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+2026-02-02 18:57:37.790  9305-9305  DeviceNoti...stenerImpl com.android.systemui                 E  setStatus bundle is null or error:true,model is null or error:true
+2026-02-02 18:57:37.846  4317-4317  Capacitor/Console       com.fouronesolutions.gruard          I  File: https://app.gruard.com/assets/use-public-config-DrKQFBsA.js - Line 1 - Msg: [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+2026-02-02 18:57:42.126  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.128  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.131  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.134  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.136  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.139  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.141  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.144  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.148  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.152  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.156  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.159  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.163  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.166  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:42.170  9023-6276  ContentPro...eportUtils com.android.bluetooth                W  Skipping reporting this error to prevent flooding. fileNameEnum=20008, tag=2
+2026-02-02 18:57:44.703  2281-8207  ACDB                    android.hardware.audio.service_64    E  AcdbComputeDeltaCKV:5495 Error[19]: No calibration data can be found. There is no difference between CKV[new] and CKV[old].
+2026-02-02 18:57:44.703  2281-8207  ACDB                    android.hardware.audio.service_64    E  AcdbCmdGetSubgraphCalDataNonPersist:5711 Error[19]: Failed to get the delta CKV
+2026-02-02 18:57:44.704  2281-8207  ACDB                    android.hardware.audio.service_64    E  AcdbComputeDeltaCKV:5495 Error[19]: No calibration data can be found. There is no difference between CKV[new] and CKV[old].
+2026-02-02 18:57:44.704  2281-8207  ACDB                    android.hardware.audio.service_64    E  AcdbCmdGetSubgraphCalDataNonPersist:5711 Error[19]: Failed to get the delta CKV
+2026-02-02 18:57:46.720  2281-2281  libc                    android.hardware.audio.service_64    W  Unable to set property "vendor.audio.usb_cctoggle" to "0": PROP_ERROR_PERMISSION_DENIED (0x18)
+2026-02-02 18:57:46.736  2281-2281  AGM: graph              android.hardware.audio.service_64    E  graph_register_for_events: 1878: event registration failed with error -95
+2026-02-02 18:57:46.736  2281-2281  AGM: session            android.hardware.audio.service_64    E  session_obj_register_for_events: 1985: Error:-95 registering events with graph for sess_id:126
+2026-02-02 18:57:46.736  2281-2281  AGM: API                android.hardware.audio.service_64    E  agm_session_register_for_events: 647: Error:-95 registering event for session obj with                         session id=126
+2026-02-02 18:57:46.783  2281-2281  ACDB                    android.hardware.audio.service_64    E  AcdbCmdGetProcSubgraphCalDataPersist:8217 Error[19]: No calibration found
+2026-02-02 18:57:46.783  2281-2281  ACDB                    android.hardware.audio.service_64    E  AcdbCmdGetProcSubgraphCalDataPersist:8217 Error[19]: No calibration found
+2026-02-02 18:57:46.783  2281-2281  ACDB                    android.hardware.audio.service_64    E  AcdbCmdGetProcSubgraphCalDataPersist:8217 Error[19]: No calibration found

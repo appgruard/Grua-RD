@@ -664,8 +664,16 @@ export function MapboxMap({
         onMove={evt => setViewState(evt.viewState)}
         onClick={handleMapClick}
         onLoad={handleLoad}
-        onError={(e) => {
-          console.error('Map error:', e);
+        onError={(e: any) => {
+          // Log detailed error info for debugging
+          console.error('Map error type:', typeof e);
+          console.error('Map error message:', e?.error?.message || e?.message || 'unknown');
+          console.error('Map error status:', e?.error?.status || e?.status || 'unknown');
+          try {
+            console.error('Map error full:', JSON.stringify(e, null, 2));
+          } catch {
+            console.error('Map error (non-serializable):', e);
+          }
           setError('Error al cargar el mapa');
           setLoading(false);
         }}
