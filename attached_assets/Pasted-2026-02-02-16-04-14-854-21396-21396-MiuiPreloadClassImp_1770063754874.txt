@@ -1,0 +1,34 @@
+2026-02-02 16:04:14.854 21396-21396 MiuiPreloadClassImpl    pid-21396                            E  invoke error.
+2026-02-02 16:04:15.338  5098-5098  MiuiPreloadClassImpl    pid-5098                             E  invoke error.
+2026-02-02 16:04:15.523  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31100 with flags 0 to frozen apps and got error -74
+2026-02-02 16:04:15.524  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31100 with flags 0 to frozen apps and got error -74
+2026-02-02 16:04:15.524  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31101 with flags 0 to frozen apps and got error -74
+2026-02-02 16:04:15.926  5243-5243  MiuiPreloadClassImpl    pid-5243                             E  invoke error.
+2026-02-02 16:04:30.681  5592-5592  MiuiPreloadClassImpl    pid-5592                             E  invoke error.
+2026-02-02 16:04:42.750  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31100 with flags 0 to frozen apps and got error -74
+2026-02-02 16:04:42.751  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31100 with flags 0 to frozen apps and got error -74
+2026-02-02 16:04:42.752  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31101 with flags 0 to frozen apps and got error -74
+2026-02-02 16:04:43.433  5675-5675  MiuiPreloadClassImpl    pid-5675                             E  invoke error.
+2026-02-02 16:04:43.437  5675-5675  ActivityThread          pid-5675                             D  useGrowthLimitOutExpendMethod invoke error.
+2026-02-02 16:04:51.417  5753-5753  MiuiPreloadClassImpl    pid-5753                             E  invoke error.
+2026-02-02 16:04:51.703  5793-5793  MiuiPreloadClassImpl    pid-5793                             E  invoke error.
+2026-02-02 16:04:51.704  5793-5793  ActivityThread          pid-5793                             D  useGrowthLimitOutExpendMethod invoke error.
+2026-02-02 16:04:51.725  5801-5801  MiuiPreloadClassImpl    pid-5801                             E  invoke error.
+2026-02-02 16:04:51.965  5871-5871  MiuiPreloadClassImpl    pid-5871                             E  invoke error.
+2026-02-02 16:05:38.495  3116-9403  ActivityManager         system_server                        W  pid 13240 com.xiaomi.mi_connect_service sent binder code 5 with flags 0 to frozen apps and got error -74
+2026-02-02 16:05:38.588  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31101 with flags 0 to frozen apps and got error -74
+2026-02-02 16:05:38.589  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31100 with flags 0 to frozen apps and got error -74
+2026-02-02 16:05:38.589  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31100 with flags 0 to frozen apps and got error -74
+2026-02-02 16:05:38.594  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31101 with flags 0 to frozen apps and got error -74
+2026-02-02 16:05:38.594  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31101 with flags 0 to frozen apps and got error -74
+2026-02-02 16:05:38.598  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31101 with flags 0 to frozen apps and got error -74
+2026-02-02 16:05:38.831  3116-13324 ActivityManager         system_server                        W  pid 3116 system sent binder code 12 with flags 1 to frozen apps and got error -32
+2026-02-02 16:05:38.833  3116-13324 ActivityManager         system_server                        W  pid 3116 system sent binder code 41 with flags 1 to frozen apps and got error -32
+2026-02-02 16:05:39.108  6313-6313  MiuiPreloadClassImpl    pid-6313                             E  invoke error.
+2026-02-02 16:05:39.281  3116-8368  ActivityManager         system_server                        W  pid 3116 system sent binder code 31100 with flags 0 to frozen apps and got error -74
+2026-02-02 16:05:39.507  3116-8402  Biometrics...tionClient system_server                        D  onErrorInternal code: 5, finish: true
+2026-02-02 16:05:40.087  1603-22169 keystore2               keystore2                            E  system/security/keystore2/src/error.rs:183 - system/security/keystore2/src/security_level.rs:328
+                                                                                                    
+                                                                                                    Caused by:
+                                                                                                        0: system/security/keystore2/src/enforcements.rs:599: matching auth token (challenge=0, userId=-7804137053334087824, authId=0, authType=0x1, timestamp=241652247ms) rcved=BootTime(241647007) for sids [-7804137053334087824] type Some(r#PASSWORD) is expired (68348s old > timeout=5s)
+                                                                                                        1: Error::Km(r#KEY_USER_NOT_AUTHENTICATED)

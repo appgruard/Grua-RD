@@ -66,40 +66,56 @@ async function nativeFetch(
 /**
  * Universal fetch that works on both web and native platforms.
  * Use this for external API calls (Mapbox, etc.) that don't go through our backend.
+ * 
+ * When CapacitorHttp is enabled in capacitor.config.ts, Capacitor automatically
+ * intercepts all fetch() calls and routes them through the native HTTP plugin,
+ * which bypasses CORS restrictions.
  */
 export async function universalFetch(url: string): Promise<any> {
   const isNative = isNativePlatform();
   console.log('[universalFetch] URL:', url.substring(0, 100), 'isNative:', isNative);
   
-  if (isNative) {
-    try {
-      const response = await CapacitorHttp.get({
-        url,
-        headers: { 'Accept': 'application/json' },
-        responseType: 'json',
-      });
-      console.log('[universalFetch] Native response status:', response.status, 'dataType:', typeof response.data);
-      
-      // Handle case where data comes as string instead of object
-      let data = response.data;
-      if (typeof data === 'string') {
-        try {
-          data = JSON.parse(data);
-          console.log('[universalFetch] Parsed string data to JSON');
-        } catch (e) {
-          console.error('[universalFetch] Failed to parse string data:', e);
-        }
-      }
-      
-      console.log('[universalFetch] Returning data, hasFeatures:', !!(data && data.features));
-      return data;
-    } catch (error) {
-      console.error('[universalFetch] Native fetch error:', error);
-      throw error;
+  try {
+    // With CapacitorHttp enabled, fetch() is automatically intercepted on native
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    
+    console.log('[universalFetch] Response status:', response.status, 'ok:', response.ok);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-  } else {
-    const response = await fetch(url);
-    return response.json();
+    
+    const data = await response.json();
+    console.log('[universalFetch] Data received, hasFeatures:', !!(data && data.features));
+    return data;
+  } catch (error) {
+    console.error('[universalFetch] Fetch error:', error);
+    
+    // Fallback: try using CapacitorHttp directly if fetch fails on native
+    if (isNative) {
+      console.log('[universalFetch] Trying CapacitorHttp fallback...');
+      try {
+        const response = await CapacitorHttp.get({
+          url,
+          headers: { 'Accept': 'application/json' },
+        });
+        console.log('[universalFetch] CapacitorHttp fallback status:', response.status);
+        
+        let data = response.data;
+        if (typeof data === 'string') {
+          data = JSON.parse(data);
+        }
+        return data;
+      } catch (fallbackError) {
+        console.error('[universalFetch] CapacitorHttp fallback also failed:', fallbackError);
+        throw fallbackError;
+      }
+    }
+    
+    throw error;
   }
 }
 
