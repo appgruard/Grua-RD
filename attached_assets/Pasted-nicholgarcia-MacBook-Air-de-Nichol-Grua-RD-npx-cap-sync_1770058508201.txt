@@ -1,0 +1,50 @@
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % npx cap sync android
+npx cap sync ios
+✔ Copying web assets from public to android/app/src/main/assets/public in 60.66ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 903.33μs
+✔ copy android in 104.24ms
+✔ Updating Android plugins in 11.36ms
+[info] Found 6 Capacitor plugins for android:
+       @capacitor/app@7.1.1
+       @capacitor/camera@7.0.3
+       @capacitor/filesystem@7.1.6
+       @capacitor/geolocation@7.1.7
+       @capacitor/network@7.0.3
+       @capacitor/push-notifications@7.0.4
+✖ update android - failed!
+[error] TypeError: Cannot read properties of undefined (reading 'extract')
+        at extractTemplate
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/util/template.js:9:25)
+        at async removePluginsNativeFiles
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/android/update.js:294:5)
+        at async updateAndroid
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/android/update.js:27:5)
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js:69:13
+        at async runTask (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/common.js:178:23)
+        at async update (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js:63:5)
+        at async sync (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js:52:5)
+        at async syncCommand
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js:29:13)
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/index.js:70:9
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/telemetry.js:27:13
+✔ Copying web assets from public to ios/App/App/public in 45.22ms
+✔ Creating capacitor.config.json in ios/App/App in 720.54μs
+✔ copy ios in 144.85ms
+✔ Updating iOS plugins in 13.58ms
+✖ update ios - failed!
+[error] TypeError: Cannot read properties of undefined (reading 'extract')
+        at extractTemplate
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/util/template.js:9:25)
+        at async removePluginsNativeFiles
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/ios/update.js:422:5)
+        at async updatePluginFiles
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/ios/update.js:33:5)
+        at async updateIOS (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/ios/update.js:25:5)
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js:66:13
+        at async runTask (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/common.js:178:23)
+        at async update (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/update.js:63:5)
+        at async sync (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js:52:5)
+        at async syncCommand
+        (/Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/tasks/sync.js:29:13)
+        at async /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/cli/dist/index.js:70:9
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % 
