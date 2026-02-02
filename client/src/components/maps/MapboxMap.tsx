@@ -294,19 +294,31 @@ interface MapboxMapProps {
 const MAP_STYLE_LIGHT = 'mapbox://styles/mapbox/streets-v12';
 
 async function reverseGeocode(lat: number, lng: number, token: string | null): Promise<string> {
+  console.log('[reverseGeocode] Starting with lat:', lat, 'lng:', lng, 'hasToken:', !!token);
+  
   if (!token) {
+    console.log('[reverseGeocode] No token, returning coordinates');
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   }
+  
   try {
     const { universalFetch } = await import('@/lib/queryClient');
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}`;
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&language=es`;
+    console.log('[reverseGeocode] Calling URL:', url.substring(0, 80) + '...');
+    
     const data = await universalFetch(url);
-    if (data.features && data.features.length > 0) {
-      return data.features[0].place_name;
+    console.log('[reverseGeocode] Response received:', JSON.stringify(data).substring(0, 200));
+    
+    if (data && data.features && data.features.length > 0) {
+      const placeName = data.features[0].place_name;
+      console.log('[reverseGeocode] Found place:', placeName);
+      return placeName;
     }
+    
+    console.log('[reverseGeocode] No features found, returning coordinates');
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   } catch (error) {
-    console.error('Reverse geocoding failed:', error);
+    console.error('[reverseGeocode] Error:', error);
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   }
 }

@@ -76,9 +76,23 @@ export async function universalFetch(url: string): Promise<any> {
       const response = await CapacitorHttp.get({
         url,
         headers: { 'Accept': 'application/json' },
+        responseType: 'json',
       });
-      console.log('[universalFetch] Native response status:', response.status, 'hasData:', !!response.data);
-      return response.data;
+      console.log('[universalFetch] Native response status:', response.status, 'dataType:', typeof response.data);
+      
+      // Handle case where data comes as string instead of object
+      let data = response.data;
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+          console.log('[universalFetch] Parsed string data to JSON');
+        } catch (e) {
+          console.error('[universalFetch] Failed to parse string data:', e);
+        }
+      }
+      
+      console.log('[universalFetch] Returning data, hasFeatures:', !!(data && data.features));
+      return data;
     } catch (error) {
       console.error('[universalFetch] Native fetch error:', error);
       throw error;
