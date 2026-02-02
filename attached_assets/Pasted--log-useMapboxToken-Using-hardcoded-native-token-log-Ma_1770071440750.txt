@@ -1,0 +1,1202 @@
+[log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  TO JS {"status":200,"headers":{"x-content-type-options":"nosniff","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.googleapis.com https:\/\/maps.gstatic.com https:\/\/api.mapbox.com;style-src 'self' 'un
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  To Native ->  CapacitorHttp request 73862546
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  TO JS {"status":200,"headers":{"origin-agent-cluster":"?1","x-permitted-cross-domain-policies":"none","content-type":"application\/json; charset=utf-8","vary":"Origin","cross-origin-opener-policy":"same-origin","x-content-type-options":"nosniff","strict-transpor
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000c8d9b0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000c8d9b0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce1cb0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce1cb0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce1fb0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce1fb0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb0a20 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb0a20 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb2400 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb2400 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb24f0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb24f0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb29a0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb29a0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb0a20 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb0a20 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb2400 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cb2400 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000c12400 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000c12400 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000d04b70 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000d04b70 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000d04ae0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000d04ae0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce8ea0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce8ea0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cebc60 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000cebc60 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce8ba0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce8ba0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce8e10 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce8e10 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce8ea0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000ce8ea0 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+       CHHapticPattern.mm:487   +[CHHapticPattern patternForKey:error:]: Failed to read pattern library data: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000d04c30 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+<_UIKBFeedbackGenerator: 0x60000350d130>: Error creating CHHapticPattern: Error Domain=NSCocoaErrorDomain Code=260 "El archivo “hapticpatternlibrary.plist” no ha podido abrirse porque no se encuentra." UserInfo={NSFilePath=/Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSURL=file:///Library/Audio/Tunings/Generic/Haptics/Library/hapticpatternlibrary.plist, NSUnderlyingError=0x600000d04c30 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  To Native ->  CapacitorHttp request 73862547
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"headers":{"x-download-options":"noopen","strict-transport-security":"max-age=31536000; includeSubDomains; preload","content-security-policy":"default-src 'self';script-src 'self' '
+⚡️  To Native ->  CapacitorHttp request 73862548
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"headers":{"strict-transport-security":"max-age=31536000; includeSubDomains; preload","referrer-policy":"no-referrer","content-security-policy":"default-src 'self';script-src 'self'
+⚡️  To Native ->  CapacitorHttp request 73862549
+⚡️  TO JS {"status":200,"data":[],"url":"https:\/\/app.gruard.com\/api\/services\/my-services","headers":{"vary":"Origin","referrer-policy":"no-referrer","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.goo
+⚡️  To Native ->  CapacitorHttp request 73862550
+⚡️  TO JS {"data":[],"headers":{"strict-transport-security":"max-age=31536000; includeSubDomains; preload","referrer-policy":"no-referrer","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.googleapis.com htt
+⚡️  To Native ->  CapacitorHttp request 73862551
+⚡️  TO JS {"status":200,"data":[],"url":"https:\/\/app.gruard.com\/api\/services\/my-services","headers":{"referrer-policy":"no-referrer","cross-origin-opener-policy":"same-origin","server":"nginx","date":"Mon, 02 Feb 2026 22:25:26 GMT","x-response-time":"225.97ms",
+⚡️  To Native ->  CapacitorHttp request 73862552
+⚡️  TO JS {"status":200,"url":"https:\/\/app.gruard.com\/api\/services\/my-services","headers":{"vary":"Origin","origin-agent-cluster":"?1","x-permitted-cross-domain-policies":"none","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-frame-options":"SAMEORIGIN","cross
+⚡️  To Native ->  CapacitorHttp request 73862553
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"data":[],"headers":{"referrer-policy":"no-referrer","x-xss-protection":"0","cross-origin-opener-policy":"same-origin","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-dns-prefetch-
+⚡️  To Native ->  CapacitorHttp request 73862554
+⚡️  TO JS {"status":200,"data":[],"headers":{"origin-agent-cluster":"?1","strict-transport-security":"max-age=31536000; includeSubDomains; preload","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.googleapi
+⚡️  To Native ->  CapacitorHttp request 73862555
+⚡️  TO JS {"data":[],"headers":{"referrer-policy":"no-referrer","date":"Mon, 02 Feb 2026 22:26:08 GMT","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.googleapis.com https:\/\/maps.gstatic.com https:\/\/ap
+⚡️  To Native ->  CapacitorHttp request 73862556
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"headers":{"referrer-policy":"no-referrer","cross-origin-opener-policy":"same-origin","server":"nginx","date":"Mon, 02 Feb 2026 22:26:19 GMT","x-response-time":"317.23ms","content-s
+⚡️  To Native ->  CapacitorHttp request 73862557
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","data":[],"status":200,"headers":{"x-response-time":"210.48ms","x-frame-options":"SAMEORIGIN","x-download-options":"noopen","content-type":"application\/json; charset=utf-8","x-permitted-cross-d
+⚡️  To Native ->  CapacitorHttp request 73862558
+⚡️  TO JS {"status":200,"data":[],"url":"https:\/\/app.gruard.com\/api\/services\/my-services","headers":{"vary":"Origin","origin-agent-cluster":"?1","x-permitted-cross-domain-policies":"none","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-frame-options":"SAMEORIG
+⚡️  To Native ->  CapacitorHttp request 73862559
+⚡️  TO JS {"status":200,"data":[],"url":"https:\/\/app.gruard.com\/api\/services\/my-services","headers":{"vary":"Origin","origin-agent-cluster":"?1","x-permitted-cross-domain-policies":"none","referrer-policy":"no-referrer","cross-origin-opener-policy":"same-origin
+⚡️  To Native ->  CapacitorHttp request 73862560
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"headers":{"referrer-policy":"no-referrer","x-xss-protection":"0","cross-origin-opener-policy":"same-origin","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-dns-prefetch-control":"
+⚡️  To Native ->  CapacitorHttp request 73862561
+⚡️  TO JS {"headers":{"referrer-policy":"no-referrer","cross-origin-opener-policy":"same-origin","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.googleapis.com https:\/\/maps.gstatic.com https:\/\/api.mapb
+⚡️  To Native ->  CapacitorHttp request 73862562
+⚡️  TO JS {"headers":{"vary":"Origin","origin-agent-cluster":"?1","x-permitted-cross-domain-policies":"none","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-frame-options":"SAMEORIGIN","cross-origin-opener-policy":"same-origin","referrer-policy":"no-referrer","x-co
+⚡️  To Native ->  CapacitorHttp request 73862563
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"headers":{"referrer-policy":"no-referrer","x-xss-protection":"0","cross-origin-opener-policy":"same-origin","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-dns-prefetch-control":"
+⚡️  To Native ->  CapacitorHttp request 73862564
+⚡️  TO JS {"data":[],"status":200,"headers":{"origin-agent-cluster":"?1","strict-transport-security":"max-age=31536000; includeSubDomains; preload","x-frame-options":"SAMEORIGIN","cross-origin-opener-policy":"same-origin","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"
+⚡️  To Native ->  CapacitorHttp request 73862565
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"headers":{"etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","strict-transport-security":"max-age=31536000; includeSubDomains; preload","x-download-options":"noopen","x-response-time":"
+⚡️  To Native ->  CapacitorHttp request 73862566
+⚡️  TO JS {"data":[],"headers":{"strict-transport-security":"max-age=31536000; includeSubDomains; preload","referrer-policy":"no-referrer","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.googleapis.com htt
+⚡️  To Native ->  CapacitorHttp request 73862567
+⚡️  TO JS {"status":200,"data":[],"url":"https:\/\/app.gruard.com\/api\/services\/my-services","headers":{"vary":"Origin","origin-agent-cluster":"?1","x-permitted-cross-domain-policies":"none","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-frame-options":"SAMEORIG
+nw_connection_copy_connected_local_endpoint_block_invoke [C3] Connection has no local endpoint
+⚡️  To Native ->  CapacitorHttp request 73862568
+⚡️  TO JS {"data":[],"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"headers":{"x-dns-prefetch-control":"off","x-permitted-cross-domain-policies":"none","vary":"Origin","content-type":"application\/json; charset=utf-8","x-download-options"
+⚡️  To Native ->  CapacitorHttp request 73862569
+⚡️  TO JS {"status":200,"url":"https:\/\/app.gruard.com\/api\/services\/my-services","headers":{"x-dns-prefetch-control":"off","x-permitted-cross-domain-policies":"none","vary":"Origin","content-type":"application\/json; charset=utf-8","x-download-options":"noopen",
+⚡️  To Native ->  CapacitorHttp get 73862570
+⚡️  [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/geocoding/v5/mapbox.places/-122.406417,37.785834.json?access_token=pk.eyJ1Ijo isNative: true
+⚡️  TO JS {"headers":{"access-control-allow-origin":"*","x-cache":"Hit from cloudfront","access-control-expose-headers":"x-rate-limit-interval,x-rate-limit-limit,x-rate-limit-remaining,x-rate-limit-reset,ip-proximity","etag":"\"9854e858465303c85ada681273ae1881\"","x
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [calculateRoute] isNative: true origin: {"lat":37.785834,"lng":-122.406417} destination: {"lat":37.78579054078308,"lng":-122.40671589741702}
+⚡️  [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  [log] - [calculateRoute] Fetching from Mapbox directly
+⚡️  To Native ->  CapacitorHttp get 73862571
+⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/directions/v5/mapbox/driving/-122.406417,37.785834;-122.40671589741702,37.785 isNative: true
+⚡️  TO JS {"status":200,"data":{"uuid":"-HyL7iYLICqpi8Fy6VbMl2LydsmToeSaXzqKT_vRZBm23ZnRuHQoEA==","code":"Ok","waypoints":[{"location":[-122.40626,37.785853000000003],"name":"Stockton Street","distance":13.977},{"location":[-122.40668599999999,37.785651000000001],"n
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  To Native ->  CapacitorHttp request 73862572
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/pricing\/calculate","status":200,"headers":{"ratelimit-remaining":"25","access-control-allow-credentials":"true","content-type":"application\/json; charset=utf-8","ratelimit-reset":"623","vary":"Origin, Accept-Encodin
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  To Native ->  CapacitorHttp request 73862573
+⚡️  TO JS {"data":[],"headers":{"content-type":"application\/json; charset=utf-8","access-control-allow-credentials":"true","x-download-options":"noopen","vary":"Origin","origin-agent-cluster":"?1","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-frame-options":"SAM
+⚡️  To Native ->  ⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/geocoding/v5/mapbox.places/-122.40622300084141,37.78581454028462.json?access_ isNative: true
+CapacitorHttp get 73862574
+nw_connection_copy_connected_local_endpoint_block_invoke [C5] Connection has no local endpoint
+nw_connection_copy_connected_local_endpoint_block_invoke [C5] Connection has no local endpoint
+⚡️  TO JS {"headers":{"x-amz-cf-pop":"MIA3-P8","via":"1.1 0c72e8c84db7dda399af214342d1e968.cloudfront.net (CloudFront)","content-type":"application\/vnd.geo+json; charset=utf-8","vary":"Accept-Encoding","x-powered-by":"Express","x-rate-limit-interval":"60","x-rate-l
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [calculateRoute] isNative: true origin: {"lat":37.78581454028462,"lng":-122.40622300084141} destination: {"lat":37.78579054078308,"lng":-122.40671589741702}
+⚡️  [log] - [fetchMapboxToken] isNative: true
+⚡️  [log] - [fetchMapboxToken] Returning hardcoded native token
+⚡️  To Native ->  CapacitorHttp ⚡️  [log] - [calculateRoute] Fetching from Mapbox directly
+get 73862575
+⚡️  [log] - [universalFetch] URL: https://api.mapbox.com/directions/v5/mapbox/driving/-122.40622300084141,37.78581454028462;-122.40671 isNative: true
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  TO JS {"data":{"waypoints":[{"distance":2.6400000000000001,"location":[-122.406251,37.785806000000001],"name":"Stockton Street"},{"distance":15.736000000000001,"location":[-122.40668599999999,37.785651000000001],"name":"Ellis Street"}],"routes":[{"geometry":{"co
+⚡️  [log] - [universalFetch] Native response status: 200 hasData: true
+⚡️  To Native ->  CapacitorHttp request 73862576
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/pricing\/calculate","headers":{"strict-transport-security":"max-age=31536000; includeSubDomains; preload","content-length":"254","cross-origin-opener-policy":"same-origin","etag":"W\/\"fe-fqpePUxuqcDFt8IsanGF2JwHf6U\"
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  [log] - [useMapboxToken] isNative: true isLoading: false hasError: false hasData: true
+⚡️  [log] - [useMapboxToken] Using hardcoded native token
+⚡️  [log] - [MapboxMap] Token received: pk.eyJ1IjoiZm91cm9uZ...
+⚡️  To Native ->  CapacitorHttp request 73862577
+⚡️  TO JS {"data":[],"headers":{"referrer-policy":"no-referrer","x-xss-protection":"0","cross-origin-opener-policy":"same-origin","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","x-dns-prefetch-control":"off","x-frame-options":"SAMEORIGIN","access-control-allow-creden
+⚡️  To Native ->  CapacitorHttp request 73862578
+⚡️  TO JS {"headers":{"referrer-policy":"no-referrer","strict-transport-security":"max-age=31536000; includeSubDomains; preload","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","cross-origin-opener-policy":"same-origin","x-frame-options":"SAMEORIGIN","content-length":
+⚡️  To Native ->  CapacitorHttp request 73862579
+⚡️  TO JS {"url":"https:\/\/app.gruard.com\/api\/services\/my-services","data":[],"status":200,"headers":{"vary":"Origin","content-type":"application\/json; charset=utf-8","cross-origin-opener-policy":"same-origin","referrer-policy":"no-referrer","strict-transport-s
+⚡️  To Native ->  CapacitorHttp request 73862580
+⚡️  TO JS {"data":[],"status":200,"headers":{"strict-transport-security":"max-age=31536000; includeSubDomains; preload","referrer-policy":"no-referrer","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.googl
+⚡️  To Native ->  CapacitorHttp request 73862581
+⚡️  TO JS {"data":[],"headers":{"referrer-policy":"no-referrer","cross-origin-opener-policy":"same-origin","content-security-policy":"default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval' https:\/\/maps.googleapis.com https:\/\/maps.gstatic.com https:\/
+⚡️  To Native ->  CapacitorHttp request 73862582
+⚡️  TO JS {"data":[],"url":"https:\/\/app.gruard.com\/api\/services\/my-services","status":200,"headers":{"cross-origin-opener-policy":"same-origin","strict-transport-security":"max-age=31536000; includeSubDomains; preload","x-dns-prefetch-control":"off","x-content-
+⚡️  To Native ->  CapacitorHttp request 73862583
+⚡️  TO JS {"status":200,"headers":{"content-length":"2","referrer-policy":"no-referrer","x-response-time":"206.77ms","cross-origin-opener-policy":"same-origin","content-type":"application\/json; charset=utf-8","x-xss-protection":"0","x-download-options":"noopen","va
+⚡️  To Native ->  CapacitorHttp request 73862584
+⚡️  TO JS {"data":[],"headers":{"content-type":"application\/json; charset=utf-8","x-xss-protection":"0","x-response-time":"299.42ms","server":"nginx","vary":"Origin","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\"","cross-origin-opener-policy":"same-origin","x-frame-o
+⚡️  To Native ->  CapacitorHttp request 73862585
+⚡️  TO JS {"headers":{"x-xss-protection":"0","strict-transport-security":"max-age=31536000; includeSubDomains; preload","x-response-time":"312.35ms","server":"nginx","vary":"Origin","cross-origin-opener-policy":"same-origin","etag":"W\/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0
