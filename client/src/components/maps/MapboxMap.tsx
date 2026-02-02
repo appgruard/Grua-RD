@@ -294,31 +294,46 @@ interface MapboxMapProps {
 const MAP_STYLE_LIGHT = 'mapbox://styles/mapbox/streets-v12';
 
 async function reverseGeocode(lat: number, lng: number, token: string | null): Promise<string> {
-  console.log('[reverseGeocode] Starting with lat:', lat, 'lng:', lng, 'hasToken:', !!token);
+  console.log('[GEOCODE] Starting lat:', lat, 'lng:', lng);
   
   if (!token) {
-    console.log('[reverseGeocode] No token, returning coordinates');
+    console.log('[GEOCODE] No token!');
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   }
   
   try {
     const { universalFetch } = await import('@/lib/queryClient');
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${token}&language=es`;
-    console.log('[reverseGeocode] Calling URL:', url.substring(0, 80) + '...');
     
     const data = await universalFetch(url);
-    console.log('[reverseGeocode] Response received:', JSON.stringify(data).substring(0, 200));
+    
+    // Aggressive logging to debug iOS
+    console.log('[GEOCODE] data type:', typeof data);
+    console.log('[GEOCODE] data is null:', data === null);
+    console.log('[GEOCODE] data is undefined:', data === undefined);
+    if (data) {
+      console.log('[GEOCODE] data keys:', Object.keys(data).join(','));
+      console.log('[GEOCODE] has features:', 'features' in data);
+      if (data.features) {
+        console.log('[GEOCODE] features type:', typeof data.features);
+        console.log('[GEOCODE] features isArray:', Array.isArray(data.features));
+        console.log('[GEOCODE] features length:', data.features.length);
+        if (data.features.length > 0) {
+          console.log('[GEOCODE] first feature:', JSON.stringify(data.features[0]).substring(0, 300));
+        }
+      }
+    }
     
     if (data && data.features && data.features.length > 0) {
       const placeName = data.features[0].place_name;
-      console.log('[reverseGeocode] Found place:', placeName);
+      console.log('[GEOCODE] SUCCESS place_name:', placeName);
       return placeName;
     }
     
-    console.log('[reverseGeocode] No features found, returning coordinates');
+    console.log('[GEOCODE] No features, returning coords');
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   } catch (error) {
-    console.error('[reverseGeocode] Error:', error);
+    console.error('[GEOCODE] Error:', error);
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   }
 }
