@@ -14,7 +14,7 @@ const API_BASE_URL = 'https://app.gruard.com';
 
 // Hardcoded tokens for native apps (CapacitorHttp bug prevents fetching from server)
 // These are public tokens, safe to include in client code
-const NATIVE_MAPBOX_TOKEN = 'pk.eyJ1IjoiZm91cm9uZXNvbHV0aW9ucyIsImEiOiJjbWlpcHZ0M2gweDE5M2Vvc2c3MTJvOTIxIn0.8hmHLBnGoGNyb5vMSCMzCQ';
+const NATIVE_MAPBOX_TOKEN = 'pk.sk.eyJ1IjoiZm91cm9uZXNvbHV0aW9ucyIsImEiOiJjbWw1czhpOTgwNzBpM2Vwcm4za2V2dTliIn0.Cr2bnQKlO1FTq1QuUMQsOw';
 const NATIVE_VAPID_KEY = 'BFNZW9v-o28GelcQ2dPvIklXdD97s15Va-9PouVgRxXm-wAUtjIyM60vhoGYLVm1ao9a0qMpLrvP_KYtK3GkdQ0';
 
 function getPublicConfigUrl(): string {
