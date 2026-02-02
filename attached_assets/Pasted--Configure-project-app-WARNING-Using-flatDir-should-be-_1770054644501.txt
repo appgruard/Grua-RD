@@ -1,0 +1,29 @@
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Transform classes.jar (project :capacitor-android) with DexingWithClasspathTransform
+ERROR: /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/android/capacitor/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar: D8: Type com.getcapacitor.App$AppRestoredListener is defined multiple times: /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/android/capacitor/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar:com/getcapacitor/App$AppRestoredListener 2.class, /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/android/capacitor/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar:com/getcapacitor/App$AppRestoredListener.class
+
+> Task :app:mergeDebugGlobalSynthetics FAILED
+w: Detected multiple Kotlin daemon sessions at kotlin/sessions
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:mergeDebugGlobalSynthetics'.
+> Could not resolve all files for configuration ':app:debugRuntimeClasspath'.
+   > Failed to transform classes.jar (project :capacitor-android) to match attributes {artifactType=android-global-synthetics, com.android.build.api.attributes.AgpVersionAttr=8.7.2, com.android.build.api.attributes.BuildTypeAttr=debug, com.android.build.gradle.internal.attributes.VariantAttr=debug, dexing-component-attributes=ComponentSpecificParameters(minSdkVersion=23, debuggable=true, enableCoreLibraryDesugaring=false, enableGlobalSynthetics=true, enableApiModeling=false, dependenciesClassesAreInstrumented=false, asmTransformComponent=null, useJacocoTransformInstrumentation=false, enableDesugaring=true, needsClasspath=true, useFullClasspath=false, componentIfUsingFullClasspath=null), org.gradle.libraryelements=jar, org.gradle.usage=java-runtime}.
+      > Execution failed for DexingWithClasspathTransform: /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/android/capacitor/build/intermediates/runtime_library_classes_jar/debug/bundleLibRuntimeToJarDebug/classes.jar.
+         > Error while dexing.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 26s
+248 actionable tasks: 40 executed, 208 up-to-date
