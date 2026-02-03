@@ -749,9 +749,7 @@ export function MapboxMap({
                   <Component className={`${size} ${color}`} />
                 )}
                 {isDraggable && (
-                  <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded whitespace-nowrap">
-                Arrastra
-                  </div>
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse shadow-md border border-white" />
                 )}
                 {isInactiveDriver && (
                   <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-slate-500 rounded-full flex items-center justify-center border border-white shadow-sm">
