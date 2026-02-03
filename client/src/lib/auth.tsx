@@ -128,11 +128,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: false,
     // Only fetch if session indicator exists - saves a network request for logged out users
     enabled: sessionActive,
+    // Keep previous data during refetch to prevent flickering
+    placeholderData: (previousData) => previousData,
   });
   
-  // If no session indicator, we know immediately user is not logged in
-  // This provides instant feedback without waiting for API call
-  const isLoading = sessionActive ? queryLoading : false;
+  // Only show loading if:
+  // 1. Session is active AND query is loading AND we don't have user data yet
+  // This prevents the spinner from appearing during background refetches
+  const isLoading = sessionActive && queryLoading && !user;
   
   // If session indicator exists but server says not authenticated, clear the indicator
   // This handles cases where server session expired but local indicator persists
