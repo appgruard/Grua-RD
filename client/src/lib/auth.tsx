@@ -119,8 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [pendingVerification, setPendingVerification] = useState<VerificationStatus | null>(null);
   const [pendingVerificationUser, setPendingVerificationUser] = useState<UserWithConductor | null>(null);
   
-  // Check session indicator for instant feedback
-  const sessionActive = hasSessionIndicator();
+  // Use state for session indicator to make it reactive
+  const [sessionActive, setSessionActive] = useState(() => hasSessionIndicator());
   
   const { data: user, isLoading: queryLoading } = useQuery<UserWithConductor | null>({
     queryKey: ['/api/auth/me'],
@@ -139,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (sessionActive && !queryLoading && user === null) {
       setSessionIndicator(false);
+      setSessionActive(false);
     }
   }, [sessionActive, queryLoading, user]);
 
@@ -201,6 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data?.user) {
         // Set session indicator for web browsers (needed because cookies are httpOnly)
         setSessionIndicator(true);
+        setSessionActive(true);
         queryClient.setQueryData(['/api/auth/me'], data.user);
         // Preload resources based on user type for faster navigation
         preloadByUserType(data.user.userType);
@@ -241,6 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: async (data) => {
       // Set session indicator for web browsers (needed because cookies are httpOnly)
       setSessionIndicator(true);
+      setSessionActive(true);
       queryClient.setQueryData(['/api/auth/me'], data.user);
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
     },
@@ -254,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: async () => {
       // Clear session indicator for web browsers
       setSessionIndicator(false);
+      setSessionActive(false);
       // Clear all auth-related cache immediately
       queryClient.setQueryData(['/api/auth/me'], null);
       setPendingVerification(null);
