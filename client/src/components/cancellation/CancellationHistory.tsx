@@ -46,7 +46,9 @@ export function CancellationHistory({ userId, userType }: CancellationHistoryPro
 
   const cancelaciones = data?.ultimas_cancelaciones || [];
   const totalCancelaciones = data?.total_cancelaciones || 0;
-  const penalizacionesTotales = data?.penalizaciones_totales || 0;
+  const penalizacionesTotales = typeof data?.penalizaciones_totales === 'number' 
+    ? data.penalizaciones_totales 
+    : parseFloat(data?.penalizaciones_totales || '0') || 0;
 
   if (cancelaciones.length === 0) {
     return (

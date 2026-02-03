@@ -109,15 +109,6 @@ function ProtectedRoute({
   const { user, isLoading, pendingVerificationUser, refreshUser } = useAuth();
   const [refreshAttempted, setRefreshAttempted] = useState(false);
 
-  // Debug logging - remove after fixing
-  console.log('[ProtectedRoute] State:', { 
-    isLoading, 
-    hasUser: !!user, 
-    userType: user?.userType,
-    emailVerificado: (user as any)?.emailVerificado,
-    refreshAttempted 
-  });
-
   useEffect(() => {
     if (user?.userType === 'conductor') {
       preloadDriverModules();
@@ -130,7 +121,6 @@ function ProtectedRoute({
     
     // For conductors, refresh if conductor data is missing
     if (user.userType === 'conductor' && !(user as any).conductor) {
-      console.log('[ProtectedRoute] Refreshing: conductor missing conductor data');
       setRefreshAttempted(true);
       refreshUser();
       return;
@@ -138,7 +128,6 @@ function ProtectedRoute({
     
     // For clients, refresh if emailVerificado is undefined (should be boolean)
     if (user.userType === 'cliente' && (user as any).emailVerificado === undefined) {
-      console.log('[ProtectedRoute] Refreshing: cliente emailVerificado is undefined');
       setRefreshAttempted(true);
       refreshUser();
       return;
@@ -146,7 +135,6 @@ function ProtectedRoute({
   }, [user, isLoading, refreshAttempted, refreshUser]);
 
   if (isLoading) {
-    console.log('[ProtectedRoute] Showing loading spinner because isLoading=true');
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
