@@ -6312,7 +6312,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "No autorizado" });
       }
 
+      logSystem.info('Fetching cancellations for user', { usuarioId, userType: 'cliente' });
       const cancelaciones = await storage.getCancelacionesByUsuarioId(usuarioId, 'cliente');
+      logSystem.info('Cancellations fetched successfully', { usuarioId, count: cancelaciones.length });
       
       // Calculate total penalties
       const penalizacionesTotales = cancelaciones.reduce((sum: number, c: any) => {
@@ -6325,7 +6327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         penalizaciones_totales: penalizacionesTotales,
       });
     } catch (error: any) {
-      logSystem.error('Get cancellations error', error);
+      logSystem.error('Get cancellations error', { usuarioId: req.params.id, error: error.message, stack: error.stack });
       res.status(500).json({ message: "Error al obtener cancelaciones" });
     }
   });

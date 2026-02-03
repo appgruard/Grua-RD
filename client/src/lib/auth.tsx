@@ -86,6 +86,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function hasSessionCookie(): boolean {
   if (typeof document === 'undefined') return true;
+  // In native apps, HTTP-only cookies are not visible to JavaScript
+  // Always return true for native platforms to check session on server
+  if (isNativePlatform()) {
+    return true;
+  }
   return document.cookie.includes('connect.sid');
 }
 

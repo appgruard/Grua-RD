@@ -213,8 +213,61 @@ export default function ClientHome() {
   const [locationReady, setLocationReady] = useState(() => origin !== null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(() => origin === null);
 
-  // Function to fetch current geolocation
+  // Function to fetch current geolocation (uses Capacitor on native, browser API on web)
   const fetchGeolocation = useCallback(async () => {
+    const handleLocationSuccess = async (coords: Coordinates) => {
+      setCurrentLocation(coords);
+      setLocationReady(true);
+      setIsLoadingLocation(false);
+      
+      try {
+        const token = await fetchMapboxToken();
+        if (token) {
+          const { universalFetch } = await import('@/lib/queryClient');
+          const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`;
+          const data = await universalFetch(url);
+          const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+          setOrigin(coords);
+          setOrigenDireccion(address);
+        } else {
+          setOrigin(coords);
+          setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
+        }
+      } catch (error) {
+        setOrigin(coords);
+        setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
+      }
+    };
+
+    const handleLocationError = (error: any) => {
+      console.error('Error getting location:', error);
+      setIsLoadingLocation(false);
+      setLocationReady(true);
+    };
+
+    // Try Capacitor location service first for native apps
+    try {
+      const { LocationService, isCapacitor, isWeb } = await import('@/lib/capacitor');
+      
+      if (isCapacitor() && !isWeb()) {
+        // Native app: use Capacitor's location service
+        const hasPerms = await LocationService.checkPermissions();
+        if (!hasPerms) {
+          await LocationService.requestPermissions();
+        }
+        
+        const locationData = await LocationService.getCurrentPosition();
+        await handleLocationSuccess({
+          lat: locationData.latitude,
+          lng: locationData.longitude,
+        });
+        return;
+      }
+    } catch (capacitorError) {
+      console.warn('Capacitor location failed, falling back to browser API:', capacitorError);
+    }
+
+    // Fallback to browser's geolocation API
     if (!('geolocation' in navigator)) {
       setIsLoadingLocation(false);
       setLocationReady(true);
@@ -223,37 +276,12 @@ export default function ClientHome() {
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const coords = {
+        await handleLocationSuccess({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
-        };
-        setCurrentLocation(coords);
-        setLocationReady(true);
-        setIsLoadingLocation(false);
-        
-        try {
-          const token = await fetchMapboxToken();
-          if (token) {
-            const { universalFetch } = await import('@/lib/queryClient');
-            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords.lng},${coords.lat}.json?access_token=${token}&language=es`;
-            const data = await universalFetch(url);
-            const address = data.features?.[0]?.place_name || `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
-            setOrigin(coords);
-            setOrigenDireccion(address);
-          } else {
-            setOrigin(coords);
-            setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
-          }
-        } catch (error) {
-          setOrigin(coords);
-          setOrigenDireccion(`${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`);
-        }
+        });
       },
-      (error) => {
-        console.error('Error getting location:', error);
-        setIsLoadingLocation(false);
-        setLocationReady(true);
-      },
+      handleLocationError,
       { 
         enableHighAccuracy: false,
         timeout: 5000,
