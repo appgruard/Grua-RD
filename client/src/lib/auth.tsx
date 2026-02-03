@@ -84,14 +84,34 @@ interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function hasSessionCookie(): boolean {
-  if (typeof document === 'undefined') return true;
+function hasSessionIndicator(): boolean {
+  if (typeof window === 'undefined') return true;
   // In native apps, HTTP-only cookies are not visible to JavaScript
   // Always return true for native platforms to check session on server
   if (isNativePlatform()) {
     return true;
   }
-  return document.cookie.includes('connect.sid');
+  // Check sessionStorage for login indicator (set after successful login)
+  // This is needed because session cookies are httpOnly and not readable by JS
+  try {
+    return sessionStorage.getItem('gruard_session_active') === 'true';
+  } catch {
+    return true; // If sessionStorage fails, default to checking with server
+  }
+}
+
+function setSessionIndicator(active: boolean): void {
+  if (typeof window === 'undefined') return;
+  if (isNativePlatform()) return; // Native apps don't need this
+  try {
+    if (active) {
+      sessionStorage.setItem('gruard_session_active', 'true');
+    } else {
+      sessionStorage.removeItem('gruard_session_active');
+    }
+  } catch {
+    // Ignore sessionStorage errors
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -99,20 +119,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [pendingVerification, setPendingVerification] = useState<VerificationStatus | null>(null);
   const [pendingVerificationUser, setPendingVerificationUser] = useState<UserWithConductor | null>(null);
   
-  // Check cookie existence for instant feedback (no network request needed)
-  const cookieExists = hasSessionCookie();
+  // Check session indicator for instant feedback
+  const sessionActive = hasSessionIndicator();
   
   const { data: user, isLoading: queryLoading } = useQuery<UserWithConductor | null>({
     queryKey: ['/api/auth/me'],
     queryFn: getQueryFn({ on401: 'returnNull' }),
     retry: false,
-    // Only fetch if cookie exists - saves a network request for logged out users
-    enabled: cookieExists,
+    // Only fetch if session indicator exists - saves a network request for logged out users
+    enabled: sessionActive,
   });
   
-  // If no cookie exists, we know immediately user is not logged in
+  // If no session indicator, we know immediately user is not logged in
   // This provides instant feedback without waiting for API call
-  const isLoading = cookieExists ? queryLoading : false;
+  const isLoading = sessionActive ? queryLoading : false;
+  
+  // If session indicator exists but server says not authenticated, clear the indicator
+  // This handles cases where server session expired but local indicator persists
+  useEffect(() => {
+    if (sessionActive && !queryLoading && user === null) {
+      setSessionIndicator(false);
+    }
+  }, [sessionActive, queryLoading, user]);
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; userType?: string }) => {
@@ -171,6 +199,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Update the cache immediately with the user data
       if (data?.user) {
+        // Set session indicator for web browsers (needed because cookies are httpOnly)
+        setSessionIndicator(true);
         queryClient.setQueryData(['/api/auth/me'], data.user);
         // Preload resources based on user type for faster navigation
         preloadByUserType(data.user.userType);
@@ -209,6 +239,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: async (data) => {
+      // Set session indicator for web browsers (needed because cookies are httpOnly)
+      setSessionIndicator(true);
       queryClient.setQueryData(['/api/auth/me'], data.user);
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
     },
@@ -220,6 +252,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error('Logout failed');
     },
     onSuccess: async () => {
+      // Clear session indicator for web browsers
+      setSessionIndicator(false);
       // Clear all auth-related cache immediately
       queryClient.setQueryData(['/api/auth/me'], null);
       setPendingVerification(null);
