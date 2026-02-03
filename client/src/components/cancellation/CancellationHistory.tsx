@@ -14,9 +14,14 @@ export function CancellationHistory({ userId, userType }: CancellationHistoryPro
     ? `/api/usuarios/${userId}/cancelaciones`
     : `/api/conductores/${userId}/cancelaciones`;
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<{
+    ultimas_cancelaciones: any[];
+    total_cancelaciones: number;
+    penalizaciones_totales: number;
+  }>({
     queryKey: [endpoint],
     enabled: !!userId,
+    refetchOnMount: 'always',
   });
 
   if (isLoading) {

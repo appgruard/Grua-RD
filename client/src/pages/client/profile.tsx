@@ -40,6 +40,7 @@ export default function ClientProfile() {
   const { data: linkedAccounts } = useQuery<{ hasClienteAccount: boolean; hasConductorAccount: boolean }>({
     queryKey: ['/api/auth/linked-accounts'],
     enabled: !!user,
+    refetchOnMount: 'always',
   });
 
   const uploadPhotoMutation = useMutation({

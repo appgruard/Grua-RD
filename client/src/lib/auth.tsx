@@ -163,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear any pending verification state
       setPendingVerification(null);
       setPendingVerificationUser(null);
+      
       // Update the cache immediately with the user data
       if (data?.user) {
         queryClient.setQueryData(['/api/auth/me'], data.user);
@@ -173,8 +174,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           preloadDriverResourcesOnLogin();
         }
       }
-      // Also invalidate to ensure fresh data
-      await queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      
+      // Invalidate and refetch specific queries used by home/profile pages
+      await queryClient.invalidateQueries({ queryKey: ['/api/services/my-services'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/client/insurance/status'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/linked-accounts'] });
+      
+      // Small delay to ensure session cookie is fully propagated on native platforms
+      if (isNativePlatform()) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     },
     onError: async (error: any) => {
       // If verification is required, store the state temporarily

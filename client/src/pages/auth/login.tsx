@@ -121,10 +121,52 @@ export default function Login() {
     }
   };
 
+  const confirmSessionEstablished = async (maxRetries = 3): Promise<boolean> => {
+    const { getApiUrl } = await import('@/lib/queryClient');
+    const { Capacitor } = await import('@capacitor/core');
+    const { CapacitorHttp } = await import('@capacitor/core');
+    
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const fullUrl = getApiUrl('/api/auth/me');
+        if (Capacitor.isNativePlatform()) {
+          const response = await CapacitorHttp.request({
+            url: fullUrl,
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            webFetchExtra: { credentials: 'include' },
+          });
+          if (response.status >= 200 && response.status < 300) {
+            return true;
+          }
+        } else {
+          const response = await fetch(fullUrl, { credentials: 'include' });
+          if (response.ok) {
+            return true;
+          }
+        }
+      } catch {
+        // Retry on error
+      }
+      await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+    }
+    return false;
+  };
+
   const performLogin = async (userType?: string) => {
     setLoading(true);
     try {
       const loggedInUser = await login(email, password, userType ? { userType } : undefined);
+      
+      // Confirm session is established before navigating (important for native apps)
+      const sessionConfirmed = await confirmSessionEstablished();
+      if (!sessionConfirmed) {
+        throw new Error('No se pudo establecer la sesión. Por favor intenta de nuevo.');
+      }
+      
+      // Sync React Query cache with confirmed session
+      const { queryClient } = await import('@/lib/queryClient');
+      await queryClient.refetchQueries({ queryKey: ['/api/auth/me'] });
       
       toast({
         title: '¡Bienvenido!',

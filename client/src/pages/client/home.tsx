@@ -113,12 +113,14 @@ export default function ClientHome() {
     insuranceStatus: 'pendiente' | 'aprobado' | 'rechazado' | null;
   }>({
     queryKey: ['/api/client/insurance/status'],
+    refetchOnMount: 'always',
   });
 
   const { data: myServices } = useQuery<Servicio[]>({
     queryKey: ['/api/services/my-services'],
     staleTime: 1000 * 15,
     refetchInterval: 30000,
+    refetchOnMount: 'always',
   });
 
   const activeService = myServices?.find(
