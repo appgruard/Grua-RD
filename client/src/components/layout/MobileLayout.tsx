@@ -77,12 +77,11 @@ export function MobileLayout({ children, userType }: MobileLayoutProps) {
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
-      {/* Top safe area for notch - minimal padding that respects device insets */}
+      {/* Top safe area for notch - compact padding */}
       <div 
         className="flex-shrink-0 bg-background"
         style={{ 
-          paddingTop: 'env(safe-area-inset-top, 0px)',
-          minHeight: '0px'
+          height: 'max(0px, calc(env(safe-area-inset-top, 0px) - 8px))'
         }}
       />
       {/* Main content with bottom padding for nav + gesture bar */}

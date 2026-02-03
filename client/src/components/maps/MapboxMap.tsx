@@ -695,9 +695,9 @@ export function MapboxMap({
               id="route-line"
               type="line"
               paint={{
-                'line-color': '#0F2947',
+                'line-color': theme === 'dark' ? '#ffffff' : '#000000',
                 'line-width': 4,
-                'line-opacity': 0.8
+                'line-opacity': 0.9
               }}
               layout={{
                 'line-join': 'round',
