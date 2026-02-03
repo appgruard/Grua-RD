@@ -126,23 +126,6 @@ function LazyMapboxMapInner({
 export const LazyMapboxMap = memo(LazyMapboxMapInner);
 
 export function MapboxMapWithFastLoad(props: Omit<LazyMapboxMapProps, 'deferLoad' | 'loadDelay'>) {
-  const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    // Reduced timeout for faster map loading - using microtask for near-immediate render
-    if ('requestIdleCallback' in window) {
-      const id = (window as any).requestIdleCallback(() => setIsReady(true), { timeout: 50 });
-      return () => (window as any).cancelIdleCallback(id);
-    } else {
-      // Use queueMicrotask for even faster fallback
-      queueMicrotask(() => setIsReady(true));
-    }
-  }, []);
-
-  if (!isReady) {
-    return <MapPlaceholder className={props.className} />;
-  }
-
   return (
     <Suspense fallback={<MapPlaceholder className={props.className} />}>
       <MapboxMapLazy {...props} />

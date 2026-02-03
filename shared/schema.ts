@@ -220,6 +220,7 @@ export const users = pgTable("users", {
   cancelacionesUltimoMes: integer("cancelaciones_ultimo_mes").default(0),
   penalizacionesTotales: decimal("penalizaciones_totales", { precision: 12, scale: 2 }).default("0.00"),
   ultimaCancelacionTimestamp: timestamp("ultima_cancelacion_timestamp"),
+  bloqueadoHasta: timestamp("bloqueado_hasta"),
 }, (table) => ({
   emailUserTypeUnique: uniqueIndex("users_email_user_type_unique").on(table.email, table.userType),
 }));
