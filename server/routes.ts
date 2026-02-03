@@ -6071,7 +6071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get cancellation reason to check for penalties
-      const razon = await storage.getRazonCancelacion(razonCodigo);
+      const razon = await storage.getRazonCancelacionByCodigo(razonCodigo);
       let penalizacionAplicada = 0;
       let bloqueoDuracionMinutos = 0;
       let deductFromBalance = false;
