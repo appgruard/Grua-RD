@@ -37,11 +37,26 @@ export function CancellationCard({ cancellation }: CancellationCardProps) {
     }
   };
 
-  const formattedDate = format(
-    new Date(cancellation.fecha),
-    "d 'de' MMMM 'de' yyyy 'a las' HH:mm",
-    { locale: es }
-  );
+  // Safely parse date - handle invalid dates gracefully
+  let formattedDate = 'Fecha no disponible';
+  try {
+    const dateValue = cancellation.fecha ? new Date(cancellation.fecha) : null;
+    if (dateValue && !isNaN(dateValue.getTime())) {
+      formattedDate = format(dateValue, "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es });
+    }
+  } catch {
+    formattedDate = 'Fecha no disponible';
+  }
+
+  // Safely parse penalty as number
+  const penalizacion = typeof cancellation.penalizacion === 'number' 
+    ? cancellation.penalizacion 
+    : parseFloat(String(cancellation.penalizacion || '0')) || 0;
+
+  // Safely parse distance as number
+  const distanciaRecorrida = typeof cancellation.distanciaRecorrida === 'number'
+    ? cancellation.distanciaRecorrida
+    : parseFloat(String(cancellation.distanciaRecorrida || '0')) || 0;
 
   const isBlocked = cancellation.bloqueadoHasta && new Date(cancellation.bloqueadoHasta) > new Date();
   const evaluationLevel = cancellation.evaluacion || 'ninguna';
@@ -78,19 +93,19 @@ export function CancellationCard({ cancellation }: CancellationCardProps) {
               Penalización
             </div>
             <Badge
-              className={getPenaltyColor(cancellation.penalizacion)}
+              className={getPenaltyColor(penalizacion)}
               data-testid="penalty-badge"
             >
-              ${cancellation.penalizacion.toFixed(2)}
+              ${penalizacion.toFixed(2)}
             </Badge>
           </div>
         </div>
 
-        {cancellation.distanciaRecorrida !== undefined && (
+        {cancellation.distanciaRecorrida !== undefined && cancellation.distanciaRecorrida !== null && (
           <div className="mt-3 grid grid-cols-2 gap-4" data-testid="additional-details">
             <div className="text-xs">
               <p className="text-muted-foreground">Distancia Recorrida</p>
-              <p className="font-medium" data-testid="distance-value">{cancellation.distanciaRecorrida.toFixed(1)} km</p>
+              <p className="font-medium" data-testid="distance-value">{distanciaRecorrida.toFixed(1)} km</p>
             </div>
             <div className="text-xs">
               <p className="text-muted-foreground">Nivel de Penalización</p>
