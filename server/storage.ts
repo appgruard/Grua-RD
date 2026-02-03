@@ -5101,19 +5101,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCancelacionesByUsuarioId(usuarioId: string, tipo: 'cliente' | 'conductor'): Promise<CancelacionServicioWithDetails[]> {
-    const results = await db.query.cancelacionesServicios.findMany({
-      where: and(
-        eq(cancelacionesServicios.canceladoPorId, usuarioId),
-        eq(cancelacionesServicios.tipoCancelador, tipo)
-      ),
-      with: {
-        servicio: true,
-        canceladoPor: true,
-        razonCancelacion: true,
-      },
-      orderBy: desc(cancelacionesServicios.createdAt),
-    });
-    return results as unknown as CancelacionServicioWithDetails[];
+    // Use raw SQL with LEFT JOINs for robustness against missing related records
+    try {
+      const results = await db.execute(sql`
+        SELECT 
+          cs.*,
+          row_to_json(s.*) as servicio,
+          row_to_json(u.*) as cancelado_por,
+          row_to_json(rc.*) as razon_cancelacion
+        FROM cancelaciones_servicios cs
+        LEFT JOIN servicios s ON cs.servicio_id = s.id
+        LEFT JOIN users u ON cs.cancelado_por_id = u.id
+        LEFT JOIN razones_cancelacion rc ON cs.razon_codigo = rc.codigo
+        WHERE cs.cancelado_por_id = ${usuarioId} AND cs.tipo_cancelador = ${tipo}
+        ORDER BY cs.created_at DESC
+      `);
+      
+      // Map snake_case columns to camelCase for CancelacionServicio fields
+      return (results.rows || []).map((row: any) => {
+        const cancelacion: any = {
+          id: row.id,
+          servicioId: row.servicio_id,
+          canceladoPorId: row.cancelado_por_id,
+          tipoCancelador: row.tipo_cancelador,
+          razonCodigo: row.razon_codigo,
+          detallesAdicionales: row.detalles_adicionales,
+          penalizacionAplicada: row.penalizacion_aplicada,
+          porcentajePenalizacion: row.porcentaje_penalizacion,
+          motivoExoneracion: row.motivo_exoneracion,
+          distanciaRecorridaOperador: row.distancia_recorrida_operador,
+          tiempoEsperaReal: row.tiempo_espera_real,
+          etaOriginal: row.eta_original,
+          montoTotalServicio: row.monto_total_servicio,
+          estadoRevision: row.estado_revision,
+          revisadoPor: row.revisado_por,
+          fechaRevision: row.fecha_revision,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          zonaTipo: row.zona_tipo,
+          estadoAnterior: row.estado_anterior,
+          motivoCancelacion: row.motivo_cancelacion,
+          notasUsuario: row.notas_usuario,
+          servicio: row.servicio,
+          canceladoPor: row.cancelado_por,
+          razonCancelacion: row.razon_cancelacion,
+        };
+        return cancelacion;
+      }) as CancelacionServicioWithDetails[];
+    } catch (error: any) {
+      console.error('[getCancelacionesByUsuarioId] Query error:', error.message);
+      throw error;
+    }
   }
 
   async getCancelacionesByServicioId(servicioId: string): Promise<CancelacionServicioWithDetails | undefined> {
@@ -5129,16 +5167,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllCancelaciones(limit: number = 100): Promise<CancelacionServicioWithDetails[]> {
-    const results = await db.query.cancelacionesServicios.findMany({
-      with: {
-        servicio: true,
-        canceladoPor: true,
-        razonCancelacion: true,
-      },
-      orderBy: desc(cancelacionesServicios.createdAt),
-      limit,
-    });
-    return results as unknown as CancelacionServicioWithDetails[];
+    // Use raw SQL with LEFT JOINs for robustness
+    try {
+      const results = await db.execute(sql`
+        SELECT 
+          cs.*,
+          row_to_json(s.*) as servicio,
+          row_to_json(u.*) as cancelado_por,
+          row_to_json(rc.*) as razon_cancelacion
+        FROM cancelaciones_servicios cs
+        LEFT JOIN servicios s ON cs.servicio_id = s.id
+        LEFT JOIN users u ON cs.cancelado_por_id = u.id
+        LEFT JOIN razones_cancelacion rc ON cs.razon_codigo = rc.codigo
+        ORDER BY cs.created_at DESC
+        LIMIT ${limit}
+      `);
+      
+      // Map snake_case columns to camelCase for CancelacionServicio fields
+      return (results.rows || []).map((row: any) => {
+        const cancelacion: any = {
+          id: row.id,
+          servicioId: row.servicio_id,
+          canceladoPorId: row.cancelado_por_id,
+          tipoCancelador: row.tipo_cancelador,
+          razonCodigo: row.razon_codigo,
+          detallesAdicionales: row.detalles_adicionales,
+          penalizacionAplicada: row.penalizacion_aplicada,
+          porcentajePenalizacion: row.porcentaje_penalizacion,
+          motivoExoneracion: row.motivo_exoneracion,
+          distanciaRecorridaOperador: row.distancia_recorrida_operador,
+          tiempoEsperaReal: row.tiempo_espera_real,
+          etaOriginal: row.eta_original,
+          montoTotalServicio: row.monto_total_servicio,
+          estadoRevision: row.estado_revision,
+          revisadoPor: row.revisado_por,
+          fechaRevision: row.fecha_revision,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          zonaTipo: row.zona_tipo,
+          estadoAnterior: row.estado_anterior,
+          motivoCancelacion: row.motivo_cancelacion,
+          notasUsuario: row.notas_usuario,
+          servicio: row.servicio,
+          canceladoPor: row.cancelado_por,
+          razonCancelacion: row.razon_cancelacion,
+        };
+        return cancelacion;
+      }) as CancelacionServicioWithDetails[];
+    } catch (error: any) {
+      console.error('[getAllCancelaciones] Query error:', error.message);
+      throw error;
+    }
   }
 
   async updateCancelacion(id: string, data: Partial<CancelacionServicio>): Promise<CancelacionServicio> {
