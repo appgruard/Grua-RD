@@ -1,0 +1,47 @@
+2026-02-03T20:03:19.452099344Z 8:03:19 PM [express] POST /api/analytics/web-vitals 204 in 111ms
+2026-02-03T20:03:19.465881722Z 20:03:19 [info] Fetching cancellations for user {"usuarioId":"35c787ea-fe55-457e-9655-52b81dfc2c67","userType":"cliente","category":"system"}
+2026-02-03T20:03:19.522011076Z 20:03:19 [info] Cancellations fetched successfully {"usuarioId":"35c787ea-fe55-457e-9655-52b81dfc2c67","count":2,"category":"system"}
+2026-02-03T20:03:19.527933022Z 8:03:19 PM [express] GET /api/auth/linked-accounts 304 in 138ms :: {"hasClienteAccount":false,"hasCo…
+2026-02-03T20:03:19.529782865Z 8:03:19 PM [express] GET /api/client/payment-methods 304 in 148ms :: []
+2026-02-03T20:03:19.547552349Z 8:03:19 PM [express] GET /api/usuarios/35c787ea-fe55-457e-9655-52b81dfc2c67/cancelaciones 304 in 154…
+2026-02-03T20:03:19.550245551Z 8:03:19 PM [express] GET /api/client/insurance/status 304 in 165ms :: {"hasApprovedInsurance":false,…
+2026-02-03T20:03:19.628879653Z 8:03:19 PM [express] GET /api/wallet 401 in 236ms :: {"message":"No autorizado"}
+2026-02-03T20:03:19.728815473Z 8:03:19 PM [express] GET /api/services/my-services 304 in 337ms :: [{"id":"c19940f1-f94b-4133-ad8d-a…
+2026-02-03T20:03:19.851663099Z 20:03:19 [info] Web Vital metric received {"metric":"DOM_CONTENT_LOADED","value":"43.10","rating":"good","delta":"43.10","metricId":"custom-1770148999624","navigationType":"custom","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:19.858873880Z 20:03:19 [info] Web Vital metric received {"metric":"TTFB","value":"8.80","rating":"good","delta":"8.80","metricId":"v5-1770148999607-5301055263650","navigationType":"reload","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:19.862369151Z 20:03:19 [info] Web Vital metric received {"metric":"DOM_INTERACTIVE","value":"33.90","rating":"good","delta":"33.90","metricId":"custom-1770148999625","navigationType":"custom","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:19.866124931Z 20:03:19 [info] Web Vital metric received {"metric":"LOAD_EVENT","value":"46.90","rating":"good","delta":"46.90","metricId":"custom-1770148999624","navigationType":"custom","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:19.876101504Z 8:03:19 PM [express] GET /api/auth/me 304 in 79ms :: {"id":"35c787ea-fe55-457e-9655-52b81dfc2c67","e…
+2026-02-03T20:03:19.877247456Z 8:03:19 PM [express] POST /api/analytics/web-vitals 204 in 80ms
+2026-02-03T20:03:19.878153589Z 8:03:19 PM [express] POST /api/analytics/web-vitals 204 in 83ms
+2026-02-03T20:03:19.881230596Z 8:03:19 PM [express] POST /api/analytics/web-vitals 204 in 81ms
+2026-02-03T20:03:19.882590858Z 8:03:19 PM [express] POST /api/analytics/web-vitals 204 in 84ms
+2026-02-03T20:03:20.073190739Z 20:03:20 [info] Fetching cancellations for user {"usuarioId":"35c787ea-fe55-457e-9655-52b81dfc2c67","userType":"cliente","category":"system"}
+2026-02-03T20:03:20.118835332Z 20:03:20 [info] Cancellations fetched successfully {"usuarioId":"35c787ea-fe55-457e-9655-52b81dfc2c67","count":2,"category":"system"}
+2026-02-03T20:03:20.158274125Z 8:03:20 PM [express] GET /api/usuarios/35c787ea-fe55-457e-9655-52b81dfc2c67/cancelaciones 304 in 136…
+2026-02-03T20:03:20.166792008Z 8:03:20 PM [express] GET /api/services/my-services 304 in 139ms :: [{"id":"c19940f1-f94b-4133-ad8d-a…
+2026-02-03T20:03:20.172868093Z 8:03:20 PM [express] GET /api/client/payment-methods 304 in 154ms :: []
+2026-02-03T20:03:20.174166775Z 8:03:20 PM [express] GET /api/auth/linked-accounts 304 in 154ms :: {"hasClienteAccount":false,"hasCo…
+2026-02-03T20:03:20.175166738Z 8:03:20 PM [express] GET /api/client/insurance/status 304 in 158ms :: {"hasApprovedInsurance":false,…
+2026-02-03T20:03:20.297999913Z 8:03:20 PM [express] GET /api/wallet 401 in 277ms :: {"message":"No autorizado"}
+2026-02-03T20:03:20.305285325Z 20:03:20 [info] Web Vital metric received {"metric":"FCP","value":"292.00","rating":"good","delta":"292.00","metricId":"v5-1770148999606-8871142082763","navigationType":"reload","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:20.323582586Z 8:03:20 PM [express] POST /api/analytics/web-vitals 204 in 280ms
+2026-02-03T20:03:30.782961800Z 8:03:30 PM [express] GET /api/auth/me 304 in 82ms :: {"id":"35c787ea-fe55-457e-9655-52b81dfc2c67","e…
+2026-02-03T20:03:30.856478267Z 20:03:30 [info] Web Vital metric received {"metric":"LOAD_EVENT","value":"264.70","rating":"good","delta":"264.70","metricId":"custom-1770149010449","navigationType":"custom","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:30.875041387Z 8:03:30 PM [express] POST /api/analytics/web-vitals 204 in 172ms
+2026-02-03T20:03:31.001726827Z 8:03:31 PM [express] GET /api/announcements/active 304 in 104ms :: []
+2026-02-03T20:03:31.025334872Z 20:03:31 [info] Web Vital metric received {"metric":"DOM_CONTENT_LOADED","value":"261.80","rating":"good","delta":"261.80","metricId":"custom-1770149010449","navigationType":"custom","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:31.027059558Z 20:03:31 [info] Web Vital metric received {"metric":"TTFB","value":"221.00","rating":"good","delta":"221.00","metricId":"v5-1770149010439-5942261130760","navigationType":"reload","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:31.044045001Z 8:03:31 PM [express] POST /api/analytics/web-vitals 204 in 341ms
+2026-02-03T20:03:31.044649975Z 8:03:31 PM [express] POST /api/analytics/web-vitals 204 in 343ms
+2026-02-03T20:03:31.054615460Z 20:03:31 [info] Web Vital metric received {"metric":"DOM_INTERACTIVE","value":"253.30","rating":"good","delta":"253.30","metricId":"custom-1770149010450","navigationType":"custom","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:31.071994891Z 8:03:31 PM [express] POST /api/analytics/web-vitals 204 in 368ms
+2026-02-03T20:03:31.123447170Z 8:03:31 PM [express] GET /api/wallet 401 in 224ms :: {"message":"No autorizado"}
+2026-02-03T20:03:31.151498512Z 20:03:31 [info] Web Vital metric received {"metric":"FCP","value":"568.00","rating":"good","delta":"568.00","metricId":"v5-1770149010439-9842722846049","navigationType":"reload","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:31.152494339Z 8:03:31 PM [express] GET /api/client/insurance/status 304 in 255ms :: {"hasApprovedInsurance":false,…
+2026-02-03T20:03:31.170072518Z 8:03:31 PM [express] GET /api/services/my-services 304 in 269ms :: [{"id":"c19940f1-f94b-4133-ad8d-a…
+2026-02-03T20:03:31.172649138Z 8:03:31 PM [express] POST /api/analytics/web-vitals 204 in 241ms
+2026-02-03T20:03:37.998568372Z 20:03:37 [info] Web Vital metric received {"metric":"CLS","value":"0.00","rating":"good","delta":"0.00","metricId":"v5-1770149010755-5215224411438","navigationType":"reload","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:38.004682135Z 20:03:38 [info] Web Vital metric received {"metric":"LCP","value":"792.00","rating":"good","delta":"792.00","metricId":"v5-1770149010439-9823064165143","navigationType":"reload","userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Sa","category":"system"}
+2026-02-03T20:03:38.015931589Z 8:03:38 PM [express] POST /api/analytics/web-vitals 204 in 117ms
+2026-02-03T20:03:38.021438696Z 8:03:38 PM [express] POST /api/analytics/web-vitals 204 in 121ms

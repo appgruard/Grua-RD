@@ -137,6 +137,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // This prevents the spinner from appearing during background refetches
   const isLoading = sessionActive && queryLoading && !user;
   
+  // Debug logging - remove after fixing
+  console.log('[AUTH] State:', { sessionActive, queryLoading, user: !!user, isLoading });
+  
   // If session indicator exists but server says not authenticated, clear the indicator
   // This handles cases where server session expired but local indicator persists
   useEffect(() => {
