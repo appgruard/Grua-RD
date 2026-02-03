@@ -1,0 +1,85 @@
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % cd android
+./gradlew clean
+cd ..
+npx cap sync
+./android/gradlew -p android assembleRelease
+Starting a Gradle Daemon, 1 incompatible Daemon could not be reused, use --status for details
+
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Task :app:clean FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:clean'.
+> java.io.IOException: Unable to delete directory '/Users/nicholgarcia/Documents/Grua-RD/android/app/build'
+    Failed to delete some children. This might happen because a process has files open or has its working directory set in the target directory.
+    - /Users/nicholgarcia/Documents/Grua-RD/android/app/build/intermediates
+    New files were found. This might happen because a process is still writing to the target directory.
+    - /Users/nicholgarcia/Documents/Grua-RD/android/app/build/intermediates/.DS_Store
+    - /Users/nicholgarcia/Documents/Grua-RD/android/app/build/.DS_Store
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 49s
+2 actionable tasks: 2 executed
+✔ Copying web assets from public to android/app/src/main/assets/public in 112.79ms
+✔ Creating capacitor.config.json in android/app/src/main/assets in 633.58μs
+✔ copy android in 145.75ms
+✔ Updating Android plugins in 10.17ms
+[info] Found 6 Capacitor plugins for android:
+       @capacitor/app@6.0.3
+       @capacitor/camera@6.1.3
+       @capacitor/filesystem@6.0.4
+       @capacitor/geolocation@6.1.1
+       @capacitor/network@6.0.4
+       @capacitor/push-notifications@6.0.5
+✔ update android in 74.76ms
+✔ Copying web assets from public to ios/App/App/public in 69.13ms
+✔ Creating capacitor.config.json in ios/App/App in 414.96μs
+✔ copy ios in 116.63ms
+✔ Updating iOS plugins in 8.85ms
+✔ Updating iOS native dependencies with pod install in 4.21s
+[info] Found 6 Capacitor plugins for ios:
+       @capacitor/app@6.0.3
+       @capacitor/camera@6.1.3
+       @capacitor/filesystem@6.0.4
+       @capacitor/geolocation@6.1.1
+       @capacitor/network@6.0.4
+       @capacitor/push-notifications@6.0.5
+✔ update ios in 5.31s
+✔ copy web in 19.36ms
+✔ update web in 19.17ms
+[info] Sync finished in 6.104s
+
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Task :capacitor-android:compileReleaseJavaWithJavac
+Note: /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/Bridge.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :capacitor-camera:compileReleaseJavaWithJavac
+Note: /Users/nicholgarcia/Documents/Grua-RD/node_modules/@capacitor/camera/android/src/main/java/com/capacitorjs/plugins/camera/CameraBottomSheetDialogFragment.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+[Incubating] Problems report is available at: file:///Users/nicholgarcia/Documents/Grua-RD/android/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 53s
+340 actionable tasks: 115 executed, 225 up-to-date
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % keytool -list
+error de herramienta de claves: java.lang.Exception: El archivo de almacén de claves no existe: /Users/nicholgarcia/.keystore
+nicholgarcia@MacBook-Air-de-Nichol Grua-RD % 
