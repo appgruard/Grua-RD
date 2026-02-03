@@ -6,6 +6,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import watermarkLogo from '@assets/20251129_191904_0001_1764458415723.png';
 import type { RouteGeometry } from '@/lib/maps';
 import { useMapboxToken } from '@/hooks/use-public-config';
+import { useTheme } from '@/components/ThemeToggle';
 
 export interface Coordinates {
   lat: number;
@@ -292,6 +293,7 @@ interface MapboxMapProps {
 }
 
 const MAP_STYLE_LIGHT = 'mapbox://styles/mapbox/streets-v12';
+const MAP_STYLE_DARK = 'mapbox://styles/mapbox/dark-v11';
 
 async function reverseGeocode(lat: number, lng: number, token: string | null): Promise<string> {
   console.log('[GEOCODE] Starting lat:', lat, 'lng:', lng);
@@ -431,6 +433,9 @@ export function MapboxMap({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mapboxToken = useMapboxToken();
+  const { theme } = useTheme();
+  
+  const mapStyle = theme === 'dark' ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;
   
   console.log('[MapboxMap] Token received:', mapboxToken ? `${mapboxToken.substring(0, 20)}...` : 'null');
   
@@ -679,7 +684,7 @@ export function MapboxMap({
         }}
         mapboxAccessToken={mapboxToken}
         style={{ width: '100%', height: '100%', minHeight: '300px' }}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapStyle={mapStyle}
         attributionControl={false}
       >
         <GeolocateControl position="top-right" trackUserLocation />
