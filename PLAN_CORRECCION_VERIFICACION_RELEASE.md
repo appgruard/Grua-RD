@@ -3,10 +3,11 @@
 ## Problema Detectado
 El usuario reporta que en las versiones Release (APK/AAB) los conductores son redirigidos a la página de verificación incluso si ya están verificados. Además, en el panel de administración, la carga del estado de verificación falla. Ambos problemas no ocurren en la PWA (web).
 
+**Observación Clave:** Al cerrar y abrir la app, el Dashboard del conductor se muestra sin problemas. Esto indica que el problema ocurre específicamente en la transición post-login (donde los datos del usuario podrían no estar completamente hidratados en la caché de React Query) y no es un problema de permisos permanentes en la base de datos.
+
 ## Análisis Técnico Inicial
-1.  **Redirección de Conductores:** En `client/src/App.tsx`, el `ProtectedRoute` utiliza `currentUser` (que puede ser `user` de la sesión activa o `pendingVerificationUser`). La lógica de redirección depende de campos como `conductor`, `cedulaVerificada`, `fotoVerificada`, etc. Si estos campos llegan como `undefined` o no están presentes en el objeto retornado por el servidor en modo producción/nativo, la app redirige preventivamente a `/verify-pending`.
-2.  **Error en Panel Admin:** El error "No se pudo cargar el estado de verificación" en `AdminVerifications.tsx` sugiere que el endpoint `/api/admin/verification-status` está fallando o retornando un error 401/403 que no se maneja correctamente en el entorno nativo (posiblemente por problemas de cookies/sesión persistente).
-3.  **Diferencia PWA vs Nativo:** Las aplicaciones nativas usan `CapacitorHttp` y manejan las cookies de forma distinta. En producción, la configuración de `sameSite: "lax"` y `secure: true` es crítica.
+1.  **Redirección de Conductores:** En `client/src/App.tsx`, el `ProtectedRoute` utiliza `currentUser`. Si al iniciar sesión, la respuesta del login no incluye el objeto `conductor` (o este se carga asincrónicamente mediante un refetch que aún no ha terminado), la lógica de `needsVerification` se dispara. Al reiniciar la app, `useQuery(['/api/auth/me'])` carga el usuario completo (incluyendo relaciones) desde el inicio, por lo que el Dashboard funciona.
+2.  **Error en Panel Admin:** El error "No se pudo cargar el estado de verificación" en `AdminVerifications.tsx` se debe probablemente a que el query usa `/api/admin/verification-status` como URL relativa. En Capacitor, las URLs deben ser absolutas para que el plugin de HTTP maneje correctamente las cookies/sesiones.
 
 ## Plan de Acción
 
