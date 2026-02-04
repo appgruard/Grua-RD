@@ -162,18 +162,17 @@ function ProtectedRoute({
 
   // For conductors, check if verification is complete using authoritative server data
   if (currentUser.userType === 'conductor') {
-    // If conductor data is not loaded and we haven't tried refreshing yet, show brief loading
-    // After refresh attempt, if still no conductor data, redirect to verify-pending
+    // If conductor data is not loaded, show loading instead of immediate redirect
+    // This prevents false redirects during session hydration/login transition
     if (!(currentUser as any).conductor) {
-      if (!refreshAttempted) {
-        return (
-          <div className="flex items-center justify-center min-h-screen">
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex flex-col items-center gap-4">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Verificando perfil...</p>
           </div>
-        );
-      }
-      // Refresh was attempted but no conductor data - redirect to verify-pending
-      return <Redirect to="/verify-pending" />;
+        </div>
+      );
     }
     
     // Either telefonoVerificado OR emailVerificado counts as contact verified
