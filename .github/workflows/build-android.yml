@@ -12,7 +12,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Release se ejecuta tanto en push a main como en tags v*
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
 
     steps:
@@ -85,7 +84,6 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
-
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -95,20 +93,25 @@ jobs:
       # ---------- RELEASE ----------
       - name: Decode Android keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/grua-rd-release.jks
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/keystore.jks
 
-      - name: Build Release APK & AAB
+      - name: Build Release AAB
         env:
+          ANDROID_KEYSTORE_PATH: keystore.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease
+          ./gradlew bundleRelease
 
-      - name: Upload Release APK & AAB
+      - name: Verify AAB signature
+        run: |
+          jarsigner -verify -verbose -certs android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload Release AAB
         uses: actions/upload-artifact@v4
         with:
           name: app-release-${{ github.run_number }}
-          path: android/app/build/outputs/
+          path: android/app/build/outputs/bundle/release/
