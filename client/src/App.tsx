@@ -184,8 +184,15 @@ function ProtectedRoute({
     const categoriasConfiguradas = (currentUser as any).conductor?.categoriasConfiguradas;
     const vehiculosRegistrados = (currentUser as any).conductor?.vehiculosRegistrados;
     // Driver needs ALL 6 verification steps completed
-    const needsVerification = !currentUser.cedulaVerificada || !contactoVerificado || !fotoVerificada || 
-      !licenciaVerificada || !categoriasConfiguradas || !vehiculosRegistrados;
+    // Robustness: Only redirect if verification fields are explicitly false
+    const needsVerification = 
+      currentUser.cedulaVerificada === false || 
+      contactoVerificado === false || 
+      fotoVerificada === false || 
+      licenciaVerificada === false || 
+      categoriasConfiguradas === false || 
+      vehiculosRegistrados === false;
+      
     if (needsVerification) {
       return <Redirect to="/verify-pending" />;
     }

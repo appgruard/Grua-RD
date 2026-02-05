@@ -285,6 +285,16 @@ passport.deserializeUser(async (id: string, done) => {
       logSystem.warn("DeserializeUser: User not found", { userId: id });
       return done(null, false);
     }
+
+    // Log diagnostic data for verification issues in production/release
+    if (user.userType === 'conductor') {
+      logSystem.info("Diagnostic: Driver Deserialization", {
+        userId: user.id,
+        cedulaVerificada: user.cedulaVerificada,
+        hasConductorData: !!user.conductor,
+        conductorLicenciaVerificada: (user as any).conductor?.licenciaVerificada
+      });
+    }
     
     if (user.estadoCuenta === 'suspendido' || user.estadoCuenta === 'rechazado') {
       logSystem.warn("DeserializeUser: User suspended/rejected", { userId: id, estado: user.estadoCuenta });

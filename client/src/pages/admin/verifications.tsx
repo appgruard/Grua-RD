@@ -242,7 +242,8 @@ export default function AdminVerifications() {
   const { data, isLoading, isError } = useQuery<VerificationStatusResponse>({
     queryKey: ['/api/admin/verification-status', queryParams.toString()],
     queryFn: async () => {
-      const url = getApiUrl(`/api/admin/verification-status${queryParams.toString() ? '?' + queryParams.toString() : ''}`);
+      const queryString = queryParams.toString() ? '?' + queryParams.toString() : '';
+      const url = getApiUrl(`/api/admin/verification-status${queryString}`);
       const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch verification status');
       return res.json();
