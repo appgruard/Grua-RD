@@ -1,4 +1,4 @@
-name: Build iOS
+name: iOS CI/CD
 
 on:
   push:
@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ------------------- SIMULATOR BUILD -------------------
   build-simulator:
     name: Build for Simulator
     runs-on: macos-latest
@@ -98,22 +99,18 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+  # ------------------- RELEASE BUILD -------------------
   build-release:
-    name: Build Release IPA
+    name: Build Release IPA & Upload
     runs-on: macos-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     
     steps:
       - name: Check required secrets
         run: |
-          if [ -z "${{ secrets.IOS_CERTIFICATE_BASE64 }}" ]; then
-            echo "::warning::iOS release build skipped - IOS_CERTIFICATE_BASE64 secret not configured"
-            echo "To enable iOS release builds, configure the following secrets:"
-            echo "  - IOS_CERTIFICATE_BASE64: Base64 encoded .p12 certificate"
-            echo "  - IOS_CERTIFICATE_PASSWORD: Password for the .p12 certificate"
-            echo "  - IOS_PROVISIONING_PROFILE_BASE64: Base64 encoded provisioning profile"
-            echo "  - IOS_TEAM_ID: Your Apple Developer Team ID"
-            exit 0
+          if [ -z "${{ secrets.IOS_CERTIFICATE_BASE64 }}" ] || [ -z "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" ] || [ -z "${{ secrets.IOS_TEAM_ID }}" ] || [ -z "${{ secrets.APP_STORE_CONNECT_KEY }}" ]; then
+            echo "::error::iOS release build skipped - required secrets not configured"
+            exit 1
           fi
       
       - name: Checkout code
@@ -132,7 +129,6 @@ jobs:
           xcodebuild -version
       
       - name: Install Apple Certificate
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
         env:
           CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
@@ -151,7 +147,6 @@ jobs:
           security list-keychain -d user -s $KEYCHAIN_PATH
       
       - name: Install Provisioning Profile
-        if: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 != '' }}
         env:
           PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
         run: |
@@ -169,42 +164,6 @@ jobs:
           VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.VITE_MAPBOX_ACCESS_TOKEN }}
         run: npm run build
       
-      - name: Patch Capacitor CLI template.js
-        run: |
-          cat > node_modules/@capacitor/cli/dist/util/template.js << 'EOF'
-          "use strict";
-          Object.defineProperty(exports, "__esModule", { value: true });
-          exports.extractTemplate = void 0;
-          const fs_extra_1 = require("fs-extra");
-          const tar = require("tar");
-          const path_1 = require("path");
-          
-          async function extractTemplate(src, dir) {
-              if (!src) {
-                  const cliDir = path_1.resolve(__dirname, '..');
-                  const assetsDir = path_1.join(cliDir, 'assets');
-                  
-                  if (dir.includes('capacitor-cordova-android-plugins')) {
-                      src = path_1.join(assetsDir, 'capacitor-cordova-android-plugins.tar.gz');
-                  } else if (dir.includes('capacitor-cordova-ios-plugins')) {
-                      src = path_1.join(assetsDir, 'capacitor-cordova-ios-plugins.tar.gz');
-                  } else if (dir.includes('android')) {
-                      src = path_1.join(assetsDir, 'android-template.tar.gz');
-                  } else if (dir.includes('ios')) {
-                      src = path_1.join(assetsDir, 'ios-pods-template.tar.gz');
-                  }
-                  
-                  if (!src) {
-                      throw new Error('Template source is undefined and could not be inferred for directory: ' + dir);
-                  }
-              }
-              
-              await (0, fs_extra_1.mkdirp)(dir);
-              await tar.extract({ file: src, cwd: dir });
-          }
-          exports.extractTemplate = extractTemplate;
-          EOF
-      
       - name: Sync Capacitor
         run: npx cap sync ios
       
@@ -214,7 +173,6 @@ jobs:
           pod install
       
       - name: Build Release Archive
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
         env:
           IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
         run: |
@@ -228,7 +186,6 @@ jobs:
             clean archive
       
       - name: Export IPA
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
         run: |
           cat > $RUNNER_TEMP/ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -253,15 +210,24 @@ jobs:
             -exportPath $RUNNER_TEMP/ipa \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist
       
-      - name: Upload IPA
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-ipa
           path: ${{ runner.temp }}/ipa/*.ipa
+
+      - name: Upload to TestFlight via Fastlane
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+          FASTLANE_USER: ${{ secrets.APP_STORE_CONNECT_USER }}
+          FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          cd ios/App
+          gem install fastlane
+          fastlane pilot upload --ipa $RUNNER_TEMP/ipa/*.ipa --skip_waiting_for_build_processing true
       
       - name: Cleanup
-        if: always()
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
           rm -f $RUNNER_TEMP/certificate.p12 $RUNNER_TEMP/profile.mobileprovision
