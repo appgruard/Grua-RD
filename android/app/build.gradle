@@ -8,9 +8,13 @@ android {
         applicationId "com.fouronesolutions.gruard"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+
+        // 👇 VERSIONADO DESDE CI / LOCAL
+        versionCode (project.findProperty("VERSION_CODE") ?: "2").toInteger()
+        versionName (project.findProperty("VERSION_NAME") ?: "1.0.1")
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
         aaptOptions {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
