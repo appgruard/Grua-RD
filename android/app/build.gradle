@@ -9,9 +9,12 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
 
-        // 👇 VERSIONADO DESDE CI / LOCAL
-        versionCode (project.findProperty("VERSION_CODE") ?: "2").toInteger()
-        versionName (project.findProperty("VERSION_NAME") ?: "1.0.1")
+        // 👇 VERSIONADO DESDE CI / LOCAL (FIX: null + vacío)
+        def vc = project.findProperty("VERSION_CODE")
+        def vn = project.findProperty("VERSION_NAME")
+
+        versionCode (vc != null && vc.toString().trim() ? vc.toInteger() : 2)
+        versionName (vn != null && vn.toString().trim() ? vn : "1.0.1")
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -36,7 +39,9 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile(
+                'proguard-android-optimize.txt'
+            ), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
     }
@@ -73,5 +78,7 @@ try {
         apply plugin: 'com.google.gms.google-services'
     }
 } catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+    logger.info(
+        "google-services.json not found, google-services plugin not applied. Push Notifications won't work"
+    )
 }
