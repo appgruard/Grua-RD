@@ -13,8 +13,8 @@ android {
         def vc = project.findProperty("VERSION_CODE")
         def vn = project.findProperty("VERSION_NAME")
 
-        versionCode (vc != null && vc.toString().trim() ? vc.toInteger() : 2)
-        versionName (vn != null && vn.toString().trim() ? vn : "1.0.1")
+        versionCode (vc != null && vc.toString().trim() ? vc.toInteger() : 3)
+        versionName (vn != null && vn.toString().trim() ? vn : "1.0.2")
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
