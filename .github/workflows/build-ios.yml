@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '21'
           cache: 'npm'
       
       - name: Select Xcode version
@@ -95,7 +95,7 @@ jobs:
             -workspace App.xcworkspace \
             -scheme App \
             -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             build
 
@@ -119,7 +119,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '21'
           cache: 'npm'
       
       - name: Select Xcode version
@@ -164,6 +164,36 @@ jobs:
           VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.VITE_MAPBOX_ACCESS_TOKEN }}
         run: npm run build
       
+      - name: Patch Capacitor CLI template.js
+        run: |
+          cat > node_modules/@capacitor/cli/dist/util/template.js << 'EOF'
+          "use strict";
+          Object.defineProperty(exports, "__esModule", { value: true });
+          exports.extractTemplate = void 0;
+          const fs_extra_1 = require("fs-extra");
+          const tar = require("tar");
+          const path_1 = require("path");
+          
+          async function extractTemplate(src, dir) {
+              if (!src) {
+                  const cliDir = path_1.resolve(__dirname, '..');
+                  const assetsDir = path_1.join(cliDir, 'assets');
+                  
+                  if (dir.includes('ios')) {
+                      src = path_1.join(assetsDir, 'ios-pods-template.tar.gz');
+                  }
+                  
+                  if (!src) {
+                      throw new Error('Template source undefined for: ' + dir);
+                  }
+              }
+              
+              await (0, fs_extra_1.mkdirp)(dir);
+              await tar.extract({ file: src, cwd: dir });
+          }
+          exports.extractTemplate = extractTemplate;
+          EOF
+      
       - name: Sync Capacitor
         run: npx cap sync ios
       
@@ -171,6 +201,11 @@ jobs:
         run: |
           cd ios/App
           pod install
+      
+      - name: Clean Pods
+        run: |
+          cd ios/App
+          rm -rf Pods Podfile.lock
       
       - name: Build Release Archive
         env:
