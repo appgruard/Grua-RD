@@ -2,20 +2,19 @@ name: iOS CI/CD
 
 on:
   push:
-    branches: [main]  # Ejecutar en cualquier push a la rama 'main'
+    branches: [main]
     tags:
-      - 'v*'           # Mantener la condición para tags, si lo prefieres (esto sigue siendo opcional)
+      - 'v*'
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 jobs:
-  # ------------------- SIMULATOR BUILD -------------------
-  build-simulator:
-    name: Build for Simulator
+  build-release:
+    name: Build Release IPA & Upload
     runs-on: macos-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
-    
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,109 +24,54 @@ jobs:
         with:
           node-version: '21'
           cache: 'npm'
-      
-      - name: Select Xcode version
-        run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE_PATH" ]; then
-            XCODE_PATH="/Applications/Xcode.app"
-          fi
-          echo "Using Xcode at: $XCODE_PATH"
-          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
-          xcodebuild -version
-      
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Build web assets
-        env:
-          VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.VITE_MAPBOX_ACCESS_TOKEN }}
-        run: npm run build
-      
-      - name: Patch Capacitor CLI template.js
+
+      - name: Install Capacitor iOS dependencies
         run: |
-          cat > node_modules/@capacitor/cli/dist/util/template.js << 'EOF'
-          "use strict";
-          Object.defineProperty(exports, "__esModule", { value: true });
-          exports.extractTemplate = void 0;
-          const fs_extra_1 = require("fs-extra");
-          const tar = require("tar");
-          const path_1 = require("path");
-          
-          async function extractTemplate(src, dir) {
-              if (!src) {
-                  const cliDir = path_1.resolve(__dirname, '..');
-                  const assetsDir = path_1.join(cliDir, 'assets');
-                  
-                  if (dir.includes('capacitor-cordova-android-plugins')) {
-                      src = path_1.join(assetsDir, 'capacitor-cordova-android-plugins.tar.gz');
-                  } else if (dir.includes('capacitor-cordova-ios-plugins')) {
-                      src = path_1.join(assetsDir, 'capacitor-cordova-ios-plugins.tar.gz');
-                  } else if (dir.includes('android')) {
-                      src = path_1.join(assetsDir, 'android-template.tar.gz');
-                  } else if (dir.includes('ios')) {
-                      src = path_1.join(assetsDir, 'ios-pods-template.tar.gz');
-                  }
-                  
-                  if (!src) {
-                      throw new Error('Template source is undefined and could not be inferred for directory: ' + dir);
-                  }
-              }
-              
-              await (0, fs_extra_1.mkdirp)(dir);
-              await tar.extract({ file: src, cwd: dir });
-          }
-          exports.extractTemplate = extractTemplate;
-          EOF
-      
+          npm install @capacitor/ios
+
       - name: Sync Capacitor
         run: npx cap sync ios
-      
+
+      - name: Verify Provisioning Profile App ID
+        run: |
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PROFILE_PATH
+          APP_ID=$(security cms -D -i $PROFILE_PATH | /usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" -)
+          echo "App ID from provisioning profile: $APP_ID"
+          EXPECTED_APP_ID="com.fouronesolutions.gruard"  # Cambia esto a tu App ID
+          if [ "$APP_ID" != "$EXPECTED_APP_ID" ]; then
+            echo "::error::App ID does not match the expected value!"
+            exit 1
+          else
+            echo "App ID matches successfully."
+          fi
+
+      - name: Verify Bundle Identifier in Info.plist
+        run: |
+          BUNDLE_IDENTIFIER=$(defaults read ios/App/Info.plist CFBundleIdentifier)
+          echo "Bundle Identifier from Info.plist: $BUNDLE_IDENTIFIER"
+          EXPECTED_BUNDLE_IDENTIFIER="com.fouronesolutions.gruard"  # Cambia esto a tu Bundle Identifier
+          if [ "$BUNDLE_IDENTIFIER" != "$EXPECTED_BUNDLE_IDENTIFIER" ]; then
+            echo "::error::Bundle Identifier does not match the expected value!"
+            exit 1
+          else
+            echo "Bundle Identifier matches successfully."
+          fi
+
       - name: Install CocoaPods
         run: |
           cd ios/App
           pod install
-      
-      - name: Build for Simulator
-        run: |
-          cd ios/App
-          xcodebuild \
-            -workspace App.xcworkspace \
-            -scheme App \
-            -configuration Debug \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
-            CODE_SIGNING_ALLOWED=NO \
-            build
 
-  # ------------------- RELEASE BUILD -------------------
-  build-release:
-    name: Build Release IPA & Upload
-    runs-on: macos-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # Cambié la condición aquí para cualquier push a 'main'
-    
-    steps:
-      - name: Check required secrets
+      - name: Clean CocoaPods cache (optional)
         run: |
-          if [ -z "${{ secrets.IOS_CERTIFICATE_BASE64 }}" ] || [ -z "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" ] || [ -z "${{ secrets.IOS_TEAM_ID }}" ] || [ -z "${{ secrets.APP_STORE_CONNECT_KEY }}" ]; then
-            echo "::error::iOS release build skipped - required secrets not configured"
-            exit 1
-          fi
-      
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '21'
-          cache: 'npm'
-      
-      - name: Select Xcode version
-        run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
-          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
-          xcodebuild -version
-      
+          pod cache clean --all
+          cd ios/App
+          pod install
+
       - name: Install Apple Certificate
         env:
           CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
@@ -145,7 +89,7 @@ jobs:
           
           security import $CERTIFICATE_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
-      
+
       - name: Install Provisioning Profile
         env:
           PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
@@ -155,33 +99,7 @@ jobs:
           
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
-      
-      - name: Clean Pods
-        run: |
-          cd ios/App
-          rm -rf Pods Podfile.lock
-      
-      - name: Install CocoaPods
-        run: |
-          cd ios/App
-          pod install --repo-update
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Build web assets
-        env:
-          VITE_MAPBOX_ACCESS_TOKEN: ${{ secrets.VITE_MAPBOX_ACCESS_TOKEN }}
-        run: npm run build
-      
-      - name: Sync Capacitor
-        run: npx cap sync ios
-      
-      - name: Install CocoaPods
-        run: |
-          cd ios/App
-          pod install
-    
+
       - name: Build Release Archive
         env:
           IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
@@ -194,7 +112,7 @@ jobs:
             -archivePath $RUNNER_TEMP/GruaRD.xcarchive \
             DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
             clean archive
-      
+
       - name: Export IPA
         run: |
           cat > $RUNNER_TEMP/ExportOptions.plist << EOF
@@ -219,13 +137,13 @@ jobs:
             -archivePath $RUNNER_TEMP/GruaRD.xcarchive \
             -exportPath $RUNNER_TEMP/ipa \
             -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist
-      
+
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-ipa
           path: ${{ runner.temp }}/ipa/*.ipa
-    
+
       - name: Upload to TestFlight via Fastlane
         env:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
@@ -236,7 +154,8 @@ jobs:
           cd ios/App
           gem install fastlane
           fastlane pilot upload --ipa $RUNNER_TEMP/ipa/*.ipa --skip_waiting_for_build_processing true
-    
+
       - name: Cleanup
         run: |
-          security delete-keychain $RUNNER
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
+          rm -f $RUNNER_TEMP/certificate.p12 $RUNNER_TEMP/profile.mobileprovision
