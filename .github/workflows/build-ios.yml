@@ -65,9 +65,6 @@ jobs:
 
           echo -n "$CERTIFICATE_BASE64" | base64 --decode > $CERT_PATH
 
-          echo "Verifying certificate integrity..."
-          openssl pkcs12 -info -in $CERT_PATH -noout -passin pass:"$CERTIFICATE_PASSWORD"
-
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
@@ -97,7 +94,7 @@ jobs:
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
 
       # =========================
-      # BUILD ARCHIVE
+      # BUILD ARCHIVE (FORCED MANUAL SIGNING)
       # =========================
 
       - name: Build Archive
@@ -111,6 +108,9 @@ jobs:
             -configuration Release \
             -archivePath $RUNNER_TEMP/GruaRD.xcarchive \
             DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="GruaRD" \
             clean archive
 
       # =========================
@@ -131,6 +131,8 @@ jobs:
               <string>app-store</string>
               <key>teamID</key>
               <string>$IOS_TEAM_ID</string>
+              <key>signingStyle</key>
+              <string>manual</string>
               <key>uploadSymbols</key>
               <true/>
               <key>compileBitcode</key>
