@@ -18,11 +18,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Setup Node.js
+
+      - name: Setup Node.js (LTS Stable)
         uses: actions/setup-node@v4
         with:
-          node-version: '21'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -31,49 +31,37 @@ jobs:
       - name: Build web assets
         run: npm run build
 
-      - name: Install Capacitor iOS dependencies
-        run: |
-          npm install @capacitor/ios
-
       - name: Sync Capacitor
         run: npx cap sync ios
-
-      - name: Verify Provisioning Profile App ID
-        run: |
-          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
-          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PROFILE_PATH
-          APP_ID=$(security cms -D -i $PROFILE_PATH | /usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" -)
-          echo "App ID from provisioning profile: $APP_ID"
-          EXPECTED_APP_ID="com.fouronesolutions.gruard"  # Cambia esto a tu App ID
-          if [ "$APP_ID" != "$EXPECTED_APP_ID" ]; then
-            echo "::error::App ID does not match the expected value!"
-            exit 1
-          else
-            echo "App ID matches successfully."
-          fi
-
-      - name: Verify Bundle Identifier in Info.plist
-        run: |
-          BUNDLE_IDENTIFIER=$(defaults read ios/App/Info.plist CFBundleIdentifier)
-          echo "Bundle Identifier from Info.plist: $BUNDLE_IDENTIFIER"
-          EXPECTED_BUNDLE_IDENTIFIER="com.fouronesolutions.gruard"  # Cambia esto a tu Bundle Identifier
-          if [ "$BUNDLE_IDENTIFIER" != "$EXPECTED_BUNDLE_IDENTIFIER" ]; then
-            echo "::error::Bundle Identifier does not match the expected value!"
-            exit 1
-          else
-            echo "Bundle Identifier matches successfully."
-          fi
 
       - name: Install CocoaPods
         run: |
           cd ios/App
           pod install
 
-      - name: Clean CocoaPods cache (optional)
+      - name: Verify Provisioning Profile App ID
+        env:
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
         run: |
-          pod cache clean --all
-          cd ios/App
-          pod install
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PROFILE_PATH
+          APP_ID=$(security cms -D -i $PROFILE_PATH | /usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" -)
+          echo "App ID from provisioning profile: $APP_ID"
+          EXPECTED_APP_ID="com.fouronesolutions.gruard"
+          if [[ "$APP_ID" != *"$EXPECTED_APP_ID" ]]; then
+            echo "::error::App ID does not match the expected value!"
+            exit 1
+          fi
+
+      - name: Verify Bundle Identifier
+        run: |
+          BUNDLE_IDENTIFIER=$(defaults read ios/App/App/Info CFBundleIdentifier)
+          echo "Bundle Identifier: $BUNDLE_IDENTIFIER"
+          EXPECTED_BUNDLE_IDENTIFIER="com.fouronesolutions.gruard"
+          if [ "$BUNDLE_IDENTIFIER" != "$EXPECTED_BUNDLE_IDENTIFIER" ]; then
+            echo "::error::Bundle Identifier mismatch!"
+            exit 1
+          fi
 
       - name: Install Apple Certificate
         env:
@@ -83,13 +71,12 @@ jobs:
         run: |
           CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          
+
           echo -n "$CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
-          
+
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          
           security import $CERTIFICATE_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
@@ -99,7 +86,7 @@ jobs:
         run: |
           PP_PATH=$RUNNER_TEMP/profile.mobileprovision
           echo -n "$PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PP_PATH
-          
+
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
 
@@ -134,7 +121,7 @@ jobs:
           </dict>
           </plist>
           EOF
-          
+
           xcodebuild \
             -exportArchive \
             -archivePath $RUNNER_TEMP/GruaRD.xcarchive \
@@ -147,18 +134,15 @@ jobs:
           name: app-ipa
           path: ${{ runner.temp }}/ipa/*.ipa
 
-      - name: Upload to TestFlight via Fastlane
+      - name: Upload to TestFlight
         env:
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
           FASTLANE_USER: ${{ secrets.APP_STORE_CONNECT_USER }}
           FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
-          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
         run: |
-          cd ios/App
           gem install fastlane
           fastlane pilot upload --ipa $RUNNER_TEMP/ipa/*.ipa --skip_waiting_for_build_processing true
 
       - name: Cleanup
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
-          rm -f $RUNNER_TEMP/certificate.p12 $RUNNER_TEMP/profile.mobileprovision
+          rm -f $RUNNER_TEMP/certificate.p12
