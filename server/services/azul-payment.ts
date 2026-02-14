@@ -252,16 +252,15 @@ export class AzulPaymentService {
     const config = getAzulConfig();
     const { cert: certPath, key: keyPath } = getCertPaths();
     
-    // In production mode, require explicit credentials (not defaults)
+    // Check if certificates exist - this is the primary auth method
+    const hasCerts = fs.existsSync(certPath) && fs.existsSync(keyPath);
+
     if (config.environment === 'production') {
       const hasExplicitMerchant = !!process.env.AZUL_MERCHANT_ID;
-      const hasExplicitAuth = !!process.env.AZUL_AUTH_KEY;
-      const hasCerts = fs.existsSync(certPath) && fs.existsSync(keyPath);
-      
-      return hasExplicitMerchant && hasExplicitAuth && hasCerts;
+      return hasExplicitMerchant && hasCerts;
     }
     
-    // In sandbox, just check if merchantId exists (even default is ok)
+    // In sandbox, allow proceeding even without certs if merchantId exists
     return !!(config.merchantId);
   }
 
@@ -280,14 +279,6 @@ export class AzulPaymentService {
     
     if (!process.env.AZUL_MERCHANT_ID) {
       errors.push('AZUL_MERCHANT_ID no está configurado');
-    }
-    
-    if (!process.env.AZUL_AUTH_KEY) {
-      errors.push('AZUL_AUTH_KEY no está configurado');
-    }
-    
-    if (!process.env.AZUL_AUTH_3DS) {
-      errors.push('AZUL_AUTH_3DS no está configurado (requerido para 3D Secure)');
     }
     
     const { cert: certPath, key: keyPath } = getCertPaths();
